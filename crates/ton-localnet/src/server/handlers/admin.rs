@@ -214,7 +214,7 @@ pub async fn export_checkpoint(
 ) -> Response {
     json_download_response(
         node.export_checkpoint(payload.name).await,
-        "attachment; filename=acton-localnet-checkpoint.json",
+        "attachment; filename=acton-simulated-localnet-checkpoint.json",
     )
     .await
 }
@@ -264,7 +264,7 @@ pub async fn set_next_block_timestamp(
 pub async fn dump_state(State(node): State<Arc<Localnet>>) -> Response {
     json_download_response(
         node.dump_state().await,
-        "attachment; filename=acton-localnet-state.json",
+        "attachment; filename=acton-simulated-localnet-state.json",
     )
     .await
 }

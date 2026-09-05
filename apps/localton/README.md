@@ -227,6 +227,33 @@ On first start, `join` downloads only `global.config.json`. The file contains th
 
 `GLOBAL_CONFIG_URL` can point to the bootstrap instance's `/config` route or to the same JSON file on any static HTTP server. No Localton-specific bootstrap document is required.
 
+### Start a full node from a database dump
+
+The dump contains public validator-engine database files, but not the
+machine's node configuration or private keys. Pass it to `join`; Localton creates
+those host-owned files first, imports the chain data without replacing them, then
+starts a disk-backed full node and its liteserver:
+
+```bash
+brew install lzip
+
+localton join <GLOBAL_CONFIG_URL> \
+  --state-dir .localton-node \
+  --advertise-ip <ADVERTISED_IPV4> \
+  --dump /path/to/ton_dump.tar.lz \
+  --startup-timeout 1800
+```
+
+On Debian or Ubuntu, install `plzip` instead. Keep the archive outside the state
+directory. The import streams decompressed tar data into a staging directory, so it
+does not require a second copy of the extracted database. The node manifest is
+written only after import completes; an interrupted import is discarded and retried
+on the next invocation. Once initialized, later starts do not require `--dump`.
+
+Forward the selected ADNL UDP port to the advertised public IPv4 address. The
+liteserver listens on the port saved in `.localton-node/settings.json`; it does
+not need to be exposed publicly when only local clients use it.
+
 Add `--validator` to make the remote node enter elections:
 
 ```bash
@@ -338,13 +365,65 @@ Make sure that the API returns the current masterchain block:
 curl http://127.0.0.1:18002/api/v2/getMasterchainInfo
 ```
 
-The build uses the pinned API V2 source and the same TON release as the node. Build artifacts stay under `.localton/tools`.
+The build uses the pinned API V2 source and the same TON release as the node.
+Sources and build files stay under `.localton/tools/ton-http-api-v2`; installed
+artifacts go into its `install` directory. Use `--install-dir` to choose another
+installation directory:
+
+```bash
+xtask build-ton-http-api-v2 --state-dir .localton --install-dir ./build/ton-http-api-v2 --jobs 8
+```
+
+With a custom installation directory, pass the installed binary and config to
+`localton bootstrap` using `--ton-http-api-command` and
+`--ton-http-api-static-config` alongside `--ton-http-api`.
+
+Override the pinned API repository and commit with `--repository` and `--commit`,
+or `TON_HTTP_API_REPOSITORY` and `TON_HTTP_API_COMMIT`. The corresponding Docker
+build arguments are also available. The commit must be a full 40-character SHA;
+the TON submodule remains pinned to the node-compatible version. Changing the
+repository or commit invalidates the native build cache. Changing only the
+installation directory reuses the compiled binary.
 
 The native build requires these development components:
 
 - CMake, Ninja, Clang, `clang-format`, and `pkg-config`.
 - Boost, OpenSSL, ICU, libsodium, and `libmicrohttpd`.
 - LZ4, fmt, hiredis, jemalloc, and c-ares.
+
+## Build TON Center API V3
+
+The Docker image builds API V3 through the same `xtask` executable as API V2.
+The task checks out a pinned `toncenter/ton-indexer` commit, applies the bundled
+Localton patches, and builds the worker, Go API, and Python event classifier:
+
+```bash
+xtask build-ton-http-api-v3 --state-dir .localton --jobs 8
+```
+
+Sources and build files stay under `.localton/tools/ton-http-api-v3`; installed
+artifacts go into its `install` directory. Use `--install-dir` to choose another
+installation directory. The installation contains `bin`, `lib`, `include`,
+`venv`, `classifier`, and the upstream `LICENSE`.
+
+Use `--component worker`, `--component api`, or `--component classifier` to build
+one component. The API builds the worker's native libraries if they have not
+been installed for the selected source version. Docker uses these component
+options in separate stages to retain its C++, Go, and pip caches.
+
+The task requires the build tools and development libraries installed by the
+Dockerfile: Clang, CMake, Ninja, ccache, Go, Python with venv/pip, and the TON
+Indexer C++ dependencies. It uses the current user's build directories and
+does not install headers or libraries into system directories. The worker
+uses portable CPU settings, and the Go API links against its installed marker
+libraries.
+
+The default repository and commit are pinned in `xtask`. Override them with
+`--repository` and `--commit`, or `TON_INDEXER_REPOSITORY` and
+`TON_INDEXER_COMMIT`. The corresponding Docker build arguments remain available.
+Changing the commit or bundled patches invalidates the prepared source and
+native build directory. This command builds V3; use Docker Compose to run its
+services with PostgreSQL and Redis.
 
 ## Network configuration
 

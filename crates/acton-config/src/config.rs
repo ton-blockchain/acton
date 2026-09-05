@@ -165,7 +165,7 @@ pub struct ActonConfig {
     pub build: Option<BuildSettings>,
     /// Default settings for wrapper generation
     pub wrappers: Option<WrappersConfig>,
-    /// Default settings for `acton localnet` commands
+    /// Shared settings for the localnet target and local development services
     pub localnet: Option<LocalnetSettings>,
     /// Custom scripts that can be run with `acton run`
     pub scripts: Option<BTreeMap<String, String>>,
@@ -498,31 +498,30 @@ pub struct TypescriptWrapperSettings {
     pub output_dir: Option<String>,
 }
 
-/// Default settings for `acton localnet` commands
+/// Shared settings for the localnet target and local development services
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct LocalnetSettings {
-    /// Localnet port used by `acton localnet` commands
+    /// HTTP port used by localnet services and tools
     #[schemars(default = "default_localnet_port", range(max = 65535))]
     pub port: Option<u16>,
-    /// Path to an `SQLite` database used by `acton localnet start` for persistent node state
+    /// Path to an `SQLite` database used for persistent localnet state
     pub db_path: Option<String>,
-    /// Network to fork from used by `acton localnet start`
+    /// Remote network used as the source of forked localnet state
     #[schemars(with = "Option<Network>")]
     pub fork_net: Option<String>,
-    /// Block sequence number used by `acton localnet start` when forking from historical state
+    /// Remote masterchain block sequence number used for a historical localnet fork
     pub fork_block_number: Option<u64>,
-    /// Wallet names from `[wallets]` that are automatically funded and deployed on
-    /// `acton localnet start`
+    /// Wallet names from `[wallets]` that are funded and deployed when localnet starts
     pub accounts: Option<Vec<String>>,
-    /// Maximum number of API requests per second served by `Localnet` `/api` endpoints
+    /// Maximum number of API requests per second served by localnet `/api` endpoints
     pub rate_limit: Option<u32>,
-    /// Response delay in milliseconds for `Localnet` `/api/v2`, `/api/v3`, and `/api/emulate/v1` endpoints
+    /// Response delay in milliseconds for localnet `/api/v2`, `/api/v3`, and `/api/emulate/v1` endpoints
     pub response_delay_ms: Option<u64>,
-    /// Block production interval in milliseconds for `acton localnet start`
+    /// Localnet block production interval in milliseconds
     #[schemars(range(min = 1))]
     pub block_interval_ms: Option<u64>,
-    /// Disable automatic block production for `acton localnet start`
+    /// Disable automatic localnet block production
     pub no_mining: Option<bool>,
     /// Mine blocks even when there are no pending messages
     pub mine_empty_blocks: Option<bool>,

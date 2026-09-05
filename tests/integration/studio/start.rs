@@ -67,8 +67,7 @@ fn studio_start_serves_workspace_and_registers_for_reporting() {
     assert_eq!(descriptor.url, studio.url());
     assert_eq!(descriptor.pid, studio_pid);
 
-    let output = studio.stop();
-    assert!(output.status.success());
+    studio.stop();
     assert!(
         load_studio_daemon_descriptor(project.path())
             .expect("Studio daemon descriptor must remain readable after shutdown")
@@ -104,7 +103,7 @@ fn studio_start_rejects_a_second_instance_for_the_same_project() {
             .name,
         "studio-duplicate-instance"
     );
-    assert!(first.stop().status.success());
+    first.stop();
 }
 
 #[cfg(unix)]
@@ -123,8 +122,7 @@ fn studio_start_works_without_an_acton_manifest() {
     assert_eq!(descriptor.url, studio.url());
     assert_eq!(descriptor.pid, studio.id());
 
-    let output = studio.stop();
-    assert!(output.status.success());
+    studio.stop();
     assert!(
         load_studio_daemon_descriptor(project.path())
             .expect("standalone Studio descriptor must remain readable after shutdown")

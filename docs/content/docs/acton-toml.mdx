@@ -41,7 +41,7 @@ The top-level of `Acton.toml` contains the following sections:
 - `[build]` — Build command output settings.
 - `[wrappers]` — Default output settings for `acton wrapper`.
 - `[fmt]` — Tolk formatter settings for `acton fmt`.
-- `[localnet]` — Default settings for `acton localnet` commands.
+- `[localnet]` — Shared settings for the localnet target and local development services.
 - `[test]` — Configuration for the test runner.
 - `[lint]` — General linter configuration.
 - `[networks]` — Custom network definitions.
@@ -260,19 +260,19 @@ CLI flags still override config values for a single run (for example `acton fmt 
 
 ## `[localnet]`
 
-Configures defaults for `acton localnet`.
+Configures shared defaults for the localnet target and local development services.
 
 | Field               | Type       | Default | Description                                                                                                                 |
 |:--------------------|:-----------|:--------|:----------------------------------------------------------------------------------------------------------------------------|
-| `port`              | `integer`  | `5411`  | Port used by `acton localnet` commands when `--port` is omitted.                                                            |
+| `port`              | `integer`  | `5411`  | HTTP port used by localnet services and tools.                                                                                |
 | `db-path`           | `string`   | -       | SQLite database path for persistent node state. Relative paths resolve from project root; incompatible with `--load-state`. |
-| `fork-net`          | `string`   | -       | Network used by `acton localnet start` when `--fork-net` is omitted.                                                        |
-| `fork-block-number` | `integer`  | -       | Block sequence number used by `acton localnet start` for historical state fork.                                             |
+| `fork-net`          | `string`   | -       | Remote network used as the source of forked localnet state.                                                                 |
+| `fork-block-number` | `integer`  | -       | Remote masterchain block sequence number used for a historical localnet fork.                                              |
 | `accounts`          | `string[]` | -       | Wallet names from `[wallets]` to auto-fund and auto-deploy on `localnet start`.                                             |
 | `rate-limit`        | `integer`  | -       | Maximum `/api` requests per second to simulate provider limits (`429` on overflow).                                         |
 | `response-delay-ms` | `integer`  | -       | Response delay for `/api/v2`, `/api/v3`, and `/api/emulate/v1` endpoints; streaming/control/UI are not delayed.             |
 | `block-interval-ms` | `integer`  | `500`   | Block production interval in milliseconds when automatic mining is enabled.                                                 |
-| `no-mining`         | `boolean`  | `false` | Disable automatic block production; mine blocks manually with `acton localnet mine` or `/acton_mine`.                       |
+| `no-mining`         | `boolean`  | `false` | Disable automatic block production; mine blocks manually with `acton simulated-localnet mine` or `/acton_mine`.                       |
 
 The localnet fork uses the network configuration from the resolved masterchain
 block. When `fork-block-number` is set, it also uses that block's Unix time;
@@ -293,7 +293,7 @@ block-interval-ms = 500
 no-mining = false
 ```
 
-`acton localnet start --port <PORT>`, `--db-path <PATH>`, `--fork-net <NETWORK>`, `--fork-block-number <SEQNO>`, `--accounts <NAME[,NAME...]>`, `--rate-limit <RPS>`, `--response-delay-ms <MS>`, `--block-interval-ms <MS>`, and `--no-mining` override these values for a single run. If `[localnet].no-mining = true`, there is no CLI flag that turns automatic mining back on for that run.
+`acton simulated-localnet start --port <PORT>`, `--db-path <PATH>`, `--fork-net <NETWORK>`, `--fork-block-number <SEQNO>`, `--accounts <NAME[,NAME...]>`, `--rate-limit <RPS>`, `--response-delay-ms <MS>`, `--block-interval-ms <MS>`, and `--no-mining` override these values for a single run. If `[localnet].no-mining = true`, there is no CLI flag that turns automatic mining back on for that run.
 
 ## `[test]`
 

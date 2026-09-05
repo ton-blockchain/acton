@@ -1,5 +1,6 @@
 # Acton project directories
 .acton/
+.acton-localnet/
 .studio/
 /objs
 /build

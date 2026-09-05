@@ -3,34 +3,36 @@ Acton is all-in-one on-chain development tool for TON.
 Usage: acton[EXE] <command> [...flags] [...args]
 
 Commands:
-  new              [PATH]              Create a new project from a template
-  init                                 Add Acton support to current directory
+  new                 [PATH]              Create a new project from a template
+  init                                    Add Acton support to current directory
 
-  test             [PATH]              Run tests from files or directories
-  build            [CONTRACT_NAME]     Build one contract or every contract
-  check            [TARGET]            Check project Tolk sources for errors
-  script           <PATH> [ARGS...]    Run a standalone Tolk script file
-  fmt              [PATHS...]          Format project Tolk source files
+  test                [PATH]              Run tests from files or directories
+  build               [CONTRACT_NAME]     Build one contract or every contract
+  check               [TARGET]            Check project Tolk sources for errors
+  script              <PATH> [ARGS...]    Run a standalone Tolk script file
+  fmt                 [PATHS...]          Format project Tolk source files
 
-  wallet           <COMMAND>           Manage project and global wallets
-  rpc              <COMMAND>           Inspect remote accounts and contracts
-  verify           [CONTRACT_NAME]     Verify contract source on TON Verifier
-  library          <COMMAND>           Publish and manage on-chain libraries
-  retrace          <TX_HASH>           Replay a transaction trace by hash
+  wallet              <COMMAND>           Manage project and global wallets
+  rpc                 <COMMAND>           Inspect remote accounts and contracts
+  verify              [CONTRACT_NAME]     Verify contract source on TON Verifier
+  library             <COMMAND>           Publish and manage on-chain libraries
+  simulated-localnet  <COMMAND>           Run Acton's simplified TON development environment
+  localnet            <COMMAND>           Run and manage real TON development networks
+  retrace             <TX_HASH>           Replay a transaction trace by hash
 
-  run              <SCRIPT> [ARGS...]  Run a named script from Acton.toml
-  compile          <PATH>              Compile one Tolk source into TVM code
-  wrapper          <CONTRACT_NAME>     Generate contract wrappers and test stubs
-  disasm           [BOC_FILE]          Disassemble TVM code into TASM
-  doc              <COMMAND>           Look up reference documentation and contract ABIs
+  run                 <SCRIPT> [ARGS...]  Run a named script from Acton.toml
+  compile             <PATH>              Compile one Tolk source into TVM code
+  wrapper             <CONTRACT_NAME>     Generate contract wrappers and test stubs
+  disasm              [BOC_FILE]          Disassemble TVM code into TASM
+  doc                 <COMMAND>           Look up reference documentation and contract ABIs
 
-  ls                                   Run LSP server for the TON languages and technologies
-  up                                   Install or update Acton CLI releases
-  help             [COMMAND]           Show top-level or command-specific help
-  hooks            <COMMAND>           Install and manage project Git hooks
-  doctor                               Inspect the resolved project setup
-  func2tolk        <PATH>              Convert FunC sources into Tolk code
-  completions      <SHELL>             Generate shell completion scripts
+  ls                                      Run LSP server for the TON languages and technologies
+  up                                      Install or update Acton CLI releases
+  help                [COMMAND]           Show top-level or command-specific help
+  hooks               <COMMAND>           Install and manage project Git hooks
+  doctor                                  Inspect the resolved project setup
+  func2tolk           <PATH>              Convert FunC sources into Tolk code
+  completions         <SHELL>             Generate shell completion scripts
 
 Use acton help <command> for detailed manuals with behavior, config, and examples.
 

@@ -1,687 +1,206 @@
-mod snapshot;
-mod status;
+//! Command-line adapter for the standalone localnet control service.
 
-use crate::context::Wallet;
-use crate::wallets::{self, wallet_message_expire_at};
-use acton_config::color::OwoColorize;
-use acton_config::config::ActonConfig;
+mod args;
+mod delete;
+mod inspect;
+mod output;
+mod progress;
+mod selection;
+mod service;
+mod start;
+
+pub use args::LocalnetArgs;
+
+use acton_localnet::{catalog, client::Client};
 use anyhow::Context;
-use rand::RngCore;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-use ton::ton_core::cell::TonCell;
-use ton::ton_core::traits::tlb::TLB;
-use ton::ton_wallet::WalletVersion;
-use ton_localnet::node::StateSource;
-use ton_localnet::remote::RemoteProvider;
-use ton_localnet::storage::AccountStatus;
-use ton_localnet::{
-    Localnet, LocalnetMiningMode, ServerArgs, ServerError, StartupAccount, run_server,
-};
-use ton_retrace::Network;
-use toncenter_keys::LOCALNET_API_KEY_ENV;
-use tycho_types::boc::BocRepr;
-use tycho_types::cell::{CellBuilder, CellSliceParts};
-use tycho_types::models::{
-    Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, IntMsgInfo, MsgInfo,
-    OwnedMessage, StdAddr,
-};
+use reqwest::Method;
+use serde_json::{Value, json};
 
-const STARTUP_ACCOUNT_TOPUP_NANOGRAMS: u128 = 100_000_000_000; // 100 GRAM
-const STARTUP_DEPLOY_TRANSFER_NANOGRAMS: u128 = 50_000_000; // 0.05 GRAM
-pub(crate) const LOCALNET_AUTH_TOKEN_ENV: &str = LOCALNET_API_KEY_ENV;
-pub use snapshot::{
-    localnet_checkpoint_clear_cmd, localnet_checkpoint_create_cmd, localnet_checkpoint_delete_cmd,
-    localnet_checkpoint_export_cmd, localnet_checkpoint_import_cmd, localnet_checkpoint_list_cmd,
-    localnet_checkpoint_restore_cmd, localnet_state_dump_cmd, localnet_state_load_cmd,
-};
-pub use status::localnet_status_cmd;
+use args::{LocalnetCommand, NodeCommand, SnapshotCommand};
 
-#[allow(clippy::too_many_arguments)]
-pub async fn localnet_start_cmd(
-    port: u16,
-    db_path: Option<String>,
-    fork_net: Option<String>,
-    fork_block_number: Option<u64>,
-    accounts: Vec<String>,
-    rate_limit: Option<u32>,
-    response_delay_ms: Option<u64>,
-    block_interval_ms: u64,
-    no_mining: bool,
-    mine_empty_blocks: bool,
-    load_state: Option<String>,
-    dump_state: Option<String>,
-    require_auth: bool,
-    liteapi: bool,
-    liteapi_port: Option<u16>,
-) -> anyhow::Result<()> {
-    if load_state.is_some() && db_path.is_some() {
-        anyhow::bail!(
-            "{} cannot be used together with {} for now",
-            "--load-state".yellow(),
-            "--db-path".yellow(),
-        );
-    }
-    if block_interval_ms == 0 {
-        anyhow::bail!("localnet block interval must be greater than 0");
+/// Runs localnet independently from Studio. Only the service owns Docker state;
+/// every command uses the same HTTP contract as other management clients.
+pub fn localnet_cmd(args: LocalnetArgs) -> anyhow::Result<()> {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(run(args))
+}
+
+async fn run(args: LocalnetArgs) -> anyhow::Result<()> {
+    let root = args
+        .state_dir
+        .unwrap_or_else(|| acton_config::config::project_root().join(".acton-localnet"));
+
+    tokio::fs::create_dir_all(&root).await?;
+    let root = dunce::canonicalize(root)?;
+
+    match args.command {
+        LocalnetCommand::Start { options, detach } => {
+            return start::start(&root, options, detach, args.json).await;
+        }
+        LocalnetCommand::Create { options } => {
+            let request = start::create_request(&options).await?;
+            let location = catalog::create(&root, request).await?;
+            return output::network(&location.network, args.json);
+        }
+        LocalnetCommand::List => {
+            let networks = catalog::list(&root).await?;
+            return output::print(&networks.into_iter().map(|n| n.network).collect::<Vec<_>>());
+        }
+        _ => {}
     }
 
-    let (state_source, fork_network, fork_block_number) = if let Some(network) = fork_net {
-        let network = Network::from_str(&network)?;
-        let provider = RemoteProvider::pinned(network, fork_block_number).await?;
-        let fork_network = provider.network.to_string();
-        let fork_block_number = provider.fork_block_number;
-        (
-            StateSource::Remote(provider),
-            Some(fork_network),
-            fork_block_number,
-        )
-    } else {
-        (StateSource::Local, None, None)
+    let name = match &args.command {
+        LocalnetCommand::Serve { network, .. }
+        | LocalnetCommand::Status { network }
+        | LocalnetCommand::Stop { network }
+        | LocalnetCommand::Delete { network, .. }
+        | LocalnetCommand::Logs { network, .. }
+        | LocalnetCommand::Node { network, .. }
+        | LocalnetCommand::Snapshot { network, .. }
+        | LocalnetCommand::Operation { network, .. }
+        | LocalnetCommand::Shutdown { network } => network.as_deref(),
+        _ => unreachable!("handled before network selection"),
+    };
+    let Some(location) = selection::resolve(&root, name, args.json).await? else {
+        return Ok(());
     };
 
-    let node = Arc::new(Localnet::new(
-        state_source,
-        db_path.clone(),
-        Duration::from_millis(block_interval_ms),
-        !no_mining,
-        LocalnetMiningMode {
-            skip_empty_blocks: !mine_empty_blocks,
-        },
-    ));
-    if let Some(path) = load_state.as_deref() {
-        node.load_state_from_path(path.to_owned())
-            .await
-            .with_context(|| format!("Failed to load state snapshot from {path}"))?;
-        println!(
-            "      {} state from {}",
-            "Loaded".green().bold(),
-            path.dimmed()
-        );
+    if let LocalnetCommand::Serve { port, .. } = args.command {
+        let location = location.prepare(&root).await?;
+        return service::serve(&location.path, port, args.json).await;
     }
-
-    let startup_accounts = setup_startup_accounts(&node, &accounts, no_mining).await?;
-    let auth_token = require_auth.then(localnet_auth_token);
-    let run_result = run_server(
-        node.clone(),
-        ServerArgs {
-            port,
-            db_path,
-            fork_network,
-            fork_block_number,
-            rate_limit_rps: rate_limit,
-            response_delay_ms,
-            startup_accounts,
-            auth_token,
-            liteapi,
-            liteapi_port,
-        },
-    )
-    .await;
-
-    if run_result.is_ok()
-        && let Some(path) = dump_state.as_deref()
+    if let LocalnetCommand::Delete { yes, .. } = args.command
+        && !delete::confirm(&location.network, yes, args.json)?
     {
-        node.dump_state_to_path(path.to_owned())
-            .await
-            .with_context(|| format!("Failed to dump state snapshot to {path}"))?;
-        println!(
-            "       {} state to {}",
-            "Saved".green().bold(),
-            path.dimmed()
-        );
+        return Ok(());
     }
 
-    if let Err(error) = run_result {
-        return match error {
-            ServerError::Bind { address, source } => Err(anyhow::Error::new(source).context(
-                format!(
-                    "Failed to start localnet on {address}\nSet another port with [localnet].port in Acton.toml\nOr stop the process currently listening on that port"
-                ),
-            )),
-            ServerError::LiteApiBind { address, source } => Err(anyhow::Error::new(source).context(
-                format!(
-                    "Failed to start localnet LiteAPI on {address}\nSet another localnet port with [localnet].port in Acton.toml so the next port is free\nOr stop the process currently listening on that port"
-                ),
-            )),
-            error => Err(error.into()),
-        };
-    }
-    Ok(())
-}
-
-async fn setup_startup_accounts(
-    node: &Arc<Localnet>,
-    accounts: &[String],
-    manual_mining: bool,
-) -> anyhow::Result<Vec<StartupAccount>> {
-    if accounts.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let config =
-        ActonConfig::load().context("Failed to load Acton.toml to resolve [localnet].accounts")?;
-    let selected_wallets = wallets::open_selected_wallets(&config, accounts, &Network::Localnet)?;
-
-    if selected_wallets.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let mut startup_accounts = Vec::with_capacity(selected_wallets.len());
-
-    for (wallet_name, wallet) in selected_wallets {
-        let address = format_std_address(&wallet.address(), &Network::Localnet);
-        let version = wallet_version_to_string(wallet.wallet.version).to_owned();
-
-        let has_history = node
-            .get_transactions(address.clone(), 1, None, None, None)
-            .await
-            .ok()
-            .is_some_and(|transactions| !transactions.is_empty());
-
-        if has_history {
-            println!(
-                "       {} wallet {} {}",
-                "Found".green().bold(),
-                wallet_name.cyan(),
-                address.as_str().dimmed(),
-            );
-        } else {
-            node.faucet(address.clone(), STARTUP_ACCOUNT_TOPUP_NANOGRAMS)
-                .await
-                .with_context(|| format!("Failed to top up wallet '{wallet_name}'"))?;
-            if manual_mining {
-                node.mine_blocks(1)
-                    .await
-                    .with_context(|| format!("Failed to mine top up for wallet '{wallet_name}'"))?;
-            }
-
-            let wallet_state = wait_for_startup_wallet_funds(node, &address, &wallet_name).await?;
-
-            if wallet_state == AccountStatus::Active {
-                println!(
-                    "      {} wallet {} {}",
-                    "Funded".green().bold(),
-                    wallet_name.cyan(),
-                    address.as_str().dimmed(),
-                );
-            } else {
-                let deploy_boc = build_wallet_deploy_message(&wallet)?;
-                node.send_boc(deploy_boc)
-                    .await
-                    .with_context(|| format!("Failed to deploy wallet '{wallet_name}'"))?;
-                if manual_mining {
-                    node.mine_blocks(1).await.with_context(|| {
-                        format!("Failed to mine deployment for wallet '{wallet_name}'")
-                    })?;
-                }
-                wait_for_startup_wallet_deploy(node, &address, &wallet_name).await?;
-                println!(
-                    "       {} wallet {} {}",
-                    "Ready".green().bold(),
-                    wallet_name.cyan(),
-                    address.as_str().dimmed(),
-                );
-            }
+    match &args.command {
+        LocalnetCommand::Status { .. } => return inspect::status(&location.path, args.json).await,
+        LocalnetCommand::Logs { tail, .. } => {
+            return inspect::logs(&location.path, *tail, args.json).await;
         }
-
-        startup_accounts.push(StartupAccount {
-            name: wallet_name,
-            version,
-            network: "localnet".to_owned(),
-            address,
-        });
+        LocalnetCommand::Operation { id, wait, .. } => {
+            return inspect::operation(&location.path, id, *wait, args.json).await;
+        }
+        _ => {}
     }
 
-    Ok(startup_accounts)
-}
-
-async fn wait_for_startup_wallet_funds(
-    node: &Arc<Localnet>,
-    address: &str,
-    wallet_name: &str,
-) -> anyhow::Result<AccountStatus> {
-    let deadline = Instant::now() + Duration::from_secs(12);
-    loop {
-        let wallet_state = node
-            .get_address_state(address.to_owned(), None)
-            .await
-            .with_context(|| format!("Failed to fetch state for wallet '{wallet_name}'"))?;
-
-        if wallet_state != AccountStatus::Nonexist {
-            return Ok(wallet_state);
-        }
-
-        if Instant::now() >= deadline {
-            anyhow::bail!("Timed out waiting for localnet top up of wallet '{wallet_name}'");
-        }
-
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-}
-
-async fn wait_for_startup_wallet_deploy(
-    node: &Arc<Localnet>,
-    address: &str,
-    wallet_name: &str,
-) -> anyhow::Result<()> {
-    let deadline = Instant::now() + Duration::from_secs(12);
-    loop {
-        let wallet_state = node
-            .get_address_state(address.to_owned(), None)
-            .await
-            .with_context(|| format!("Failed to fetch state for wallet '{wallet_name}'"))?;
-
-        if wallet_state == AccountStatus::Active {
-            return Ok(());
-        }
-
-        if Instant::now() >= deadline {
-            anyhow::bail!("Timed out waiting for localnet deployment of wallet '{wallet_name}'");
-        }
-
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-}
-
-pub(crate) const fn wallet_version_to_string(version: WalletVersion) -> &'static str {
-    match version {
-        WalletVersion::V1R1 => "v1r1",
-        WalletVersion::V1R2 => "v1r2",
-        WalletVersion::V1R3 => "v1r3",
-        WalletVersion::V2R1 => "v2r1",
-        WalletVersion::V2R2 => "v2r2",
-        WalletVersion::V3R1 => "v3r1",
-        WalletVersion::V3R2 => "v3r2",
-        WalletVersion::V4R1 => "v4r1",
-        WalletVersion::V4R2 => "v4r2",
-        WalletVersion::V5R1 => "v5r1",
-        WalletVersion::HLV1R1 => "highloadv1r1",
-        WalletVersion::HLV1R2 => "highloadv1r2",
-        WalletVersion::HLV2 => "highloadv2",
-        WalletVersion::HLV2R1 => "highloadv2r1",
-        WalletVersion::HLV2R2 => "highloadv2r2",
-    }
-}
-
-fn build_wallet_deploy_message(wallet: &Wallet) -> anyhow::Result<String> {
-    let expire_at = wallet_message_expire_at(&Network::Localnet)?;
-
-    let wallet_addr = wallet.address();
-    let message_info = IntMsgInfo {
-        ihr_disabled: true,
-        bounce: false,
-        bounced: false,
-        src: IntAddr::Std(wallet_addr.clone()),
-        dst: IntAddr::Std(wallet_addr),
-        value: CurrencyCollection::new(STARTUP_DEPLOY_TRANSFER_NANOGRAMS),
-        ihr_fee: Default::default(),
-        fwd_fee: Default::default(),
-        created_at: 0,
-        created_lt: 0,
-    };
-
-    let message = OwnedMessage {
-        info: MsgInfo::Int(message_info),
-        init: None,
-        body: CellSliceParts::from(CellBuilder::new().build()?),
-        layout: None,
-    };
-
-    let message_cell_boc = BocRepr::encode(message)?;
-    let message_cell = TonCell::from_boc(message_cell_boc)?;
-    let external = wallet
-        .wallet
-        .create_ext_in_msg(vec![message_cell], 0, expire_at, true)?;
-    Ok(external.to_boc_base64()?)
-}
-
-fn format_std_address(address: &StdAddr, network: &Network) -> String {
-    DisplayBase64StdAddr {
-        addr: address,
-        flags: Base64StdAddrFlags {
-            testnet: network.uses_testnet_address_format(),
-            base64_url: true,
-            bounceable: true,
-        },
-    }
-    .to_string()
-}
-
-pub async fn localnet_airdrop_cmd(
-    address: &str,
-    amount_grams: f64,
-    port: u16,
-    auth_token: Option<String>,
-) -> anyhow::Result<()> {
-    let client = crate::http::client_builder()
-        .user_agent(crate::build_info::user_agent())
-        .build()?;
-    let amount_nanograms = (amount_grams * 1_000_000_000.0) as u128;
-    let auth_token = resolve_localnet_auth_token(auth_token);
-    let request = client
-        .post(format!("http://127.0.0.1:{port}/acton_fundAccount"))
-        .json(&serde_json::json!({
-            "address": address,
-            "amount": amount_nanograms
-        }));
-    let res = with_localnet_auth(request, auth_token.as_deref())
-        .send()
-        .await
-        .context("Failed to reach localnet faucet")?;
-
-    if res.status().is_success() {
-        let json: serde_json::Value = res.json().await?;
-        if json
-            .get("ok")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false)
-            || json
-                .get("success")
-                .and_then(serde_json::Value::as_bool)
-                .unwrap_or(false)
-        {
-            println!(
-                "{} airdrop {} GRAM to {} on localnet",
-                "Successfully".green().bold(),
-                amount_grams,
-                address
-            );
-        } else {
-            let error = json
-                .get("error")
-                .and_then(|v| v.as_str())
-                .unwrap_or("Unknown error");
-            anyhow::bail!("Airdrop failed: {error}");
-        }
+    // Stop/delete may need to clean up a network whose service is already gone.
+    // Any temporary owner is scoped to this directory and is always reaped.
+    let (client, owned) = if matches!(
+        args.command,
+        LocalnetCommand::Stop { .. }
+            | LocalnetCommand::Delete { .. }
+            | LocalnetCommand::Shutdown { .. }
+    ) {
+        service::connect_or_start(&root, location).await?
     } else {
-        let status = res.status();
-        let body = res.text().await.unwrap_or_default();
-        anyhow::bail!("Airdrop failed with status {status}: {body}");
-    }
-
-    Ok(())
-}
-
-pub async fn localnet_mine_cmd(
-    blocks: u32,
-    port: u16,
-    auth_token: Option<String>,
-) -> anyhow::Result<()> {
-    let result = post_localnet_control(
-        port,
-        auth_token,
-        "acton_mine",
-        serde_json::json!({ "blocks": blocks }),
-        "Mining",
-    )
-    .await?;
-    let blocks_mined = result
-        .get("blocks_mined")
-        .and_then(serde_json::Value::as_u64)
-        .unwrap_or_else(|| u64::from(blocks));
-    let last_block_seqno = result
-        .get("last_block_seqno")
-        .and_then(serde_json::Value::as_u64)
-        .unwrap_or_default();
-    let skipped_empty_blocks = result
-        .get("skipped_empty_blocks")
-        .and_then(serde_json::Value::as_u64)
-        .unwrap_or_default();
-    println!(
-        "{} mined {} localnet block{}; skipped {} empty; latest seqno {}",
-        "Successfully".green().bold(),
-        blocks_mined,
-        if blocks_mined == 1 { "" } else { "s" },
-        skipped_empty_blocks,
-        last_block_seqno
+        (Client::connect(&location.path).await.with_context(|| format!(
+            "Network {:?} has no running service; run `acton localnet start {:?}` or `acton localnet serve {:?}`",
+            location.network.name, location.network.name, location.network.name
+        ))?, None)
+    };
+    let close_service = matches!(
+        args.command,
+        LocalnetCommand::Stop { .. }
+            | LocalnetCommand::Delete { .. }
+            | LocalnetCommand::Shutdown { .. }
     );
-
-    Ok(())
-}
-
-pub async fn localnet_increase_time_cmd(
-    seconds: u64,
-    port: u16,
-    auth_token: Option<String>,
-) -> anyhow::Result<()> {
-    let result = post_localnet_control(
-        port,
-        auth_token,
-        "acton_increaseTime",
-        serde_json::json!({ "seconds": seconds }),
-        "Increase time",
-    )
-    .await?;
-    print_clock_update("increased localnet time", &result);
-    Ok(())
-}
-
-pub async fn localnet_set_time_cmd(
-    timestamp: u32,
-    port: u16,
-    auth_token: Option<String>,
-) -> anyhow::Result<()> {
-    let result = post_localnet_control(
-        port,
-        auth_token,
-        "acton_setTime",
-        serde_json::json!({ "timestamp": timestamp }),
-        "Set time",
-    )
-    .await?;
-    print_clock_update("set localnet time", &result);
-    Ok(())
-}
-
-pub async fn localnet_set_next_block_timestamp_cmd(
-    timestamp: u32,
-    port: u16,
-    auth_token: Option<String>,
-) -> anyhow::Result<()> {
-    let result = post_localnet_control(
-        port,
-        auth_token,
-        "acton_setNextBlockTimestamp",
-        serde_json::json!({ "timestamp": timestamp }),
-        "Set next block timestamp",
-    )
-    .await?;
-    print_clock_update("set next block timestamp", &result);
-    Ok(())
-}
-
-pub(super) async fn post_localnet_control(
-    port: u16,
-    auth_token: Option<String>,
-    path: &str,
-    body: serde_json::Value,
-    action: &str,
-) -> anyhow::Result<serde_json::Value> {
-    let client = crate::http::client_builder()
-        .user_agent(crate::build_info::user_agent())
-        .build()?;
-    let auth_token = resolve_localnet_auth_token(auth_token);
-    let request = client
-        .post(format!("http://127.0.0.1:{port}/{path}"))
-        .json(&body);
-    let response = with_localnet_auth(request, auth_token.as_deref())
-        .send()
-        .await
-        .with_context(|| format!("Failed to reach localnet control endpoint /{path}"))?;
-
-    parse_localnet_control_response(response, action).await
-}
-
-pub(super) async fn get_localnet_control(
-    port: u16,
-    auth_token: Option<String>,
-    path: &str,
-    action: &str,
-) -> anyhow::Result<serde_json::Value> {
-    let client = crate::http::client_builder()
-        .user_agent(crate::build_info::user_agent())
-        .build()?;
-    let auth_token = resolve_localnet_auth_token(auth_token);
-    let request = client.get(format!("http://127.0.0.1:{port}/{path}"));
-    let response = with_localnet_auth(request, auth_token.as_deref())
-        .send()
-        .await
-        .with_context(|| format!("Failed to reach localnet control endpoint /{path}"))?;
-
-    parse_localnet_control_response(response, action).await
-}
-
-pub(super) async fn get_localnet_control_bytes(
-    port: u16,
-    auth_token: Option<String>,
-    path: &str,
-    query: &[(&str, &str)],
-    action: &str,
-) -> anyhow::Result<Vec<u8>> {
-    let client = crate::http::client_builder()
-        .user_agent(crate::build_info::user_agent())
-        .build()?;
-    let auth_token = resolve_localnet_auth_token(auth_token);
-    let request = client
-        .get(format!("http://127.0.0.1:{port}/{path}"))
-        .query(query);
-    let response = with_localnet_auth(request, auth_token.as_deref())
-        .send()
-        .await
-        .with_context(|| format!("Failed to reach localnet control endpoint /{path}"))?;
-
-    if response.status().is_success() {
-        return Ok(response.bytes().await?.to_vec());
+    let result = execute(&client, args.command, args.json).await;
+    if let Some(mut child) = owned {
+        let cleanup =
+            output::shutdown(args.json, true, service::stop_owned(&client, &mut child)).await;
+        result?;
+        return cleanup;
     }
-
-    let status = response.status();
-    let body = response.text().await.unwrap_or_default();
-    anyhow::bail!("{action} failed with status {status}: {body}");
+    result?;
+    if close_service {
+        output::shutdown(args.json, true, async {
+            client.shutdown().await.map_err(Into::into)
+        })
+        .await?;
+    }
+    Ok(())
 }
 
-pub(super) async fn post_localnet_control_bytes(
-    port: u16,
-    auth_token: Option<String>,
-    path: &str,
-    query: &[(&str, &str)],
-    body: Vec<u8>,
-    action: &str,
-) -> anyhow::Result<serde_json::Value> {
-    let client = crate::http::client_builder()
-        .user_agent(crate::build_info::user_agent())
-        .build()?;
-    let auth_token = resolve_localnet_auth_token(auth_token);
-    let request = client
-        .post(format!("http://127.0.0.1:{port}/{path}"))
-        .query(query)
-        .header(reqwest::header::CONTENT_TYPE, "application/json")
-        .body(body);
-    let response = with_localnet_auth(request, auth_token.as_deref())
-        .send()
-        .await
-        .with_context(|| format!("Failed to reach localnet control endpoint /{path}"))?;
-
-    parse_localnet_control_response(response, action).await
-}
-
-async fn parse_localnet_control_response(
-    response: reqwest::Response,
-    action: &str,
-) -> anyhow::Result<serde_json::Value> {
-    if response.status().is_success() {
-        let json: serde_json::Value = response.json().await?;
-        if json
-            .get("ok")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false)
-        {
-            Ok(json
-                .get("result")
-                .cloned()
-                .unwrap_or(serde_json::Value::Null))
-        } else {
-            let error = json
-                .get("error")
-                .and_then(|v| v.as_str())
-                .unwrap_or("Unknown error");
-            anyhow::bail!("{action} failed: {error}");
+async fn execute(client: &Client, command: LocalnetCommand, json: bool) -> anyhow::Result<()> {
+    match command {
+        LocalnetCommand::Stop { .. } => {
+            output::mutate(client, Method::POST, "/v1/network/stop", None, json).await
         }
-    } else {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        anyhow::bail!("{action} failed with status {status}: {body}");
+        LocalnetCommand::Delete { .. } => {
+            output::mutate(client, Method::DELETE, "/v1/network", None, json).await
+        }
+        LocalnetCommand::Node { command, .. } => {
+            let base = "/v1/network/nodes".to_owned();
+            let (method, path, body) = match command {
+                NodeCommand::Add { name, validator } => (
+                    Method::POST,
+                    base,
+                    Some(json!({"name":name, "validator":validator})),
+                ),
+                NodeCommand::Remove { id, force, .. } => {
+                    validate_identifier(&id)?;
+                    (Method::DELETE, format!("{base}/{id}?force={force}"), None)
+                }
+                NodeCommand::EnterValidation { id } => {
+                    validate_identifier(&id)?;
+                    (Method::POST, format!("{base}/{id}/enter-validation"), None)
+                }
+                NodeCommand::LeaveValidation { id } => {
+                    validate_identifier(&id)?;
+                    (Method::POST, format!("{base}/{id}/leave-validation"), None)
+                }
+            };
+
+            output::mutate(client, method, &path, body, json).await
+        }
+        LocalnetCommand::Snapshot { command, .. } => {
+            let base = "/v1/network/snapshots".to_owned();
+            let (method, path, body) = match command {
+                SnapshotCommand::List => {
+                    let snapshots: Value = client.request(Method::GET, &base, None).await?;
+                    return output::print(&snapshots);
+                }
+                SnapshotCommand::Create { name } => {
+                    (Method::POST, base, Some(json!({"name":name})))
+                }
+                SnapshotCommand::Restore { id, .. } => {
+                    validate_identifier(&id)?;
+                    (Method::POST, format!("{base}/{id}/restore"), None)
+                }
+                SnapshotCommand::Delete { id, .. } => {
+                    validate_identifier(&id)?;
+                    (Method::DELETE, format!("{base}/{id}"), None)
+                }
+            };
+
+            output::mutate(client, method, &path, body, json).await
+        }
+        LocalnetCommand::Shutdown { .. } => Ok(()),
+        LocalnetCommand::Serve { .. }
+        | LocalnetCommand::Start { .. }
+        | LocalnetCommand::Create { .. }
+        | LocalnetCommand::List
+        | LocalnetCommand::Status { .. }
+        | LocalnetCommand::Logs { .. }
+        | LocalnetCommand::Operation { .. } => {
+            unreachable!("handled before client discovery")
+        }
     }
 }
 
-fn print_clock_update(action: &str, result: &serde_json::Value) {
-    let current = result
-        .get("current_unix_time")
-        .and_then(serde_json::Value::as_u64)
-        .unwrap_or_default();
-    let offset = result
-        .get("time_offset_seconds")
-        .and_then(serde_json::Value::as_i64)
-        .unwrap_or_default();
-    let pending = result
-        .get("next_block_timestamp")
-        .and_then(serde_json::Value::as_u64);
-
-    if let Some(pending) = pending {
-        println!(
-            "{} {}; virtual time {}, offset {}s, next block timestamp {}",
-            "Successfully".green().bold(),
-            action,
-            current,
-            offset,
-            pending
-        );
-    } else {
-        println!(
-            "{} {}; virtual time {}, offset {}s",
-            "Successfully".green().bold(),
-            action,
-            current,
-            offset
-        );
-    }
-}
-
-fn localnet_auth_token() -> String {
-    localnet_auth_token_from_env().unwrap_or_else(generate_localnet_auth_token)
-}
-
-pub(crate) fn resolve_localnet_auth_token(auth_token: Option<String>) -> Option<String> {
-    auth_token
-        .and_then(|token| {
-            let token = token.trim().to_owned();
-            (!token.is_empty()).then_some(token)
-        })
-        .or_else(localnet_auth_token_from_env)
-}
-
-fn localnet_auth_token_from_env() -> Option<String> {
-    std::env::var(LOCALNET_AUTH_TOKEN_ENV)
-        .ok()
-        .and_then(|token| {
-            let token = token.trim().to_owned();
-            (!token.is_empty()).then_some(token)
-        })
-}
-
-fn generate_localnet_auth_token() -> String {
-    let mut bytes = [0_u8; 32];
-    rand::rngs::OsRng.fill_bytes(&mut bytes);
-    hex::encode(bytes)
-}
-
-pub(crate) fn with_localnet_auth(
-    request: reqwest::RequestBuilder,
-    auth_token: Option<&str>,
-) -> reqwest::RequestBuilder {
-    match auth_token.map(str::trim).filter(|token| !token.is_empty()) {
-        Some(token) => request.bearer_auth(token),
-        None => request,
-    }
+fn validate_identifier(id: &str) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        !id.is_empty()
+            && id.len() <= 80
+            && id
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-'),
+        "Invalid resource identifier"
+    );
+    Ok(())
 }

@@ -130,7 +130,7 @@ export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({
 
 function explorerNetworkId(id: string | undefined): ExplorerNetworkInfo["id"] {
   const normalized = id?.trim().toLocaleLowerCase()
-  if (!normalized || normalized === "localnet" || normalized === "acton-localnet") {
+  if (!normalized || normalized === "localnet" || normalized === "acton-simulated-localnet") {
     return "localnet"
   }
   if (normalized === "mainnet" || normalized === "testnet") return normalized

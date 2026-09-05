@@ -687,6 +687,10 @@ Rules:
 
 - `TONCENTER_MAINNET_API_KEY`: API key for TonCenter mainnet requests.
 - `TONCENTER_TESTNET_API_KEY`: API key for TonCenter testnet requests.
+- `ACTON_STUDIO_TONCENTER_MAINNET_API_KEY` and
+  `ACTON_STUDIO_TONCENTER_TESTNET_API_KEY`: build-time application keys embedded
+  in the Rust binary for Studio's public-network requests. Runtime
+  `TONCENTER_MAINNET_API_KEY` and `TONCENTER_TESTNET_API_KEY` values override them.
 - `VITE_LOCALNET_TONCENTER_API_KEY`: API key sent by the localnet UI to
   TonCenter-compatible `/api/v2` and `/api/v3` endpoints.
 - `DISABLE_TMP_DIR_CLEANUP_IN_TESTS=1`: preserve temp test directories.
@@ -694,6 +698,16 @@ Rules:
 
 In generated projects, `.env` is usually the simplest place to set the
 TonCenter keys because Acton loads that file automatically.
+
+Release and published trunk builds require the `TONCENTER_MAINNET_API_KEY` and
+`TONCENTER_TESTNET_API_KEY` GitHub Actions secrets. The build workflows pass them
+to Rust through the `ACTON_STUDIO_` variables. Pull-request builds do not receive
+these keys. Local builds can set the same build-time variables explicitly;
+Cargo does not load `.env` files automatically.
+
+Embedded application keys can be extracted from distributed binaries. Use keys
+intended for distribution. Studio adds them to upstream requests on the server;
+it does not expose them through its browser configuration.
 
 ## AI Policy
 

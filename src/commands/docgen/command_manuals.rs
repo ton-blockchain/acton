@@ -93,11 +93,11 @@ pub(super) const COMMAND_MANUALS: &[CommandManualSpec] = &[
         docs_description: "Reference manual for the acton library command",
     },
     CommandManualSpec {
-        command: "localnet",
-        source_name: "acton-localnet.md",
-        docs_slug: "localnet",
-        docs_title: "acton localnet",
-        docs_description: "Reference manual for the acton localnet command",
+        command: "simulated-localnet",
+        source_name: "acton-simulated-localnet.md",
+        docs_slug: "simulated-localnet",
+        docs_title: "acton simulated-localnet",
+        docs_description: "Reference manual for the acton simulated-localnet command",
     },
     CommandManualSpec {
         command: "retrace",

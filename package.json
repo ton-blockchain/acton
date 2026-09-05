@@ -25,11 +25,11 @@
   "overrides": {
     "@ton/core": "^0.63.1",
     "brace-expansion": "5.0.9",
-    "fast-uri": "^3.1.5",
+    "fast-uri": "^3.1.6",
     "js-yaml": "4.3.1",
     "nanoid": "3.3.18",
     "postcss": "^8.5.23",
-    "qs": "^6.15.2",
+    "qs": "^6.16.0",
     "sharp": "^0.35.3",
     "undici": "^7.29.0",
     "uuid": "^14.0.0",

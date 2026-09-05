@@ -1,0 +1,55 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--acton-space-8);
+  background-color: color-mix(in srgb, var(--acton-color-surface) 72%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.dialog {
+  width: min(480px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--acton-space-12);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+  background-color: var(--acton-color-surface);
+  box-shadow: var(--acton-shadow-overlay);
+  text-align: center;
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--acton-space-6);
+  color: var(--acton-color-text-muted);
+  line-height: 1;
+}
+
+.icon svg {
+  width: 64px;
+  height: 64px;
+  stroke-width: 1.5;
+}
+
+.title {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-3xl);
+  font-weight: var(--acton-font-weight-emphasis);
+  line-height: 1.2;
+}
+
+.message {
+  max-width: 37ch;
+  margin: var(--acton-space-4) 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-lg);
+  line-height: 1.55;
+}

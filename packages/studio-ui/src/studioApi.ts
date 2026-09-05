@@ -16,8 +16,8 @@ export type StudioConnectionState = "connecting" | "connected" | "disconnected"
 export type EnvironmentStatus = "starting" | "running" | "stopping" | "stopped" | "failed"
 export type EnvironmentLifecycle = "managed" | "external"
 
-export interface ActonLocalnetEnvironmentConfig {
-  readonly kind: "actonLocalnet"
+export interface ActonSimulatedLocalnetEnvironmentConfig {
+  readonly kind: "actonSimulatedLocalnet"
   readonly port: number
   readonly forkNetwork?: string
   readonly forkBlockNumber?: number
@@ -61,12 +61,12 @@ export interface RemoteTonNetworkEnvironmentConfig {
 }
 
 export type EnvironmentConfig =
-  | ActonLocalnetEnvironmentConfig
+  | ActonSimulatedLocalnetEnvironmentConfig
   | FullTonNetworkEnvironmentConfig
   | RemoteTonNetworkEnvironmentConfig
 
-export interface CreateActonLocalnetEnvironmentConfig {
-  readonly kind: "actonLocalnet"
+export interface CreateActonSimulatedLocalnetEnvironmentConfig {
+  readonly kind: "actonSimulatedLocalnet"
   readonly port?: number
   readonly forkNetwork?: string
   readonly forkBlockNumber?: number
@@ -91,7 +91,7 @@ export interface CreateFullTonNetworkEnvironmentConfig {
 }
 
 export type CreateEnvironmentConfig =
-  | CreateActonLocalnetEnvironmentConfig
+  | CreateActonSimulatedLocalnetEnvironmentConfig
   | CreateFullTonNetworkEnvironmentConfig
 
 export type EnvironmentCapability =
@@ -100,6 +100,7 @@ export type EnvironmentCapability =
   | "configApi"
   | "explorer"
   | "integration"
+  | "testnetFaucet"
   | "controlApi"
   | "simulator"
   | "wallets"
@@ -112,6 +113,57 @@ export type EnvironmentCapability =
   | "snapshots"
   | "checkpoints"
   | "observability"
+  | "health"
+
+export type NetworkHealthStatus = "healthy" | "syncing" | "degraded" | "stopped"
+export type ApiHealthStatus = "ready" | "syncing" | "unavailable" | "stopped"
+export type ServiceHealthStatus =
+  | "ready"
+  | "starting"
+  | "completed"
+  | "stopped"
+  | "failed"
+  | "unknown"
+
+export interface ApiHealth {
+  readonly status: ApiHealthStatus
+  readonly endpoint: string
+  readonly latencyMs: number | null
+  readonly masterchainSeqno: number | null
+  readonly blockTimeUnix: number | null
+  readonly blockAgeMs: number | null
+  readonly error: string | null
+}
+
+export interface ServiceHealth {
+  readonly name: string
+  readonly status: ServiceHealthStatus
+  readonly state: string | null
+  readonly health: string | null
+  readonly exitCode: number | null
+}
+
+export interface NetworkHealthSample {
+  readonly observedAtMs: number
+  readonly apiV2LatencyMs: number | null
+  readonly apiV3LatencyMs: number | null
+  readonly apiV2Seqno: number | null
+  readonly apiV3Seqno: number | null
+  readonly indexerLagBlocks: number | null
+  readonly blockAgeMs: number | null
+}
+
+export interface NetworkHealth {
+  readonly observedAtMs: number
+  readonly status: NetworkHealthStatus
+  readonly apiV2: ApiHealth
+  readonly apiV3: ApiHealth
+  readonly indexerLagBlocks: number | null
+  readonly estimatedIndexerLagMs: number | null
+  readonly services: readonly ServiceHealth[]
+  readonly history: readonly NetworkHealthSample[]
+  readonly infrastructureError: string | null
+}
 
 export interface EnvironmentEndpoints {
   readonly apiV2?: string
@@ -324,6 +376,16 @@ export async function fetchStudioInfo(signal: AbortSignal): Promise<StudioInfo> 
   return info
 }
 
+/** Checks whether the Studio owner process still serves its control API. */
+export async function checkStudioConnection(signal: AbortSignal): Promise<void> {
+  // The health endpoint intentionally returns 204, so parsing it as JSON would
+  // turn every successful heartbeat into a false connection failure.
+  await request("/api/v1/health", {
+    cache: "no-store",
+    signal,
+  })
+}
+
 export function fetchStudioEnvironments(signal?: AbortSignal): Promise<StudioEnvironment[]> {
   return requestJson<StudioEnvironment[]>("/api/v1/environments", {
     headers: {accept: "application/json"},
@@ -361,6 +423,16 @@ export function restartStudioEnvironment(environmentId: string): Promise<StudioE
       method: "POST",
       headers: {accept: "application/json"},
     },
+  )
+}
+
+export function fetchStudioEnvironmentHealth(
+  environmentId: string,
+  signal?: AbortSignal,
+): Promise<NetworkHealth> {
+  return requestJson<NetworkHealth>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/health`,
+    {headers: {accept: "application/json"}, signal},
   )
 }
 

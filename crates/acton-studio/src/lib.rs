@@ -23,8 +23,7 @@ use ton::ton_core::types::TonAddress;
 #[cfg(debug_assertions)]
 use tower_http::services::{ServeDir, ServeFile};
 
-mod admin;
-pub use admin::{AdminOperation, AdminRequest};
+pub use acton_localnet::{AdminOperation, AdminRequest};
 mod api_calls;
 mod contract_facade;
 mod contract_registry;
@@ -32,14 +31,15 @@ mod contract_source_artifact;
 mod environment;
 mod environment_catalog;
 mod environment_store;
-mod full_ton_network;
 mod local_artifacts;
 mod local_process;
 mod local_test_process;
+mod localnet;
 mod openapi;
 mod test_api;
 mod test_run;
 mod test_runtime;
+mod testnet_faucet;
 mod wallet;
 
 pub use api_calls::{
@@ -88,6 +88,7 @@ pub const STUDIO_HEALTH_PATH: &str = "/api/v1/health";
 pub const STUDIO_INFO_PATH: &str = "/api/v1/info";
 pub const STUDIO_OPENAPI_PATH: &str = "/api/v1/openapi.json";
 pub const STUDIO_WALLETS_PATH_SUFFIX: &str = "/wallets";
+pub const DEFAULT_TESTNET_FAUCET_URL: &str = "https://faucet.ton.org/";
 
 const MAX_DEPLOYMENT_SUBMISSION_BODY_BYTES: usize = 4 * 1024 * 1024;
 const TONCENTER_API_KEY_HEADER: &str = "x-api-key";
@@ -139,6 +140,7 @@ pub struct StudioServerConfig {
     server_version: String,
     workspace: Option<StudioWorkspace>,
     toncenter_api_keys: PublicToncenterApiKeys,
+    testnet_faucet_url: reqwest::Url,
 }
 
 impl StudioServerConfig {
@@ -147,6 +149,8 @@ impl StudioServerConfig {
             server_version: server_version.into(),
             workspace: None,
             toncenter_api_keys: PublicToncenterApiKeys::from_environment(),
+            testnet_faucet_url: reqwest::Url::parse(DEFAULT_TESTNET_FAUCET_URL)
+                .expect("default Testnet faucet URL must be valid"),
         }
     }
 
@@ -166,6 +170,17 @@ impl StudioServerConfig {
             .set(network, sensitive_header_value(api_key.as_ref()));
         self
     }
+
+    /// Replaces the fixed upstream used by the guest Testnet faucet proxy.
+    ///
+    /// Production Studio uses [`DEFAULT_TESTNET_FAUCET_URL`]. Tests and private
+    /// distributions can provide a controlled compatible service without exposing
+    /// an arbitrary proxy target through the HTTP API.
+    #[must_use]
+    pub fn with_testnet_faucet_url(mut self, url: reqwest::Url) -> Self {
+        self.testnet_faucet_url = url;
+        self
+    }
 }
 
 #[derive(Clone, Default)]
@@ -175,14 +190,30 @@ struct PublicToncenterApiKeys {
 }
 
 impl PublicToncenterApiKeys {
+    /// Loads public-network credentials once when the Studio server is configured.
+    ///
+    /// Distributed binaries carry application keys supplied at compile time.
+    /// Runtime keys take precedence so operators can replace them without rebuilding.
+    /// These defaults only authenticate Studio's requests to the public `TonCenter` APIs.
     fn from_environment() -> Self {
         let mut keys = Self::default();
+
         for descriptor in environment_catalog::PUBLIC_TON_NETWORKS {
+            let embedded = match descriptor.network {
+                PublicTonNetwork::Testnet => {
+                    option_env!("ACTON_STUDIO_TONCENTER_TESTNET_API_KEY")
+                }
+                PublicTonNetwork::Mainnet => {
+                    option_env!("ACTON_STUDIO_TONCENTER_MAINNET_API_KEY")
+                }
+            };
             let value = std::env::var(descriptor.api_key_environment_variable)
                 .ok()
-                .and_then(|value| sensitive_header_value(&value));
+                .and_then(|value| sensitive_header_value(&value))
+                .or_else(|| embedded.and_then(sensitive_header_value));
             keys.set(descriptor.network, value);
         }
+
         keys
     }
 
@@ -296,6 +327,7 @@ impl StudioServer {
                 .build()
                 .expect("Studio HTTP client must build"),
             toncenter_api_keys: self.config.toncenter_api_keys.clone(),
+            testnet_faucet_url: self.config.testnet_faucet_url.clone(),
         };
         let api = Router::new()
             .route("/openapi.json", get(openapi::handler))
@@ -334,6 +366,10 @@ impl StudioServer {
             .route(
                 "/environments/{environment_id}/restart",
                 post(restart_environment),
+            )
+            .route(
+                "/environments/{environment_id}/health",
+                get(get_environment_health),
             )
             .route(
                 "/environments/{environment_id}/snapshots",
@@ -378,6 +414,7 @@ impl StudioServer {
                 "/environments/{environment_id}/observability/{*path}",
                 any(proxy_environment_observability),
             )
+            .merge(testnet_faucet::router())
             .merge(test_api::router())
             .fallback(api_not_found);
         let app = Router::new()
@@ -434,6 +471,7 @@ pub(crate) struct StudioState {
     wallet_runtime: Arc<dyn WalletRuntime>,
     http_client: reqwest::Client,
     toncenter_api_keys: PublicToncenterApiKeys,
+    testnet_faucet_url: reqwest::Url,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, utoipa::ToSchema)]
@@ -909,6 +947,30 @@ async fn restart_environment(
         .restart(&environment_id)
         .await
         .map(|environment| Json(public_environment(environment)))
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}/health",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    responses(
+        (status = 200, description = "Live Full localnet health", body = acton_localnet::NetworkHealth),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Health diagnostics are unavailable", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to inspect environment health", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
+async fn get_environment_health(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+) -> Result<Json<acton_localnet::NetworkHealth>, StudioApiError> {
+    state
+        .environment_runtime
+        .health(&environment_id)
+        .await
+        .map(Json)
         .map_err(StudioApiError)
 }
 
@@ -1538,7 +1600,8 @@ fn public_ton_network(environment: &StudioEnvironment) -> Option<PublicTonNetwor
     }
     match &environment.config {
         EnvironmentConfig::RemoteTonNetwork { network } => Some(*network),
-        EnvironmentConfig::ActonLocalnet { .. } | EnvironmentConfig::FullTonNetwork { .. } => None,
+        EnvironmentConfig::ActonSimulatedLocalnet { .. }
+        | EnvironmentConfig::FullTonNetwork { .. } => None,
     }
 }
 

@@ -290,6 +290,10 @@ async fn run_localton<'a>(
 ) -> Result<String> {
     let output = Command::new(&paths.localton)
         .args(args)
+        // The account subcommand's stdout is a machine-readable protocol for
+        // this xtask. Human-oriented tracing and ANSI styling would corrupt it.
+        .env("RUST_LOG", "error")
+        .env("NO_COLOR", "1")
         .output()
         .await
         .with_context(|| format!("failed to execute {}", paths.localton.display()))?;

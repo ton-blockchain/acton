@@ -1,0 +1,37 @@
+  __LOCALTON_NODE_ID__:
+    image: "__LOCALTON_IMAGE__"
+    command:
+      - join
+      - http://127.0.0.1:18000/config
+      - --state-dir
+      - /var/lib/localton
+      - --node
+      - __LOCALTON_NODE_NAME__
+      - --advertise-ip
+      - 127.0.0.1
+      - --port-base
+      - "__LOCALTON_NODE_PORT_BASE__"
+      __LOCALTON_VALIDATOR_ARGS__
+    network_mode: service:localton
+    depends_on:
+      localton:
+        condition: service_healthy
+        restart: true
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - --silent
+        - --show-error
+        - http://127.0.0.1:__LOCALTON_NODE_PORT_BASE__/healthz
+      interval: 5s
+      timeout: 3s
+      start_period: 240s
+      start_interval: 1s
+      retries: 12
+    restart: unless-stopped
+    volumes:
+      - __LOCALTON_NODE_ID__-state:/var/lib/localton
+    security_opt:
+      - no-new-privileges:true

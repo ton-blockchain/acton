@@ -8,7 +8,7 @@ pub const TONCENTER_MAINNET_API_KEY_ENV: &str = "TONCENTER_MAINNET_API_KEY";
 /// Environment variable for the testnet `TonCenter` API key.
 pub const TONCENTER_TESTNET_API_KEY_ENV: &str = "TONCENTER_TESTNET_API_KEY";
 
-/// Environment variable for the protected Acton localnet API token.
+/// Environment variable for the protected Acton simulated localnet API token.
 pub const LOCALNET_API_KEY_ENV: &str = "ACTON_LOCALNET_AUTH_TOKEN";
 
 /// Returns the `TonCenter` API key env var name for the selected network.

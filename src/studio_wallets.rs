@@ -42,7 +42,7 @@ impl ProjectWalletRuntime {
 
     const fn wallets_for(&self, environment: &StudioEnvironment) -> &BTreeMap<String, Wallet> {
         match &environment.config {
-            EnvironmentConfig::ActonLocalnet { .. }
+            EnvironmentConfig::ActonSimulatedLocalnet { .. }
             | EnvironmentConfig::FullTonNetwork { .. }
             | EnvironmentConfig::RemoteTonNetwork {
                 network: PublicTonNetwork::Testnet,
@@ -63,8 +63,10 @@ impl WalletRuntime for ProjectWalletRuntime {
                 name: wallet.name.clone(),
                 address: wallet.wallet.address.to_base64(false, false, true),
                 public_key: format!("0x{}", hex::encode(wallet.wallet.key_pair.public_key)),
-                version: crate::commands::localnet::wallet_version_to_string(wallet.wallet.version)
-                    .to_owned(),
+                version: crate::commands::simulated_localnet::wallet_version_to_string(
+                    wallet.wallet.version,
+                )
+                .to_owned(),
                 wallet_id: wallet.wallet.wallet_id,
                 workchain: wallet.wallet.address.workchain,
             })

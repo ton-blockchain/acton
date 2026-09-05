@@ -5,11 +5,12 @@
 //! share: service keys, engine database initialization, durable node identity,
 //! readiness, and transfer of a running process into the common registry.
 
+mod database_dump;
 mod validator;
 
 pub(crate) use validator::configure_genesis_identity;
 
-use std::{fs, io::ErrorKind, time::Duration};
+use std::{fs, io::ErrorKind, path::Path, time::Duration};
 
 use anyhow::{Context, Result, ensure};
 use tracing::{info, warn};
@@ -46,8 +47,20 @@ pub(crate) struct NodeServiceKeys {
 /// tune one process invocation without changing node identity or network policy.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct NodeStartOptions {
-    /// Enables validator-engine's memory-resident CellDb working set for this process.
-    pub(crate) celldb_in_memory: bool,
+    /// Chooses whether CellDb stays on disk or is eagerly loaded into memory.
+    pub(crate) celldb_mode: CellDbMode,
+}
+
+/// Process-local CellDb loading policy for validator-engine.
+///
+/// Small development databases benefit from eager preload, while an imported
+/// database can be hundreds of gigabytes and must remain disk-backed by default.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) enum CellDbMode {
+    OnDisk,
+    #[default]
+    PreloadAll,
+    InMemory,
 }
 
 /// Generates the service identities required by one configured node.
@@ -155,6 +168,7 @@ pub(crate) async fn initialize_joined_node(
     tools: &Toolchain,
     node: &NodeSettings,
     timeout: Duration,
+    database_dump: Option<&Path>,
 ) -> Result<NodeManifest> {
     ensure!(
         node.role == NodeRole::Joined,
@@ -188,6 +202,10 @@ pub(crate) async fn initialize_joined_node(
             &context,
         )
         .await?;
+
+        if let Some(archive) = database_dump {
+            database_dump::import(archive, &node_layout.db, &node.name).await?;
+        }
 
         let manifest = NodeManifest::new(
             &node.name,
@@ -253,7 +271,7 @@ pub(crate) async fn start(
     info!(
         operation = "start_node",
         node = node.name,
-        celldb_in_memory = options.celldb_in_memory,
+        celldb_mode = ?options.celldb_mode,
         outcome = "pending",
         "starting validator-engine node"
     );
@@ -262,7 +280,7 @@ pub(crate) async fn start(
         tools.validator_engine.as_ref(),
         node,
         database,
-        options.celldb_in_memory,
+        options.celldb_mode,
     )
     .await?;
 
@@ -305,7 +323,7 @@ pub(crate) async fn start(
     info!(
         operation = "start_node",
         node = node.name,
-        celldb_in_memory = options.celldb_in_memory,
+        celldb_mode = ?options.celldb_mode,
         duration_ms = started.elapsed().as_millis(),
         outcome = "success",
         "validator-engine node started"

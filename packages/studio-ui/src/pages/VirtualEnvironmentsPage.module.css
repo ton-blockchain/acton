@@ -116,7 +116,7 @@
   background: var(--acton-color-danger-text);
 }
 
-.rpcUrl {
+.environmentId {
   display: block;
   min-width: 0;
   overflow: hidden;

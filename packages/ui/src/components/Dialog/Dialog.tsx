@@ -15,6 +15,10 @@ export interface DialogProps {
   readonly contentPadding?: "default" | "none"
   readonly description?: ReactNode
   readonly dismissible?: boolean
+  /** Pins actions below a scrollable header and body, keeping them reachable on short screens */
+  readonly footer?: ReactNode
+  /** Changes header composition without replacing the accessible title and description */
+  readonly headerClassName?: string
   readonly leadingIcon?: ReactNode
   readonly maxWidth?: CSSProperties["maxWidth"]
   readonly onOpenChange: (open: boolean) => void
@@ -31,6 +35,8 @@ export function Dialog({
   contentPadding = "default",
   description,
   dismissible = true,
+  footer,
+  headerClassName,
   leadingIcon,
   maxWidth,
   onOpenChange,
@@ -44,6 +50,38 @@ export function Dialog({
       onOpenChange(nextOpen)
     }
   }
+
+  const content = (
+    <>
+      <header className={cx(styles.header, headerClassName)}>
+        {leadingIcon !== undefined && leadingIcon !== null && (
+          <div className={styles.leadingIcon}>{leadingIcon}</div>
+        )}
+        <div className={styles.heading}>
+          <DialogBase.Title className={styles.title}>{title}</DialogBase.Title>
+          {description !== undefined && description !== null && (
+            <DialogBase.Description className={styles.description}>
+              {description}
+            </DialogBase.Description>
+          )}
+        </div>
+        {canDismiss && (
+          <DialogBase.Close className={styles.closeButton} aria-label={closeLabel}>
+            <X size={18} aria-hidden="true" />
+          </DialogBase.Close>
+        )}
+      </header>
+      <div
+        className={cx(
+          styles.content,
+          contentPadding === "none" && styles.contentPaddingNone,
+          contentClassName,
+        )}
+      >
+        {children}
+      </div>
+    </>
+  )
 
   return (
     <DialogBase.Root open={open} onOpenChange={handleOpenChange}>
@@ -60,33 +98,14 @@ export function Dialog({
                 : ({"--acton-dialog-max-width": toCssSize(maxWidth)} as CSSProperties)
             }
           >
-            <header className={styles.header}>
-              {leadingIcon !== undefined && leadingIcon !== null && (
-                <div className={styles.leadingIcon}>{leadingIcon}</div>
-              )}
-              <div className={styles.heading}>
-                <DialogBase.Title className={styles.title}>{title}</DialogBase.Title>
-                {description !== undefined && description !== null && (
-                  <DialogBase.Description className={styles.description}>
-                    {description}
-                  </DialogBase.Description>
-                )}
-              </div>
-              {canDismiss && (
-                <DialogBase.Close className={styles.closeButton} aria-label={closeLabel}>
-                  <X size={18} aria-hidden="true" />
-                </DialogBase.Close>
-              )}
-            </header>
-            <div
-              className={cx(
-                styles.content,
-                contentPadding === "none" && styles.contentPaddingNone,
-                contentClassName,
-              )}
-            >
-              {children}
-            </div>
+            {footer === undefined || footer === null ? (
+              content
+            ) : (
+              <>
+                <div className={styles.scrollArea}>{content}</div>
+                {footer}
+              </>
+            )}
           </DialogBase.Popup>
         </DialogBase.Viewport>
       </DialogBase.Portal>

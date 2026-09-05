@@ -1,0 +1,4 @@
+[wallets.visual-wallet]
+kind = "v5r1"
+workchain = 0
+keys = { mnemonic = "pond fantasy knock unfold hurry mixture round assist hub asset hunt wage stuff shift lazy crystal goat edit surprise march maple brass bid maze" }

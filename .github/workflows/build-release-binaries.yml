@@ -6,6 +6,11 @@ on:
       plan:
         required: false
         type: string
+    secrets:
+      TONCENTER_MAINNET_API_KEY:
+        required: true
+      TONCENTER_TESTNET_API_KEY:
+        required: true
 
 concurrency:
   group: build-release-binaries-${{ github.ref }}
@@ -90,9 +95,14 @@ jobs:
 
       - name: Build acton binary
         env:
+          ACTON_STUDIO_TONCENTER_MAINNET_API_KEY: ${{ secrets.TONCENTER_MAINNET_API_KEY }}
+          ACTON_STUDIO_TONCENTER_TESTNET_API_KEY: ${{ secrets.TONCENTER_TESTNET_API_KEY }}
           CC: clang-16
           CXX: clang++-16
-        run: cargo build --profile release-size --locked --target "${TARGET_NAME}" --bin acton
+        run: |
+          : "${ACTON_STUDIO_TONCENTER_MAINNET_API_KEY:?Studio mainnet API key is required}"
+          : "${ACTON_STUDIO_TONCENTER_TESTNET_API_KEY:?Studio testnet API key is required}"
+          cargo build --profile release-size --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Test acton binary
         run: |
@@ -176,7 +186,13 @@ jobs:
         run: just build-ui
 
       - name: Build acton binary
-        run: cargo build --profile release-size --locked --target "${TARGET_NAME}" --bin acton
+        env:
+          ACTON_STUDIO_TONCENTER_MAINNET_API_KEY: ${{ secrets.TONCENTER_MAINNET_API_KEY }}
+          ACTON_STUDIO_TONCENTER_TESTNET_API_KEY: ${{ secrets.TONCENTER_TESTNET_API_KEY }}
+        run: |
+          : "${ACTON_STUDIO_TONCENTER_MAINNET_API_KEY:?Studio mainnet API key is required}"
+          : "${ACTON_STUDIO_TONCENTER_TESTNET_API_KEY:?Studio testnet API key is required}"
+          cargo build --profile release-size --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Test acton binary
         run: |

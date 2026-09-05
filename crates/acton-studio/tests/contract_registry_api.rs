@@ -273,7 +273,7 @@ fn localnet_environment(base_url: &str) -> StudioEnvironment {
         "localnet-1",
         "Localnet",
         EnvironmentStatus::Running,
-        EnvironmentConfig::ActonLocalnet {
+        EnvironmentConfig::ActonSimulatedLocalnet {
             port: 5411,
             fork_network: None,
             fork_block_number: None,

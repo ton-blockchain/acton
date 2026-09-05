@@ -1683,8 +1683,11 @@ the modal frame and scroll behavior while callers own the domain content.
   close action while an operation is running.
 - `contentPadding`: use `"none"` when the caller owns a flush or independently
   scrolling content layout.
-- `contentClassName`: caller-owned content layout hook; keep the shared header,
-  close button, surface, and backdrop unchanged.
+- `contentClassName`: caller-owned content layout hook.
+- `headerClassName`: custom header composition, such as a centered request
+  identity. Keep the accessible title, description, and close action intact.
+- `footer`: pinned actions outside the scrollable header and body. Use this
+  when request details can exceed the viewport height.
 - `closeLabel`: accessible label for the standard close action.
 - `DialogActions`: shared footer alignment for dialog buttons. Set
   `stackOnMobile` when full-width mobile actions are easier to use.

@@ -19,6 +19,7 @@ dependencies = [
  "acton-abi-catalog",
  "acton-config",
  "acton-debug",
+ "acton-localnet",
  "acton-mdman",
  "acton-studio",
  "anyhow",
@@ -166,6 +167,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "acton-localnet"
+version = "1.1.0"
+dependencies = [
+ "axum",
+ "base64",
+ "chrono",
+ "dunce",
+ "expect-test",
+ "fs2",
+ "log",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "ton-hardfork",
+ "tower 0.5.2",
+ "tracing",
+ "utoipa",
+ "uuid",
+ "xxhash-rust",
+]
+
+[[package]]
 name = "acton-mdman"
 version = "1.1.0"
 dependencies = [
@@ -205,6 +231,7 @@ dependencies = [
 name = "acton-studio"
 version = "1.1.0"
 dependencies = [
+ "acton-localnet",
  "axum",
  "base64",
  "chrono",
@@ -223,7 +250,6 @@ dependencies = [
  "tokio",
  "ton",
  "ton-api",
- "ton-hardfork",
  "toncenter-keys",
  "tower 0.5.2",
  "tower-http",
@@ -885,9 +911,9 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "chacha20"
-version = "0.10.0"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f8d983286843e49675a4b7a2d174efe136dc93a18d69130dd18198a6c167601"
+checksum = "65c35e4b699c7e15ccbe7ee35c005e4fc0a278d22238a2857e6ce2dadeda1b06"
 dependencies = [
  "cfg-if",
  "cpufeatures 0.3.0",

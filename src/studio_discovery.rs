@@ -139,14 +139,22 @@ mod tests {
         let task = tokio::spawn(async move { axum::serve(listener, server.router()).await });
         let studio_url = format!("http://{address}");
 
-        let matching_url = studio_url.clone();
-        assert!(
-            tokio::task::spawn_blocking(move || {
-                is_matching_studio_running(&matching_url, "matching-project")
-            })
-            .await
-            .expect("probe should complete")
-        );
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let matching_url = studio_url.clone();
+                if tokio::task::spawn_blocking(move || {
+                    is_matching_studio_running(&matching_url, "matching-project")
+                })
+                .await
+                .expect("probe should complete")
+                {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("Studio server should become ready");
 
         let mismatched_url = studio_url.clone();
         assert!(

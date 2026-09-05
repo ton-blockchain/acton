@@ -1,8 +1,8 @@
 import process from "node:process"
 
-import {expect, type Page} from "@playwright/test"
+import {expect, type Locator, type Page} from "@playwright/test"
 
-export type VisualApp = "explorer" | "localnet"
+export type VisualApp = "explorer" | "localnet" | "studio"
 export type VisualTheme = "dark" | "light"
 
 interface PrepareVisualPageOptions {
@@ -47,7 +47,12 @@ export const prepareVisualPage = async (
   await page.addInitScript(
     ({appName, initialStorage, initialTheme}) => {
       localStorage.clear()
-      localStorage.setItem(appName === "explorer" ? "explorerTheme" : "theme", initialTheme)
+      const themeKey = {
+        explorer: "explorerTheme",
+        localnet: "theme",
+        studio: "acton-studio-theme",
+      }[appName]
+      localStorage.setItem(themeKey, initialTheme)
       for (const [key, value] of Object.entries(initialStorage)) {
         localStorage.setItem(key, value)
       }
@@ -96,5 +101,18 @@ export const expectVisualSnapshot = async (
     caret: "hide",
     fullPage,
     maxDiffPixels: 200,
+  })
+}
+
+export const expectVisualElementSnapshot = async (
+  page: Page,
+  element: Locator,
+  scenarioId: string,
+) => {
+  await stabilizeVisualPage(page)
+  await expect(element).toHaveScreenshot(`${scenarioId}.png`, {
+    animations: "disabled",
+    caret: "hide",
+    maxDiffPixels: 120,
   })
 }

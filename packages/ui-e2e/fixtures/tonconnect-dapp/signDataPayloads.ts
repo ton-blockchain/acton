@@ -1,4 +1,4 @@
-export const SIGN_DATA_TEXT = "Authorize the Acton localnet e2e test\nAction: signData"
+export const SIGN_DATA_TEXT = "Authorize the Simulated localnet e2e test\nAction: signData"
 
 export const SIGN_DATA_CELL_SCHEMA = `nothing$0 {X:Type} = Maybe X;
 just$1 {X:Type} value:X = Maybe X;

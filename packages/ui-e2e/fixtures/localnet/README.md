@@ -3,7 +3,7 @@
 `ui-state.json` is the canonical state for localnet and explorer visual tests. Start it with:
 
 ```sh
-acton localnet start --port 15411 --load-state packages/ui-e2e/fixtures/localnet/ui-state.json --no-mining
+acton simulated-localnet start --port 15411 --load-state packages/ui-e2e/fixtures/localnet/ui-state.json --no-mining
 ```
 
 The node runs with mining disabled so timestamps and block contents stay stable. Scenarios that

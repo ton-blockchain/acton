@@ -1,4 +1,6 @@
-mod http_api;
+mod build;
+mod http_api_v2;
+mod http_api_v3;
 mod recursive_load;
 
 use std::path::PathBuf;
@@ -17,24 +19,16 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Build and install the pinned TON HTTP API V2 backend.
-    BuildTonHttpApiV2(BuildTonHttpApiV2Args),
+    BuildTonHttpApiV2(build::BuildArgs),
+
+    /// Build and install the pinned TON Center API V3 components.
+    BuildTonHttpApiV3(http_api_v3::BuildV3Args),
 
     /// Build a deterministic external message for a recursive load root.
     PrepareRecursiveLoad(PrepareRecursiveLoadArgs),
 
     /// Fund and deploy a recursive load root through the Localton liteserver.
     RunRecursiveLoad(RunRecursiveLoadArgs),
-}
-
-#[derive(Debug, Args)]
-struct BuildTonHttpApiV2Args {
-    /// State directory whose tools directory receives the installed artifacts.
-    #[arg(long, default_value = ".localton")]
-    state_dir: PathBuf,
-
-    /// Number of parallel native compilation jobs.
-    #[arg(long, default_value_t = 4, value_parser = clap::value_parser!(u8).range(1..=64))]
-    jobs: u8,
 }
 
 #[derive(Debug, Args)]
@@ -71,9 +65,8 @@ async fn main() -> Result<()> {
         .init();
 
     match Cli::parse().command {
-        Command::BuildTonHttpApiV2(args) => {
-            http_api::build(&args.state_dir, usize::from(args.jobs)).await
-        }
+        Command::BuildTonHttpApiV2(args) => http_api_v2::build(args).await,
+        Command::BuildTonHttpApiV3(args) => http_api_v3::build(args).await,
         Command::PrepareRecursiveLoad(args) => recursive_load::prepare(args.tree_id).await,
         Command::RunRecursiveLoad(args) => {
             recursive_load::run(
@@ -85,4 +78,12 @@ async fn main() -> Result<()> {
             .await
         }
     }
+}
+
+#[cfg(test)]
+#[test]
+fn cli_arguments_are_consistent() {
+    use clap::CommandFactory;
+
+    Cli::command().debug_assert();
 }

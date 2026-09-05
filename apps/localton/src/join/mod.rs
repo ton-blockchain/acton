@@ -89,6 +89,20 @@ pub async fn run(args: JoinArgs) -> Result<()> {
             let toolchain = Toolchain::official(layout.clone(), binaries);
             let startup_timeout = Duration::from_secs(args.startup_timeout);
 
+            let dump = match args.dump.as_deref() {
+                Some(path) => Some(dunce::canonicalize(path).with_context(|| {
+                    format!("failed to resolve TON database dump {}", path.display())
+                })?),
+                None => None,
+            };
+
+            if let Some(path) = dump.as_deref() {
+                anyhow::ensure!(
+                    !path.starts_with(&layout.root),
+                    "TON database dump must be outside the Localton state directory"
+                );
+            }
+
             // Publish instance ownership before any persistent child starts. Every
             // later error converges on the cleanup boundary outside this block.
             RuntimeState::update_atomic(&layout.runtime, |runtime| {
@@ -105,6 +119,7 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                 &toolchain,
                 node_settings,
                 startup_timeout,
+                dump.as_deref(),
             )
             .await
             .with_context(|| format!("failed to initialize joined node `{node_name}`"))?;
@@ -122,7 +137,11 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                 node_settings,
                 startup_timeout,
                 node::NodeStartOptions {
-                    celldb_in_memory: args.celldb_in_memory,
+                    celldb_mode: if args.celldb_in_memory {
+                        node::CellDbMode::InMemory
+                    } else {
+                        node::CellDbMode::OnDisk
+                    },
                 },
                 &processes,
             )

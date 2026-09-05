@@ -1,0 +1,3 @@
+
+    Stopping Acton Studio gracefully (shutdown requested)
+     Stopped Acton Studio gracefully in [TIME]

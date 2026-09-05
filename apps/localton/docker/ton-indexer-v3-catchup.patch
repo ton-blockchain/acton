@@ -19,3 +19,41 @@ diff --git a/ton-index-worker/index-engine/src/IndexScheduler.cpp b/ton-index-wo
      } else if (is_in_sync_ && (last_known_seqno_ - last_indexed_seqno_ > IS_IN_SYNC_THRESHOLD)) {
          LOG(WARNING) << "Indexing is out of sync with TON node";
          is_in_sync_ = false;
+diff --git a/ton-index-worker/CMakeLists.txt b/ton-index-worker/CMakeLists.txt
+--- a/ton-index-worker/CMakeLists.txt
++++ b/ton-index-worker/CMakeLists.txt
+@@ -28,3 +28,18 @@
+ find_package(Git REQUIRED)
++# Apply separately from the secondary-open patch, which existing builds may
++# already contain. Configure time ensures Ninja sees the changed source before
++# deciding which existing RocksDB objects need recompilation.
++execute_process(
++  COMMAND ${CMAKE_COMMAND}
++    -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
++    -DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/patches/limit-table-opening-threads.patch
++    -DPATCH_WORKING_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/external/ton/third-party/rocksdb
++    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ApplyPatch.cmake
++  RESULT_VARIABLE rocksdb_thread_limit_patch_result
++)
++if(NOT rocksdb_thread_limit_patch_result EQUAL 0)
++  message(FATAL_ERROR "Failed to apply RocksDB table-opening thread limit")
++endif()
++
+ set(TON_INDEXER_ROCKSDB_SECONDARY_OPEN_PATCH
+     ${CMAKE_CURRENT_SOURCE_DIR}/patches/fix-secondary-open.patch)
+diff --git a/ton-index-worker/patches/limit-table-opening-threads.patch b/ton-index-worker/patches/limit-table-opening-threads.patch
+new file mode 100644
+--- /dev/null
++++ b/ton-index-worker/patches/limit-table-opening-threads.patch
+@@ -0,0 +1,11 @@
++diff --git a/db/version_builder.cc b/db/version_builder.cc
++--- a/db/version_builder.cc
+++++ b/db/version_builder.cc
++@@ -1732,3 +1732,6 @@
++     std::vector<port::Thread> threads;
++-    for (int i = 1; i < max_threads; i++) {
+++    // Secondary catch-up often has no new SSTs. Avoid creating idle workers
+++    // on every poll, but keep parallel opening when multiple files need it.
+++    for (int i = 1; i < max_threads && static_cast<size_t>(i) < files_meta.size();
+++         i++) {
++       threads.emplace_back(load_handlers_func);

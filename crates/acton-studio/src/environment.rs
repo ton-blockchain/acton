@@ -23,19 +23,7 @@ pub struct FullTonAccountImport {
     pub(crate) shard_account_boc_hex: Option<String>,
 }
 
-/// A Localton node managed as part of a full TON Studio environment.
-///
-/// The genesis node owns the shared HTTP APIs and indexer. Entries in this
-/// collection are additional validator-engine instances that join the same
-/// chain and publish telemetry to the genesis observability collector.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct FullTonNode {
-    pub id: String,
-    pub name: String,
-    pub validator: bool,
-    pub port_base: u16,
-}
+pub use acton_localnet::Node as FullTonNode;
 
 /// User-selected properties for a node that Studio should join to a running network.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -83,7 +71,7 @@ impl FullTonAccountImport {
     rename_all_fields = "camelCase"
 )]
 pub enum CreateEnvironmentConfig {
-    ActonLocalnet {
+    ActonSimulatedLocalnet {
         port: Option<u16>,
         fork_network: Option<String>,
         fork_block_number: Option<u64>,
@@ -127,21 +115,7 @@ pub struct CreateEnvironmentSnapshotRequest {
     pub name: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct EnvironmentSnapshot {
-    pub format_version: u32,
-    pub id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    pub created_at: u64,
-    pub archive_size_bytes: u64,
-    pub state_size_bytes: u64,
-    pub state_schema_version: u32,
-    pub ton_release: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub masterchain_seqno: Option<u32>,
-}
+pub use acton_localnet::Snapshot as EnvironmentSnapshot;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -163,18 +137,7 @@ pub enum EnvironmentSnapshotOperationPhase {
     Failed,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct EnvironmentStartupTimings {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub compose_ms: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ton_ready_ms: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub indexer_ready_ms: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub api_ready_ms: Option<u64>,
-}
+pub use acton_localnet::StartupTimings as EnvironmentStartupTimings;
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -212,7 +175,7 @@ impl EnvironmentSnapshotOperation {
     rename_all_fields = "camelCase"
 )]
 pub enum EnvironmentConfig {
-    ActonLocalnet {
+    ActonSimulatedLocalnet {
         port: u16,
         fork_network: Option<String>,
         fork_block_number: Option<u64>,
@@ -259,6 +222,7 @@ pub enum EnvironmentCapability {
     ControlApi,
     Explorer,
     Integration,
+    TestnetFaucet,
     GramFaucet,
     JettonFaucet,
     Wallets,
@@ -270,6 +234,7 @@ pub enum EnvironmentCapability {
     Snapshots,
     Checkpoints,
     Observability,
+    Health,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
@@ -403,7 +368,7 @@ impl EnvironmentConfig {
     #[must_use]
     pub fn capabilities(&self) -> Vec<EnvironmentCapability> {
         match self {
-            Self::ActonLocalnet { .. } => vec![
+            Self::ActonSimulatedLocalnet { .. } => vec![
                 EnvironmentCapability::ApiV2,
                 EnvironmentCapability::ApiV3,
                 EnvironmentCapability::ControlApi,
@@ -433,24 +398,31 @@ impl EnvironmentConfig {
                 EnvironmentCapability::ApiCalls,
                 EnvironmentCapability::Snapshots,
                 EnvironmentCapability::Observability,
+                EnvironmentCapability::Health,
             ],
-            Self::RemoteTonNetwork { .. } => vec![
-                EnvironmentCapability::ApiV2,
-                EnvironmentCapability::ApiV3,
-                EnvironmentCapability::Explorer,
-                EnvironmentCapability::Integration,
-                EnvironmentCapability::Wallets,
-                EnvironmentCapability::Simulator,
-                EnvironmentCapability::Contracts,
-                EnvironmentCapability::ApiCalls,
-            ],
+            Self::RemoteTonNetwork { network } => {
+                let mut capabilities = vec![
+                    EnvironmentCapability::ApiV2,
+                    EnvironmentCapability::ApiV3,
+                    EnvironmentCapability::Explorer,
+                    EnvironmentCapability::Integration,
+                    EnvironmentCapability::Wallets,
+                    EnvironmentCapability::Simulator,
+                    EnvironmentCapability::Contracts,
+                    EnvironmentCapability::ApiCalls,
+                ];
+                if *network == PublicTonNetwork::Testnet {
+                    capabilities.insert(4, EnvironmentCapability::TestnetFaucet);
+                }
+                capabilities
+            }
         }
     }
 
     #[must_use]
     pub fn network(&self) -> EnvironmentNetwork {
         match self {
-            Self::ActonLocalnet {
+            Self::ActonSimulatedLocalnet {
                 fork_network: Some(network),
                 ..
             } => EnvironmentNetwork {
@@ -464,8 +436,8 @@ impl EnvironmentConfig {
                 test_only: true,
                 supports_actions: false,
             },
-            Self::ActonLocalnet { .. } => EnvironmentNetwork {
-                id: "acton-localnet".to_owned(),
+            Self::ActonSimulatedLocalnet { .. } => EnvironmentNetwork {
+                id: "acton-simulated-localnet".to_owned(),
                 label: "Simulated localnet".to_owned(),
                 chain_id: -3,
                 test_only: true,
@@ -536,6 +508,20 @@ pub trait EnvironmentRuntime: Send + Sync {
     fn stop(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment>;
 
     fn restart(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment>;
+
+    /// Returns live infrastructure health when the environment has an external owner.
+    /// Implementations must not infer service state from saved environment metadata.
+    fn health(
+        &self,
+        _environment_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, acton_localnet::NetworkHealth> {
+        Box::pin(async {
+            Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_health_unavailable",
+                message: "Health diagnostics are not available for this environment".to_owned(),
+            })
+        })
+    }
 
     fn add_full_ton_node(
         &self,

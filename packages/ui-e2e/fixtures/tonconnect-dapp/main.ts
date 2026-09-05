@@ -9,6 +9,7 @@ const bridgeUrl = import.meta.env.VITE_TON_CONNECT_BRIDGE_URL
 const status = getElement<HTMLParagraphElement>("status")
 const connectButton = getElement<HTMLButtonElement>("connect")
 const connectionUrl = getElement<HTMLTextAreaElement>("connection-url")
+const sendTransactionButton = getElement<HTMLButtonElement>("send-transaction")
 const signTextButton = getElement<HTMLButtonElement>("sign-text")
 const signCellButton = getElement<HTMLButtonElement>("sign-cell")
 const result = getElement<HTMLPreElement>("result")
@@ -26,7 +27,7 @@ connector.setConnectionNetwork("-3")
 connector.onStatusChange(wallet => {
   const account = wallet?.account
   status.textContent = account ? `Connected: ${account.address}` : "Not connected"
-  setSignatureButtonsDisabled(!account)
+  setRequestButtonsDisabled(!account)
 })
 
 connectButton.addEventListener("click", () => {
@@ -37,8 +38,45 @@ connectButton.addEventListener("click", () => {
   status.textContent = "Waiting for wallet approval"
 })
 
+sendTransactionButton.addEventListener("click", () => requestTransaction())
 signTextButton.addEventListener("click", () => requestSignature("text"))
 signCellButton.addEventListener("click", () => requestSignature("cell"))
+
+async function requestTransaction(): Promise<void> {
+  const {account} = connector
+  if (!account) {
+    return
+  }
+
+  setRequestButtonsDisabled(true)
+  status.textContent = "Waiting for transaction approval"
+  result.textContent = "Transaction requested"
+
+  try {
+    const sent = await connector.sendTransaction({
+      validUntil: Math.floor(Date.now() / 1000) + 300,
+      network: account.chain,
+      from: account.address,
+      messages: [
+        {
+          address: "EQBBJBB3HagsujBqVfqeDUPJ0kXjgTPLWPFFffuNXNiJL0aA",
+          amount: "2500000000",
+        },
+        {
+          address: "EQDmnxDMhId6v1Ofg_h5KR5coWlFG6e86Ro3pc7Tq4CA0-Jn",
+          amount: "250000000",
+        },
+      ],
+    })
+    result.textContent = JSON.stringify(sent, null, 2)
+    status.textContent = "Transaction sent"
+  } catch (error) {
+    result.textContent = error instanceof Error ? error.message : String(error)
+    status.textContent = "Transaction failed"
+  } finally {
+    setRequestButtonsDisabled(false)
+  }
+}
 
 async function requestSignature(kind: SignatureKind): Promise<void> {
   const {account} = connector
@@ -62,7 +100,7 @@ async function requestSignature(kind: SignatureKind): Promise<void> {
           from: account.address,
         }
 
-  setSignatureButtonsDisabled(true)
+  setRequestButtonsDisabled(true)
   status.textContent = `Waiting for ${kind} signature`
   result.textContent = `${kind} signature requested`
 
@@ -74,11 +112,12 @@ async function requestSignature(kind: SignatureKind): Promise<void> {
     result.textContent = error instanceof Error ? error.message : String(error)
     status.textContent = "Signature failed"
   } finally {
-    setSignatureButtonsDisabled(false)
+    setRequestButtonsDisabled(false)
   }
 }
 
-function setSignatureButtonsDisabled(disabled: boolean): void {
+function setRequestButtonsDisabled(disabled: boolean): void {
+  sendTransactionButton.disabled = disabled
   signTextButton.disabled = disabled
   signCellButton.disabled = disabled
 }

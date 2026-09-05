@@ -47,7 +47,7 @@
       ]
     },
     "localnet": {
-      "description": "Default settings for `acton localnet` commands",
+      "description": "Shared settings for the localnet target and local development services",
       "allOf": [
         {
           "$ref": "#/definitions/LocalnetSettings"
@@ -1069,34 +1069,34 @@
       }
     },
     "LocalnetSettings": {
-      "description": "Default settings for `acton localnet` commands",
+      "description": "Shared settings for the localnet target and local development services",
       "type": "object",
       "properties": {
         "accounts": {
-          "description": "Wallet names from `[wallets]` that are automatically funded and deployed on `acton localnet start`",
+          "description": "Wallet names from `[wallets]` that are funded and deployed when localnet starts",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "block-interval-ms": {
-          "description": "Block production interval in milliseconds for `acton localnet start`",
+          "description": "Localnet block production interval in milliseconds",
           "type": "integer",
           "format": "uint64",
           "minimum": 1.0
         },
         "db-path": {
-          "description": "Path to an `SQLite` database used by `acton localnet start` for persistent node state",
+          "description": "Path to an `SQLite` database used for persistent localnet state",
           "type": "string"
         },
         "fork-block-number": {
-          "description": "Block sequence number used by `acton localnet start` when forking from historical state",
+          "description": "Remote masterchain block sequence number used for a historical localnet fork",
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
         },
         "fork-net": {
-          "description": "Network to fork from used by `acton localnet start`",
+          "description": "Remote network used as the source of forked localnet state",
           "allOf": [
             {
               "$ref": "#/definitions/Network"
@@ -1108,11 +1108,11 @@
           "type": "boolean"
         },
         "no-mining": {
-          "description": "Disable automatic block production for `acton localnet start`",
+          "description": "Disable automatic localnet block production",
           "type": "boolean"
         },
         "port": {
-          "description": "Localnet port used by `acton localnet` commands",
+          "description": "HTTP port used by localnet services and tools",
           "default": 3000,
           "type": "integer",
           "format": "uint16",
@@ -1120,13 +1120,13 @@
           "minimum": 0.0
         },
         "rate-limit": {
-          "description": "Maximum number of API requests per second served by `Localnet` `/api` endpoints",
+          "description": "Maximum number of API requests per second served by localnet `/api` endpoints",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
         },
         "response-delay-ms": {
-          "description": "Response delay in milliseconds for `Localnet` `/api/v2`, `/api/v3`, and `/api/emulate/v1` endpoints",
+          "description": "Response delay in milliseconds for localnet `/api/v2`, `/api/v3`, and `/api/emulate/v1` endpoints",
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0

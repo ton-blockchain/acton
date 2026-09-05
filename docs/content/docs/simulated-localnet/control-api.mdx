@@ -1,0 +1,308 @@
+---
+title: Localnet Control
+description: >-
+  Acton-only control routes for local state, wallets, address names, compiler
+  ABI metadata, simulated network conditions, and raw local message injection.
+
+
+  These routes are intended for local development tooling and should not be
+  exposed publicly. When localnet is started with --require-auth, these routes
+  require the localnet API token. Rate limiting applies only to /api routes, and
+  response delay applies only to TonCenter-compatible API routes; control routes
+  remain available when --rate-limit or --response-delay-ms is enabled.
+full: true
+sidebarTitle: Control API
+_openapi:
+  toc:
+    - depth: 2
+      title: Fund an account
+      url: '#fund-an-account'
+    - depth: 2
+      title: Mint jettons to an account
+      url: '#mint-jettons-to-an-account'
+    - depth: 2
+      title: Get address names
+      url: '#get-address-names'
+    - depth: 2
+      title: Set an address name
+      url: '#set-an-address-name'
+    - depth: 2
+      title: Get compiler ABI metadata
+      url: '#get-compiler-abi-metadata'
+    - depth: 2
+      title: List registered compiler ABI metadata
+      url: '#list-registered-compiler-abi-metadata'
+    - depth: 2
+      title: Delete registered compiler ABI metadata
+      url: '#delete-registered-compiler-abi-metadata'
+    - depth: 2
+      title: Get verified contract source
+      url: '#get-verified-contract-source'
+    - depth: 2
+      title: Get registered contract source
+      url: '#get-registered-contract-source'
+    - depth: 2
+      title: List registered contract sources
+      url: '#list-registered-contract-sources'
+    - depth: 2
+      title: Delete registered contract source
+      url: '#delete-registered-contract-source'
+    - depth: 2
+      title: Register compiler ABI metadata
+      url: '#register-compiler-abi-metadata'
+    - depth: 2
+      title: Register contract sources
+      url: '#register-contract-sources'
+    - depth: 2
+      title: Download local state
+      url: '#download-local-state'
+    - depth: 2
+      title: Load local state
+      url: '#load-local-state'
+    - depth: 2
+      title: Create checkpoint
+      url: '#create-checkpoint'
+    - depth: 2
+      title: List checkpoints
+      url: '#list-checkpoints'
+    - depth: 2
+      title: Restore checkpoint
+      url: '#restore-checkpoint'
+    - depth: 2
+      title: Delete checkpoint
+      url: '#delete-checkpoint'
+    - depth: 2
+      title: Clear checkpoints
+      url: '#clear-checkpoints'
+    - depth: 2
+      title: Download checkpoint
+      url: '#download-checkpoint'
+    - depth: 2
+      title: Import checkpoint
+      url: '#import-checkpoint'
+    - depth: 2
+      title: Replace blockchain config
+      url: '#replace-blockchain-config'
+    - depth: 2
+      title: Set a ShardAccount
+      url: '#set-a-shardaccount'
+    - depth: 2
+      title: Change account state
+      url: '#change-account-state'
+    - depth: 2
+      title: Send a raw internal message
+      url: '#send-a-raw-internal-message'
+    - depth: 2
+      title: List startup accounts
+      url: '#list-startup-accounts'
+    - depth: 2
+      title: Mine localnet blocks
+      url: '#mine-localnet-blocks'
+    - depth: 2
+      title: Increase virtual time
+      url: '#increase-virtual-time'
+    - depth: 2
+      title: Set virtual time
+      url: '#set-virtual-time'
+    - depth: 2
+      title: Set next block timestamp
+      url: '#set-next-block-timestamp'
+    - depth: 2
+      title: Set simulated network conditions
+      url: '#set-simulated-network-conditions'
+    - depth: 2
+      title: Get node status
+      url: '#get-node-status'
+  structuredData:
+    headings:
+      - content: Fund an account
+        id: fund-an-account
+      - content: Mint jettons to an account
+        id: mint-jettons-to-an-account
+      - content: Get address names
+        id: get-address-names
+      - content: Set an address name
+        id: set-an-address-name
+      - content: Get compiler ABI metadata
+        id: get-compiler-abi-metadata
+      - content: List registered compiler ABI metadata
+        id: list-registered-compiler-abi-metadata
+      - content: Delete registered compiler ABI metadata
+        id: delete-registered-compiler-abi-metadata
+      - content: Get verified contract source
+        id: get-verified-contract-source
+      - content: Get registered contract source
+        id: get-registered-contract-source
+      - content: List registered contract sources
+        id: list-registered-contract-sources
+      - content: Delete registered contract source
+        id: delete-registered-contract-source
+      - content: Register compiler ABI metadata
+        id: register-compiler-abi-metadata
+      - content: Register contract sources
+        id: register-contract-sources
+      - content: Download local state
+        id: download-local-state
+      - content: Load local state
+        id: load-local-state
+      - content: Create checkpoint
+        id: create-checkpoint
+      - content: List checkpoints
+        id: list-checkpoints
+      - content: Restore checkpoint
+        id: restore-checkpoint
+      - content: Delete checkpoint
+        id: delete-checkpoint
+      - content: Clear checkpoints
+        id: clear-checkpoints
+      - content: Download checkpoint
+        id: download-checkpoint
+      - content: Import checkpoint
+        id: import-checkpoint
+      - content: Replace blockchain config
+        id: replace-blockchain-config
+      - content: Set a ShardAccount
+        id: set-a-shardaccount
+      - content: Change account state
+        id: change-account-state
+      - content: Send a raw internal message
+        id: send-a-raw-internal-message
+      - content: List startup accounts
+        id: list-startup-accounts
+      - content: Mine localnet blocks
+        id: mine-localnet-blocks
+      - content: Increase virtual time
+        id: increase-virtual-time
+      - content: Set virtual time
+        id: set-virtual-time
+      - content: Set next block timestamp
+        id: set-next-block-timestamp
+      - content: Set simulated network conditions
+        id: set-simulated-network-conditions
+      - content: Get node status
+        id: get-node-status
+    contents:
+      - content: >-
+          Queues a local faucet transfer to credit an address. The transfer is
+          included on the next automatic or manually mined block.
+        heading: fund-an-account
+      - content: >-
+          Finds the jetton master in localnet state, verifies that it is
+          mintable and has an admin, converts the display amount using the
+          decimals from jetton metadata, preflights the legacy 0x15 and current
+          0x642b7d07 mint layouts, and queues the uniquely accepted message for
+          the next block.
+        heading: mint-jettons-to-an-account
+      - content: >-
+          Returns local names for the requested addresses. Missing names are
+          returned as null.
+        heading: get-address-names
+      - content: Sets or updates the local name for an address.
+        heading: set-an-address-name
+      - content: >-
+          Returns extended contract ABI metadata for the requested code hashes.
+          Missing ABI entries are returned as null.
+        heading: get-compiler-abi-metadata
+      - content: >-
+          Returns compiler ABI metadata registered directly in the localnet
+          node.
+        heading: list-registered-compiler-abi-metadata
+      - content: >-
+          Deletes a locally registered compiler ABI entry by code hash or one of
+          its code hash aliases.
+        heading: delete-registered-compiler-abi-metadata
+      - content: >-
+          Proxies Acton verifier source lookup by address or code hash and
+          returns the verified source bundle when the contract is confirmed.
+        heading: get-verified-contract-source
+      - content: >-
+          Returns the source bundle registered directly in the localnet node for
+          an address or code hash.
+        heading: get-registered-contract-source
+      - content: >-
+          Returns source bundles registered directly in the localnet node, one
+          per code hash.
+        heading: list-registered-contract-sources
+      - content: Deletes a locally registered source bundle by code hash.
+        heading: delete-registered-contract-source
+      - content: >-
+          Registers one or more extended compiler ABI payloads for later
+          explorer and API lookups by code hash.
+        heading: register-compiler-abi-metadata
+      - content: >-
+          Registers one or more source artifacts for later explorer source-code
+          and retrace lookups by code hash.
+        heading: register-contract-sources
+      - content: Returns the current live localnet state as a JSON document.
+        heading: download-local-state
+      - content: >-
+          Replaces the current node state from the request body and clears all
+          checkpoints.
+        heading: load-local-state
+      - content: Creates a named in-memory checkpoint for the current localnet state.
+        heading: create-checkpoint
+      - content: Lists named in-memory checkpoints in the current localnet process.
+        heading: list-checkpoints
+      - content: >-
+          Restores a checkpoint without deleting it or checkpoints created after
+          it.
+        heading: restore-checkpoint
+      - content: >-
+          Validates and replaces the full blockchain config dictionary from a
+          base64-encoded BOC, then commits the change in a config-only block.
+        heading: replace-blockchain-config
+      - content: >-
+          Replaces the selected account state with a base64-encoded ShardAccount
+          BOC.
+        heading: set-a-shardaccount
+      - content: >-
+          Changes the selected local account state to nonexist, uninit, or
+          frozen. When state is frozen with source=current, set mine=false to
+          queue the synthetic freeze transaction for the next mined block
+          instead of committing a block immediately.
+        heading: change-account-state
+      - content: >-
+          Injects a base64-encoded internal message BOC into the local internal
+          queue. TonCenter-compatible message endpoints accept external-in
+          messages only.
+        heading: send-a-raw-internal-message
+      - content: >-
+          Returns public account descriptors selected when the localnet server
+          started.
+        heading: list-startup-accounts
+      - content: >-
+          Manually mines queued and/or empty localnet blocks. When the request
+          body is omitted or blocks is not provided, one block is mined.
+        heading: mine-localnet-blocks
+      - content: >-
+          Adds seconds to the localnet virtual clock. Future blocks use this
+          adjusted time until it is changed again.
+        heading: increase-virtual-time
+      - content: >-
+          Sets the localnet virtual clock to a Unix timestamp. The timestamp
+          must not be lower than the latest mined block time.
+        heading: set-virtual-time
+      - content: >-
+          Sets a one-shot Unix timestamp for the next mined block. The timestamp
+          is consumed by the next automatic or manually mined block and must not
+          be lower than the latest mined block time.
+        heading: set-next-block-timestamp
+      - content: >-
+          Updates simulated network conditions while the localnet server is
+          running and returns the updated values. Set response_delay_ms to 0 to
+          disable response delay. Current values are also available from
+          /acton_nodeInfo.
+        heading: set-simulated-network-conditions
+      - content: >-
+          Returns uptime, latest block seqno, local or remote state-source
+          information, and current simulated network conditions.
+        heading: get-node-status
+---
+
+{/* @generated by `bun run generated-source`. Do not edit directly. */}
+
+Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.
+
+These routes are intended for local development tooling and should not be exposed publicly. When localnet is started with --require-auth, these routes require the localnet API token. Rate limiting applies only to /api routes, and response delay applies only to TonCenter-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled.
+
+<APIPage document={"./public/openapi/acton-simulated-localnet-control.openapi.json"} webhooks={[]} operations={[{"path":"/acton_fundAccount","method":"post"},{"path":"/acton_fundJetton","method":"post"},{"path":"/acton_getAddressName","method":"get"},{"path":"/acton_setAddressName","method":"post"},{"path":"/acton_getCompilerAbi","method":"get"},{"path":"/acton_listCompilerAbis","method":"get"},{"path":"/acton_deleteCompilerAbi","method":"post"},{"path":"/acton_getVerifiedSource","method":"get"},{"path":"/acton_getRegisteredVerifiedSource","method":"get"},{"path":"/acton_listVerifiedSources","method":"get"},{"path":"/acton_deleteVerifiedSource","method":"post"},{"path":"/acton_registerCompilerAbis","method":"post"},{"path":"/acton_registerVerifiedSources","method":"post"},{"path":"/acton_dumpState","method":"get"},{"path":"/acton_loadState","method":"post"},{"path":"/acton_createCheckpoint","method":"post"},{"path":"/acton_listCheckpoints","method":"get"},{"path":"/acton_restoreCheckpoint","method":"post"},{"path":"/acton_deleteCheckpoint","method":"post"},{"path":"/acton_clearCheckpoints","method":"post"},{"path":"/acton_exportCheckpoint","method":"get"},{"path":"/acton_importCheckpoint","method":"post"},{"path":"/acton_setConfig","method":"post"},{"path":"/acton_setShardAccount","method":"post"},{"path":"/acton_changeAccountState","method":"post"},{"path":"/acton_sendInternalMessage","method":"post"},{"path":"/acton_getStartupAccounts","method":"get"},{"path":"/acton_mine","method":"post"},{"path":"/acton_increaseTime","method":"post"},{"path":"/acton_setTime","method":"post"},{"path":"/acton_setNextBlockTimestamp","method":"post"},{"path":"/acton_setNetworkConditions","method":"post"},{"path":"/acton_nodeInfo","method":"get"}]} showTitle />

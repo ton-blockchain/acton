@@ -1,5 +1,5 @@
 use crate::commands::common::{create_symlink, error_fmt, select_wallet};
-use crate::wallets;
+use crate::{commands, wallets};
 use acton_config::color::OwoColorize;
 use acton_config::config;
 use acton_config::config::{
@@ -597,7 +597,7 @@ fn perform_localnet_airdrop(
         .build()
         .context("Failed to build HTTP client")?;
     let amount_nanograms = (amount_grams * 1_000_000_000.0) as u128;
-    let auth_token = crate::commands::localnet::resolve_localnet_auth_token(None);
+    let auth_token = commands::simulated_localnet::resolve_localnet_auth_token(None);
     let initial_balance =
         fetch_localnet_account_balance(&client, port, &address, auth_token.as_deref());
     let request = client
@@ -609,7 +609,7 @@ fn perform_localnet_airdrop(
     let response = with_localnet_blocking_auth(request, auth_token.as_deref())
         .send()
         .context(
-            "Failed to send request to localnet faucet. Make sure `acton localnet start` is running",
+            "Failed to send request to localnet faucet. Make sure `acton simulated-localnet start` is running",
         )?;
 
     if response.status().is_success() {

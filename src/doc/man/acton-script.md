@@ -274,7 +274,7 @@ Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
 `TONCENTER_TESTNET_API_KEY`, depending on the selected network.
 
 Protected `localnet` requests read `ACTON_LOCALNET_AUTH_TOKEN`. Use the token
-printed by `acton localnet start --require-auth`.
+printed by `acton simulated-localnet start --require-auth`.
 
 For `custom:<name>`, Acton reads `<NORMALIZED_NAME>_API_KEY`. Custom network
 names are uppercased and non-alphanumeric characters are replaced with `_`, so

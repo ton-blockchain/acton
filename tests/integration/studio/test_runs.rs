@@ -124,9 +124,7 @@ fn studio_api_runs_selected_tests_and_captures_output() {
             .any(|run| run["id"] == run_id && run["status"] == "passed")
     );
 
-    let output = studio.stop();
-    assert!(output.status.success());
-    assert!(output.stderr.is_empty());
+    studio.stop();
 }
 
 #[cfg(unix)]
@@ -176,9 +174,7 @@ fn studio_api_records_failed_test_runs() {
     );
     assert!(stderr.is_empty(), "captured stderr:\n{stderr}");
 
-    let output = studio.stop();
-    assert!(output.status.success());
-    assert!(output.stderr.is_empty());
+    studio.stop();
 }
 
 #[cfg(unix)]
@@ -215,9 +211,7 @@ fn studio_api_cancels_a_running_test_process() {
         .expect("Studio cancellation conflict must contain valid JSON");
     assert_eq!(error["error"]["code"], "test_run_not_cancellable");
 
-    let output = studio.stop();
-    assert!(output.status.success());
-    assert!(output.stderr.is_empty());
+    studio.stop();
 }
 
 #[cfg(unix)]
@@ -237,9 +231,7 @@ fn studio_restores_test_history_after_restart() {
     let finished = wait_for_finished_run(&client, first_studio.url(), &run_id);
     assert_eq!(finished["status"], "passed");
 
-    let output = first_studio.stop();
-    assert!(output.status.success());
-    assert!(output.stderr.is_empty());
+    first_studio.stop();
 
     let restarted_studio = StudioCliProcess::start(&project);
     let restored = get_json(
@@ -263,9 +255,7 @@ fn studio_restores_test_history_after_restart() {
             .any(|run| run["id"] == run_id && run["status"] == "passed")
     );
 
-    let output = restarted_studio.stop();
-    assert!(output.status.success());
-    assert!(output.stderr.is_empty());
+    restarted_studio.stop();
 }
 
 #[cfg(unix)]
@@ -300,9 +290,7 @@ fn studio_api_runs_only_the_requested_test_path() {
     assert_eq!(reports.len(), 1);
     assert_eq!(reports[0]["name"], "test requested path");
 
-    let output = studio.stop();
-    assert!(output.status.success());
-    assert!(output.stderr.is_empty());
+    studio.stop();
 }
 
 #[cfg(unix)]
@@ -340,9 +328,7 @@ fn studio_api_rejects_empty_test_path_and_filter() {
     let runs = get_json(&client, &format!("{}/api/v1/test-runs", studio.url()));
     assert_eq!(runs, json!([]));
 
-    let output = studio.stop();
-    assert!(output.status.success());
-    assert!(output.stderr.is_empty());
+    studio.stop();
 }
 
 fn studio_client() -> Client {

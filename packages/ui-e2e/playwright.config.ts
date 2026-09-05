@@ -8,8 +8,10 @@ const localnetNodePort = Number(process.env.ACTON_UI_E2E_NODE_PORT ?? 15_411)
 const explorerUiPort = Number(process.env.ACTON_UI_E2E_EXPLORER_UI_PORT ?? 14_307)
 const tonConnectDappPort = Number(process.env.ACTON_UI_E2E_TONCONNECT_DAPP_PORT ?? 14_308)
 const tonConnectBridgePort = Number(process.env.ACTON_UI_E2E_TONCONNECT_BRIDGE_PORT ?? 14_309)
+const studioUiPort = Number(process.env.ACTON_UI_E2E_STUDIO_UI_PORT ?? 14_310)
 const tonConnectBridgeUrl = `http://127.0.0.1:${tonConnectBridgePort}/bridge`
 const actonBinary = process.env.ACTON_E2E_BIN ?? path.join(repositoryRoot, "target/debug/acton")
+const studioProjectRoot = path.join(repositoryRoot, "packages/ui-e2e/fixtures/studio-project")
 
 export default defineConfig({
   testDir: "./e2e",
@@ -44,10 +46,19 @@ export default defineConfig({
         viewport: {width: 1440, height: 1000},
       },
     },
+    {
+      name: "studio-desktop",
+      testMatch: /studio\/.*\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        baseURL: `http://127.0.0.1:${studioUiPort}`,
+        viewport: {width: 1440, height: 1000},
+      },
+    },
   ],
   webServer: [
     {
-      command: `${JSON.stringify(actonBinary)} localnet start --port ${localnetNodePort} --load-state packages/ui-e2e/fixtures/localnet/ui-state.json --no-mining`,
+      command: `${JSON.stringify(actonBinary)} simulated-localnet start --port ${localnetNodePort} --load-state packages/ui-e2e/fixtures/localnet/ui-state.json --no-mining`,
       cwd: repositoryRoot,
       url: `http://127.0.0.1:${localnetNodePort}/acton_nodeInfo`,
       reuseExistingServer: false,
@@ -73,6 +84,17 @@ export default defineConfig({
       port: tonConnectDappPort,
       reuseExistingServer: false,
       timeout: 30_000,
+    },
+    {
+      command: `bun run build && ${JSON.stringify(actonBinary)} studio --project-root ${JSON.stringify(studioProjectRoot)} start --port ${studioUiPort} --no-open`,
+      cwd: path.join(repositoryRoot, "packages/studio-ui"),
+      env: {
+        VITE_TON_CONNECT_BRIDGE_URL: tonConnectBridgeUrl,
+        XDG_CONFIG_HOME: path.join(repositoryRoot, "target/ui-e2e/studio-config"),
+      },
+      url: `http://127.0.0.1:${studioUiPort}/api/v1/health`,
+      reuseExistingServer: false,
+      timeout: 90_000,
     },
   ],
 })

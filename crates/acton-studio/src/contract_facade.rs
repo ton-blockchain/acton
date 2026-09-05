@@ -534,11 +534,11 @@ const fn registered_source_kind(environment: &StudioEnvironment) -> ContractSour
         EnvironmentConfig::FullTonNetwork { .. } | EnvironmentConfig::RemoteTonNetwork { .. } => {
             ContractSourceKind::Network
         }
-        EnvironmentConfig::ActonLocalnet {
+        EnvironmentConfig::ActonSimulatedLocalnet {
             fork_network: Some(_),
             ..
         } => ContractSourceKind::Fork,
-        EnvironmentConfig::ActonLocalnet { .. } => ContractSourceKind::Local,
+        EnvironmentConfig::ActonSimulatedLocalnet { .. } => ContractSourceKind::Local,
     }
 }
 

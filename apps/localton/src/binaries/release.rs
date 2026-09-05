@@ -16,7 +16,7 @@ pub(super) struct ReleaseAsset {
 pub(super) fn current_asset() -> Result<ReleaseAsset> {
     Ok(ReleaseAsset {
         file_name: "ton-mac-arm64.zip",
-        sha256: "9ada018614dd095594429f7684109c8e8d9d97b664168ea0c9771dcd347889d5",
+        sha256: "46cb42491213adf2adc9cb7e94c922249a586ba55b7dfe4e66626695a68b9d4b",
     })
 }
 
@@ -24,7 +24,7 @@ pub(super) fn current_asset() -> Result<ReleaseAsset> {
 pub(super) fn current_asset() -> Result<ReleaseAsset> {
     Ok(ReleaseAsset {
         file_name: "ton-mac-x86-64.zip",
-        sha256: "90172ea443974847e667e1d05a925c8f51b5e7ff52b75bff3d89449bd48051f2",
+        sha256: "479cfb6ac9a750683816c1db7501bdc6d2d1d5fdb9a11861b784efc4f734be2a",
     })
 }
 
@@ -32,7 +32,7 @@ pub(super) fn current_asset() -> Result<ReleaseAsset> {
 pub(super) fn current_asset() -> Result<ReleaseAsset> {
     Ok(ReleaseAsset {
         file_name: "ton-linux-arm64.zip",
-        sha256: "f93dd78d907d47507b3b41f74a4fcee5fefb5b164c3df1469d436100dfd87a7a",
+        sha256: "acb73cd85118754e149744d35c3ef4775f065c8545b49600f70ffe8dea68060e",
     })
 }
 
@@ -40,7 +40,7 @@ pub(super) fn current_asset() -> Result<ReleaseAsset> {
 pub(super) fn current_asset() -> Result<ReleaseAsset> {
     Ok(ReleaseAsset {
         file_name: "ton-linux-x86_64.zip",
-        sha256: "15a252cbe49f700f52863a397c615283e150ec0fa72eb5d55893d3346bec8d04",
+        sha256: "548f0f29b5ebf1a42d6aa23438b25c7a0c05b2330a7f278d2ca83fc2015685e9",
     })
 }
 

@@ -1,4 +1,5 @@
 pub mod abi_args;
+mod browser;
 pub mod build;
 pub mod check;
 pub mod common;
@@ -22,6 +23,7 @@ pub mod retrace;
 pub mod rpc;
 pub mod run;
 pub mod script;
+pub mod simulated_localnet;
 pub mod studio;
 pub mod test;
 pub mod up;

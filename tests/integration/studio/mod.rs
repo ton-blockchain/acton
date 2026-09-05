@@ -12,6 +12,7 @@ mod test_runs;
 
 const STUDIO_START_TIMEOUT: Duration = Duration::from_secs(10);
 const STUDIO_STOP_TIMEOUT: Duration = Duration::from_secs(5);
+const STUDIO_START_ATTEMPTS: usize = 5;
 
 struct StudioCliProcess {
     child: Option<Child>,
@@ -20,22 +21,42 @@ struct StudioCliProcess {
 
 impl StudioCliProcess {
     fn start(project: &Project) -> Self {
-        let (listener, port) = reserve_studio_port();
-        drop(listener);
-        let port_arg = port.to_string();
-        let url = format!("http://127.0.0.1:{port}");
-        let child = project
-            .acton()
-            .current_dir(project.path())
-            .args(["studio", "start", "--port", &port_arg, "--no-open"])
-            .spawn()
-            .expect("Studio CLI process must start");
-        let mut studio = Self {
-            child: Some(child),
-            url,
-        };
-        studio.wait_for_info();
-        studio
+        for attempt in 0..STUDIO_START_ATTEMPTS {
+            let (listener, port) = reserve_studio_port();
+            drop(listener);
+
+            let port_arg = port.to_string();
+            let url = format!("http://127.0.0.1:{port}");
+            let child = project
+                .acton()
+                .current_dir(project.path())
+                .args(["studio", "start", "--port", &port_arg, "--no-open"])
+                .spawn()
+                .expect("Studio CLI process must start");
+            let mut studio = Self {
+                child: Some(child),
+                url,
+            };
+
+            match studio.try_wait_for_info() {
+                Ok(_) => return studio,
+                Err(output)
+                    if attempt + 1 < STUDIO_START_ATTEMPTS
+                        && String::from_utf8_lossy(&output.stderr)
+                            .contains("Address already in use") =>
+                {
+                    // Another parallel test can claim the released ephemeral
+                    // port before Studio binds it. Retry only that exact race.
+                }
+                Err(output) => panic!(
+                    "Studio CLI exited before becoming ready\nstdout:\n{}\nstderr:\n{}",
+                    String::from_utf8_lossy(&output.stdout),
+                    String::from_utf8_lossy(&output.stderr)
+                ),
+            }
+        }
+
+        unreachable!("Studio startup attempts always return or panic")
     }
 
     fn id(&self) -> u32 {
@@ -50,6 +71,17 @@ impl StudioCliProcess {
     }
 
     fn wait_for_info(&mut self) -> StudioInfo {
+        match self.try_wait_for_info() {
+            Ok(info) => info,
+            Err(output) => panic!(
+                "Studio CLI exited before becoming ready\nstdout:\n{}\nstderr:\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            ),
+        }
+    }
+
+    fn try_wait_for_info(&mut self) -> Result<StudioInfo, Output> {
         let client = reqwest::blocking::Client::builder()
             .timeout(Duration::from_millis(250))
             .build()
@@ -60,9 +92,9 @@ impl StudioCliProcess {
             if let Ok(response) = client.get(format!("{}/api/v1/info", self.url)).send()
                 && response.status().is_success()
             {
-                return response
+                return Ok(response
                     .json()
-                    .expect("Studio info response must contain valid JSON");
+                    .expect("Studio info response must contain valid JSON"));
             }
 
             if self
@@ -73,17 +105,12 @@ impl StudioCliProcess {
                 .expect("Studio CLI process status must be readable")
                 .is_some()
             {
-                let output = self
+                return Err(self
                     .child
                     .take()
                     .expect("Studio CLI process must be available")
                     .wait_with_output()
-                    .expect("Studio CLI output must be readable");
-                panic!(
-                    "Studio CLI exited before becoming ready\nstdout:\n{}\nstderr:\n{}",
-                    String::from_utf8_lossy(&output.stdout),
-                    String::from_utf8_lossy(&output.stderr)
-                );
+                    .expect("Studio CLI output must be readable"));
             }
 
             assert!(
@@ -96,7 +123,7 @@ impl StudioCliProcess {
     }
 
     #[cfg(unix)]
-    fn stop(mut self) -> Output {
+    fn stop(mut self) {
         let child = self
             .child
             .as_mut()
@@ -121,11 +148,21 @@ impl StudioCliProcess {
             thread::sleep(Duration::from_millis(50));
         }
 
-        self.child
+        let output = self
+            .child
             .take()
             .expect("Studio CLI process must be available")
             .wait_with_output()
-            .expect("Studio CLI output must be readable")
+            .expect("Studio CLI output must be readable");
+
+        assert!(output.status.success());
+
+        // Shutdown progress is user-facing output, so every Studio process test
+        // checks the same snapshot instead of treating stderr as an error channel.
+        crate::common::assert_ui().eq(
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+            snapbox::file!["../../snapshots/studio/graceful_shutdown.stderr.txt"],
+        );
     }
 }
 

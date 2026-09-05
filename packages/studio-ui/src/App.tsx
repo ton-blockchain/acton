@@ -4,6 +4,8 @@ import {useLocation, useNavigate, useSearchParams} from "react-router"
 import {Button, CopyButton, ToastProvider, useToast} from "@acton/ui"
 
 import {StudioShell} from "./components/StudioShell"
+import {StudioConnectionOverlay} from "./components/StudioConnectionOverlay"
+import {useStudioConnection} from "./hooks/useStudioConnection"
 import {useStudioEnvironments, type StudioEnvironmentsState} from "./hooks/useStudioEnvironments"
 import {useStudioTestRuns} from "./hooks/useStudioTestRuns"
 import {EnvironmentNavigation} from "./localnet/dashboard/EnvironmentNavigation"
@@ -15,12 +17,7 @@ import {FeaturePage} from "./pages/FeaturePage"
 import {OverviewPage} from "./pages/OverviewPage"
 import {TestsPage} from "./pages/TestsPage"
 import {VirtualEnvironmentsPage} from "./pages/VirtualEnvironmentsPage"
-import {
-  fetchStudioInfo,
-  type StudioConnectionState,
-  type StudioEnvironment,
-  type StudioInfo,
-} from "./studioApi"
+import {fetchStudioInfo, type StudioEnvironment, type StudioInfo} from "./studioApi"
 import {studioFeaturePages, studioPages, type StudioPath} from "./studioPages"
 import {
   readStudioRoute,
@@ -150,7 +147,7 @@ function StudioWorkspace({
     onSelectTestRun,
   )
   const [studioInfo, setStudioInfo] = useState<StudioInfo>()
-  const [connectionState, setConnectionState] = useState<StudioConnectionState>("connecting")
+  const {connectionLost, connectionState, markConnected} = useStudioConnection()
   const [isEnvironmentCreateOpen, setIsEnvironmentCreateOpen] = useState(false)
   const [isTestRunOpen, setIsTestRunOpen] = useState(false)
   const [sidebarMode, setSidebarMode] = useState<"studio" | "environment">(() =>
@@ -166,15 +163,16 @@ function StudioWorkspace({
     fetchStudioInfo(controller.signal)
       .then(info => {
         setStudioInfo(info)
-        setConnectionState("connected")
+        markConnected()
       })
       .catch(error => {
-        if (error instanceof DOMException && error.name === "AbortError") return
-        setConnectionState("disconnected")
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setStudioInfo(undefined)
+        }
       })
 
     return () => controller.abort()
-  }, [])
+  }, [markConnected])
 
   useEffect(() => {
     const page = studioPages.find(candidate => candidate.path === activePath)
@@ -265,198 +263,202 @@ function StudioWorkspace({
     Boolean(environmentRoute && environment) && sidebarMode === "environment"
 
   return (
-    <StudioShell
-      activePath={activePath}
-      contentMode={
-        isEnvironmentDashboard
-          ? "workspace"
-          : environmentRoute
-            ? "full"
-            : hasSelectedTestRun
-              ? "workspace"
-              : "default"
-      }
-      headerMode={hasSelectedTestRun ? "hidden" : "visible"}
-      headerActions={
-        environmentRoute ? (
-          activeEnvironmentShell?.primaryAction ? (
+    <>
+      {connectionLost ? <StudioConnectionOverlay /> : undefined}
+
+      <StudioShell
+        activePath={activePath}
+        contentMode={
+          isEnvironmentDashboard
+            ? "workspace"
+            : environmentRoute
+              ? "full"
+              : hasSelectedTestRun
+                ? "workspace"
+                : "default"
+        }
+        headerMode={hasSelectedTestRun ? "hidden" : "visible"}
+        headerActions={
+          environmentRoute ? (
+            activeEnvironmentShell?.primaryAction ? (
+              <Button
+                variant="primary"
+                size="sm"
+                leadingIcon={
+                  activeEnvironmentShell.primaryAction.icon === "plus" ? (
+                    <Plus size={16} aria-hidden="true" />
+                  ) : (
+                    <Archive size={16} aria-hidden="true" />
+                  )
+                }
+                onClick={activeEnvironmentShell.primaryAction.onClick}
+              >
+                {activeEnvironmentShell.primaryAction.label}
+              </Button>
+            ) : activeEnvironmentShell?.rpcUrl ? (
+              <CopyButton
+                value={activeEnvironmentShell.rpcUrl}
+                label="Copy RPC endpoint"
+                copiedLabel="RPC endpoint copied"
+                size="sm"
+              >
+                Copy RPC
+              </CopyButton>
+            ) : undefined
+          ) : activePath === "/" ? (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<FlaskConical size={16} aria-hidden="true" />}
+                onClick={() => navigate("/tests")}
+              >
+                Tests
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                leadingIcon={<Boxes size={16} aria-hidden="true" />}
+                onClick={() => navigate("/virtual-environments")}
+              >
+                Virtual environments
+              </Button>
+            </>
+          ) : activeFeaturePage && ActiveFeatureIcon ? (
             <Button
               variant="primary"
               size="sm"
-              leadingIcon={
-                activeEnvironmentShell.primaryAction.icon === "plus" ? (
-                  <Plus size={16} aria-hidden="true" />
-                ) : (
-                  <Archive size={16} aria-hidden="true" />
-                )
-              }
-              onClick={activeEnvironmentShell.primaryAction.onClick}
+              leadingIcon={<ActiveFeatureIcon size={16} aria-hidden="true" />}
+              onClick={() => {
+                if (activePath === "/virtual-environments") {
+                  setIsEnvironmentCreateOpen(true)
+                } else if (activePath === "/tests") {
+                  setIsTestRunOpen(true)
+                } else {
+                  showIntegrationToast(activeFeaturePage.actionLabel)
+                }
+              }}
             >
-              {activeEnvironmentShell.primaryAction.label}
+              {activeFeaturePage.actionLabel}
             </Button>
-          ) : activeEnvironmentShell?.rpcUrl ? (
-            <CopyButton
-              value={activeEnvironmentShell.rpcUrl}
-              label="Copy RPC endpoint"
-              copiedLabel="RPC endpoint copied"
-              size="sm"
-            >
-              Copy RPC
-            </CopyButton>
           ) : undefined
-        ) : activePath === "/" ? (
-          <>
-            <Button
-              variant="secondary"
-              size="sm"
-              leadingIcon={<FlaskConical size={16} aria-hidden="true" />}
-              onClick={() => navigate("/tests")}
-            >
-              Tests
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              leadingIcon={<Boxes size={16} aria-hidden="true" />}
-              onClick={() => navigate("/virtual-environments")}
-            >
-              Virtual environments
-            </Button>
-          </>
-        ) : activeFeaturePage && ActiveFeatureIcon ? (
-          <Button
-            variant="primary"
-            size="sm"
-            leadingIcon={<ActiveFeatureIcon size={16} aria-hidden="true" />}
-            onClick={() => {
-              if (activePath === "/virtual-environments") {
-                setIsEnvironmentCreateOpen(true)
-              } else if (activePath === "/tests") {
-                setIsTestRunOpen(true)
-              } else {
-                showIntegrationToast(activeFeaturePage.actionLabel)
+        }
+        pageDescription={
+          environmentRoute
+            ? (activeEnvironmentShell?.pageDescription ??
+              (environment?.lifecycle === "external"
+                ? "Preparing this network"
+                : "Preparing this virtual environment"))
+            : undefined
+        }
+        pageTitle={
+          environmentRoute
+            ? (activeEnvironmentShell?.pageTitle ??
+              environment?.name ??
+              (environmentRoute.section === "networks" ? "Network" : "Virtual Environment"))
+            : undefined
+        }
+        pages={studioPages}
+        sidebarActiveEnvironmentId={
+          environmentRoute?.section === "virtual-environments"
+            ? environmentRoute.environmentId
+            : undefined
+        }
+        sidebarActiveNetworkId={
+          environmentRoute?.section === "networks" ? environmentRoute.environmentId : undefined
+        }
+        sidebarContextAction={
+          environmentRoute && environment && !showEnvironmentNavigation
+            ? {
+                label: environment.name,
+                onSelect: () => setSidebarMode("environment"),
               }
-            }}
-          >
-            {activeFeaturePage.actionLabel}
-          </Button>
-        ) : undefined
-      }
-      pageDescription={
-        environmentRoute
-          ? (activeEnvironmentShell?.pageDescription ??
-            (environment?.lifecycle === "external"
-              ? "Preparing this network"
-              : "Preparing this virtual environment"))
-          : undefined
-      }
-      pageTitle={
-        environmentRoute
-          ? (activeEnvironmentShell?.pageTitle ??
-            environment?.name ??
-            (environmentRoute.section === "networks" ? "Network" : "Virtual Environment"))
-          : undefined
-      }
-      pages={studioPages}
-      sidebarActiveEnvironmentId={
-        environmentRoute?.section === "virtual-environments"
-          ? environmentRoute.environmentId
-          : undefined
-      }
-      sidebarActiveNetworkId={
-        environmentRoute?.section === "networks" ? environmentRoute.environmentId : undefined
-      }
-      sidebarContextAction={
-        environmentRoute && environment && !showEnvironmentNavigation
-          ? {
-              label: environment.name,
-              onSelect: () => setSidebarMode("environment"),
-            }
-          : undefined
-      }
-      sidebarNavigation={
-        showEnvironmentNavigation && environment ? (
-          <EnvironmentNavigation
-            environmentName={environment.name}
-            onShowStudioNavigation={() => setSidebarMode("studio")}
+            : undefined
+        }
+        sidebarNavigation={
+          showEnvironmentNavigation && environment ? (
+            <EnvironmentNavigation
+              environmentName={environment.name}
+              onShowStudioNavigation={() => setSidebarMode("studio")}
+            />
+          ) : undefined
+        }
+        sidebarEnvironments={managedEnvironments}
+        sidebarNetworks={externalNetworks}
+        sidebarNavigationKey={
+          showEnvironmentNavigation && environment ? `environment:${environment.id}` : "studio"
+        }
+        sidebarSearch={
+          showEnvironmentNavigation ? <DashboardSearch client={runtime.client} /> : undefined
+        }
+        sidebarSelectedTestRunId={testRuns.selectedRunId}
+        sidebarTestRuns={testRuns.runs}
+        sidebarUtilityActions={
+          showEnvironmentNavigation ? (
+            <EnvironmentNavigationActions
+              localnetApiToken={runtime.localnetApiToken}
+              onOpenAuthTokenOverlay={runtime.openAuthOverlay}
+            />
+          ) : undefined
+        }
+        onNavigate={navigate}
+        onOpenEnvironment={openEnvironment}
+        onSelectTestRun={testRuns.selectRun}
+      >
+        {environmentRoute ? (
+          <Suspense fallback={null}>
+            <EnvironmentWorkspacePage
+              basePath={environmentRoute.basePath}
+              environment={environment}
+              isLoading={environmentsState.isLoading}
+              loadError={environmentLoadError}
+              onEnvironmentChange={environmentsState.setEnvironment}
+              onEnvironmentDelete={onDeleteEnvironment}
+              onRetry={environmentsState.refresh}
+              onShellChange={handleEnvironmentShellChange}
+            />
+          </Suspense>
+        ) : activePath === "/" ? (
+          <OverviewPage
+            connectionState={connectionState}
+            environments={managedEnvironments}
+            environmentsError={environmentsState.error}
+            environmentsLoading={environmentsState.isLoading}
+            projectName={projectName}
+            projectPath={configuredProjectPath}
+            testRuns={testRuns.runs}
+            testRunsError={testRuns.error}
+            testRunsLoading={testRuns.isLoading}
+            onNavigate={navigate}
+            onOpenEnvironment={openEnvironment}
+            onSelectTestRun={testRuns.selectRun}
           />
-        ) : undefined
-      }
-      sidebarEnvironments={managedEnvironments}
-      sidebarNetworks={externalNetworks}
-      sidebarNavigationKey={
-        showEnvironmentNavigation && environment ? `environment:${environment.id}` : "studio"
-      }
-      sidebarSearch={
-        showEnvironmentNavigation ? <DashboardSearch client={runtime.client} /> : undefined
-      }
-      sidebarSelectedTestRunId={testRuns.selectedRunId}
-      sidebarTestRuns={testRuns.runs}
-      sidebarUtilityActions={
-        showEnvironmentNavigation ? (
-          <EnvironmentNavigationActions
-            localnetApiToken={runtime.localnetApiToken}
-            onOpenAuthTokenOverlay={runtime.openAuthOverlay}
-          />
-        ) : undefined
-      }
-      onNavigate={navigate}
-      onOpenEnvironment={openEnvironment}
-      onSelectTestRun={testRuns.selectRun}
-    >
-      {environmentRoute ? (
-        <Suspense fallback={null}>
-          <EnvironmentWorkspacePage
-            basePath={environmentRoute.basePath}
-            environment={environment}
+        ) : activePath === "/virtual-environments" ? (
+          <VirtualEnvironmentsPage
+            createOpen={isEnvironmentCreateOpen}
+            environments={managedEnvironments}
+            importSourceEnvironments={environmentsState.environments}
             isLoading={environmentsState.isLoading}
-            loadError={environmentLoadError}
+            loadError={environmentsState.error}
+            walletNames={studioInfo?.workspace?.walletNames ?? []}
+            onCreateOpenChange={setIsEnvironmentCreateOpen}
             onEnvironmentChange={environmentsState.setEnvironment}
-            onEnvironmentDelete={onDeleteEnvironment}
-            onRetry={environmentsState.refresh}
-            onShellChange={handleEnvironmentShellChange}
+            onOpenEnvironment={openEnvironment}
+            onRefresh={environmentsState.refresh}
           />
-        </Suspense>
-      ) : activePath === "/" ? (
-        <OverviewPage
-          connectionState={connectionState}
-          environments={managedEnvironments}
-          environmentsError={environmentsState.error}
-          environmentsLoading={environmentsState.isLoading}
-          projectName={projectName}
-          projectPath={configuredProjectPath}
-          testRuns={testRuns.runs}
-          testRunsError={testRuns.error}
-          testRunsLoading={testRuns.isLoading}
-          onNavigate={navigate}
-          onOpenEnvironment={openEnvironment}
-          onSelectTestRun={testRuns.selectRun}
-        />
-      ) : activePath === "/virtual-environments" ? (
-        <VirtualEnvironmentsPage
-          createOpen={isEnvironmentCreateOpen}
-          environments={managedEnvironments}
-          importSourceEnvironments={environmentsState.environments}
-          isLoading={environmentsState.isLoading}
-          loadError={environmentsState.error}
-          walletNames={studioInfo?.workspace?.walletNames ?? []}
-          onCreateOpenChange={setIsEnvironmentCreateOpen}
-          onEnvironmentChange={environmentsState.setEnvironment}
-          onOpenEnvironment={openEnvironment}
-          onRefresh={environmentsState.refresh}
-        />
-      ) : activePath === "/tests" ? (
-        <TestsPage
-          runDialogOpen={isTestRunOpen}
-          selectedTestKey={selectedTestKey}
-          testRuns={testRuns}
-          onSelectedTestKeyChange={selectTest}
-          onRunDialogOpenChange={setIsTestRunOpen}
-        />
-      ) : (
-        <FeaturePage page={studioFeaturePages[activePath]} onAction={showIntegrationToast} />
-      )}
-    </StudioShell>
+        ) : activePath === "/tests" ? (
+          <TestsPage
+            runDialogOpen={isTestRunOpen}
+            selectedTestKey={selectedTestKey}
+            testRuns={testRuns}
+            onSelectedTestKeyChange={selectTest}
+            onRunDialogOpenChange={setIsTestRunOpen}
+          />
+        ) : (
+          <FeaturePage page={studioFeaturePages[activePath]} onAction={showIntegrationToast} />
+        )}
+      </StudioShell>
+    </>
   )
 }
 

@@ -134,7 +134,7 @@ test("raw testnet blocks are loaded from Toncenter getBlock", async () => {
 
   try {
     const client = new TonClient({
-      v2BaseUrl: "https://toncenter.example/api/v2",
+      v2BaseUrl: "https://testnet.toncenter.example/api/v2",
       v3BaseUrl: "https://toncenter.example/api/v3",
       addressNameBaseUrl: "https://toncenter.example/api",
     })
@@ -146,11 +146,11 @@ test("raw testnet blocks are loaded from Toncenter getBlock", async () => {
       file_hash: "LX6i1+jHVUAhvrSNiqdgEPsiF3mwfKR8NuUjfKN5Cs0=",
     }
 
-    const result = await client.getRawBlockBoc(block, "testnet")
+    const result = await client.getRawBlockBoc(block)
 
     expect(result.hash().equals(blockCell.hash())).toBe(true)
     expect(requests).toHaveLength(1)
-    expect(requests[0]?.origin).toBe("https://testnet.toncenter.com")
+    expect(requests[0]?.origin).toBe("https://testnet.toncenter.example")
     expect(requests[0]?.pathname).toBe("/api/v2/getBlock")
     expect(Object.fromEntries(requests[0]?.searchParams ?? [])).toEqual({
       workchain: "-1",
@@ -194,18 +194,24 @@ test("block download URLs require valid block hashes", () => {
   ).toBeUndefined()
 })
 
-test("raw mainnet blocks keep using TonAPI until Toncenter exposes getBlock", async () => {
+test("raw mainnet blocks are loaded from Toncenter getBlock", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
   const blockCell = beginCell().storeUint(0x11_ef_55_aa, 32).endCell()
   globalThis.fetch = mockFetch(async input => {
     requests.push(new URL(input.toString()))
-    return Response.json({data: blockCell.toBoc().toString("hex")})
+    return Response.json({
+      ok: true,
+      result: {
+        "@type": "blocks.blockData",
+        data: blockCell.toBoc().toString("base64"),
+      },
+    })
   })
 
   try {
     const client = new TonClient({
-      v2BaseUrl: "https://toncenter.example/api/v2",
+      v2BaseUrl: "https://mainnet.toncenter.example/api/v2",
       v3BaseUrl: "https://toncenter.example/api/v3",
       addressNameBaseUrl: "https://toncenter.example/api",
     })
@@ -213,18 +219,24 @@ test("raw mainnet blocks keep using TonAPI until Toncenter exposes getBlock", as
       workchain: -1,
       shard: "8000000000000000",
       seqno: 81_088_003,
-      root_hash: "a".repeat(64),
-      file_hash: "b".repeat(64),
+      root_hash: "7R6EqsjYBB5ePHto67WWu4AlkZO+QpT/Z8Na+U3ZCYw=",
+      file_hash: "LX6i1+jHVUAhvrSNiqdgEPsiF3mwfKR8NuUjfKN5Cs0=",
     }
-    const extendedBlockId =
-      "(-1,8000000000000000,81088003,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
 
-    const result = await client.getRawBlockBoc(block, "mainnet")
+    const result = await client.getRawBlockBoc(block)
 
     expect(result.hash().equals(blockCell.hash())).toBe(true)
     expect(requests).toHaveLength(1)
-    expect(requests[0]?.origin).toBe("https://tonapi.io")
-    expect(decodeURIComponent(requests[0]?.pathname.split("/").at(-1) ?? "")).toBe(extendedBlockId)
+    expect(requests[0]?.origin).toBe("https://mainnet.toncenter.example")
+    expect(requests[0]?.pathname).toBe("/api/v2/getBlock")
+    expect(Object.fromEntries(requests[0]?.searchParams ?? [])).toEqual({
+      workchain: "-1",
+      shard: "-9223372036854775808",
+      seqno: "81088003",
+      root_hash: block.root_hash,
+      file_hash: block.file_hash,
+      archival: "true",
+    })
   } finally {
     globalThis.fetch = originalFetch
   }

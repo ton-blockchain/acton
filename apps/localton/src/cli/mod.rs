@@ -163,6 +163,14 @@ pub struct JoinArgs {
     #[arg(long)]
     pub celldb_in_memory: bool,
 
+    /// Import an official TON validator database dump during first initialization
+    ///
+    /// Accepts a `.tar.lz` archive from dump.ton.org or an uncompressed `.tar`.
+    /// Localton preserves its own node configuration and keyring. Import requires
+    /// `plzip` or `lzip` on PATH for `.tar.lz` archives
+    #[arg(long, value_name = "PATH")]
+    pub dump: Option<PathBuf>,
+
     /// Maximum node initialization and console readiness wait in seconds.
     #[arg(long, default_value_t = 180)]
     pub startup_timeout: u64,
@@ -667,6 +675,8 @@ mod tests {
             "--node",
             "node2",
             "--celldb-in-memory",
+            "--dump",
+            "/tmp/ton-dump.tar.lz",
         ])
         .unwrap();
         let Command::Join(args) = cli.command else {
@@ -675,6 +685,7 @@ mod tests {
         assert_eq!(args.global_config_url, "http://192.168.27.4:18000/config");
         assert_eq!(args.node.as_deref(), Some("node2"));
         assert!(args.celldb_in_memory);
+        assert_eq!(args.dump, Some(PathBuf::from("/tmp/ton-dump.tar.lz")));
     }
 
     #[test]

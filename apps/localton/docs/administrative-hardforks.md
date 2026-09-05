@@ -11,7 +11,7 @@ indexer. For development, reuse the pinned image's native TON and API layers:
 ```sh
 docker build -f apps/localton/Dockerfile --target localton-admin-dev \
   -t acton-localton:admin .
-ACTON_STUDIO_LOCALTON_IMAGE=acton-localton:admin acton studio
+ACTON_LOCALNET_IMAGE=acton-localton:admin acton studio
 ```
 
 Create a full environment with this image. Existing environments retain their
@@ -22,15 +22,16 @@ operations. Studio checks compatibility before stopping the environment.
 
 ## Execution and recovery
 
-The Studio server runs the operation independently of its HTTP request. It saves
+The acton-localnet service runs the operation independently of its HTTP request.
+Studio forwards edits to this service, sharing its mutation lock with CLI operations. It saves
 cold recovery archives for every node, suspends all validators, verifies a common
 masterchain head, builds and installs the same plan on every node, and checks that
 each node applied it. It then restores networking and validator keys and waits for
-ordinary blocks and the V3 indexer. The operation blocks conflicting Studio
-lifecycle, topology and snapshot changes until it finishes.
+ordinary blocks and the V3 indexer. The operation blocks conflicting lifecycle,
+topology and snapshot changes from Studio and the Acton CLI until it finishes.
 
-On failure, Studio restores all node archives and rebuilds the derived index.
-Recovery runs before startup after an interrupted Studio process. A retained
+On failure, the localnet service restores all node archives and rebuilds the derived index.
+Recovery runs before startup after an interrupted localnet service process. A retained
 `admin-recovery.json` means recovery still needs to complete; it must not be
 removed to bypass a failed restore. Archives live in the environment's
 `localton-snapshots` Docker volume under `admin/<operation-id>/<service>/` and are
@@ -41,7 +42,7 @@ rather than being silently resubmitted.
 `POST /api/v1/environments/{id}/admin` returns an operation immediately. Poll the
 same URL with `GET` for progress and completion. A request contains a UUID `id`:
 reuse it when retrying the **same** request after a lost response. Operation
-records persist across Studio restarts. Different content with a reused ID is
+records persist across localnet service restarts. Different content with a reused ID is
 rejected.
 
 ```json
@@ -73,7 +74,7 @@ post-change production checks.
 
 - Only masterchain and a single unsplit workchain-0 shard are supported. Split or
   merged histories are rejected. Every configured node must be available and
-  caught up; nodes managed outside Studio must not continue validating.
+  caught up; nodes managed outside the localnet service must not continue validating.
 - Several coordinated stops and starts are required. Cost includes copying node
   databases. This is intended for local development, and can take minutes.
 - Stock TON's `getState` refuses seqnos above 1000. Localton reconstructs later
@@ -97,7 +98,8 @@ post-change production checks.
   resumed production and indexing, not all future executions. In particular,
   changing consensus/election parameters or system-contract state can have
   delayed effects.
-- Manual CLI mutations and Docker operations bypass Studio's lifecycle lock.
+- Direct Localton CLI mutations and manual Docker operations bypass the localnet
+  service mutation lock.
   Avoid them while an administrative operation is active.
 
 ## Manual CLI steps
@@ -119,10 +121,10 @@ loopback ports, including on joined nodes.
 ## Regression checks
 
 ```sh
-cargo test -p ton-hardfork -p ton-fullnode-master -p ton-localnet -p acton-studio
+cargo test -p ton-hardfork -p ton-fullnode-master -p ton-localnet -p acton-localnet -p acton-studio
 cargo test --manifest-path apps/localton/Cargo.toml
 bun run --cwd packages/studio-ui build
 bunx playwright test --config packages/studio-ui/playwright.config.ts
-ACTON_STUDIO_LOCALTON_IMAGE=acton-localton:admin cargo test -p acton-studio \
+ACTON_LOCALNET_IMAGE=acton-localton:admin cargo test -p acton-localnet \
   administrative_hardfork_and_rollback_on_two_nodes -- --ignored --nocapture
 ```

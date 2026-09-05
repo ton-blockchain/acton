@@ -20,7 +20,7 @@ const SCRIPT_BROADCAST_NETWORKS = [
   },
   {
     label: "Localnet",
-    description: "Broadcast to Acton localnet",
+    description: "Broadcast to localnet",
     network: "localnet",
   },
 ] as const

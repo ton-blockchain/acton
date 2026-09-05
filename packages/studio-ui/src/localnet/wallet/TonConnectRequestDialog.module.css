@@ -1,0 +1,428 @@
+.dialog {
+  --acton-dialog-description-gap: var(--acton-space-2);
+
+  background: var(--acton-color-surface);
+}
+
+.dialog .requestHeader {
+  flex-direction: column;
+  align-items: center;
+  gap: var(--acton-space-6);
+  padding: var(--acton-space-6) var(--acton-space-5);
+  text-align: center;
+}
+
+.requestTitle {
+  display: block;
+  font-size: var(--acton-font-size-3xl);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.requestDescription {
+  display: block;
+  font-size: var(--acton-font-size-lg);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.dappName {
+  color: var(--acton-color-accent);
+}
+
+.requestIdentity {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
+}
+
+.studioMark,
+.dappMark {
+  box-sizing: border-box;
+  display: grid;
+  width: 5rem;
+  height: 5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border-radius: calc(var(--acton-radius-panel) * 2);
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text-muted);
+}
+
+.studioMark img {
+  display: block;
+  width: 3rem;
+  height: 3rem;
+}
+
+.dappMark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-4);
+  padding: 0 var(--acton-space-5) var(--acton-space-5);
+}
+
+.actions {
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: stretch;
+  padding: var(--acton-space-4) var(--acton-space-5) var(--acton-space-5);
+  border-top: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface);
+}
+
+.actionButton {
+  width: 100%;
+}
+
+.disclaimer {
+  margin: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.walletSelector {
+  display: grid;
+  gap: var(--acton-space-2);
+}
+
+.walletPlate,
+.walletOption {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface-group);
+  color: var(--acton-color-text);
+  text-align: left;
+}
+
+.walletPlateButton,
+.walletOption {
+  cursor: pointer;
+}
+
+.walletPlateButton:hover,
+.walletOption:hover {
+  border-color: var(--acton-color-border-control);
+  background: var(--acton-color-surface-hover);
+}
+
+.walletPlateButton:focus-visible,
+.walletOption:focus-visible {
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.walletIcon {
+  box-sizing: border-box;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--acton-color-text-muted);
+}
+
+.walletContent {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 3px;
+}
+
+.walletPrimary,
+.walletMeta {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--acton-space-3);
+}
+
+.walletName,
+.walletAddress {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.walletName,
+.walletBalance {
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.walletBalance,
+.walletNetwork {
+  flex: 0 0 auto;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.walletAddress,
+.walletNetwork {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+}
+
+.walletChevron,
+.walletChevronExpanded {
+  flex: 0 0 auto;
+  color: var(--acton-color-text-muted);
+  transition: transform var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.walletChevronExpanded {
+  transform: rotate(180deg);
+}
+
+.walletOptions {
+  display: grid;
+  gap: var(--acton-space-2);
+  padding: var(--acton-space-2);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface-group);
+}
+
+.walletOption {
+  padding: var(--acton-space-2) var(--acton-space-3);
+  border-color: transparent;
+}
+
+.walletOptionActive {
+  border-color: var(--acton-color-border-strong);
+  background: var(--acton-color-surface-active);
+}
+
+.optionCheck {
+  box-sizing: border-box;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: var(--acton-radius-round);
+  color: var(--acton-color-text);
+}
+
+.detailsSection,
+.requestSummary,
+.requestMessages {
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.detailsSection {
+  padding-top: var(--acton-space-4);
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--acton-space-3);
+  margin-bottom: var(--acton-space-3);
+}
+
+.sectionHeading h3 {
+  margin: 0;
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.sectionHeading span {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+}
+
+.permissionsList {
+  display: grid;
+}
+
+.requestMessages {
+  overflow: hidden;
+}
+
+.permissionItem,
+.messageItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-3) 0;
+}
+
+.permissionItem + .permissionItem,
+.messageItem + .messageItem {
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.permissionItem > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--acton-color-text-muted);
+}
+
+.permissionTitle {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.permissionDescription {
+  margin-top: 2px;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.45;
+}
+
+.requestSummary {
+  display: grid;
+  gap: var(--acton-space-2);
+  padding: var(--acton-space-4) 0 0;
+}
+
+.metaRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--acton-space-3);
+  align-items: baseline;
+}
+
+.metaLabel {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+.metaValue {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+  text-align: right;
+}
+
+.messageItem > div {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.messageIndex {
+  box-sizing: border-box;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.messageValue {
+  margin-top: var(--acton-space-2);
+}
+
+.cellDialog .signRequestPreview {
+  /* Keep the cell inspector usable while the request header scrolls with its body */
+  height: 24rem;
+}
+
+.signRequestPreview {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.signRequestPreview > * {
+  max-height: 100%;
+}
+
+.signValuePreview {
+  min-width: 0;
+  display: grid;
+  gap: var(--acton-space-4);
+}
+
+.signValueSummary {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
+}
+
+.signValueSummary > svg {
+  flex: 0 0 auto;
+  color: var(--acton-color-text-muted);
+}
+
+.signValueTitle {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.25em;
+  line-height: 1.35;
+}
+
+.signValueType {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-lg);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.signValueMetadata {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+.signTextContent {
+  padding: var(--acton-space-4);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 620px) {
+  .body {
+    padding: 0 var(--acton-space-4) var(--acton-space-4);
+  }
+
+  .actions {
+    padding: var(--acton-space-3) var(--acton-space-4) var(--acton-space-4);
+  }
+
+  .metaRow {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .metaValue {
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .walletChevron,
+  .walletChevronExpanded {
+    transition: none;
+  }
+}

@@ -17,6 +17,7 @@ use tokio::process::Command;
 use tracing::{info, warn};
 
 use crate::{
+    node::CellDbMode,
     runtime::{ManagedProcess, ServiceHandle, run_checked},
     storage::{NodeLayout, NodeSettings},
 };
@@ -195,7 +196,7 @@ pub struct ValidatorStartRequest {
     pub verbosity: u8,
     pub retention: ValidatorRetentionPolicy,
     pub initial_sync_delay: Duration,
-    pub celldb_in_memory: bool,
+    pub celldb_mode: CellDbMode,
 }
 
 /// Semantic contract implemented by a `validator-engine` provider.
@@ -257,7 +258,7 @@ impl OfficialValidatorEngine {
 
     /// Builds the common command used by all three engine modes.
     ///
-    /// In TON v2026.06 the trailing `false` and `--ip` are positional/late options
+    /// In TON v2026.08 the trailing `false` and `--ip` are positional/late options
     /// and must stay after the cell database flags. Initialization and temporary
     /// bootstrap intentionally render the same argv: the existing database state
     /// determines whether this release exits after creation or keeps running.
@@ -336,10 +337,14 @@ impl OfficialValidatorEngine {
             request.verbosity,
         );
 
-        if request.celldb_in_memory {
-            command.arg("--celldb-in-memory");
-        } else {
-            command.arg("--celldb-preload-all");
+        match request.celldb_mode {
+            CellDbMode::OnDisk => {}
+            CellDbMode::PreloadAll => {
+                command.arg("--celldb-preload-all");
+            }
+            CellDbMode::InMemory => {
+                command.arg("--celldb-in-memory");
+            }
         }
 
         command.args([
@@ -578,7 +583,7 @@ mod tests {
         }
     }
 
-    fn persistent_request(celldb_in_memory: bool) -> ValidatorStartRequest {
+    fn persistent_request(celldb_mode: CellDbMode) -> ValidatorStartRequest {
         ValidatorStartRequest {
             node_name: "validator-a".to_owned(),
             global_config: PathBuf::from("/state/global.config.json"),
@@ -599,7 +604,7 @@ mod tests {
                 key_proof_ttl_seconds: 315_360_000,
             },
             initial_sync_delay: Duration::ZERO,
-            celldb_in_memory,
+            celldb_mode,
         }
     }
 
@@ -642,7 +647,7 @@ mod tests {
     #[test]
     fn persistent_command_matches_pinned_release_snapshot() {
         let adapter = OfficialValidatorEngine::new("/ton/validator-engine");
-        let command = adapter.persistent_command(&persistent_request(false));
+        let command = adapter.persistent_command(&persistent_request(CellDbMode::PreloadAll));
 
         assert_eq!(
             args(&command),
@@ -682,7 +687,7 @@ mod tests {
     #[test]
     fn persistent_command_enables_in_memory_celldb_for_one_start() {
         let adapter = OfficialValidatorEngine::new("/ton/validator-engine");
-        let command = adapter.persistent_command(&persistent_request(true));
+        let command = adapter.persistent_command(&persistent_request(CellDbMode::InMemory));
         let args = args(&command);
         let position = args
             .iter()
@@ -694,6 +699,19 @@ mod tests {
             !args
                 .iter()
                 .any(|argument| argument == "--celldb-preload-all")
+        );
+    }
+
+    #[test]
+    fn persistent_command_can_keep_large_celldb_on_disk() {
+        let adapter = OfficialValidatorEngine::new("/ton/validator-engine");
+        let command = adapter.persistent_command(&persistent_request(CellDbMode::OnDisk));
+        let args = args(&command);
+
+        assert!(
+            !args
+                .iter()
+                .any(|argument| argument.starts_with("--celldb-"))
         );
     }
 }

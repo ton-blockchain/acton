@@ -136,7 +136,7 @@ export function VirtualEnvironmentsPage({
                 <DataTableHeaderCell columnWidth="12%">Status</DataTableHeaderCell>
                 <DataTableHeaderCell columnWidth="17%">Type</DataTableHeaderCell>
                 <DataTableHeaderCell columnWidth="14%">Network</DataTableHeaderCell>
-                <DataTableHeaderCell>Endpoint</DataTableHeaderCell>
+                <DataTableHeaderCell>ID</DataTableHeaderCell>
                 <DataTableHeaderCell align="right" columnWidth="9rem">
                   Actions
                 </DataTableHeaderCell>
@@ -218,22 +218,18 @@ export function VirtualEnvironmentsPage({
                         {formatEnvironmentNetwork(environment)}
                       </DataTableCell>
                       <DataTableCell>
-                        {primaryEndpoint(environment) ? (
-                          <InlineActions
-                            visibility="always"
-                            actions={
-                              <CopyInlineAction
-                                value={primaryEndpoint(environment) ?? ""}
-                                label="Copy endpoint"
-                                copiedLabel="Endpoint copied"
-                              />
-                            }
-                          >
-                            <span className={styles.rpcUrl}>{primaryEndpoint(environment)}</span>
-                          </InlineActions>
-                        ) : (
-                          <span className={styles.rpcUrl}>Unavailable</span>
-                        )}
+                        <InlineActions
+                          visibility="always"
+                          actions={
+                            <CopyInlineAction
+                              value={environment.id}
+                              label="Copy environment ID"
+                              copiedLabel="Environment ID copied"
+                            />
+                          }
+                        >
+                          <span className={styles.environmentId}>{environment.id}</span>
+                        </InlineActions>
                       </DataTableCell>
                       <DataTableCell align="right">
                         {canRestart ? (
@@ -290,10 +286,6 @@ function EnvironmentStatusLabel({status}: {readonly status: EnvironmentStatus}) 
       {environmentStatusLabels[status]}
     </span>
   )
-}
-
-function primaryEndpoint(environment: StudioEnvironment): string | undefined {
-  return environment.endpoints.apiV3 ?? environment.endpoints.apiV2 ?? environment.endpoints.control
 }
 
 function getErrorMessage(error: unknown) {

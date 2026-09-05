@@ -9,7 +9,7 @@ development platform. It adds Acton Studio, a full local TON network, Actonscan,
 source verification, a testnet faucet, a native language server, substantially
 more capable RPC and localnet tooling, and a shared explorer and transaction UI.
 
-`acton localnet` remains the lightweight in-process simulator. Acton Studio can
+`acton simulated-localnet` remains the lightweight in-process simulator. Acton Studio can
 manage both simulator environments and full local TON networks; those full
 networks are powered by the separate Localton runtime. The new verifier service,
 API, and web UI are included below, while the `acton verify --new` CLI
@@ -17,6 +17,10 @@ integration remains hidden and preview-only.
 
 ### Breaking Changes and Migration
 
+- TON Connect approvals no longer start a local browser bridge, and
+  `--tonconnect-port` was removed from script, library, and verifier commands.
+  Acton now lets users select a compatible wallet and prints its native QR code
+  and deep link.
 - Human-readable currency terminology changed from TON/nanoton to
   GRAM/nanogram across the CLI, debugger, reports, APIs, UI, documentation, and
   standard library. Serialized action failures now use
@@ -67,6 +71,13 @@ integration remains hidden and preview-only.
   verifier outages.
 - Added `acton doc abi <contract-or-code-hash>` for formatted compiler ABI JSON
   from project contracts, the built-in ABI catalog, or the verifier.
+- Added `acton localnet` for project-scoped real TON networks backed by Docker
+  and Localton. It can create, start, list, inspect, stop, gracefully shut down,
+  and delete named networks; tail durable logs; inspect or wait for operations;
+  manage nodes and validator participation; and create, restore, or delete cold
+  snapshots. State is stored under `<project>/.acton-localnet`, ambiguous
+  commands offer interactive network selection, and `--json` provides
+  machine-readable output.
 - `acton build --output-sources <DIR>` and `[build].output-sources` now emit
   `<contract>.source.json` registration artifacts with source, ABI, code hash,
   compiler, and debug metadata. Precompiled BoC contracts do not emit source
@@ -83,8 +94,10 @@ integration remains hidden and preview-only.
   failing process status, ignores pre-script transactions while waiting, uses
   the script ABI for message decoding, and provides clearer missing-library,
   broadcast, network, and toolchain diagnostics.
-- Acton HTTP clients now send an `acton/<version>` user agent. The bundled ABI
-  catalog and executor network configuration received repeated data updates.
+- Linux release binaries no longer expose conflicting OpenSSL symbols through
+  bundled TON objects. Acton HTTP clients also send an `acton/<version>` user
+  agent. The bundled ABI catalog and executor network configuration received
+  repeated data updates.
 
 ### Testing, Emulation, Debugging, and Profiling
 
@@ -164,12 +177,19 @@ integration remains hidden and preview-only.
 - Added persistent environment lifecycle management, startup progress, staged
   error reporting, project locking, API-call capture, generated OpenAPI, source
   and contract registries, deployment, wallet lists, and environment-specific
-  endpoints. Captured calls are available at
+  endpoints. Shutdown progress remains visible while Studio gracefully stops
+  its environments. Captured calls are available at
   `GET /api/v1/environments/{environment_id}/api-calls` for every environment.
 - Full Local TON environments can import selected addresses, bootstrap the V3
   indexer, expose account actions, and manage cold snapshots. New environments
   use the test-only chain id `-3`. Settings remain visible while an environment
   is stopped.
+- Full-network creation accepts block and election timing controls. Its
+  Network pages show topology, node and validator state, elections, block
+  authors, block-time measurements, transaction throughput, and pending queue
+  data, and can promote an existing full node to a validator.
+- Packaged Studio builds can access mainnet and testnet without separate runtime
+  TonCenter API-key configuration.
 - Studio gained explorer, tests, contracts, simulator tools, debugger, faucet,
   wallets, snapshots, API reference, configuration, control API, settings, and
   troubleshooting pages, plus a complete documentation section.
@@ -177,18 +197,20 @@ integration remains hidden and preview-only.
 ### Localnet Simulator
 
 - Added interval and manual block production with `--block-interval-ms`,
-  `--no-mining`, `acton localnet mine`, `/acton_mine`, and optional empty-block
+  `--no-mining`, `acton simulated-localnet mine`, `/acton_mine`, and optional empty-block
   mining. Submitted messages are queued into blocks, and automatic mining runs
   only while messages are pending unless empty-block mining is enabled.
   Generated blocks include a simplified masterchain, state updates, Merkle
   updates, proofs, and previous-masterchain-block TVM context.
 - Added virtual-time commands and APIs for increasing time, setting current
   time, or selecting the next block timestamp.
+- Added `/acton_setConfig` for atomically replacing and persisting the simulator
+  blockchain configuration through the control API.
 - Added optional API authentication through `--require-auth`, bearer tokens,
   `X-API-Key`, and WebSocket query tokens. Static UI assets remain public.
 - Added persistent SQLite state through `[localnet].db-path`, state file
-  dump/load through `acton localnet state`, and named in-memory checkpoints
-  through `acton localnet checkpoint`, including import and export over HTTP.
+  dump/load through `acton simulated-localnet state`, and named in-memory checkpoints
+  through `acton simulated-localnet checkpoint`, including import and export over HTTP.
   Imports validate histories, hashes, references, transactions, messages,
   queues, and configuration before atomic replacement.
 - Added typed TonCenter v2, v3, Emulation, and Streaming APIs with stable error
@@ -227,6 +249,18 @@ integration remains hidden and preview-only.
   endpoints; and cold snapshot create, list, restore, and delete operations.
 - Added a full Docker Compose stack with validators, API v2 and v3, PostgreSQL,
   Redis, a V3 worker, action classifier, and generated OpenAPI documents.
+- Localton can bootstrap nodes on separate hosts from a standard TON global
+  config, optionally import a validator database dump, and let each joined node
+  independently enter or leave validator elections without sharing its private
+  keys with the bootstrap instance.
+- Localton supports configurable block and election timing for Simplex
+  consensus v2, `--celldb-in-memory` for disposable high-speed networks, stronger
+  `--advertise-ip` validation, and a standalone command for installing the
+  pinned TON binaries into a shared per-user cache. It ships with TON
+  `v2026.08`.
+- Added Localton observability APIs and a dashboard with signed per-node
+  telemetry, topology and geographic maps, synchronization and election state,
+  block production timing, transaction throughput, and pending queue data.
 - Added `ton-indexer-core` and `ton-indexer-liteserver` for validated canonical
   masterchain and shard batches, idempotent storage, durable checkpoints, and
   at-least-once delivery.
@@ -252,6 +286,9 @@ integration remains hidden and preview-only.
   pages, and transaction-tree nodes. Search covers addresses, DNS and Telegram
   names, blocks, transactions, bundled registry names, favorites, and local
   names.
+- Explorer search can recover addresses, transactions, and blocks from pasted
+  explorer URLs, recognizes USDT as an alias for Tether USD, and can be focused
+  with `Ctrl+K` or `Cmd+K`.
 - Added a generated, network-specific address registry merged from public and
   Acton-maintained sources, weekly update automation, multi-source name
   tooltips, and JSON import/export for favorites and local names.
@@ -259,10 +296,13 @@ integration remains hidden and preview-only.
   time navigation, global version and capabilities, fees, transaction fallback
   loading, historical network configuration, validators, bridges, suspended
   addresses, oracle values, and known system-contract metadata.
+- Network configuration views decode the ConfigParam 30 consensus
+  extension, ConfigParam 46 validator registry, ConfigParam -123 Wallet TG
+  bytecode, and typed election timing fields.
 - Transaction inspection combines message flow, action overviews, value flow,
-  transaction trees, state changes, raw details, source, TASM, retracing, and
-  cell inspection. Stable contract letters connect decoded addresses to tree
-  nodes.
+  transaction trees, external-in metadata, state changes, raw details, source,
+  TASM, retracing, and cell inspection. Stable contract letters connect decoded
+  addresses to tree nodes.
 - Large traces now use previews, lazy body decoding, incremental branch loads,
   memoized panels, deferred node details, and visible-action name resolution.
   Partial traces reconstruct the causal path and clearly mark omitted segments.
@@ -270,6 +310,8 @@ integration remains hidden and preview-only.
   with multiple roots, compiler ABI or custom TL-B parsing, canonical block
   schemas, disassembly, raw cells, verified source, saved drafts, and exotic
   cell fallback.
+- ABI and source catalogs accept drag-and-drop imports from Acton project
+  directories and `acton build` artifacts.
 - Added Emulate for ABI-built or raw internal and external messages, account
   overrides, time and signature settings, enriched traces, state changes,
   debugging, localnet submission, editing an existing message, and 30-day
@@ -323,9 +365,16 @@ integration remains hidden and preview-only.
 - Added the shared verifier UI and Actonscan verified-contract catalog with
   source browsing, downloads, compiler links, ABI and source-map views,
   pagination, statistics, charts, Open Graph images, and local Explorer links.
+- Public verification uses one finalized TON testnet payment per new
+  verification attempt, bound to its code hash. `/api/v1/take_ticket` returns
+  the destination, minimum amount, and required comment. Each payment can
+  authorize only one attempt. Authenticated API-key submissions bypass the
+  payment requirement, and accepted bundles expose the payment transaction
+  hash.
 - The hidden `acton verify --new` flow uploads normalized multipart bundles,
-  validates optional deployed addresses, retries transient failures, and treats
-  `already_verified` as success.
+  validates optional deployed addresses, obtains and pays testnet tickets,
+  supports retrying with `--payment-tx-hash`, retries transient failures, and
+  treats `already_verified` as success.
 
 ### Testnet Faucet
 
@@ -345,6 +394,8 @@ integration remains hidden and preview-only.
 - Added the Actonscan Testnet Faucet page with browser/WASM proof-of-work,
   address and usage history, testnet validation, GitHub connection, recoverable
   redirects and sessions, and links to the equivalent CLI workflow.
+- Faucet deployments can enter read-only mode for challenge and claim endpoints
+  during maintenance.
 
 ### Language Server and Editor Tooling
 
@@ -378,7 +429,7 @@ integration remains hidden and preview-only.
 
 ### Developer and Contributor Changes
 
-- Building Acton from source now requires Rust 1.96.1.
+- Building Acton from source now requires Rust 1.97.1.
 - Repository contributors now need Git LFS to check out documentation images
   and visual snapshots. Users of official release binaries are not affected.
 - Repository-local frontend packages moved from `crates/` and `ui-e2e/` into
@@ -413,9 +464,10 @@ integration remains hidden and preview-only.
 - Explorer, Studio, Test UI, verifier, and transaction views were migrated to
   the shared packages, improving accessibility, responsive behavior, consistent
   copy actions, exact formatting, loading states, and theme startup.
-- JavaScript and CSS linting moved from ESLint to Biome. Bun installs use
-  hardened configuration, pinned versions, minimum release ages, and `bun ci`.
-  Project templates gained safer dependency-install defaults.
+- JavaScript and CSS linting moved from ESLint to Biome, and the frontend
+  toolchain now uses Bun 1.4. Bun installs use hardened configuration, pinned
+  versions, minimum release ages, and `bun ci`. Project templates gained safer
+  dependency-install defaults.
 - Added or expanded OSV scanning, dependency audits, release attestations,
   application and Docker checks, source-trace and grammar WASM builds, address
   registry updates, label automation, and path-aware CI for Studio, Actonscan,
@@ -429,10 +481,11 @@ integration remains hidden and preview-only.
 
 ### Documentation and Distribution
 
-- Documentation was expanded for Studio, localnet, LiteAPI, state and
-  checkpoints, RPC, gas profiling, verifier, testing, source artifacts,
-  wrappers, standard-library availability, agent skills, IDEs, deployment, and
-  the new UI tools. Preview deployments now opt out of search indexing.
+- Documentation was expanded for Studio, full localnet, simulated localnet,
+  LiteAPI, state and checkpoints, RPC, gas profiling, paid verification,
+  testing, source artifacts, wrappers, standard-library availability, agent
+  skills, IDEs, deployment, and the new UI tools. Preview deployments now opt
+  out of search indexing.
 - Embedded Studio and Test UI assets are precompressed with gzip. Project
   templates are packed into one deterministic Zstandard archive, and bundled
   TVM instruction data is compressed and loaded lazily to reduce binary size.
@@ -1299,7 +1352,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   `<NORMALIZED_NAME>_API_KEY` instead, for example `custom:foo-bar` ->
   `FOO_BAR_API_KEY`. The old shared `TONCENTER_API_KEY` fallback is gone.
 
-- `acton litenode` was renamed to `acton localnet`, and the manifest section
+- `acton litenode` was renamed to `acton simulated-localnet`, and the manifest section
   `[litenode]` was renamed to `[localnet]`. The network name stays `localnet`,
   so `--net localnet` and `[networks.localnet]` do not change.
 

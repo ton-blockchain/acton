@@ -1,0 +1,700 @@
+'\" t
+.TH "ACTON\-SIMULATED\-LOCALNET" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-simulated\-localnet \[em] Run Acton\[cq]s simplified TON development environment
+.SH "SYNOPSIS"
+\fBacton simulated\-localnet\fR [\fIoptions\fR] \fIcommand\fR
+.SH "DESCRIPTION"
+Acton simulated localnet is a fast, deterministic TON development environment
+for local execution, forked\-state development, and faucet\-based funding. It
+produces TON\-compatible blocks and provides LiteAPI, TonCenter v2/v3, Streaming
+API, and Emulate API surfaces used by many contract and dApp workflows.
+.sp
+It is Acton\[cq]s custom simplified implementation, not a real TON network or
+validator cluster. It does not model validators, consensus, shard elections,
+or the full production node and indexer stack.
+.SH "SUBCOMMANDS"
+.SS "acton simulated-localnet start"
+Start Acton\[cq]s simplified TON development environment.
+.SS "Synopsis"
+\fBacton simulated\-localnet start\fR [\fIoptions\fR]
+.SS "Options"
+.sp
+\fB\-\-port\fR \fIport\fR
+.RS 4
+Simulated localnet HTTP port.
+.RE
+.sp
+\fB\-\-fork\-net\fR \fInetwork\fR
+.RS 4
+Remote network to use for forked account resolution.
+.sp
+The fork also uses the network configuration from the resolved masterchain
+block. With an explicit historical block, it uses that block\[cq]s Unix time;
+otherwise, the virtual clock starts from the current system Unix time.
+.RE
+.sp
+\fB\-\-fork\-block\-number\fR \fIseqno\fR
+.RS 4
+Historical block sequence number to fork from.
+.sp
+The selected block provides the local network configuration and virtual\-clock
+origin.
+.RE
+.sp
+\fB\-\-accounts\fR \fIname\fR[,\fIname\fR\[u2026]]_
+.RS 4
+Wallet names to auto\-fund and deploy on startup.
+.RE
+.sp
+\fB\-\-db\-path\fR \fIpath\fR
+.RS 4
+Path to a SQLite database for persistent node state. Defaults to
+\fB[localnet].db\-path\fR when configured.
+.RE
+.sp
+\fB\-\-rate\-limit\fR \fIrps\fR
+.RS 4
+Maximum \fB/api\fR requests per second to simulate provider rate limits.
+.RE
+.sp
+\fB\-\-response\-delay\-ms\fR \fIms\fR
+.RS 4
+Delay TonCenter v2/v3 and Emulate API responses.
+.RE
+.sp
+\fB\-\-block\-interval\-ms\fR \fIms\fR
+.RS 4
+Localnet block production interval.
+.RE
+.sp
+\fB\-\-no\-mining\fR
+.RS 4
+Disable automatic block production. Mine blocks manually with
+\fBacton simulated\-localnet mine\fR or \fBPOST /acton_mine\fR\&.
+.RE
+.sp
+\fB\-\-load\-state\fR \fIpath\fR
+.RS 4
+Load Localnet state from a JSON state file before startup.
+.RE
+.sp
+\fB\-\-dump\-state\fR \fIpath\fR
+.RS 4
+Dump Localnet state to a JSON state file on shutdown.
+.RE
+.sp
+\fB\-\-liteapi\fR
+.RS 4
+Start the LiteAPI server on the TCP port immediately after the Localnet HTTP
+port. LiteAPI is disabled by default.
+.RE
+.sp
+\fB\-\-liteapi\-port\fR \fIport\fR
+.RS 4
+Set the LiteAPI TCP port explicitly. Requires \fB\-\-liteapi\fR; otherwise LiteAPI
+uses the Localnet HTTP port plus one.
+.RE
+.sp
+\fB\-\-require\-auth\fR
+.RS 4
+Require a token for all Localnet HTTP API, control, emulate, and streaming
+endpoints. The server prints the token on startup.
+.RE
+.sp
+\fB\-\-load\-state\fR cannot be used when a database path comes from either
+\fB\-\-db\-path\fR or \fB[localnet].db\-path\fR\&.
+.SS "acton simulated-localnet airdrop"
+Send GRAM from the local faucet to an address.
+.SS "Synopsis"
+\fBacton simulated\-localnet airdrop\fR [\fIoptions\fR] \fIaddress\fR
+.SS "Options"
+.sp
+\fIaddress\fR
+.RS 4
+Recipient address.
+.RE
+.sp
+\fB\-a\fR, \fB\-\-amount\fR \fIgram\fR
+.RS 4
+Amount of GRAM to request.
+.RE
+.sp
+\fB\-p\fR, \fB\-\-port\fR \fIport\fR
+.RS 4
+Simulated localnet HTTP port.
+.RE
+.sp
+\fB\-\-auth\-token\fR \fItoken\fR
+.RS 4
+Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
+Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
+.RE
+.SS "acton simulated-localnet mine"
+Mine localnet blocks manually.
+.SS "Synopsis"
+\fBacton simulated\-localnet mine\fR [\fIoptions\fR] [\fIn\fR]
+.SS "Options"
+.sp
+\fIn\fR
+.RS 4
+Number of blocks to mine. Defaults to \fB1\fR\&.
+.RE
+.sp
+\fB\-p\fR, \fB\-\-port\fR \fIport\fR
+.RS 4
+Simulated localnet HTTP port.
+.RE
+.sp
+\fB\-\-auth\-token\fR \fItoken\fR
+.RS 4
+Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
+Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
+.RE
+.SS "acton simulated-localnet increase-time"
+Increase the localnet virtual clock.
+.SS "Synopsis"
+\fBacton simulated\-localnet increase\-time\fR [\fIoptions\fR] \fIseconds\fR
+.SS "Options"
+.sp
+\fIseconds\fR
+.RS 4
+Seconds to add to the virtual localnet clock.
+.RE
+.sp
+\fB\-p\fR, \fB\-\-port\fR \fIport\fR
+.RS 4
+Simulated localnet HTTP port.
+.RE
+.sp
+\fB\-\-auth\-token\fR \fItoken\fR
+.RS 4
+Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
+Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
+.RE
+.SS "acton simulated-localnet set-time"
+Set the localnet virtual clock.
+.SS "Synopsis"
+\fBacton simulated\-localnet set\-time\fR [\fIoptions\fR] \fItimestamp\fR
+.SS "Options"
+.sp
+\fItimestamp\fR
+.RS 4
+Unix timestamp in seconds. The timestamp cannot be lower than the latest mined
+block time.
+.RE
+.sp
+\fB\-p\fR, \fB\-\-port\fR \fIport\fR
+.RS 4
+Simulated localnet HTTP port.
+.RE
+.sp
+\fB\-\-auth\-token\fR \fItoken\fR
+.RS 4
+Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
+Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
+.RE
+.SS "acton simulated-localnet set-next-block-timestamp"
+Set a one\-shot timestamp for the next localnet block.
+.SS "Synopsis"
+\fBacton simulated\-localnet set\-next\-block\-timestamp\fR [\fIoptions\fR] \fItimestamp\fR
+.SS "Options"
+.sp
+\fItimestamp\fR
+.RS 4
+Unix timestamp in seconds for the next mined block. The timestamp is consumed
+by the next automatic or manually mined block and cannot be lower than the
+latest mined block time.
+.RE
+.sp
+\fB\-p\fR, \fB\-\-port\fR \fIport\fR
+.RS 4
+Simulated localnet HTTP port.
+.RE
+.sp
+\fB\-\-auth\-token\fR \fItoken\fR
+.RS 4
+Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
+Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
+.RE
+.SS "acton simulated-localnet status"
+Inspect the current localnet status.
+.SS "Synopsis"
+\fBacton simulated\-localnet status\fR [\fIoptions\fR]
+.SS "Options"
+.sp
+\fB\-p\fR, \fB\-\-port\fR \fIport\fR
+.RS 4
+Simulated localnet HTTP port.
+.RE
+.sp
+\fB\-\-json\fR
+.RS 4
+Print machine\-readable JSON.
+.RE
+.sp
+\fB\-\-auth\-token\fR \fItoken\fR
+.RS 4
+Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
+Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
+.RE
+.SS "acton simulated-localnet state"
+Transfer the current state of a running localnet as a portable JSON file.
+.SS "Synopsis"
+\fBacton simulated\-localnet state\fR [\fIoptions\fR] \fIcommand\fR
+.SS "Subcommands"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBdump <path>\fR downloads the current live state directly to a file
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBload <path>\fR uploads a state file and replaces the current live state
+.RE
+.sp
+\fBdump\fR refuses to overwrite an existing file unless \fB\-\-force\fR is passed. A
+successful \fBload\fR clears all in\-memory checkpoints.
+.SS "acton simulated-localnet checkpoint"
+Manage named in\-memory restore points for a running localnet.
+.SS "Synopsis"
+\fBacton simulated\-localnet checkpoint\fR [\fIoptions\fR] \fIcommand\fR
+.SS "Subcommands"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBcreate <name>\fR stores the current localnet state as a checkpoint
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBlist\fR prints named checkpoints and their block seqnos
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBrestore <name>\fR restores a checkpoint without deleting any checkpoints
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBdelete <name>\fR deletes one checkpoint
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBclear\fR deletes all checkpoints
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBexport <name> \-\-out <path>\fR downloads a checkpoint as a JSON file
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBimport <path>\fR uploads a JSON file as a checkpoint, using the file stem as
+the name unless \fB\-\-name\fR is passed
+.RE
+.sp
+Relative paths resolve from the Acton project root. These commands call the
+running localnet control API, so pass \fB\-\-port\fR or \fB\-\-auth\-token\fR when the node
+does not use defaults.
+.SH "CONFIGURATION"
+You can store defaults in \fBActon.toml\fR:
+.sp
+.RS 4
+.nf
+[localnet]
+port = 5411
+db\-path = ".acton/localnet.sqlite"
+fork\-net = "testnet"
+fork\-block\-number = 55000000
+accounts = ["deployer", "user"]
+rate\-limit = 1
+response\-delay\-ms = 300
+block\-interval\-ms = 500
+no\-mining = false
+.fi
+.RE
+.sp
+CLI flags override config values for the current invocation. In particular,
+\fB\-\-db\-path\fR overrides \fB[localnet].db\-path\fR\&. A relative path in \fBActon.toml\fR
+resolves from the project root, while a relative \fB\-\-db\-path\fR resolves from the
+current working directory.
+.SH "TONCENTER API KEYS"
+When localnet forks from the built\-in \fBmainnet\fR/\fBtestnet\fR backends,
+authenticated requests read \fBTONCENTER_MAINNET_API_KEY\fR or
+\fBTONCENTER_TESTNET_API_KEY\fR\&.
+.sp
+When localnet forks from \fBcustom:<name>\fR, Acton reads
+\fB<NORMALIZED_NAME>_API_KEY\fR\&. Custom network names are uppercased and
+non\-alphanumeric characters are replaced with \fB_\fR, so \fBcustom:mock\-remote\fR
+becomes \fBMOCK_REMOTE_API_KEY\fR\&.
+.sp
+Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one\-off overrides or CI.
+.SH "LOCALNET API AUTH"
+\fBacton simulated\-localnet start \-\-require\-auth\fR protects every Localnet HTTP route under
+\fB/api/*\fR, \fB/acton_*\fR, \fB/api/emulate/*\fR, and \fB/api/streaming/*\fR\&. Static UI files
+remain public, but the bundled UI does not receive the token from the server.
+When a protected API request returns \fB401\fR, the bundled UI shows a token overlay;
+paste the printed token there before using protected API views. The key button
+in the sidebar footer reopens the same overlay.
+.sp
+When auth is enabled, the server prints a localnet API token. Pass it as either:
+.sp
+.RS 4
+.nf
+Authorization: Bearer <TOKEN>
+X\-API\-Key: <TOKEN>
+.fi
+.RE
+.sp
+\fBAuthorization: Bearer\fR is the preferred form. \fBX\-API\-Key\fR is accepted for
+TonCenter\-compatible clients. Browser WebSocket clients can pass \fBtoken=<TOKEN>\fR
+only on \fB/api/streaming/v2/ws\fR\&.
+.sp
+For CLI subcommands that call localnet control routes, pass \fB\-\-auth\-token\fR or
+set \fBACTON_LOCALNET_AUTH_TOKEN\fR\&. If \fBACTON_LOCALNET_AUTH_TOKEN\fR is set when
+starting with \fB\-\-require\-auth\fR, localnet uses that value; otherwise it generates
+and prints a fresh token.
+.SH "RUNTIME MODEL"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'fork mode allows local development against remote chain state
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton simulated\-localnet start\fR runs in the foreground until the process is stopped
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Acton starts an HTTP server on \fB127.0.0.1:<port>\fR for localnet API, control
+endpoints, and the bundled localnet UI
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the server keeps running until the process is stopped, for example with
+\fBCtrl+C\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the Localnet UI is available on the root path, for example
+\fBhttp://127.0.0.1:<port>/\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the node produces a block every \fB\-\-block\-interval\-ms\fR milliseconds, defaults
+to 500 ms, and still creates empty blocks when no transactions are queued
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-no\-mining\fR or \fB[localnet].no\-mining = true\fR disables automatic block
+production; use \fBacton simulated\-localnet mine [N]\fR or \fBPOST /acton_mine\fR to create
+blocks manually
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'localnet has a virtual clock for block and transaction time; use
+\fBacton simulated\-localnet increase\-time\fR, \fBacton simulated\-localnet set\-time\fR, or
+\fBacton simulated\-localnet set\-next\-block\-timestamp\fR to move it without waiting for real
+time
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'messages accepted through \fBsend_boc\fR, \fBacton_sendInternalMessage\fR, or the
+faucet are queued and included on a later automatic or manually mined block
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'a block can include multiple transactions; locally generated internal
+messages are processed in the same block when possible
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the bundled UI is a single\-page explorer app, so routes like \fB/explorer\fR,
+\fB/tokens\fR, \fB/nfts\fR, and per\-address or per\-transaction pages are served from
+the same frontend shell
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the UI reads chain data from \fB/api/v2\fR and \fB/api/v3\fR, and uses \fBacton_*\fR
+control endpoints for local address aliases, registered compiler ABIs,
+status, state files, and checkpoint tooling
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-require\-auth\fR protects read and write API routes, including read\-only
+streaming endpoints
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when \fB\-\-port\fR and \fB[localnet].port\fR are both absent, the current runtime
+fallback is \fB5411\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-rate\-limit\fR applies to \fB/api/*\fR endpoints, not admin endpoints
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-response\-delay\-ms\fR applies only to \fB/api/v2\fR, \fB/api/v3\fR, and
+\fB/api/emulate/v1\fR endpoints; streaming, control, and UI routes are not
+delayed
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setNetworkConditions\fR can change the response delay while the
+server is running, and \fBGET /acton_nodeInfo\fR reports the current value
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-dump\-state\fR writes a state file during graceful shutdown
+.RE
+.SH "CONTROL ENDPOINTS"
+The localnet server exposes \fBacton_*\fR control routes for local development
+tooling:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBGET /acton_nodeInfo\fR returns uptime, latest block seqno, and the active state
+source
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBGET /acton_dumpState\fR downloads the current live state as JSON bytes
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_loadState\fR accepts JSON state bytes, replaces the current node
+state, and clears all checkpoints
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_createCheckpoint\fR with \fB{"name":"before\-upgrade"}\fR creates a
+named in\-memory checkpoint
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBGET /acton_listCheckpoints\fR lists checkpoints
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_restoreCheckpoint\fR with \fB{"name":"before\-upgrade"}\fR restores a
+checkpoint without deleting it or newer checkpoints
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_deleteCheckpoint\fR deletes one named checkpoint
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_clearCheckpoints\fR deletes all checkpoints
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBGET /acton_exportCheckpoint?name=before\-upgrade\fR downloads a checkpoint as
+JSON bytes
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_importCheckpoint?name=bug\fR accepts JSON state bytes and imports
+them as a named checkpoint
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setConfig\fR with \fB{"config":"<BASE64_BOC>"}\fR validates and
+replaces the full blockchain config dictionary, then commits it in a
+config\-only block
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setShardAccount\fR with
+\fB{"address":"<ADDR>","shard_account":"<BASE64_BOC>"}\fR replaces the selected
+account state with a base64\-encoded \fBShardAccount\fR BOC
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_sendInternalMessage\fR with \fB{"boc":"<BASE64_BOC>"}\fR sends a
+base64\-encoded internal message BOC through the local internal queue
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_mine\fR with optional \fB{"blocks":N}\fR mines queued and/or empty
+blocks manually; \fBN\fR defaults to \fB1\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_increaseTime\fR with \fB{"seconds":3600}\fR adds seconds to the
+virtual localnet clock
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setTime\fR with \fB{"timestamp":1710000000}\fR sets the current
+virtual Unix time
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setNextBlockTimestamp\fR with \fB{"timestamp":1710000600}\fR sets a
+one\-shot timestamp for the next mined block
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setNetworkConditions\fR with \fB{"response_delay_ms":300}\fR updates
+simulated network latency; use \fB0\fR to disable response delay
+.RE
+.sp
+TonCenter\-compatible message endpoints such as \fB/api/v2/sendBoc\fR and
+\fB/api/v3/message\fR accept external\-in messages only. Use
+\fB/acton_sendInternalMessage\fR when local tooling needs to inject a raw internal
+message.
+.sp
+Control endpoints are unauthenticated by default for local development. Use
+\fB\-\-require\-auth\fR when another local process, browser page, or test harness should
+not be able to read or mutate the running localnet without the token. Do not
+expose the localnet server publicly.
+.SH "PERSISTENCE"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-db\-path\fR or \fB[localnet].db\-path\fR enables persistent SQLite\-backed node
+state across runs
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-load\-state\fR initializes state from a JSON state file and cannot be combined
+with a database path from either CLI or \fBActon.toml\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-dump\-state\fR exports a JSON state file on shutdown
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'blockchain configs replaced through \fB/acton_setConfig\fR are stored in block
+history and survive restarts when \fB\-\-db\-path\fR is configured
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when no database path is configured, node state is ephemeral unless loaded
+or dumped
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The selected localnet subcommand completed successfully. For
+\fBacton simulated\-localnet status\fR, this also includes the selected port not running;
+use \fB\-\-json\fR and inspect \fBrunning\fR for automation.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Startup failed because port binding, state loading, remote fork
+initialization, faucet handling, or a status/control query failed.
+.RE
+.SH "DISPLAY OPTIONS"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SH "PROJECT OPTIONS"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Path to the \fBActon.toml\fR file to use for this invocation.
+.sp
+Use this when running the command outside the project directory or when the
+manifest lives at a non\-default location.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Path to the project root to use for configuration discovery and relative
+defaults.
+.sp
+This conflicts with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Start with defaults:
+.sp
+.RS 4
+.nf
+acton simulated\-localnet start
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Fork from testnet at a historical block:
+.sp
+.RS 4
+.nf
+acton simulated\-localnet start \-\-fork\-net testnet \-\-fork\-block\-number 55000000
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Load and dump JSON state files:
+.sp
+.RS 4
+.nf
+acton simulated\-localnet start \(rs
+  \-\-load\-state states/localnet.json \(rs
+  \-\-dump\-state states/localnet.json
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Airdrop local funds:
+.sp
+.RS 4
+.nf
+acton simulated\-localnet airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM \-\-amount 25
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Start a local integration node with pre\-funded accounts:
+.sp
+.RS 4
+.nf
+acton simulated\-localnet start \-\-accounts deployer,user \-\-db\-path build/localnet.db
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Inspect a running localnet:
+.sp
+.RS 4
+.nf
+acton simulated\-localnet status \-\-json
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'Dump/load state files and manage runtime checkpoints:
+.sp
+.RS 4
+.nf
+acton simulated\-localnet state dump states/localnet.json
+acton simulated\-localnet checkpoint create before\-upgrade
+acton simulated\-localnet checkpoint list
+acton simulated\-localnet checkpoint restore before\-upgrade
+acton simulated\-localnet checkpoint export before\-upgrade \-\-out states/before\-upgrade.json
+acton simulated\-localnet checkpoint import states/before\-upgrade.json
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help wallet\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fISimulated localnet guide\fR <https://ton\-blockchain.github.io/acton/docs/simulated\-localnet/overview>
+.RE

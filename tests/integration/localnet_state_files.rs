@@ -27,7 +27,7 @@ fn localnet_state_dump_and_load_replace_live_state_and_clear_checkpoints() {
     let port = node.port().to_string();
     let dump_output = project
         .acton()
-        .args(["localnet", "state", "dump"])
+        .args(["simulated-localnet", "state", "dump"])
         .arg(&state_path_arg)
         .arg("--port")
         .arg(&port)
@@ -58,7 +58,7 @@ fn localnet_state_dump_and_load_replace_live_state_and_clear_checkpoints() {
 
     let load_output = project
         .acton()
-        .args(["localnet", "state", "load"])
+        .args(["simulated-localnet", "state", "load"])
         .arg(&state_path_arg)
         .arg("--port")
         .arg(&port)
@@ -146,7 +146,7 @@ fn sqlite_state_dump_preserves_transactions_and_historical_account_states() {
     let reopened_port = reopened.port().to_string();
     let dump_output = project
         .acton()
-        .args(["localnet", "state", "dump"])
+        .args(["simulated-localnet", "state", "dump"])
         .arg(&state_path_arg)
         .arg("--port")
         .arg(&reopened_port)
@@ -165,7 +165,7 @@ fn sqlite_state_dump_preserves_transactions_and_historical_account_states() {
     let restored_port = restored.port().to_string();
     let load_output = project
         .acton()
-        .args(["localnet", "state", "load"])
+        .args(["simulated-localnet", "state", "load"])
         .arg(&state_path_arg)
         .arg("--port")
         .arg(&restored_port)
@@ -188,7 +188,7 @@ fn sqlite_state_dump_preserves_transactions_and_historical_account_states() {
     let imported_port = imported.port().to_string();
     let sqlite_load_output = project
         .acton()
-        .args(["localnet", "state", "load"])
+        .args(["simulated-localnet", "state", "load"])
         .arg(&state_path_arg)
         .arg("--port")
         .arg(&imported_port)

@@ -964,7 +964,7 @@ fn test_wallet_airdrop_localnet_transport_error_without_running_node() {
         .failure();
 
     output.assert_stderr_contains(
-        "Failed to send request to localnet faucet. Make sure `acton localnet start` is running",
+        "Failed to send request to localnet faucet. Make sure `acton simulated-localnet start` is running",
     );
 }
 

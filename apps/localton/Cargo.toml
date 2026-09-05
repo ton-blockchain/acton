@@ -57,6 +57,7 @@ serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10"
 tempfile.workspace = true
+tar = "0.4.46"
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 ton = "0.4.1"
 ton-fullnode-master = { path = "../../crates/ton-fullnode-master" }

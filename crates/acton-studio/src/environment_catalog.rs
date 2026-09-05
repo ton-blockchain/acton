@@ -123,6 +123,23 @@ impl EnvironmentRuntime for EnvironmentCatalogRuntime {
         self.managed.restart(environment_id)
     }
 
+    fn health(
+        &self,
+        environment_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, acton_localnet::NetworkHealth> {
+        if public_ton_network_descriptor_by_id(environment_id).is_some() {
+            return Box::pin(async {
+                Err(EnvironmentRuntimeError::Conflict {
+                    code: "environment_health_unavailable",
+                    message: "Health diagnostics are available for Full localnet environments"
+                        .to_owned(),
+                })
+            });
+        }
+
+        self.managed.health(environment_id)
+    }
+
     fn add_full_ton_node(
         &self,
         environment_id: &str,

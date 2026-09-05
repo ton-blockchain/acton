@@ -27,6 +27,12 @@ export interface FaucetAuthStatus {
   readonly windowSeconds: number
 }
 
+export interface FaucetRequestOptions {
+  readonly signal?: AbortSignal
+  readonly baseUrl?: string
+  readonly authorized?: boolean
+}
+
 export interface FaucetSession {
   readonly githubUserId: number
   readonly login: string
@@ -80,8 +86,11 @@ interface FaucetSessionResponse {
   readonly token?: unknown
 }
 
-export async function requestFaucetAuthStatus(signal?: AbortSignal): Promise<FaucetAuthStatus> {
-  const payload = await faucetGet<FaucetAuthStatusResponse>("auth/status", signal, false)
+export async function requestFaucetAuthStatus(
+  signal?: AbortSignal,
+  baseUrl?: string,
+): Promise<FaucetAuthStatus> {
+  const payload = await faucetGet<FaucetAuthStatusResponse>("auth/status", signal, false, baseUrl)
 
   return {
     enabled: payload.enabled === true,
@@ -108,8 +117,7 @@ export async function exchangeGitHubGrant(
   const payload = await faucetRequest<FaucetSessionResponse>(
     "auth/exchange",
     {grant},
-    signal,
-    false,
+    {signal, authorized: false},
   )
   if (typeof payload.token !== "string" || payload.token.length < 32) {
     throw new Error("Faucet returned an invalid GitHub session token")
@@ -162,12 +170,12 @@ export function clearFaucetSession(): void {
 
 export async function requestFaucetChallenge(
   address: string,
-  signal?: AbortSignal,
+  options: FaucetRequestOptions = {},
 ): Promise<FaucetChallenge> {
   const payload = await faucetRequest<FaucetChallengeResponse>(
     "challenge",
     {address, type: 1},
-    signal,
+    options,
   )
   const maxSolveTtlSeconds =
     payload.max_solve_ttl_seconds === undefined
@@ -206,7 +214,7 @@ export async function submitFaucetClaim(
   address: string,
   challenge: FaucetChallenge,
   nonce: number,
-  signal?: AbortSignal,
+  options: FaucetRequestOptions = {},
 ): Promise<FaucetClaim> {
   const payload = await faucetRequest<FaucetMessageResponse>(
     "claim",
@@ -217,7 +225,7 @@ export async function submitFaucetClaim(
       nonce,
       type: 1,
     },
-    signal,
+    options,
   )
 
   return {
@@ -231,20 +239,25 @@ export async function submitFaucetClaim(
 function faucetRequest<T>(
   path: string,
   payload: Record<string, unknown>,
-  signal?: AbortSignal,
-  authorized = true,
+  options: FaucetRequestOptions = {},
 ): Promise<T> {
   return faucetFetch<T>(path, {
     method: "POST",
     body: JSON.stringify(payload),
-    signal,
-    authorized,
+    signal: options.signal,
+    authorized: options.authorized,
     contentType: true,
+    baseUrl: options.baseUrl,
   })
 }
 
-function faucetGet<T>(path: string, signal?: AbortSignal, authorized = true): Promise<T> {
-  return faucetFetch<T>(path, {method: "GET", signal, authorized})
+function faucetGet<T>(
+  path: string,
+  signal?: AbortSignal,
+  authorized = true,
+  baseUrl?: string,
+): Promise<T> {
+  return faucetFetch<T>(path, {method: "GET", signal, authorized, baseUrl})
 }
 
 interface FaucetFetchOptions {
@@ -253,6 +266,7 @@ interface FaucetFetchOptions {
   readonly signal?: AbortSignal
   readonly authorized?: boolean
   readonly contentType?: boolean
+  readonly baseUrl?: string
 }
 
 async function faucetFetch<T = unknown>(path: string, options: FaucetFetchOptions): Promise<T> {
@@ -266,7 +280,7 @@ async function faucetFetch<T = unknown>(path: string, options: FaucetFetchOption
     if (sessionToken) headers.authorization = `Bearer ${sessionToken}`
   }
 
-  const response = await fetch(new URL(path, faucetBaseUrl()), {
+  const response = await fetch(new URL(path, faucetBaseUrl(options.baseUrl)), {
     method: options.method,
     headers,
     body: options.body,
@@ -287,10 +301,11 @@ async function faucetFetch<T = unknown>(path: string, options: FaucetFetchOption
   return parsed as T
 }
 
-function faucetBaseUrl(): string {
-  const configured = import.meta.env.VITE_FAUCET_URL?.trim()
+function faucetBaseUrl(override?: string): string {
+  const configured = override?.trim() || import.meta.env.VITE_FAUCET_URL?.trim()
   const value = configured || DEFAULT_FAUCET_URL
-  return value.endsWith("/") ? value : `${value}/`
+  const resolved = new URL(value, globalThis.location.origin).toString()
+  return resolved.endsWith("/") ? resolved : `${resolved}/`
 }
 
 function faucetDeviceUid(): string {

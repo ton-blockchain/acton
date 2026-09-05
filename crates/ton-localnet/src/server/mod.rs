@@ -159,13 +159,13 @@ pub struct ServerArgs {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
-    #[error("failed to bind localnet server to {address}")]
+    #[error("failed to bind Acton simulated localnet server to {address}")]
     Bind { address: String, source: io::Error },
     #[error("localnet LiteAPI port overflows u16 for HTTP port {http_port}")]
     LiteApiPortOverflow { http_port: u16 },
     #[error("failed to bind localnet LiteAPI to {address}")]
     LiteApiBind { address: String, source: io::Error },
-    #[error("localnet server stopped with an error")]
+    #[error("Acton simulated localnet server stopped with an error")]
     Serve { source: io::Error },
     #[error("failed to initialize the off-chain metadata HTTP client")]
     OffchainMetadataClient { source: reqwest::Error },
@@ -226,7 +226,7 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
         None
     };
     println!(
-        "    {} Localnet server on http://{address}",
+        "    {} Acton simulated localnet on http://{address}",
         "Starting".green().bold(),
     );
     if let Some(liteapi_endpoint) = liteapi_endpoint {
@@ -272,7 +272,10 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {
             if tokio::signal::ctrl_c().await.is_ok() {
-                println!("  {} Localnet server", "Stopping".yellow().bold());
+                println!(
+                    "\n    {} Acton simulated localnet gracefully (shutdown requested)",
+                    "Stopping".yellow().bold()
+                );
                 shutdown.notify();
             }
         })

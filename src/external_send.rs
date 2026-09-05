@@ -69,7 +69,7 @@ fn transport_failure_fix_hint(network_name: &str) -> String {
 Possible fix:
 - start localnet with {}
 - if localnet uses a custom port, check {localnet_port} and {localnet_api_v2} in Acton.toml",
-                "acton localnet start".yellow()
+                "acton simulated-localnet start".yellow()
             )
         }
         "testnet" | "mainnet" => {
@@ -287,7 +287,7 @@ Possible fix:
 - a firewall, proxy, or temporary service outage blocked the request
 
 Possible fix:
-- start localnet with acton localnet start
+- start localnet with acton simulated-localnet start
 - if localnet uses a custom port, check [localnet].port and [networks.localnet].api.v2 in Acton.toml
 
 Details:

@@ -33,7 +33,7 @@ interface CreateEnvironmentDialogProps {
 }
 
 interface EnvironmentFormState {
-  readonly kind: "actonLocalnet" | "fullTonNetwork"
+  readonly kind: "actonSimulatedLocalnet" | "fullTonNetwork"
   readonly name: string
   readonly port: string
   readonly forkNetwork: string
@@ -164,9 +164,9 @@ export function CreateEnvironmentDialog({
       request = {
         name: form.name.trim(),
         config:
-          form.kind === "actonLocalnet"
+          form.kind === "actonSimulatedLocalnet"
             ? {
-                kind: "actonLocalnet",
+                kind: "actonSimulatedLocalnet",
                 port: optionalPositiveInteger(form.port, "Local port"),
                 forkNetwork: form.forkNetwork || undefined,
                 forkBlockNumber: form.forkNetwork
@@ -239,15 +239,15 @@ export function CreateEnvironmentDialog({
           <Select
             label="Environment type"
             description={
-              form.kind === "actonLocalnet"
-                ? "Uses the Acton emulator, starts quickly, uses little disk space, and supports forks, manual mining, time travel, and network controls, but can behave differently from a real TON network in edge cases"
+              form.kind === "actonSimulatedLocalnet"
+                ? "Fast local TON environment with compatible blocks, APIs, forks, mining controls, and time travel; Acton's custom simplified implementation, not a real TON network"
                 : "Runs a complete local TON network and full indexer, supports actions, and reproduces full-node API behavior, but starts more slowly and uses more memory and disk space"
             }
             value={form.kind}
             autoFocus
             onChange={event => updateKind(event.target.value as EnvironmentFormState["kind"])}
           >
-            <option value="actonLocalnet">Simulated localnet</option>
+            <option value="actonSimulatedLocalnet">Simulated localnet</option>
             <option value="fullTonNetwork">Full localnet</option>
           </Select>
 
@@ -261,7 +261,7 @@ export function CreateEnvironmentDialog({
             onChange={event => updateForm("name", event.target.value)}
           />
 
-          {form.kind === "actonLocalnet" ? (
+          {form.kind === "actonSimulatedLocalnet" ? (
             <>
               <div className={styles.formGrid}>
                 <Input
@@ -416,8 +416,8 @@ export function CreateEnvironmentDialog({
 
 function createInitialForm(environmentCount: number): EnvironmentFormState {
   return {
-    kind: "actonLocalnet",
-    name: defaultEnvironmentName("actonLocalnet", environmentCount),
+    kind: "actonSimulatedLocalnet",
+    name: defaultEnvironmentName("actonSimulatedLocalnet", environmentCount),
     port: "",
     forkNetwork: "",
     forkBlockNumber: "",
@@ -597,7 +597,7 @@ function defaultEnvironmentName(
   kind: EnvironmentFormState["kind"],
   environmentCount: number,
 ): string {
-  return kind === "actonLocalnet"
+  return kind === "actonSimulatedLocalnet"
     ? `Simulated localnet ${environmentCount + 1}`
     : `Full localnet ${environmentCount + 1}`
 }

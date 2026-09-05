@@ -436,7 +436,7 @@ impl NodeSettings {
     /// validator participation is opt-in and configured by the join workflow.
     #[must_use]
     pub fn joined(name: String, public_ip: Ipv4Addr, ports: NodePorts) -> Self {
-        Self {
+        let mut settings = Self {
             role: NodeRole::Joined,
             name,
             enabled: true,
@@ -450,7 +450,13 @@ impl NodeSettings {
             verbosity: 1,
             participate_in_elections: false,
             ..Self::genesis()
-        }
+        };
+        // Joined full nodes should not retain a year of downloaded chain data by
+        // default. This matches the official validator-engine container policy.
+        settings.state_ttl_seconds = 86_400;
+        settings.block_ttl_seconds = 86_400;
+        settings.archive_ttl_seconds = 86_400;
+        settings
     }
 
     fn validate(&self) -> Result<()> {

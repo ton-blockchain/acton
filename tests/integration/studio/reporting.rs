@@ -60,9 +60,7 @@ fn running_studio_is_discovered_by_acton_test() {
             .is_some_and(|path| !path.is_empty())
     );
 
-    let output = studio.stop();
-    assert!(output.status.success());
-    assert!(output.stderr.is_empty());
+    studio.stop();
 }
 
 #[cfg(unix)]
@@ -109,9 +107,7 @@ fn studio_reporting_rejects_a_descriptor_for_another_workspace() {
             .exists()
     );
 
-    let output = studio.stop();
-    assert!(output.status.success());
-    assert!(output.stderr.is_empty());
+    studio.stop();
 }
 
 #[test]

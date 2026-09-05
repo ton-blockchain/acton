@@ -1,14 +1,6 @@
-import {Check, Copy, KeyRound, Shield} from "lucide-react"
+import {KeyRound, Shield} from "lucide-react"
 import {TlbCellViewer} from "@acton/transaction-ui"
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  GramAmount,
-  RawDataBlock,
-  shortenMiddle,
-  useToast,
-} from "@acton/ui"
+import {AddressChip, GramAmount, RawDataBlock, useToast} from "@acton/ui"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
 import type {
@@ -20,11 +12,17 @@ import type {
 } from "@ton/walletkit"
 
 import {fetchStudioWallets, type EnvironmentConfig, type StudioWallet} from "../../studioApi"
-import styles from "../dashboard/pages/WalletsPage.module.css"
-import {formatAddress, normalizeAddress} from "@acton/explorer-core/components/utils"
+import styles from "./TonConnectRequestDialog.module.css"
+import {normalizeAddress} from "@acton/explorer-core/components/utils"
 import {useAddressFormat} from "@acton/explorer-core/hooks/useNetworkInfo"
 
 import {addProjectWalletToKit, createWalletKit} from "./kit"
+import {
+  TonConnectRequestDialog,
+  TonConnectWalletPlate,
+  TonConnectWalletSelector,
+  type TonConnectWalletOption,
+} from "./TonConnectRequestDialog"
 import type {ProjectWalletRecord, RuntimeWallet} from "./types"
 import {isSupportedWalletVersion} from "./types"
 import {useTonConnectPasteHandler} from "./useTonConnectPasteHandler"
@@ -94,6 +92,42 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
   )
   const selectedConnectWallet =
     runtimeWallets.find(wallet => wallet.id === selectedConnectWalletId) ?? runtimeWallets[0]
+  const resolveRequestWallet = (walletId?: string, sessionId?: string) => {
+    const sessionWalletId = sessions.find(session => session.sessionId === sessionId)?.walletId
+    return (
+      runtimeWallets.find(wallet => wallet.id === (walletId ?? sessionWalletId)) ??
+      runtimeWallets[0]
+    )
+  }
+  const transactionWallet = pendingTransactionRequest
+    ? resolveRequestWallet(pendingTransactionRequest.walletId, pendingTransactionRequest.sessionId)
+    : undefined
+  const signDataWallet = pendingSignDataRequest
+    ? resolveRequestWallet(pendingSignDataRequest.walletId, pendingSignDataRequest.sessionId)
+    : undefined
+  const toWalletOption = (wallet: RuntimeWallet): TonConnectWalletOption => {
+    const normalizedAddress = normalizeAddress(wallet.record.address, addressFormat)
+    const balance = walletBalances[wallet.id]
+    const balanceLabel =
+      balance?.value === undefined ? (
+        balance?.isLoading ? (
+          "Loading balance"
+        ) : (
+          "Balance unavailable"
+        )
+      ) : (
+        <GramAmount tabIndex={-1} value={balance.value} />
+      )
+
+    return {
+      id: wallet.id,
+      name: wallet.record.name,
+      address: normalizedAddress,
+      network: networkLabel,
+      balance: balanceLabel,
+    }
+  }
+  const connectWalletOptions = runtimeWallets.map(toWalletOption)
 
   const showErrorToast = useCallback(
     (title: string, error: unknown, fallback: string) => {
@@ -305,7 +339,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
           const wallet = await addProjectWalletToKit(walletKit, walletRecord, {
             environmentId,
             chainId,
-            useLocalnetAdapters: environmentKind === "actonLocalnet",
+            useLocalnetAdapters: environmentKind === "actonSimulatedLocalnet",
           })
           if (wallet) {
             nextRuntimeWallets.push({
@@ -395,11 +429,6 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
       try {
         await walletKit.handleTonConnectUrl(url.trim())
         setTonConnectUrl("")
-        showToast({
-          variant: "info",
-          title: "TON Connect request received",
-          description: "Review and approve the request in Acton.",
-        })
       } catch (error) {
         showErrorToast("TON Connect failed", error, "Failed to process TON Connect URL.")
       } finally {
@@ -710,111 +739,72 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
     <WalletRuntimeContext.Provider value={value}>
       {children}
       {pendingConnectRequest && (
-        <Dialog
+        <TonConnectRequestDialog
           open
-          title="Connection Request"
-          description={`${getDappName(pendingConnectRequest.preview.dAppInfo?.name)} wants to connect`}
-          className={styles.modalDialog}
-          maxWidth={520}
-          closeLabel="Close request"
-          contentClassName={styles.modalContent}
+          kind="connect"
+          titlePrefix="Connect to"
+          dappInfo={pendingConnectRequest.preview.dAppInfo}
+          domain={pendingConnectRequest.domain}
+          description={`${pendingConnectRequest.preview.dAppInfo?.name?.trim() || "This dApp"} is requesting access to your wallet address:`}
+          wallet={
+            <TonConnectWalletSelector
+              options={connectWalletOptions}
+              selectedId={selectedConnectWallet?.id}
+              onSelect={setSelectedConnectWalletId}
+            />
+          }
+          disclaimer="Only connect to apps you trust · Connecting shares your wallet address and allows the app to request transactions"
+          approveLabel="Connect wallet"
+          approveDisabled={!selectedConnectWallet}
           busy={isSubmitting}
-          onOpenChange={open => {
-            if (!open) void handleRejectConnect()
-          }}
+          onApprove={() => void handleApproveConnect()}
+          onReject={() => void handleRejectConnect()}
         >
-          <div className={styles.permissionsList}>
-            {pendingConnectRequest.preview.permissions.map((permission, index) => (
-              <div
-                key={`${permission.name ?? "permission"}-${index}`}
-                className={styles.permissionItem}
-              >
-                <Shield size={15} />
-                <div>
-                  <div className={styles.permissionTitle}>
-                    {permission.title ?? permission.name ?? "Permission"}
-                  </div>
-                  <div className={styles.permissionDescription}>
-                    {permission.description ?? "Requested by the dApp during connect."}
+          <section className={styles.detailsSection} aria-labelledby="connect-permissions-title">
+            <div className={styles.sectionHeading}>
+              <h3 id="connect-permissions-title">Permissions</h3>
+              <span>{pendingConnectRequest.preview.permissions.length} requested</span>
+            </div>
+            <div className={styles.permissionsList}>
+              {pendingConnectRequest.preview.permissions.map((permission, index) => (
+                <div
+                  key={`${permission.name ?? "permission"}-${index}`}
+                  className={styles.permissionItem}
+                >
+                  <Shield size={15} />
+                  <div>
+                    <div className={styles.permissionTitle}>
+                      {permission.title ?? permission.name ?? "Permission"}
+                    </div>
+                    <div className={styles.permissionDescription}>
+                      {permission.description ?? "Requested by the app during connection"}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          <div className={styles.walletPicker}>
-            <span className={styles.walletPickerLabel}>Connect with</span>
-            {runtimeWallets.map(wallet => {
-              const isSelected = wallet.id === selectedConnectWallet?.id
-              const walletAddress = normalizeAddress(wallet.record.address, addressFormat)
-              const balance = walletBalances[wallet.id]
-              const balanceLabel =
-                balance?.value === undefined ? (
-                  balance?.isLoading ? (
-                    "Loading balance"
-                  ) : (
-                    "Balance unavailable"
-                  )
-                ) : (
-                  <GramAmount tabIndex={-1} value={balance.value} />
-                )
-              return (
-                <button
-                  key={wallet.id}
-                  type="button"
-                  className={`${styles.pickerOption} ${isSelected ? styles.pickerOptionActive : ""}`}
-                  onClick={() => setSelectedConnectWalletId(wallet.id)}
-                >
-                  <span className={styles.pickerOptionContent}>
-                    <span className={styles.pickerPrimary}>
-                      <span className={styles.pickerTitle}>{wallet.record.name}</span>
-                      <span className={styles.pickerBalance}>{balanceLabel}</span>
-                    </span>
-                    <span className={styles.pickerMeta}>
-                      <span className={styles.pickerAddress} title={walletAddress}>
-                        {formatAddress(walletAddress, true, addressFormat)}
-                      </span>
-                      <span className={styles.pickerNetwork}>{networkLabel}</span>
-                    </span>
-                  </span>
-                  <span className={styles.radio}>{isSelected && <Check size={14} />}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          <DialogActions stackOnMobile>
-            <Button
-              variant="outline"
-              onClick={() => void handleRejectConnect()}
-              disabled={isSubmitting}
-            >
-              Reject
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => void handleApproveConnect()}
-              disabled={!selectedConnectWallet || isSubmitting}
-            >
-              Connect
-            </Button>
-          </DialogActions>
-        </Dialog>
+              ))}
+            </div>
+          </section>
+        </TonConnectRequestDialog>
       )}
 
       {pendingTransactionRequest && (
-        <Dialog
+        <TonConnectRequestDialog
           open
-          title="Transaction Request"
-          description={`${getDappName(pendingTransactionRequest.dAppInfo?.name)} wants this wallet to send a transaction.`}
-          className={styles.modalDialog}
-          maxWidth={520}
-          closeLabel="Close request"
-          contentClassName={styles.modalContent}
+          kind="transaction"
+          titlePrefix="Confirm transaction for"
+          dappInfo={pendingTransactionRequest.dAppInfo}
+          domain={pendingTransactionRequest.domain}
+          description="A dApp wants to send a transaction from your wallet:"
+          wallet={
+            transactionWallet ? (
+              <TonConnectWalletPlate wallet={toWalletOption(transactionWallet)} />
+            ) : undefined
+          }
+          disclaimer="Only approve transactions whose recipients and amounts you recognize"
+          approveLabel="Approve and sign"
           busy={isSubmitting}
-          onOpenChange={open => {
-            if (!open) void handleRejectTransaction()
-          }}
+          onApprove={() => void handleApproveTransaction()}
+          onReject={() => void handleRejectTransaction()}
         >
           <div className={styles.requestSummary}>
             <MetaRow label="Messages">
@@ -836,10 +826,12 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
               <div key={`${message.address}-${index}`} className={styles.messageItem}>
                 <span className={styles.messageIndex}>#{index + 1}</span>
                 <div>
-                  <CopyableAddress
+                  <AddressChip
                     address={normalizeAddress(message.address, addressFormat)}
-                    copiedAddress={copiedAddress}
-                    onCopy={handleCopyAddress}
+                    variant="plain"
+                    onCopyError={error =>
+                      showErrorToast("Copy failed", error, "Failed to copy address")
+                    }
                   />
                   <div className={styles.messageValue}>
                     <GramAmount value={message.amount} />
@@ -848,65 +840,35 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
               </div>
             ))}
           </div>
-
-          <DialogActions stackOnMobile>
-            <Button
-              variant="outline"
-              onClick={() => void handleRejectTransaction()}
-              disabled={isSubmitting}
-            >
-              Reject
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => void handleApproveTransaction()}
-              disabled={isSubmitting}
-            >
-              Approve
-            </Button>
-          </DialogActions>
-        </Dialog>
+        </TonConnectRequestDialog>
       )}
 
       {pendingSignDataRequest && (
-        <Dialog
+        <TonConnectRequestDialog
           open
-          title="Sign Request"
-          description={`${getDappName(pendingSignDataRequest.preview.dAppInfo?.name)} wants a signature`}
-          className={`${styles.modalDialog} ${
-            pendingSignDataRequest.preview.data.type === "cell" ? styles.cellSignDialog : ""
-          }`}
-          maxWidth={520}
-          closeLabel="Close request"
-          contentClassName={`${styles.modalContent} ${
-            pendingSignDataRequest.preview.data.type === "cell" ? styles.cellSignDialogContent : ""
-          }`}
+          kind="sign"
+          titlePrefix="Sign data for"
+          dappInfo={pendingSignDataRequest.preview.dAppInfo}
+          domain={pendingSignDataRequest.domain}
+          description="A dApp wants you to sign data with your wallet:"
+          wallet={
+            signDataWallet ? (
+              <TonConnectWalletPlate wallet={toWalletOption(signDataWallet)} />
+            ) : undefined
+          }
+          disclaimer="Signing may prove identity or authorize an action · Only sign data you understand"
+          approveLabel="Sign data"
+          className={
+            pendingSignDataRequest.preview.data.type === "cell" ? styles.cellDialog : undefined
+          }
           busy={isSubmitting}
-          onOpenChange={open => {
-            if (!open) void handleRejectSignData()
-          }}
+          onApprove={() => void handleApproveSignData()}
+          onReject={() => void handleRejectSignData()}
         >
           <div className={styles.signRequestPreview}>
             <SignRequestPreview preview={pendingSignDataRequest.preview.data} />
           </div>
-
-          <DialogActions stackOnMobile>
-            <Button
-              variant="outline"
-              onClick={() => void handleRejectSignData()}
-              disabled={isSubmitting}
-            >
-              Reject
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => void handleApproveSignData()}
-              disabled={isSubmitting}
-            >
-              Sign
-            </Button>
-          </DialogActions>
-        </Dialog>
+        </TonConnectRequestDialog>
       )}
     </WalletRuntimeContext.Provider>
   )
@@ -923,32 +885,6 @@ const MetaRow: FC<MetaRowProps> = ({label, children}) => (
     <span className={styles.metaValue}>{children}</span>
   </div>
 )
-
-interface CopyableAddressProps {
-  readonly address: string
-  readonly copiedAddress?: string
-  readonly onCopy: (address: string) => Promise<void>
-}
-
-const CopyableAddress: FC<CopyableAddressProps> = ({address, copiedAddress, onCopy}) => {
-  const isCopied = copiedAddress === address
-
-  return (
-    <div className={styles.copyableAddress}>
-      <span className={styles.copyableAddressText} title={address}>
-        {shortenMiddle(address, {start: 14, end: 14, separator: "..."})}
-      </span>
-      <button
-        type="button"
-        className={`${styles.addressCopyButton} ${isCopied ? styles.addressCopyButtonCopied : ""}`}
-        onClick={() => void onCopy(address)}
-        aria-label={isCopied ? "Address copied" : "Copy address"}
-      >
-        {isCopied ? <Check size={14} /> : <Copy size={14} />}
-      </button>
-    </div>
-  )
-}
 
 const SignRequestPreview: FC<SignRequestPreviewProps> = ({preview}) => {
   if (preview.type === "cell") {

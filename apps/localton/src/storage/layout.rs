@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::ton::tools::types::TonPublicKey;
 
 pub const SCHEMA_VERSION: u32 = 4;
-pub const TON_RELEASE: &str = "v2026.06";
+pub const TON_RELEASE: &str = "v2026.08";
 
 pub const VALIDATOR_CONSOLE_PORT: u16 = 4441;
 pub const VALIDATOR_ADNL_PORT: u16 = 4442;

@@ -38,7 +38,7 @@ export const SettingsPage: FC<SettingsPageProps> = ({
   const {showToast} = useToast()
   const {environment} = useLocalnetRuntime()
   const localnetConfig =
-    environment?.config.kind === "actonLocalnet" ? environment.config : undefined
+    environment?.config.kind === "actonSimulatedLocalnet" ? environment.config : undefined
   const runtimeAvailable = environment?.status === "running"
   const hasControlApi = runtimeAvailable && supports(environment, "controlApi")
   const hasMining = runtimeAvailable && supports(environment, "mining")
@@ -521,7 +521,7 @@ function parseResponseDelay(value: string): number | undefined {
 }
 
 function formatForkState(environment?: StudioEnvironment): string {
-  if (environment?.config.kind !== "actonLocalnet") return "Not applicable"
+  if (environment?.config.kind !== "actonSimulatedLocalnet") return "Not applicable"
 
   const network = environment.config.forkNetwork
   if (!network) return "Clean network"

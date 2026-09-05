@@ -114,6 +114,8 @@ const relayMessage = async (request: Request, url: URL): Promise<Response> => {
 Bun.serve({
   hostname: "127.0.0.1",
   port,
+  // Approvals can stay open during visual review, so idle SSE clients must remain connected
+  idleTimeout: 0,
   fetch(request) {
     const url = new URL(request.url)
     if (request.method === "OPTIONS") {

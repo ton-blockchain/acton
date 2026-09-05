@@ -65,11 +65,14 @@ type FaucetPhase =
   | "cancelled"
   | "error"
 
-interface FaucetPageProps {
+export interface FaucetPageProps {
   readonly isTestnetSelected: boolean
   readonly selectedNetworkLabel: string
   readonly testnetClient: TonClient
   readonly onSwitchToTestnet: () => void
+  readonly githubAuthEnabled?: boolean
+  readonly faucetBaseUrl?: string
+  readonly addressPath?: (address: string) => string
 }
 
 interface FaucetRun {
@@ -151,9 +154,14 @@ function addressErrorToast(error: unknown): {readonly title: string; readonly de
 
 export const FaucetPage: FC<FaucetPageProps> = props => {
   const {isTestnetSelected, selectedNetworkLabel, testnetClient} = props
+  const githubAuthEnabled = props.githubAuthEnabled ?? true
   const {dismissToast, showToast, updateToast} = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [initialAuthParams] = useState(() => readGitHubRedirectParams(searchParams))
+  const [initialAuthParams] = useState(() =>
+    githubAuthEnabled
+      ? readGitHubRedirectParams(searchParams)
+      : {grant: null, error: null, returnState: undefined},
+  )
   const [address, setAddress] = useState(
     () => initialAuthParams.returnState?.address ?? searchParams.get("address") ?? "",
   )
@@ -229,7 +237,11 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
 
   useEffect(() => {
     let cancelled = false
-    authInitializationRef.current ??= initializeFaucetAuth(initialAuthParams.grant)
+    authInitializationRef.current ??= initializeFaucetAuth(
+      initialAuthParams.grant,
+      githubAuthEnabled,
+      props.faucetBaseUrl,
+    )
 
     void authInitializationRef.current
       .then(({status, session, sessionError}) => {
@@ -260,7 +272,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
     return () => {
       cancelled = true
     }
-  }, [initialAuthParams, setSearchParams, showToast])
+  }, [githubAuthEnabled, initialAuthParams, props.faucetBaseUrl, setSearchParams, showToast])
 
   useEffect(() => {
     setUsage(readFaucetUsage(Date.now(), requestLimit, requestWindowMs))
@@ -363,7 +375,11 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
 
     try {
       const balanceBefore = await getTestnetBalance(testnetClient, testnetAddress)
-      const challenge = await requestFaucetChallenge(testnetAddress, controller.signal)
+      const challenge = await requestFaucetChallenge(testnetAddress, {
+        signal: controller.signal,
+        baseUrl: props.faucetBaseUrl,
+        authorized: githubAuthEnabled,
+      })
       setPhase("solving")
       updateToast(toastId, {
         variant: "loading",
@@ -397,12 +413,11 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
         description: statusDescription("claiming"),
         durationMs: 60_000,
       })
-      const claim = await submitFaucetClaim(
-        testnetAddress,
-        challenge,
-        solution.nonce,
-        controller.signal,
-      )
+      const claim = await submitFaucetClaim(testnetAddress, challenge, solution.nonce, {
+        signal: controller.signal,
+        baseUrl: props.faucetBaseUrl,
+        authorized: githubAuthEnabled,
+      })
       setUsage(recordFaucetRequest(Date.now(), requestLimit, requestWindowMs))
       setPhase("waiting")
       updateToast(toastId, {
@@ -428,9 +443,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
             {statusDescription(finalPhase)}
             <br />
             <br />
-            <Link to={`/address/${encodeURIComponent(testnetAddress)}?network=testnet`}>
-              View on Testnet
-            </Link>
+            <Link to={faucetAddressPath(props, testnetAddress)}>View on Testnet</Link>
           </span>
         ),
         durationMs: 10_000,
@@ -539,15 +552,17 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
           </form>
         </section>
 
-        <GitHubLimitsCard
-          status={authStatus}
-          session={githubSession}
-          requestWindowMs={requestWindowMs}
-          busy={authBusy}
-          disabled={running}
-          onConnect={handleConnectGitHub}
-          onDisconnect={() => void handleDisconnectGitHub()}
-        />
+        {githubAuthEnabled && (
+          <GitHubLimitsCard
+            status={authStatus}
+            session={githubSession}
+            requestWindowMs={requestWindowMs}
+            busy={authBusy}
+            disabled={running}
+            onConnect={handleConnectGitHub}
+            onDisconnect={() => void handleDisconnectGitHub()}
+          />
+        )}
 
         <section className={styles.processCard}>
           <div className={styles.cardHeader}>
@@ -761,6 +776,10 @@ function abortError(): Error {
   return error
 }
 
+function faucetAddressPath(props: FaucetPageProps, address: string): string {
+  return props.addressPath?.(address) ?? `/address/${encodeURIComponent(address)}?network=testnet`
+}
+
 function isRunningPhase(phase: FaucetPhase): boolean {
   return phase === "challenge" || phase === "solving" || phase === "claiming" || phase === "waiting"
 }
@@ -947,10 +966,14 @@ function clearGitHubReturnState(): void {
   }
 }
 
-async function initializeFaucetAuth(grant: string | null): Promise<FaucetAuthInitializationResult> {
-  const status = await requestFaucetAuthStatus()
-  if (!status.enabled) {
-    clearFaucetSession()
+async function initializeFaucetAuth(
+  grant: string | null,
+  githubAuthEnabled: boolean,
+  faucetBaseUrl?: string,
+): Promise<FaucetAuthInitializationResult> {
+  const status = await requestFaucetAuthStatus(undefined, faucetBaseUrl)
+  if (!status.enabled || !githubAuthEnabled) {
+    if (githubAuthEnabled) clearFaucetSession()
     return {status}
   }
 

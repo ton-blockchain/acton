@@ -1,0 +1,14 @@
+{
+  "title": "Acton simulated localnet",
+  "icon": "Server",
+  "pages": [
+    "overview",
+    "getting-started",
+    "forking-from-network",
+    "startup-accounts",
+    "persistence-and-snapshots",
+    "control-api",
+    "api-compatibility",
+    "liteapi-support"
+  ]
+}

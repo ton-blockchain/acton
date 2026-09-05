@@ -228,19 +228,31 @@ fn localnet_checkpoint_cli_manages_and_transfers_checkpoints() {
 
     let create = project
         .acton()
-        .args(["localnet", "checkpoint", "create", "stable", "--port"])
+        .args([
+            "simulated-localnet",
+            "checkpoint",
+            "create",
+            "stable",
+            "--port",
+        ])
         .arg(&port)
         .run()
         .success();
     let list = project
         .acton()
-        .args(["localnet", "checkpoint", "list", "--port"])
+        .args(["simulated-localnet", "checkpoint", "list", "--port"])
         .arg(&port)
         .run()
         .success();
     let export = project
         .acton()
-        .args(["localnet", "checkpoint", "export", "stable", "--out"])
+        .args([
+            "simulated-localnet",
+            "checkpoint",
+            "export",
+            "stable",
+            "--out",
+        ])
         .arg(&checkpoint_path_arg)
         .arg("--port")
         .arg(&port)
@@ -248,13 +260,19 @@ fn localnet_checkpoint_cli_manages_and_transfers_checkpoints() {
         .success();
     let delete = project
         .acton()
-        .args(["localnet", "checkpoint", "delete", "stable", "--port"])
+        .args([
+            "simulated-localnet",
+            "checkpoint",
+            "delete",
+            "stable",
+            "--port",
+        ])
         .arg(&port)
         .run()
         .success();
     let import = project
         .acton()
-        .args(["localnet", "checkpoint", "import"])
+        .args(["simulated-localnet", "checkpoint", "import"])
         .arg(&checkpoint_path_arg)
         .args(["--name", "restored", "--port"])
         .arg(&port)
@@ -262,19 +280,25 @@ fn localnet_checkpoint_cli_manages_and_transfers_checkpoints() {
         .success();
     let restore = project
         .acton()
-        .args(["localnet", "checkpoint", "restore", "restored", "--port"])
+        .args([
+            "simulated-localnet",
+            "checkpoint",
+            "restore",
+            "restored",
+            "--port",
+        ])
         .arg(&port)
         .run()
         .success();
     let clear = project
         .acton()
-        .args(["localnet", "checkpoint", "clear", "--port"])
+        .args(["simulated-localnet", "checkpoint", "clear", "--port"])
         .arg(&port)
         .run()
         .success();
     let list_after_clear = project
         .acton()
-        .args(["localnet", "checkpoint", "list", "--port"])
+        .args(["simulated-localnet", "checkpoint", "list", "--port"])
         .arg(&port)
         .run()
         .success();

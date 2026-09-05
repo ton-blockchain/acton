@@ -7,14 +7,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
-use chrono::Utc;
-use serde::Deserialize;
-use tokio::net::TcpStream;
-use tokio::process::{Child, Command};
-use tokio::sync::{Mutex, Notify, RwLock};
-use tokio::time::{Instant, sleep, timeout};
-use ton::ton_core::types::TonAddress;
-
 use crate::contract_registry::{
     ContractRegistration, ContractRegistryStore, VerifiedSourceRegistration,
 };
@@ -22,33 +14,25 @@ use crate::environment::{
     CreateEnvironmentConfig, CreateEnvironmentRequest, CreateEnvironmentSnapshotRequest,
     CreateFullTonNodeRequest, EnvironmentConfig, EnvironmentEndpoints, EnvironmentRuntime,
     EnvironmentRuntimeError, EnvironmentRuntimeFuture, EnvironmentSnapshot,
-    EnvironmentSnapshotOperation, EnvironmentSnapshotOperationKind,
-    EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings, EnvironmentStatus,
-    FullTonAccountImport, FullTonNode, RemoveFullTonNodeRequest, StudioEnvironment,
-    UpdateEnvironmentRequest,
+    EnvironmentSnapshotOperation, EnvironmentStatus, FullTonAccountImport,
+    RemoveFullTonNodeRequest, StudioEnvironment, UpdateEnvironmentRequest,
 };
 use crate::environment_store::{
     LoadedEnvironments, StoredEnvironment, load_environments, persist_environment,
 };
-use crate::full_ton_network::FullTonNetworkDriver;
 use crate::local_artifacts::{ProjectArtifactSynchronizer, ProjectFingerprint};
+use crate::localnet::{self, FullLocalnet};
+use tokio::net::TcpStream;
+use tokio::process::{Child, Command};
+use tokio::sync::{Mutex, Notify, RwLock};
+use tokio::time::{Instant, sleep, timeout};
+use ton::ton_core::types::TonAddress;
+use tracing::log;
 
 const FIRST_LOCALNET_PORT: u16 = 5411;
-const FIRST_FULL_TON_V2_PORT: u16 = 18080;
-const FIRST_FULL_TON_V3_PORT: u16 = 18081;
-const FIRST_FULL_TON_ADMIN_PORT: u16 = 18082;
-const FIRST_FULL_TON_CONFIG_PORT: u16 = 18083;
-const FIRST_FULL_TON_OBSERVABILITY_PORT: u16 = 18084;
-const FIRST_JOIN_NODE_PORT: u16 = 19000;
-const JOIN_NODE_PORT_STRIDE: u16 = 10;
 const LOCALNET_READY_TIMEOUT: Duration = Duration::from_secs(15);
 const LOCALNET_READY_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const LOCALNET_STATUS_POLL_INTERVAL: Duration = Duration::from_millis(500);
-const FULL_TON_IMAGE_INSPECT_TIMEOUT: Duration = Duration::from_secs(10);
-const FULL_TON_IMAGE_PULL_TIMEOUT: Duration = Duration::from_secs(15 * 60);
-const FULL_TON_COMPOSE_TIMEOUT: Duration = Duration::from_secs(15 * 60);
-const SNAPSHOT_START_TIMEOUT: Duration = Duration::from_secs(20 * 60);
-const STARTUP_READINESS_REQUEST_TIMEOUT: Duration = Duration::from_millis(750);
 const PROJECT_ARTIFACT_POLL_INTERVAL: Duration = Duration::from_millis(750);
 const PROJECT_ARTIFACT_DEBOUNCE: Duration = Duration::from_millis(500);
 const PROJECT_ARTIFACT_PUBLISH_RETRY_INTERVAL: Duration = Duration::from_secs(2);
@@ -80,70 +64,17 @@ struct LocalEnvironment {
     generation: AtomicU64,
     resume_on_startup: AtomicBool,
     deleted: AtomicBool,
-    snapshot_operation: RwLock<Option<EnvironmentSnapshotOperation>>,
-    admin_operation: RwLock<Option<crate::AdminOperation>>,
-    startup_compose_started_at: Mutex<Option<Instant>>,
 }
 
 enum EnvironmentDriver {
-    ActonLocalnet {
+    ActonSimulatedLocalnet {
         acton_executable: PathBuf,
         workspace_root: PathBuf,
         db_path: PathBuf,
         config: EnvironmentConfig,
         port: u16,
     },
-    FullTonNetwork(FullTonNetworkDriver),
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum FullTonStartPhase {
-    LocalImageCheck,
-    ImagePull(FullTonImagePullKind),
-    ComposeUp,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum FullTonProcessOutcome {
-    Succeeded,
-    Failed,
-    TimedOut,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum FullTonTransition {
-    StartImagePull,
-    StartCompose,
-    Running,
-    Failed { cleanup_compose: bool },
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum FullTonImagePullKind {
-    ActiveDockerConfiguration,
-    IsolatedPublicImage,
-}
-
-enum SnapshotAction {
-    Create { name: Option<String> },
-    Restore { snapshot_id: String },
-}
-
-#[derive(Clone, Copy)]
-enum EnvironmentStartupMilestone {
-    Compose,
-    TonReady,
-    IndexerReady,
-    ApiReady,
-}
-
-impl SnapshotAction {
-    const fn kind(&self) -> EnvironmentSnapshotOperationKind {
-        match self {
-            Self::Create { .. } => EnvironmentSnapshotOperationKind::Create,
-            Self::Restore { .. } => EnvironmentSnapshotOperationKind::Restore,
-        }
-    }
+    FullTonNetwork(Box<FullLocalnet>),
 }
 
 struct ArtifactRevision {
@@ -294,7 +225,8 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 } if !imported_accounts.is_empty() => Some(imported_accounts.clone()),
                 _ => None,
             };
-            let (name, config) = resolve_request(request, &reserved_ports)?;
+            let (name, config, network) =
+                resolve_request(&self.inner.workspace_root, request, &reserved_ports).await?;
             let id_number = self
                 .inner
                 .next_id
@@ -321,12 +253,9 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 &self.inner.acton_executable,
                 &self.inner.workspace_root,
                 &data_dir,
-                &id,
                 &config,
-                resolved_imported_accounts.as_deref(),
-            )
-            .await
-            {
+                network,
+            ) {
                 Ok(driver) => driver,
                 Err(error) => {
                     let _ = tokio::fs::remove_dir_all(&data_dir).await;
@@ -348,13 +277,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 generation: AtomicU64::new(1),
                 resume_on_startup: AtomicBool::new(true),
                 deleted: AtomicBool::new(false),
-                snapshot_operation: RwLock::new(None),
-                admin_operation: RwLock::new(None),
-                startup_compose_started_at: Mutex::new(None),
             });
-            if matches!(&environment.driver, EnvironmentDriver::FullTonNetwork(_)) {
-                prepare_environment_startup(&environment).await;
-            }
             if let Err(error) =
                 persist_environment_definition(&self.inner, &environment, true).await
             {
@@ -417,7 +340,6 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         Box::pin(async move {
             let name = validate_environment_name(&request.name)?;
             let environment = find_environment(&self.inner, &environment_id).await?;
-            ensure_no_active_snapshot(&environment).await?;
             let _lifecycle_guard = environment.lifecycle.lock().await;
             ensure_environment_not_deleted(&environment).await?;
             let details = environment.details.read().await.clone();
@@ -428,6 +350,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                     name: name.clone(),
                     config: details.config,
                     resume_on_startup: environment.resume_on_startup.load(Ordering::Acquire),
+                    network_id: network_id(&environment),
                 },
             )
             .await?;
@@ -441,7 +364,6 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let environment_id = environment_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &environment_id).await?;
-            ensure_no_active_snapshot(&environment).await?;
             delete_environment_runtime(&self.inner, &environment).await?;
             Ok(())
         })
@@ -451,7 +373,6 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let environment_id = environment_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &environment_id).await?;
-            ensure_no_active_snapshot(&environment).await?;
             stop_environment(&self.inner, &environment, true).await?;
             Ok(environment.details.read().await.clone())
         })
@@ -461,8 +382,29 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let environment_id = environment_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &environment_id).await?;
-            ensure_no_active_snapshot(&environment).await?;
             restart_environment(&self.inner, &environment).await
+        })
+    }
+
+    fn health(
+        &self,
+        environment_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, acton_localnet::NetworkHealth> {
+        let environment_id = environment_id.to_owned();
+
+        Box::pin(async move {
+            let environment = find_environment(&self.inner, &environment_id).await?;
+
+            match &environment.driver {
+                EnvironmentDriver::FullTonNetwork(driver) => driver.health().await,
+                EnvironmentDriver::ActonSimulatedLocalnet { .. } => {
+                    Err(EnvironmentRuntimeError::Conflict {
+                        code: "environment_health_unavailable",
+                        message: "Health diagnostics are available for Full localnet environments"
+                            .to_owned(),
+                    })
+                }
+            }
         })
     }
 
@@ -473,130 +415,22 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
     ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
         let environment_id = environment_id.to_owned();
         Box::pin(async move {
-            let started_at = Instant::now();
-            let node_name = validate_full_ton_node_name(&request.name)?;
             let environment = find_environment(&self.inner, &environment_id).await?;
-            ensure_no_active_snapshot(&environment).await?;
-            let _lifecycle_guard = environment.lifecycle.lock().await;
+            let _guard = environment.lifecycle.lock().await;
             ensure_environment_not_deleted(&environment).await?;
-
-            let details = environment.details.read().await.clone();
-            if details.status != EnvironmentStatus::Running {
-                return Err(EnvironmentRuntimeError::Conflict {
-                    code: "environment_not_running",
-                    message: "The full TON network must be running before a node can join"
-                        .to_owned(),
-                });
-            }
-            let EnvironmentConfig::FullTonNetwork { nodes, .. } = &details.config else {
-                return Err(EnvironmentRuntimeError::Conflict {
-                    code: "environment_nodes_unavailable",
-                    message: "Nodes can only be added to a full TON network".to_owned(),
-                });
-            };
-            if nodes
-                .iter()
-                .any(|node| node.name.eq_ignore_ascii_case(&node_name))
-            {
-                return Err(EnvironmentRuntimeError::Conflict {
-                    code: "environment_node_name_duplicate",
-                    message: format!("A node named {node_name} already exists"),
-                });
-            }
-
-            let node_number = nodes
-                .iter()
-                .filter_map(|node| node.id.strip_prefix("node-")?.parse::<u16>().ok())
-                .max()
-                .unwrap_or(0)
-                .checked_add(1)
-                .ok_or_else(|| EnvironmentRuntimeError::Conflict {
-                    code: "environment_node_limit_reached",
-                    message: "Studio cannot allocate another node in this environment".to_owned(),
-                })?;
-            let port_offset = node_number
-                .checked_sub(1)
-                .and_then(|value| value.checked_mul(JOIN_NODE_PORT_STRIDE))
-                .ok_or_else(|| EnvironmentRuntimeError::Conflict {
-                    code: "environment_node_limit_reached",
-                    message: "Studio cannot allocate another node in this environment".to_owned(),
-                })?;
-            let port_base = FIRST_JOIN_NODE_PORT
-                .checked_add(port_offset)
-                .ok_or_else(|| EnvironmentRuntimeError::Conflict {
-                    code: "environment_node_limit_reached",
-                    message: "Studio cannot allocate another node in this environment".to_owned(),
-                })?;
-            let node = FullTonNode {
-                id: format!("node-{node_number}"),
-                name: node_name,
-                validator: request.validator,
-                port_base,
-            };
-            let mut config = details.config.clone();
-            let EnvironmentConfig::FullTonNetwork {
-                nodes: updated_nodes,
-                ..
-            } = &mut config
-            else {
-                unreachable!("the environment kind was checked above");
-            };
-            updated_nodes.push(node.clone());
-
-            tracing::info!(
-                operation = "join_full_ton_node",
-                environment_id = %environment_id,
-                node = %node.name,
-                target = %node.id,
-                "Joining a node to the Studio full TON network"
-            );
-            persist_environment(
-                &self.inner.workspace_root,
-                &StoredEnvironment {
-                    id: details.id.clone(),
-                    name: details.name.clone(),
-                    config: config.clone(),
-                    resume_on_startup: environment.resume_on_startup.load(Ordering::Acquire),
-                },
+            let driver = full_localnet(&environment)?;
+            let client = driver.client().await?;
+            let operation = client
+                .add_node(&request.name, request.validator)
+                .await
+                .map_err(localnet::error)?;
+            client.wait(operation).await.map_err(localnet::error)?;
+            refresh_full_localnet(
+                &environment,
+                client.network().await.map_err(localnet::error)?,
             )
-            .await?;
-
-            if let Err(error) = environment.driver.add_full_ton_node(nodes, &node).await {
-                let _ = persist_environment(
-                    &self.inner.workspace_root,
-                    &StoredEnvironment {
-                        id: details.id,
-                        name: details.name,
-                        config: details.config,
-                        resume_on_startup: environment.resume_on_startup.load(Ordering::Acquire),
-                    },
-                )
-                .await;
-                tracing::warn!(
-                    operation = "join_full_ton_node",
-                    environment_id = %environment_id,
-                    node = %node.name,
-                    target = %node.id,
-                    duration_ms = started_at.elapsed().as_millis(),
-                    outcome = "error",
-                    %error,
-                    "Failed to join a node to the Studio full TON network"
-                );
-                return Err(error);
-            }
-
-            let mut updated = environment.details.write().await;
-            updated.config = config;
-            tracing::info!(
-                operation = "join_full_ton_node",
-                environment_id = %environment_id,
-                node = %node.name,
-                target = %node.id,
-                duration_ms = started_at.elapsed().as_millis(),
-                outcome = "success",
-                "Node joined the Studio full TON network"
-            );
-            Ok(updated.clone())
+            .await;
+            Ok(environment.details.read().await.clone())
         })
     }
 
@@ -609,97 +443,22 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let environment_id = environment_id.to_owned();
         let node_id = node_id.to_owned();
         Box::pin(async move {
-            let started_at = Instant::now();
             let environment = find_environment(&self.inner, &environment_id).await?;
-            ensure_no_active_snapshot(&environment).await?;
-            let _lifecycle_guard = environment.lifecycle.lock().await;
+            let _guard = environment.lifecycle.lock().await;
             ensure_environment_not_deleted(&environment).await?;
-
-            let details = environment.details.read().await.clone();
-            let EnvironmentConfig::FullTonNetwork { nodes, .. } = &details.config else {
-                return Err(EnvironmentRuntimeError::Conflict {
-                    code: "environment_nodes_unavailable",
-                    message: "Nodes can only be removed from a full TON network".to_owned(),
-                });
-            };
-            let node = nodes
-                .iter()
-                .find(|node| node.id == node_id)
-                .cloned()
-                .ok_or_else(|| EnvironmentRuntimeError::InvalidRequest {
-                    code: "environment_node_not_found",
-                    message: format!("Node {node_id} is not managed by this environment"),
-                })?;
-
-            if node.validator && !request.force {
-                ensure_validator_can_be_removed(&details, &node).await?;
-            }
-
-            let mut config = details.config.clone();
-            let EnvironmentConfig::FullTonNetwork {
-                nodes: updated_nodes,
-                ..
-            } = &mut config
-            else {
-                unreachable!("the environment kind was checked above");
-            };
-            updated_nodes.retain(|candidate| candidate.id != node.id);
-
-            tracing::info!(
-                operation = "remove_full_ton_node",
-                environment_id = %environment_id,
-                node = %node.name,
-                target = %node.id,
-                force = request.force,
-                "Removing a node from the Studio full TON network"
-            );
-            persist_environment(
-                &self.inner.workspace_root,
-                &StoredEnvironment {
-                    id: details.id.clone(),
-                    name: details.name.clone(),
-                    config: config.clone(),
-                    resume_on_startup: environment.resume_on_startup.load(Ordering::Acquire),
-                },
+            let driver = full_localnet(&environment)?;
+            let client = driver.client().await?;
+            let operation = client
+                .remove_node(&node_id, request.force)
+                .await
+                .map_err(localnet::error)?;
+            client.wait(operation).await.map_err(localnet::error)?;
+            refresh_full_localnet(
+                &environment,
+                client.network().await.map_err(localnet::error)?,
             )
-            .await?;
-
-            if let Err(error) = environment.driver.remove_full_ton_node(nodes, &node).await {
-                let _ = persist_environment(
-                    &self.inner.workspace_root,
-                    &StoredEnvironment {
-                        id: details.id,
-                        name: details.name,
-                        config: details.config,
-                        resume_on_startup: environment.resume_on_startup.load(Ordering::Acquire),
-                    },
-                )
-                .await;
-                tracing::warn!(
-                    operation = "remove_full_ton_node",
-                    environment_id = %environment_id,
-                    node = %node.name,
-                    target = %node.id,
-                    duration_ms = started_at.elapsed().as_millis(),
-                    outcome = "error",
-                    %error,
-                    "Failed to remove a node from the Studio full TON network"
-                );
-                return Err(error);
-            }
-
-            let mut updated = environment.details.write().await;
-            updated.config = config;
-            tracing::info!(
-                operation = "remove_full_ton_node",
-                environment_id = %environment_id,
-                node = %node.name,
-                target = %node.id,
-                duration_ms = started_at.elapsed().as_millis(),
-                outcome = "success",
-                "Node removed from the Studio full TON network"
-            );
-            Ok(updated.clone())
+            .await;
+            Ok(environment.details.read().await.clone())
         })
     }
 
@@ -711,73 +470,22 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let environment_id = environment_id.to_owned();
         let node_id = node_id.to_owned();
         Box::pin(async move {
-            let started_at = Instant::now();
             let environment = find_environment(&self.inner, &environment_id).await?;
-            ensure_no_active_snapshot(&environment).await?;
-            let _lifecycle_guard = environment.lifecycle.lock().await;
+            let _guard = environment.lifecycle.lock().await;
             ensure_environment_not_deleted(&environment).await?;
-
-            let details = environment.details.read().await.clone();
-            if details.status != EnvironmentStatus::Running {
-                return Err(EnvironmentRuntimeError::Conflict {
-                    code: "environment_not_running",
-                    message: "The full TON network must be running before validation can change"
-                        .to_owned(),
-                });
-            }
-            let EnvironmentConfig::FullTonNetwork { nodes, .. } = &details.config else {
-                return Err(EnvironmentRuntimeError::Conflict {
-                    code: "environment_nodes_unavailable",
-                    message: "Validator participation can only be changed in a full TON network"
-                        .to_owned(),
-                });
-            };
-            let node = nodes
-                .iter()
-                .find(|node| node.id == node_id)
-                .cloned()
-                .ok_or_else(|| EnvironmentRuntimeError::InvalidRequest {
-                    code: "environment_node_not_found",
-                    message: format!("Node {node_id} is not managed by this environment"),
-                })?;
-            if !node.validator {
-                return Err(EnvironmentRuntimeError::InvalidRequest {
-                    code: "environment_node_not_validator",
-                    message: format!("Node {} is not configured as a validator", node.name),
-                });
-            }
-
-            tracing::info!(
-                operation = "leave_full_ton_validation",
-                environment_id = %environment_id,
-                node = %node.name,
-                target = %node.id,
-                "Disabling future validator election participation"
-            );
-            if let Err(error) = environment.driver.leave_full_ton_validation(&node).await {
-                tracing::warn!(
-                    operation = "leave_full_ton_validation",
-                    environment_id = %environment_id,
-                    node = %node.name,
-                    target = %node.id,
-                    duration_ms = started_at.elapsed().as_millis(),
-                    outcome = "error",
-                    %error,
-                    "Failed to disable future validator election participation"
-                );
-                return Err(error);
-            }
-
-            tracing::info!(
-                operation = "leave_full_ton_validation",
-                environment_id = %environment_id,
-                node = %node.name,
-                target = %node.id,
-                duration_ms = started_at.elapsed().as_millis(),
-                outcome = "success",
-                "Future validator election participation disabled"
-            );
-            Ok(details)
+            let driver = full_localnet(&environment)?;
+            let client = driver.client().await?;
+            let operation = client
+                .validation(&node_id, false)
+                .await
+                .map_err(localnet::error)?;
+            client.wait(operation).await.map_err(localnet::error)?;
+            refresh_full_localnet(
+                &environment,
+                client.network().await.map_err(localnet::error)?,
+            )
+            .await;
+            Ok(environment.details.read().await.clone())
         })
     }
 
@@ -789,104 +497,22 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let environment_id = environment_id.to_owned();
         let node_id = node_id.to_owned();
         Box::pin(async move {
-            let started_at = Instant::now();
             let environment = find_environment(&self.inner, &environment_id).await?;
-            ensure_no_active_snapshot(&environment).await?;
-            let _lifecycle_guard = environment.lifecycle.lock().await;
+            let _guard = environment.lifecycle.lock().await;
             ensure_environment_not_deleted(&environment).await?;
-
-            let details = environment.details.read().await.clone();
-            if details.status != EnvironmentStatus::Running {
-                return Err(EnvironmentRuntimeError::Conflict {
-                    code: "environment_not_running",
-                    message: "The full TON network must be running before validation can change"
-                        .to_owned(),
-                });
-            }
-            let EnvironmentConfig::FullTonNetwork { nodes, .. } = &details.config else {
-                return Err(EnvironmentRuntimeError::Conflict {
-                    code: "environment_nodes_unavailable",
-                    message: "Validator participation can only be changed in a full TON network"
-                        .to_owned(),
-                });
-            };
-            let node = nodes
-                .iter()
-                .find(|node| node.id == node_id)
-                .cloned()
-                .ok_or_else(|| EnvironmentRuntimeError::InvalidRequest {
-                    code: "environment_node_not_found",
-                    message: format!("Node {node_id} is not managed by this environment"),
-                })?;
-
-            let mut config = details.config.clone();
-            let EnvironmentConfig::FullTonNetwork {
-                nodes: updated_nodes,
-                ..
-            } = &mut config
-            else {
-                unreachable!("the environment kind was checked above");
-            };
-
-            let updated_node = updated_nodes
-                .iter_mut()
-                .find(|candidate| candidate.id == node.id)
-                .expect("the managed node was resolved from this configuration");
-            updated_node.validator = true;
-
-            tracing::info!(
-                operation = "enter_full_ton_validation",
-                environment_id = %environment_id,
-                node = %node.name,
-                target = %node.id,
-                "Enabling future validator election participation"
-            );
-            persist_environment(
-                &self.inner.workspace_root,
-                &StoredEnvironment {
-                    id: details.id.clone(),
-                    name: details.name.clone(),
-                    config: config.clone(),
-                    resume_on_startup: environment.resume_on_startup.load(Ordering::Acquire),
-                },
+            let driver = full_localnet(&environment)?;
+            let client = driver.client().await?;
+            let operation = client
+                .validation(&node_id, true)
+                .await
+                .map_err(localnet::error)?;
+            client.wait(operation).await.map_err(localnet::error)?;
+            refresh_full_localnet(
+                &environment,
+                client.network().await.map_err(localnet::error)?,
             )
-            .await?;
-            if let Err(error) = environment.driver.enter_full_ton_validation(&node).await {
-                let _ = persist_environment(
-                    &self.inner.workspace_root,
-                    &StoredEnvironment {
-                        id: details.id,
-                        name: details.name,
-                        config: details.config,
-                        resume_on_startup: environment.resume_on_startup.load(Ordering::Acquire),
-                    },
-                )
-                .await;
-                tracing::warn!(
-                    operation = "enter_full_ton_validation",
-                    environment_id = %environment_id,
-                    node = %node.name,
-                    target = %node.id,
-                    duration_ms = started_at.elapsed().as_millis(),
-                    outcome = "error",
-                    %error,
-                    "Failed to enable future validator election participation"
-                );
-                return Err(error);
-            }
-
-            let mut updated = environment.details.write().await;
-            updated.config = config;
-            tracing::info!(
-                operation = "enter_full_ton_validation",
-                environment_id = %environment_id,
-                node = %node.name,
-                target = %node.id,
-                duration_ms = started_at.elapsed().as_millis(),
-                outcome = "success",
-                "Future validator election participation enabled"
-            );
-            Ok(updated.clone())
+            .await;
+            Ok(environment.details.read().await.clone())
         })
     }
 
@@ -896,49 +522,14 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         request: crate::AdminRequest,
     ) -> EnvironmentRuntimeFuture<'_, crate::AdminOperation> {
         let id = environment_id.to_owned();
-        let runtime = Arc::clone(&self.inner);
         Box::pin(async move {
-            request.validate()?;
-            let environment = find_environment(&runtime, &id).await?;
-            let _guard = environment.lifecycle.try_lock().map_err(|_| admin_busy())?;
-            ensure_environment_not_deleted(&environment).await?;
-            if let Some(previous) = environment.admin_operation.read().await.as_ref()
-                && previous.is_active()
-            {
-                return Err(admin_busy());
-            }
-            if let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver
-                && let Some(previous) = driver.saved_admin_operation(Some(&request)).await?
-            {
-                return Ok(previous);
-            }
-            ensure_no_active_snapshot(&environment).await?;
-            if !matches!(environment.driver, EnvironmentDriver::FullTonNetwork(_))
-                || environment.details.read().await.status != EnvironmentStatus::Running
-            {
-                return Err(EnvironmentRuntimeError::Conflict {
-                    code: "admin_unavailable",
-                    message: "Start the full TON network before editing its state".into(),
-                });
-            }
-            let operation = crate::AdminOperation {
-                id: request.id().into(),
-                phase: "preparing".into(),
-                started_at: Utc::now().to_rfc3339(),
-                finished_at: None,
-                error: None,
-                block_seqno: None,
-            };
-            if let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver {
-                driver.save_admin_operation(&request, &operation).await?;
-            }
-            *environment.admin_operation.write().await = Some(operation.clone());
-            tokio::spawn(run_admin_operation(
-                Arc::clone(&runtime),
-                Arc::clone(&environment),
-                request,
-            ));
-            Ok(operation)
+            let environment = find_environment(&self.inner, &id).await?;
+            full_localnet(&environment)?
+                .client()
+                .await?
+                .start_admin(&request)
+                .await
+                .map_err(localnet::error)
         })
     }
 
@@ -948,18 +539,13 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
     ) -> EnvironmentRuntimeFuture<'_, Option<crate::AdminOperation>> {
         let id = environment_id.to_owned();
         Box::pin(async move {
-            let env = find_environment(&self.inner, &id).await?;
-            let operation = env.admin_operation.read().await.clone();
-            if operation.is_some() {
-                return Ok(operation);
-            }
-            let Ok(_guard) = env.lifecycle.try_lock() else {
-                return Ok(None);
-            };
-            if let EnvironmentDriver::FullTonNetwork(driver) = &env.driver {
-                return driver.saved_admin_operation(None).await;
-            }
-            Ok(None)
+            let environment = find_environment(&self.inner, &id).await?;
+            full_localnet(&environment)?
+                .client()
+                .await?
+                .admin_operation()
+                .await
+                .map_err(localnet::error)
         })
     }
 
@@ -973,7 +559,12 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
             let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver else {
                 return Err(snapshots_unavailable());
             };
-            driver.list_snapshots().await
+            driver
+                .client()
+                .await?
+                .snapshots()
+                .await
+                .map_err(localnet::error)
         })
     }
 
@@ -985,12 +576,14 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let environment_id = environment_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &environment_id).await?;
-            start_snapshot_operation(
-                Arc::clone(&self.inner),
-                environment,
-                SnapshotAction::Create { name: request.name },
-            )
-            .await
+            let _guard = environment.lifecycle.lock().await;
+            ensure_environment_not_deleted(&environment).await?;
+            let client = full_localnet(&environment)?.client().await?;
+            let operation = client
+                .create_snapshot(request.name.as_deref())
+                .await
+                .map_err(localnet::error)?;
+            Ok(localnet::snapshot_operation(&operation))
         })
     }
 
@@ -1003,12 +596,16 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let snapshot_id = snapshot_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &environment_id).await?;
-            start_snapshot_operation(
-                Arc::clone(&self.inner),
-                environment,
-                SnapshotAction::Restore { snapshot_id },
-            )
-            .await
+            let _guard = environment.lifecycle.lock().await;
+            ensure_environment_not_deleted(&environment).await?;
+            let client = full_localnet(&environment)?.client().await?;
+            let operation = client
+                .restore_snapshot(&snapshot_id)
+                .await
+                .map_err(localnet::error)?;
+            persist_environment_definition(&self.inner, &environment, true).await?;
+            environment.resume_on_startup.store(true, Ordering::Release);
+            Ok(localnet::snapshot_operation(&operation))
         })
     }
 
@@ -1021,11 +618,16 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let snapshot_id = snapshot_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &environment_id).await?;
-            ensure_no_active_snapshot(&environment).await?;
             let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver else {
                 return Err(snapshots_unavailable());
             };
-            driver.delete_snapshot(&snapshot_id).await
+            let client = driver.client().await?;
+            let operation = client
+                .delete_snapshot(&snapshot_id)
+                .await
+                .map_err(localnet::error)?;
+            client.wait(operation).await.map_err(localnet::error)?;
+            Ok(())
         })
     }
 
@@ -1039,7 +641,12 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
             if !matches!(environment.driver, EnvironmentDriver::FullTonNetwork(_)) {
                 return Err(snapshots_unavailable());
             }
-            Ok(environment.snapshot_operation.read().await.clone())
+            Ok(full_localnet(&environment)?
+                .network()
+                .await?
+                .snapshot_operation
+                .as_ref()
+                .map(localnet::snapshot_operation))
         })
     }
 
@@ -1050,10 +657,24 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
             let environments = self.inner.environments.read().await.clone();
             let mut first_error = None;
             for environment in environments {
-                if let Err(error) = stop_environment(&self.inner, &environment, false).await
-                    && first_error.is_none()
-                {
-                    first_error = Some(error);
+                let started = Instant::now();
+                let id = environment.details.read().await.id.clone();
+                log::info!("operation=studio_shutdown target={id} outcome=stopping");
+
+                match stop_environment(&self.inner, &environment, false).await {
+                    Ok(()) => log::info!(
+                        "operation=studio_shutdown target={id} duration_ms={} outcome=stopped",
+                        started.elapsed().as_millis()
+                    ),
+                    Err(error) => {
+                        log::error!(
+                            "operation=studio_shutdown target={id} duration_ms={} outcome=failed error={error}",
+                            started.elapsed().as_millis()
+                        );
+                        if first_error.is_none() {
+                            first_error = Some(error);
+                        }
+                    }
                 }
             }
             if let Some(error) = first_error {
@@ -1155,515 +776,28 @@ mod imported_contract_tests {
     }
 }
 
-fn admin_busy() -> EnvironmentRuntimeError {
-    EnvironmentRuntimeError::Conflict {
-        code: "admin_busy",
-        message: "Wait for the administrative operation to finish".into(),
-    }
-}
-
-async fn run_admin_operation(
-    runtime: Arc<LocalProcessRuntimeInner>,
-    environment: Arc<LocalEnvironment>,
-    request: crate::AdminRequest,
-) {
-    let _guard = environment.lifecycle.lock().await;
-    environment.generation.fetch_add(1, Ordering::AcqRel);
-    terminate_child(&environment).await;
-    set_environment_status(&environment, EnvironmentStatus::Starting, None).await;
-    let details = environment.details.read().await.clone();
-    let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver else {
-        return;
-    };
-    let EnvironmentConfig::FullTonNetwork { nodes, .. } = &details.config else {
-        return;
-    };
-    let result = driver
-        .apply_admin(nodes, &request, &environment.admin_operation)
-        .await;
-    // The driver returns with the complete environment running, or leaves the
-    // recovery journal intact if restoring the backups also failed.
-    let failed_recovery = result.is_err() && !driver.admin_is_running().await;
-    set_environment_status(
-        &environment,
-        if failed_recovery {
-            EnvironmentStatus::Failed
-        } else {
-            EnvironmentStatus::Running
-        },
-        result.as_ref().err().map(ToString::to_string),
-    )
-    .await;
-    if let Some(op) = environment.admin_operation.write().await.as_mut() {
-        op.phase = if result.is_ok() {
-            "completed"
-        } else {
-            "failed"
-        }
-        .into();
-        op.finished_at = Some(Utc::now().to_rfc3339());
-        match result {
-            Ok(seqno) => op.block_seqno = Some(seqno),
-            Err(error) => op.error = Some(error.to_string()),
-        }
-        if let Err(error) = driver.save_admin_operation(&request, op).await {
-            tracing::error!(%error, "Failed to persist administrative operation result");
-        }
-    }
-    schedule_project_artifact_sync(&runtime);
-}
-
-async fn start_snapshot_operation(
-    runtime: Arc<LocalProcessRuntimeInner>,
-    environment: Arc<LocalEnvironment>,
-    mut action: SnapshotAction,
-) -> Result<EnvironmentSnapshotOperation, EnvironmentRuntimeError> {
-    if !matches!(environment.driver, EnvironmentDriver::FullTonNetwork(_)) {
-        return Err(snapshots_unavailable());
-    }
-    ensure_environment_not_deleted(&environment).await?;
-    match &mut action {
-        SnapshotAction::Create { name } => {
-            if let Some(value) = name {
-                let trimmed = value.trim();
-                if trimmed.is_empty() || trimmed.chars().count() > 80 {
-                    return Err(EnvironmentRuntimeError::InvalidRequest {
-                        code: "environment_snapshot_name_invalid",
-                        message: "Snapshot name must contain 1 to 80 characters".to_owned(),
-                    });
-                }
-                *value = trimmed.to_owned();
-            }
-        }
-        SnapshotAction::Restore { snapshot_id } => validate_snapshot_id(snapshot_id)?,
-    }
-    let status = environment.details.read().await.status;
-    if matches!(
-        status,
-        EnvironmentStatus::Starting | EnvironmentStatus::Stopping
-    ) {
-        return Err(EnvironmentRuntimeError::Conflict {
-            code: "environment_snapshot_busy",
-            message: "Wait for the current environment operation to finish".to_owned(),
-        });
-    }
-
-    let operation = EnvironmentSnapshotOperation {
-        kind: action.kind(),
-        phase: EnvironmentSnapshotOperationPhase::Preparing,
-        started_at: Utc::now().to_rfc3339(),
-        finished_at: None,
-        snapshot_id: match &action {
-            SnapshotAction::Create { .. } => None,
-            SnapshotAction::Restore { snapshot_id } => Some(snapshot_id.clone()),
-        },
-        snapshot_name: match &action {
-            SnapshotAction::Create { name } => name.clone(),
-            SnapshotAction::Restore { .. } => None,
-        },
-        startup_timings: None,
-        error: None,
-    };
-    {
-        let mut current = environment.snapshot_operation.write().await;
-        if current
-            .as_ref()
-            .is_some_and(EnvironmentSnapshotOperation::is_active)
-        {
-            return Err(EnvironmentRuntimeError::Conflict {
-                code: "environment_snapshot_busy",
-                message: "Another snapshot operation is already running".to_owned(),
-            });
-        }
-        *current = Some(operation.clone());
-    }
-
-    tokio::spawn(run_snapshot_operation(runtime, environment, action));
-    Ok(operation)
-}
-
-async fn run_snapshot_operation(
-    runtime: Arc<LocalProcessRuntimeInner>,
-    environment: Arc<LocalEnvironment>,
-    action: SnapshotAction,
-) {
-    let previous_status = environment.details.read().await.status;
-    let should_restart = previous_status == EnvironmentStatus::Running
-        || matches!(&action, SnapshotAction::Restore { .. });
-    let result = snapshot_operation_work(&runtime, &environment, &action).await;
-
-    let restart_result = if should_restart {
-        set_snapshot_phase(&environment, EnvironmentSnapshotOperationPhase::Starting).await;
-        match restart_environment(&runtime, &environment).await {
-            Ok(_) => wait_for_environment_start(&environment).await,
-            Err(error) => Err(error),
-        }
-    } else {
-        Ok(())
-    };
-
-    match (result, restart_result) {
-        (Ok(snapshot), Ok(())) => finish_snapshot_operation(&environment, snapshot, None).await,
-        (Err(error), Ok(())) | (Ok(_), Err(error)) => {
-            finish_snapshot_operation(&environment, None, Some(error.to_string())).await;
-        }
-        (Err(operation_error), Err(restart_error)) => {
-            finish_snapshot_operation(
-                &environment,
-                None,
-                Some(format!(
-                    "{operation_error}. Studio also failed to restart the environment: {restart_error}"
-                )),
-            )
-            .await;
-        }
-    }
-}
-
-async fn snapshot_operation_work(
-    runtime: &LocalProcessRuntimeInner,
-    environment: &LocalEnvironment,
-    action: &SnapshotAction,
-) -> Result<Option<EnvironmentSnapshot>, EnvironmentRuntimeError> {
-    set_snapshot_phase(environment, EnvironmentSnapshotOperationPhase::Stopping).await;
-    stop_environment(runtime, environment, false).await?;
-    let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver else {
-        return Err(snapshots_unavailable());
-    };
-
-    match action {
-        SnapshotAction::Create { name } => {
-            set_snapshot_phase(
-                environment,
-                EnvironmentSnapshotOperationPhase::CreatingArchive,
-            )
-            .await;
-            driver.create_snapshot(name.as_deref()).await.map(Some)
-        }
-        SnapshotAction::Restore { snapshot_id } => {
-            set_snapshot_phase(
-                environment,
-                EnvironmentSnapshotOperationPhase::RestoringState,
-            )
-            .await;
-            let snapshot = driver.restore_snapshot(snapshot_id).await?;
-            set_snapshot_phase(
-                environment,
-                EnvironmentSnapshotOperationPhase::ResettingIndexer,
-            )
-            .await;
-            driver.reset_indexer().await?;
-            Ok(Some(snapshot))
-        }
-    }
-}
-
-async fn wait_for_environment_start(
-    environment: &LocalEnvironment,
-) -> Result<(), EnvironmentRuntimeError> {
-    timeout(SNAPSHOT_START_TIMEOUT, async {
-        loop {
-            let details = environment.details.read().await;
-            let status = details.status;
-            let startup_complete = details
-                .startup_timings
-                .as_ref()
-                .is_some_and(startup_timings_complete);
-            match status {
-                EnvironmentStatus::Failed => {
-                    return Err(EnvironmentRuntimeError::Internal {
-                        code: "environment_snapshot_restart_failed",
-                        message: details.error.clone().unwrap_or_else(|| {
-                            "The environment failed to start after the snapshot operation"
-                                .to_owned()
-                        }),
-                    });
-                }
-                EnvironmentStatus::Starting
-                | EnvironmentStatus::Stopping
-                | EnvironmentStatus::Stopped
-                | EnvironmentStatus::Running => {}
-            }
-            drop(details);
-
-            if status == EnvironmentStatus::Running && startup_complete {
-                return Ok(());
-            }
-            sleep(LOCALNET_STATUS_POLL_INTERVAL).await;
-        }
-    })
-    .await
-    .map_err(|_| EnvironmentRuntimeError::Internal {
-        code: "environment_snapshot_restart_failed",
-        message: format!(
-            "The environment did not start within {} minutes",
-            SNAPSHOT_START_TIMEOUT.as_secs() / 60
-        ),
-    })?
-}
-
-async fn startup_readiness_urls(
-    environment: &LocalEnvironment,
-) -> Option<(String, String, String)> {
-    let endpoints = environment.details.read().await.runtime_endpoints.clone();
-    let api_v2 = endpoints.api_v2?;
-    let api_v3 = endpoints.api_v3?;
-    let api_v3_root = api_v3
-        .strip_suffix("/api/v3")
-        .unwrap_or(api_v3.as_str())
-        .trim_end_matches('/');
-    Some((
-        format!("{}/getMasterchainInfo", api_v2.trim_end_matches('/')),
-        format!("{}/masterchainInfo", api_v3.trim_end_matches('/')),
-        format!("{api_v3_root}/healthcheck"),
-    ))
-}
-
-async fn fetch_masterchain_seqno(
-    http_client: &reqwest::Client,
-    url: &str,
-    json_pointer: &str,
-) -> Option<u64> {
-    http_client
-        .get(url)
-        .send()
-        .await
-        .ok()?
-        .error_for_status()
-        .ok()?
-        .json::<serde_json::Value>()
-        .await
-        .ok()?
-        .pointer(json_pointer)?
-        .as_u64()
-}
-
-async fn endpoint_is_ready(http_client: &reqwest::Client, url: &str) -> bool {
-    http_client
-        .get(url)
-        .send()
-        .await
-        .is_ok_and(|response| response.status().is_success())
-}
-
-fn spawn_environment_startup_probe(environment: Arc<LocalEnvironment>, generation: u64) {
-    tokio::spawn(async move {
-        let Some((ton_url, indexer_url, api_health_url)) =
-            startup_readiness_urls(&environment).await
-        else {
-            return;
-        };
-        let Ok(http_client) = reqwest::Client::builder()
-            .use_rustls_tls()
-            .timeout(STARTUP_READINESS_REQUEST_TIMEOUT)
-            .build()
-        else {
-            return;
-        };
-
-        loop {
-            if !is_current_generation(&environment, generation) {
-                return;
-            }
-            let status = environment.details.read().await.status;
-            if matches!(
-                status,
-                EnvironmentStatus::Stopped
-                    | EnvironmentStatus::Stopping
-                    | EnvironmentStatus::Failed
-            ) {
-                return;
-            }
-
-            let (ton_seqno, indexer_seqno, api_ready) = tokio::join!(
-                fetch_masterchain_seqno(&http_client, &ton_url, "/result/last/seqno"),
-                fetch_masterchain_seqno(&http_client, &indexer_url, "/last/seqno"),
-                endpoint_is_ready(&http_client, &api_health_url),
-            );
-            if ton_seqno.is_some() {
-                record_environment_startup_milestone(
-                    &environment,
-                    EnvironmentStartupMilestone::TonReady,
-                )
-                .await;
-            }
-            if api_ready {
-                record_environment_startup_milestone(
-                    &environment,
-                    EnvironmentStartupMilestone::ApiReady,
-                )
-                .await;
-            }
-            if let (Some(ton_seqno), Some(indexer_seqno)) = (ton_seqno, indexer_seqno)
-                && indexer_seqno >= ton_seqno.saturating_sub(1)
-            {
-                record_environment_startup_milestone(
-                    &environment,
-                    EnvironmentStartupMilestone::IndexerReady,
-                )
-                .await;
-            }
-
-            let readiness_complete = environment
-                .details
-                .read()
-                .await
-                .startup_timings
-                .as_ref()
-                .is_some_and(|timings| {
-                    timings.ton_ready_ms.is_some()
-                        && timings.indexer_ready_ms.is_some()
-                        && timings.api_ready_ms.is_some()
-                });
-            if readiness_complete {
-                return;
-            }
-            sleep(LOCALNET_STATUS_POLL_INTERVAL).await;
-        }
-    });
-}
-
-async fn prepare_environment_startup(environment: &LocalEnvironment) {
-    *environment.startup_compose_started_at.lock().await = None;
-    let timings = EnvironmentStartupTimings::default();
-    environment.details.write().await.startup_timings = Some(timings.clone());
-    if let Some(operation) = environment.snapshot_operation.write().await.as_mut()
-        && operation.phase == EnvironmentSnapshotOperationPhase::Starting
-    {
-        operation.startup_timings = Some(timings);
-    }
-}
-
-async fn mark_environment_compose_started(environment: &LocalEnvironment) {
-    *environment.startup_compose_started_at.lock().await = Some(Instant::now());
-}
-
-async fn record_environment_startup_milestone(
-    environment: &LocalEnvironment,
-    milestone: EnvironmentStartupMilestone,
-) {
-    let Some(started_at) = *environment.startup_compose_started_at.lock().await else {
-        return;
-    };
-    let elapsed_ms = u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX);
-    let mut details = environment.details.write().await;
-    let Some(timings) = details.startup_timings.as_mut() else {
-        return;
-    };
-    let timing = match milestone {
-        EnvironmentStartupMilestone::Compose => &mut timings.compose_ms,
-        EnvironmentStartupMilestone::TonReady => &mut timings.ton_ready_ms,
-        EnvironmentStartupMilestone::IndexerReady => &mut timings.indexer_ready_ms,
-        EnvironmentStartupMilestone::ApiReady => &mut timings.api_ready_ms,
-    };
-    timing.get_or_insert(elapsed_ms);
-    let timings = timings.clone();
-    drop(details);
-
-    if let Some(operation) = environment.snapshot_operation.write().await.as_mut()
-        && operation.phase == EnvironmentSnapshotOperationPhase::Starting
-    {
-        operation.startup_timings = Some(timings);
-    }
-}
-
-const fn startup_timings_complete(timings: &EnvironmentStartupTimings) -> bool {
-    timings.compose_ms.is_some()
-        && timings.ton_ready_ms.is_some()
-        && timings.indexer_ready_ms.is_some()
-        && timings.api_ready_ms.is_some()
-}
-
-async fn set_snapshot_phase(
-    environment: &LocalEnvironment,
-    phase: EnvironmentSnapshotOperationPhase,
-) {
-    if let Some(operation) = environment.snapshot_operation.write().await.as_mut() {
-        operation.phase = phase;
-    }
-}
-
-async fn finish_snapshot_operation(
-    environment: &LocalEnvironment,
-    snapshot: Option<EnvironmentSnapshot>,
-    error: Option<String>,
-) {
-    let mut current = environment.snapshot_operation.write().await;
-    let Some(operation) = current.as_mut() else {
-        return;
-    };
-    operation.finished_at = Some(Utc::now().to_rfc3339());
-    operation.error = error;
-    operation.phase = if operation.error.is_some() {
-        EnvironmentSnapshotOperationPhase::Failed
-    } else {
-        EnvironmentSnapshotOperationPhase::Completed
-    };
-    if let Some(snapshot) = snapshot {
-        operation.snapshot_id = Some(snapshot.id);
-        operation.snapshot_name = snapshot.name;
-    }
-    drop(current);
-    *environment.startup_compose_started_at.lock().await = None;
-}
-
-async fn ensure_no_active_snapshot(
-    environment: &LocalEnvironment,
-) -> Result<(), EnvironmentRuntimeError> {
-    if environment
-        .admin_operation
-        .read()
-        .await
-        .as_ref()
-        .is_some_and(crate::AdminOperation::is_active)
-    {
-        return Err(admin_busy());
-    }
-
-    if environment
-        .snapshot_operation
-        .read()
-        .await
-        .as_ref()
-        .is_some_and(EnvironmentSnapshotOperation::is_active)
-    {
-        return Err(EnvironmentRuntimeError::Conflict {
-            code: "environment_snapshot_busy",
-            message: "Wait for the current snapshot operation to finish".to_owned(),
-        });
-    }
-    Ok(())
-}
-
 fn snapshots_unavailable() -> EnvironmentRuntimeError {
     EnvironmentRuntimeError::Conflict {
         code: "environment_snapshots_unavailable",
-        message: "Snapshots are available only for full TON network environments".to_owned(),
+        message: "Snapshots are available only for full localnet environments".to_owned(),
     }
 }
 
-fn validate_snapshot_id(snapshot_id: &str) -> Result<(), EnvironmentRuntimeError> {
-    if snapshot_id.is_empty()
-        || snapshot_id.len() > 128
-        || !snapshot_id
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
-    {
-        return Err(EnvironmentRuntimeError::InvalidRequest {
-            code: "environment_snapshot_id_invalid",
-            message: "Snapshot ID is invalid".to_owned(),
-        });
-    }
-    Ok(())
-}
-
-fn resolve_request(
+async fn resolve_request(
+    workspace: &Path,
     request: CreateEnvironmentRequest,
     reserved_ports: &[u16],
-) -> Result<(String, EnvironmentConfig), EnvironmentRuntimeError> {
+) -> Result<
+    (
+        String,
+        EnvironmentConfig,
+        Option<acton_localnet::catalog::NetworkDirectory>,
+    ),
+    EnvironmentRuntimeError,
+> {
     let name = validate_environment_name(&request.name)?;
     let config = match request.config {
-        CreateEnvironmentConfig::ActonLocalnet {
+        CreateEnvironmentConfig::ActonSimulatedLocalnet {
             port,
             mut fork_network,
             fork_block_number,
@@ -1701,7 +835,7 @@ fn resolve_request(
                 });
             }
 
-            EnvironmentConfig::ActonLocalnet {
+            EnvironmentConfig::ActonSimulatedLocalnet {
                 port: select_port(FIRST_LOCALNET_PORT, port, reserved_ports)?,
                 fork_network,
                 fork_block_number,
@@ -1727,110 +861,48 @@ fn resolve_request(
             election_time_seconds,
             mut imported_accounts,
         } => {
-            validate_requested_port(api_v2_port)?;
-            validate_requested_port(api_v3_port)?;
-            validate_requested_port(admin_port)?;
-            validate_requested_port(config_port)?;
-            validate_requested_port(observability_port)?;
-
-            if block_time_ms == Some(0) {
-                return Err(EnvironmentRuntimeError::InvalidRequest {
-                    code: "full_ton_block_time_invalid",
-                    message: "Block time must be greater than zero".to_owned(),
-                });
-            }
-
-            if election_time_seconds.is_some_and(|seconds| seconds < 4) {
-                return Err(EnvironmentRuntimeError::InvalidRequest {
-                    code: "full_ton_election_time_invalid",
-                    message: "Election time must be at least 4 seconds".to_owned(),
-                });
-            }
-
-            let api_v2_port = select_port(FIRST_FULL_TON_V2_PORT, api_v2_port, reserved_ports)?;
-            let mut excluded_ports = reserved_ports.to_vec();
-            excluded_ports.push(api_v2_port);
-            let api_v3_port = select_port(FIRST_FULL_TON_V3_PORT, api_v3_port, &excluded_ports)?;
-            excluded_ports.push(api_v3_port);
-            let admin_port = select_port(FIRST_FULL_TON_ADMIN_PORT, admin_port, &excluded_ports)?;
-            excluded_ports.push(admin_port);
-            let config_port =
-                select_port(FIRST_FULL_TON_CONFIG_PORT, config_port, &excluded_ports)?;
-            excluded_ports.push(config_port);
-            let observability_port = select_port(
-                FIRST_FULL_TON_OBSERVABILITY_PORT,
-                observability_port,
-                &excluded_ports,
-            )?;
+            let imported_account_bocs = imported_accounts
+                .iter()
+                .map(|account| {
+                    account.shard_account_boc_hex.clone().ok_or_else(|| {
+                        EnvironmentRuntimeError::InvalidRequest {
+                            code: "full_ton_import_unresolved",
+                            message: format!(
+                                "Imported account {} has no resolved state",
+                                account.address
+                            ),
+                        }
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let location = acton_localnet::catalog::create(
+                &localnet::root(workspace),
+                acton_localnet::CreateNetwork {
+                    name: name.clone(),
+                    block_time_ms,
+                    election_time_seconds,
+                    imported_account_bocs,
+                    ports: acton_localnet::PortOptions {
+                        config: config_port,
+                        admin: admin_port,
+                        api_v2: api_v2_port,
+                        api_v3: api_v3_port,
+                        observability: observability_port,
+                    },
+                    reserved_ports: reserved_ports.to_vec(),
+                    ..Default::default()
+                },
+            )
+            .await
+            .map_err(localnet::error)?;
             for account in &mut imported_accounts {
                 account.shard_account_boc_hex = None;
             }
-            EnvironmentConfig::FullTonNetwork {
-                api_v2_port,
-                api_v3_port,
-                admin_port,
-                config_port,
-                observability_port,
-                block_time_ms,
-                election_time_seconds,
-                imported_accounts,
-                nodes: Vec::new(),
-            }
+            let config = localnet::configuration(&location.network, imported_accounts);
+            return Ok((name, config, Some(location)));
         }
     };
-    Ok((name, config))
-}
-
-#[cfg(test)]
-mod full_ton_request_validation_tests {
-    use expect_test::expect;
-
-    use super::{
-        CreateEnvironmentConfig, CreateEnvironmentRequest, EnvironmentRuntimeError, resolve_request,
-    };
-
-    #[test]
-    fn network_timing_rejects_values_localton_cannot_bootstrap() {
-        let cases = [
-            ("block time", Some(0), Some(120)),
-            ("election time", Some(1_000), Some(3)),
-        ];
-        let actual = cases
-            .into_iter()
-            .map(|(label, block_time_ms, election_time_seconds)| {
-                let result = resolve_request(
-                    CreateEnvironmentRequest {
-                        name: "Full localnet".to_owned(),
-                        config: CreateEnvironmentConfig::FullTonNetwork {
-                            api_v2_port: None,
-                            api_v3_port: None,
-                            admin_port: None,
-                            config_port: None,
-                            observability_port: None,
-                            block_time_ms,
-                            election_time_seconds,
-                            imported_accounts: Vec::new(),
-                        },
-                    },
-                    &[],
-                );
-                match result {
-                    Err(EnvironmentRuntimeError::InvalidRequest { code, message }) => {
-                        format!("{label}: {code} ({message})")
-                    }
-                    Err(error) => format!("{label}: unexpected error ({error})"),
-                    Ok(_) => format!("{label}: unexpected success"),
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        expect![[
-            r"block time: full_ton_block_time_invalid (Block time must be greater than zero)
-election time: full_ton_election_time_invalid (Election time must be at least 4 seconds)"
-        ]]
-        .assert_eq(&actual);
-    }
+    Ok((name, config, None))
 }
 
 fn validate_requested_port(port: Option<u16>) -> Result<(), EnvironmentRuntimeError> {
@@ -1858,106 +930,6 @@ fn validate_environment_name(name: &str) -> Result<String, EnvironmentRuntimeErr
         });
     }
     Ok(name.to_owned())
-}
-
-fn validate_full_ton_node_name(name: &str) -> Result<String, EnvironmentRuntimeError> {
-    let name = validate_environment_name(name)?;
-    if name.eq_ignore_ascii_case("genesis") {
-        return Err(EnvironmentRuntimeError::InvalidRequest {
-            code: "environment_node_name_reserved",
-            message: "The node name genesis is reserved for the bootstrap node".to_owned(),
-        });
-    }
-    Ok(name)
-}
-
-#[derive(Deserialize)]
-struct ObservedNetworkNodes {
-    nodes: Vec<ObservedNetworkNode>,
-}
-
-#[derive(Deserialize)]
-struct ObservedNetworkNode {
-    name: String,
-    active_validator: bool,
-    participate_in_elections: bool,
-    current_validator: Option<bool>,
-    next_validator: Option<bool>,
-}
-
-/// Refuses normal removal until election participation is disabled and the validator is outside
-/// every elected set known to the collector.
-///
-/// A missing next set is safe after participation is disabled because the node cannot enter a set
-/// that has not been elected. Collector failures remain unsafe because membership is then unknown.
-async fn ensure_validator_can_be_removed(
-    environment: &StudioEnvironment,
-    node: &FullTonNode,
-) -> Result<(), EnvironmentRuntimeError> {
-    let endpoint = environment
-        .runtime_endpoints
-        .observability
-        .as_deref()
-        .ok_or_else(|| EnvironmentRuntimeError::Conflict {
-            code: "environment_node_state_unavailable",
-            message: "Validator state is unavailable; force removal to continue".to_owned(),
-        })?;
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(3))
-        .build()
-        .map_err(|error| EnvironmentRuntimeError::Internal {
-            code: "environment_node_state_unavailable",
-            message: format!("Failed to prepare the validator safety check: {error}"),
-        })?;
-    let response = client
-        .get(format!("{}/api/v1/network", endpoint.trim_end_matches('/')))
-        .send()
-        .await
-        .map_err(|error| EnvironmentRuntimeError::Conflict {
-            code: "environment_node_state_unavailable",
-            message: format!("Validator state is unavailable; force removal to continue: {error}"),
-        })?;
-    if !response.status().is_success() {
-        return Err(EnvironmentRuntimeError::Conflict {
-            code: "environment_node_state_unavailable",
-            message: format!(
-                "Validator state is unavailable; the collector returned {}",
-                response.status()
-            ),
-        });
-    }
-    let network = response
-        .json::<ObservedNetworkNodes>()
-        .await
-        .map_err(|error| EnvironmentRuntimeError::Conflict {
-            code: "environment_node_state_unavailable",
-            message: format!("Validator state is invalid; force removal to continue: {error}"),
-        })?;
-    let observed = network
-        .nodes
-        .into_iter()
-        .find(|observed| observed.name.eq_ignore_ascii_case(&node.name))
-        .ok_or_else(|| EnvironmentRuntimeError::Conflict {
-            code: "environment_node_state_unavailable",
-            message: format!(
-                "Validator {} has not reported its elected-set state; force removal to continue",
-                node.name
-            ),
-        })?;
-    let safely_inactive = !observed.participate_in_elections
-        && !observed.active_validator
-        && observed.current_validator == Some(false)
-        && observed.next_validator != Some(true);
-    if safely_inactive {
-        return Ok(());
-    }
-    Err(EnvironmentRuntimeError::Conflict {
-        code: "environment_node_validator_active",
-        message: format!(
-            "Validator {} belongs to the current or next set; wait for it to leave or force removal",
-            node.name
-        ),
-    })
 }
 
 fn select_port(
@@ -1993,7 +965,7 @@ async fn reserved_environment_ports(runtime: &LocalProcessRuntimeInner) -> Vec<u
     let mut ports = Vec::with_capacity(environments.len() * 5);
     for environment in environments {
         match &environment.details.read().await.config {
-            EnvironmentConfig::ActonLocalnet { port, .. } => ports.push(*port),
+            EnvironmentConfig::ActonSimulatedLocalnet { port, .. } => ports.push(*port),
             EnvironmentConfig::FullTonNetwork {
                 api_v2_port,
                 api_v3_port,
@@ -2016,7 +988,7 @@ async fn reserved_environment_ports(runtime: &LocalProcessRuntimeInner) -> Vec<u
 
 fn runtime_endpoints(config: &EnvironmentConfig) -> EnvironmentEndpoints {
     match config {
-        EnvironmentConfig::ActonLocalnet { port, .. } => {
+        EnvironmentConfig::ActonSimulatedLocalnet { port, .. } => {
             let root = format!("http://127.0.0.1:{port}");
             EnvironmentEndpoints {
                 api_v2: Some(format!("{root}/api/v2")),
@@ -2056,15 +1028,17 @@ async fn restore_environment(
     record: StoredEnvironment,
 ) -> Result<(), EnvironmentRuntimeError> {
     let data_dir = environment_data_dir(&runtime.workspace_root, &record.id);
+    let network = match record.network_id.as_deref() {
+        Some(id) => Some(localnet::find_network(&runtime.workspace_root, id).await?),
+        None => None,
+    };
     let driver = EnvironmentDriver::new(
         &runtime.acton_executable,
         &runtime.workspace_root,
         &data_dir,
-        &record.id,
         &record.config,
-        None,
-    )
-    .await?;
+        network,
+    )?;
     let runtime_endpoints = runtime_endpoints(&record.config);
     let (status, error, child) = if record.resume_on_startup {
         match driver
@@ -2098,15 +1072,7 @@ async fn restore_environment(
         generation: AtomicU64::new(1),
         resume_on_startup: AtomicBool::new(record.resume_on_startup),
         deleted: AtomicBool::new(false),
-        snapshot_operation: RwLock::new(None),
-        admin_operation: RwLock::new(None),
-        startup_compose_started_at: Mutex::new(None),
     });
-    if status == EnvironmentStatus::Starting
-        && matches!(&environment.driver, EnvironmentDriver::FullTonNetwork(_))
-    {
-        prepare_environment_startup(&environment).await;
-    }
     if let Some(error) = error {
         environment.details.write().await.error = Some(error);
     }
@@ -2116,7 +1082,7 @@ async fn restore_environment(
         .await
         .push(Arc::clone(&environment));
     let should_monitor = environment.child.lock().await.is_some();
-    if should_monitor {
+    if should_monitor || matches!(environment.driver, EnvironmentDriver::FullTonNetwork(_)) {
         spawn_environment_monitor(Arc::clone(runtime), environment, 1);
     }
     Ok(())
@@ -2135,55 +1101,41 @@ async fn persist_environment_definition(
             name: details.name.clone(),
             config: details.config.clone(),
             resume_on_startup,
+            network_id: network_id(environment),
         },
     )
     .await
 }
 
 impl EnvironmentDriver {
-    async fn new(
+    fn new(
         acton_executable: &Path,
         workspace_root: &Path,
         data_dir: &Path,
-        environment_id: &str,
         config: &EnvironmentConfig,
-        resolved_imported_accounts: Option<&[FullTonAccountImport]>,
+        network: Option<acton_localnet::catalog::NetworkDirectory>,
     ) -> Result<Self, EnvironmentRuntimeError> {
         match config {
-            EnvironmentConfig::ActonLocalnet { port, .. } => Ok(Self::ActonLocalnet {
-                acton_executable: acton_executable.to_owned(),
-                workspace_root: workspace_root.to_owned(),
-                db_path: data_dir.join("localnet.sqlite"),
-                config: config.clone(),
-                port: *port,
-            }),
-            EnvironmentConfig::FullTonNetwork {
-                api_v2_port,
-                api_v3_port,
-                admin_port,
-                config_port,
-                observability_port,
-                block_time_ms,
-                election_time_seconds,
-                imported_accounts,
-                nodes,
-            } => FullTonNetworkDriver::materialize(
-                data_dir,
-                workspace_root,
-                environment_id,
-                *api_v2_port,
-                *api_v3_port,
-                *admin_port,
-                *config_port,
-                *observability_port,
-                *block_time_ms,
-                *election_time_seconds,
-                imported_accounts,
-                nodes,
-                resolved_imported_accounts,
-            )
-            .await
-            .map(Self::FullTonNetwork),
+            EnvironmentConfig::ActonSimulatedLocalnet { port, .. } => {
+                Ok(Self::ActonSimulatedLocalnet {
+                    acton_executable: acton_executable.to_owned(),
+                    workspace_root: workspace_root.to_owned(),
+                    db_path: data_dir.join("localnet.sqlite"),
+                    config: config.clone(),
+                    port: *port,
+                })
+            }
+            EnvironmentConfig::FullTonNetwork { .. } => {
+                let network = network.ok_or_else(|| EnvironmentRuntimeError::Internal {
+                    code: "localnet_binding_missing",
+                    message: "Full localnet environment has no network reference".to_owned(),
+                })?;
+                Ok(Self::FullTonNetwork(Box::new(FullLocalnet::new(
+                    acton_executable,
+                    workspace_root,
+                    network,
+                ))))
+            }
             EnvironmentConfig::RemoteTonNetwork { .. } => {
                 Err(EnvironmentRuntimeError::InvalidRequest {
                     code: "external_environment_not_managed",
@@ -2196,91 +1148,42 @@ impl EnvironmentDriver {
 
     fn spawn_start(&self) -> Result<Child, EnvironmentRuntimeError> {
         match self {
-            Self::ActonLocalnet {
+            Self::ActonSimulatedLocalnet {
                 acton_executable,
                 workspace_root,
                 db_path,
                 config,
                 ..
             } => spawn_localnet(acton_executable, workspace_root, db_path.clone(), config),
-            Self::FullTonNetwork(driver) => driver.spawn_image_inspect(),
+            Self::FullTonNetwork(driver) => driver.spawn_start(),
         }
     }
 
     fn ensure_restartable(&self) -> Result<(), EnvironmentRuntimeError> {
         match self {
-            Self::ActonLocalnet { port, .. } => select_port(*port, Some(*port), &[]).map(|_| ()),
+            Self::ActonSimulatedLocalnet { port, .. } => {
+                select_port(*port, Some(*port), &[]).map(|_| ())
+            }
             Self::FullTonNetwork(_) => Ok(()),
         }
     }
 
     async fn stop(&self) -> Result<(), EnvironmentRuntimeError> {
         match self {
-            Self::ActonLocalnet { .. } => Ok(()),
-            Self::FullTonNetwork(driver) => driver.stop().await,
+            Self::ActonSimulatedLocalnet { .. } => Ok(()),
+            Self::FullTonNetwork(driver) => driver.shutdown().await,
         }
     }
 
     async fn delete(&self) -> Result<(), EnvironmentRuntimeError> {
         match self {
-            Self::ActonLocalnet { .. } => Ok(()),
-            Self::FullTonNetwork(driver) => driver.delete().await,
-        }
-    }
-
-    async fn add_full_ton_node(
-        &self,
-        existing_nodes: &[FullTonNode],
-        node: &FullTonNode,
-    ) -> Result<(), EnvironmentRuntimeError> {
-        match self {
-            Self::FullTonNetwork(driver) => driver.add_node(existing_nodes, node).await,
-            Self::ActonLocalnet { .. } => Err(EnvironmentRuntimeError::Conflict {
-                code: "environment_nodes_unavailable",
-                message: "Nodes can only be added to a full TON network".to_owned(),
-            }),
-        }
-    }
-
-    async fn leave_full_ton_validation(
-        &self,
-        node: &FullTonNode,
-    ) -> Result<(), EnvironmentRuntimeError> {
-        match self {
-            Self::FullTonNetwork(driver) => driver.leave_validation(node).await,
-            Self::ActonLocalnet { .. } => Err(EnvironmentRuntimeError::Conflict {
-                code: "environment_nodes_unavailable",
-                message: "Validator participation can only be changed in a full TON network"
-                    .to_owned(),
-            }),
-        }
-    }
-
-    async fn enter_full_ton_validation(
-        &self,
-        node: &FullTonNode,
-    ) -> Result<(), EnvironmentRuntimeError> {
-        match self {
-            Self::FullTonNetwork(driver) => driver.enter_validation(node).await,
-            Self::ActonLocalnet { .. } => Err(EnvironmentRuntimeError::Conflict {
-                code: "environment_nodes_unavailable",
-                message: "Validator participation can only be changed in a full TON network"
-                    .to_owned(),
-            }),
-        }
-    }
-
-    async fn remove_full_ton_node(
-        &self,
-        existing_nodes: &[FullTonNode],
-        node: &FullTonNode,
-    ) -> Result<(), EnvironmentRuntimeError> {
-        match self {
-            Self::FullTonNetwork(driver) => driver.remove_node(existing_nodes, node).await,
-            Self::ActonLocalnet { .. } => Err(EnvironmentRuntimeError::Conflict {
-                code: "environment_nodes_unavailable",
-                message: "Nodes can only be removed from a full TON network".to_owned(),
-            }),
+            Self::ActonSimulatedLocalnet { .. } => Ok(()),
+            Self::FullTonNetwork(driver) => {
+                let client = driver.client().await?;
+                let operation = client.delete().await.map_err(localnet::error)?;
+                client.wait(operation).await.map_err(localnet::error)?;
+                driver.shutdown().await
+            }
         }
     }
 
@@ -2291,7 +1194,7 @@ impl EnvironmentDriver {
         generation: u64,
     ) {
         match self {
-            Self::ActonLocalnet { port, .. } => {
+            Self::ActonSimulatedLocalnet { port, .. } => {
                 monitor_localnet(runtime, environment, generation, *port).await;
             }
             Self::FullTonNetwork(driver) => {
@@ -2307,7 +1210,7 @@ fn spawn_localnet(
     db_path: PathBuf,
     config: &EnvironmentConfig,
 ) -> Result<Child, EnvironmentRuntimeError> {
-    let EnvironmentConfig::ActonLocalnet {
+    let EnvironmentConfig::ActonSimulatedLocalnet {
         port,
         fork_network,
         fork_block_number,
@@ -2319,13 +1222,13 @@ fn spawn_localnet(
         mine_empty_blocks,
     } = config
     else {
-        unreachable!("localnet driver requires an Acton localnet configuration");
+        unreachable!("localnet driver requires an Acton simulated localnet configuration");
     };
     let mut command = Command::new(acton_executable);
     command
         .arg("--project-root")
         .arg(workspace_root)
-        .arg("localnet")
+        .arg("simulated-localnet")
         .arg("start")
         .arg("--port")
         .arg(port.to_string())
@@ -2504,247 +1407,91 @@ async fn monitor_localnet(
 }
 
 async fn monitor_full_ton_network(
-    driver: &FullTonNetworkDriver,
+    driver: &FullLocalnet,
     runtime: Arc<LocalProcessRuntimeInner>,
     environment: Arc<LocalEnvironment>,
-    generation: u64,
+    _generation: u64,
 ) {
-    let mut phase = FullTonStartPhase::LocalImageCheck;
-    let mut deadline = Instant::now() + FULL_TON_IMAGE_INSPECT_TIMEOUT;
-
-    loop {
-        if !is_current_generation(&environment, generation) {
-            return;
-        }
-
-        let (outcome, exit_status) = if Instant::now() >= deadline {
-            terminate_child(&environment).await;
-            (FullTonProcessOutcome::TimedOut, None)
-        } else {
-            match child_exit_status(&environment).await {
-                Ok(Some(status)) if status.success() => {
-                    (FullTonProcessOutcome::Succeeded, Some(status))
-                }
-                Ok(Some(status)) => (FullTonProcessOutcome::Failed, Some(status)),
-                Ok(None) => {
-                    sleep(LOCALNET_STATUS_POLL_INTERVAL).await;
-                    continue;
-                }
-                Err(error) => {
-                    fail_full_ton_network(
-                        driver,
-                        &environment,
-                        generation,
-                        matches!(phase, FullTonStartPhase::ComposeUp),
-                        format!("Failed to inspect the Docker startup process: {error}"),
-                    )
-                    .await;
-                    return;
-                }
-            }
-        };
-
-        match full_ton_transition(phase, outcome) {
-            FullTonTransition::StartImagePull => {
-                match start_full_ton_image_pull(driver, &environment, generation).await {
-                    Ok(Some(kind)) => {
-                        phase = FullTonStartPhase::ImagePull(kind);
-                        deadline = Instant::now() + FULL_TON_IMAGE_PULL_TIMEOUT;
-                    }
-                    Ok(None) => return,
-                    Err(error) => {
-                        fail_environment(&environment, generation, error.to_string()).await;
-                        return;
-                    }
-                }
-            }
-            FullTonTransition::StartCompose => {
-                let started = match spawn_child_if_current(&environment, generation, || {
-                    driver.spawn_compose_up()
-                })
-                .await
-                {
-                    Ok(started) => started,
-                    Err(error) => {
-                        fail_environment(&environment, generation, error.to_string()).await;
-                        return;
-                    }
-                };
-                if !started {
-                    return;
-                }
-                mark_environment_compose_started(&environment).await;
-                spawn_environment_startup_probe(Arc::clone(&environment), generation);
-                phase = FullTonStartPhase::ComposeUp;
-                deadline = Instant::now() + FULL_TON_COMPOSE_TIMEOUT;
-            }
-            FullTonTransition::Running => {
-                record_environment_startup_milestone(
-                    &environment,
-                    EnvironmentStartupMilestone::Compose,
-                )
-                .await;
-                set_environment_status_if_current(
-                    &environment,
-                    generation,
-                    EnvironmentStatus::Running,
-                    None,
-                )
-                .await;
-                schedule_project_artifact_sync(&runtime);
-                return;
-            }
-            FullTonTransition::Failed { cleanup_compose } => {
-                let error = if let Some(status) = exit_status {
-                    driver
-                        .startup_failure_message(full_ton_operation(phase), status)
-                        .await
-                } else {
-                    full_ton_timeout_message(phase)
-                };
-                fail_full_ton_network(driver, &environment, generation, cleanup_compose, error)
-                    .await;
-                return;
-            }
-        }
-    }
-}
-
-const fn full_ton_transition(
-    phase: FullTonStartPhase,
-    outcome: FullTonProcessOutcome,
-) -> FullTonTransition {
-    match (phase, outcome) {
-        (
-            FullTonStartPhase::LocalImageCheck,
-            FullTonProcessOutcome::Failed | FullTonProcessOutcome::TimedOut,
-        ) => FullTonTransition::StartImagePull,
-        (FullTonStartPhase::LocalImageCheck, FullTonProcessOutcome::Succeeded)
-        | (FullTonStartPhase::ImagePull(_), FullTonProcessOutcome::Succeeded) => {
-            FullTonTransition::StartCompose
-        }
-        (
-            FullTonStartPhase::ImagePull(_),
-            FullTonProcessOutcome::Failed | FullTonProcessOutcome::TimedOut,
-        ) => FullTonTransition::Failed {
-            cleanup_compose: false,
-        },
-        (FullTonStartPhase::ComposeUp, FullTonProcessOutcome::Succeeded) => {
-            FullTonTransition::Running
-        }
-        (
-            FullTonStartPhase::ComposeUp,
-            FullTonProcessOutcome::Failed | FullTonProcessOutcome::TimedOut,
-        ) => FullTonTransition::Failed {
-            cleanup_compose: true,
-        },
-    }
-}
-
-const fn full_ton_operation(phase: FullTonStartPhase) -> &'static str {
-    match phase {
-        FullTonStartPhase::LocalImageCheck => "inspect the full TON network image with Docker",
-        FullTonStartPhase::ImagePull(kind) => match kind {
-            FullTonImagePullKind::IsolatedPublicImage => {
-                "pull the public full TON network image using the isolated Docker configuration"
-            }
-            FullTonImagePullKind::ActiveDockerConfiguration => {
-                "pull the full TON network image using the active Docker configuration"
-            }
-        },
-        FullTonStartPhase::ComposeUp => "start the full TON network with Docker Compose",
-    }
-}
-
-fn full_ton_timeout_message(phase: FullTonStartPhase) -> String {
-    match phase {
-        FullTonStartPhase::LocalImageCheck => {
-            "Docker image inspection did not finish within 10 seconds".to_owned()
-        }
-        FullTonStartPhase::ImagePull(_) => {
-            "Docker image pull did not finish within 15 minutes".to_owned()
-        }
-        FullTonStartPhase::ComposeUp => {
-            "Full TON network startup did not finish within 15 minutes".to_owned()
-        }
-    }
-}
-
-async fn start_full_ton_image_pull(
-    driver: &FullTonNetworkDriver,
-    environment: &LocalEnvironment,
-    generation: u64,
-) -> Result<Option<FullTonImagePullKind>, EnvironmentRuntimeError> {
-    if !is_current_generation(environment, generation) {
-        return Ok(None);
-    }
-
-    let (kind, isolated_target) = match driver.isolated_pull_target().await {
-        Ok(Some(target)) => (FullTonImagePullKind::IsolatedPublicImage, Some(target)),
-        Ok(None) => (FullTonImagePullKind::ActiveDockerConfiguration, None),
-        Err(error) => {
-            tracing::warn!(
-                %error,
-                "Isolated Docker image pull is unavailable; using the active Docker configuration"
-            );
-            (FullTonImagePullKind::ActiveDockerConfiguration, None)
-        }
-    };
-
-    let started = spawn_child_if_current(environment, generation, move || {
-        if let Some(target) = isolated_target {
-            driver.spawn_isolated_pull(&target)
-        } else {
-            driver.spawn_normal_pull()
-        }
-    })
-    .await?;
-    if started { Ok(Some(kind)) } else { Ok(None) }
-}
-
-async fn fail_full_ton_network(
-    driver: &FullTonNetworkDriver,
-    environment: &LocalEnvironment,
-    generation: u64,
-    cleanup_compose: bool,
-    error: String,
-) {
-    let _lifecycle_guard = environment.lifecycle.lock().await;
-    if !is_current_generation(environment, generation) {
+    if driver.monitoring.swap(true, Ordering::AcqRel) {
         return;
     }
-    terminate_child(environment).await;
-    let mut error = error;
-    if cleanup_compose && let Err(cleanup_error) = driver.stop().await {
-        tracing::warn!(
-            %cleanup_error,
-            "Failed to stop partially started full TON network containers"
-        );
-        error = format!(
-            "{error}\nCleanup failed; some full TON network containers may still be running: {cleanup_error}"
-        );
+    while !runtime.shutting_down.load(Ordering::Acquire)
+        && !environment.deleted.load(Ordering::Acquire)
+    {
+        if let Ok(guard) = environment.lifecycle.try_lock() {
+            let previous = environment.details.read().await.status;
+            let child_status = child_exit_status(&environment).await;
+            match driver.network().await {
+                Ok(network) => {
+                    // A freshly launched CLI publishes its service before accepting
+                    // start. Keep Studio's pending intent visible through that gap.
+                    let pending_start = previous == EnvironmentStatus::Starting
+                        && network.status == acton_localnet::Status::Stopped
+                        && matches!(child_status, Ok(None));
+                    if !pending_start {
+                        refresh_full_localnet(&environment, network).await;
+                    }
+                    if previous != EnvironmentStatus::Running
+                        && environment.details.read().await.status == EnvironmentStatus::Running
+                    {
+                        schedule_project_artifact_sync(&runtime);
+                    }
+                }
+                Err(error) => {
+                    set_environment_status(
+                        &environment,
+                        EnvironmentStatus::Failed,
+                        Some(error.to_string()),
+                    )
+                    .await
+                }
+            }
+            if let Ok(Some(status)) = child_status
+                && !status.success()
+            {
+                set_environment_status(
+                    &environment,
+                    EnvironmentStatus::Failed,
+                    Some(format!(
+                        "Acton localnet exited with {status}; full log: {}",
+                        driver.location.path.join("owner.log").display()
+                    )),
+                )
+                .await;
+            }
+            drop(guard);
+        }
+        sleep(LOCALNET_STATUS_POLL_INTERVAL).await;
     }
-    set_environment_status_if_current(
-        environment,
-        generation,
-        EnvironmentStatus::Failed,
-        Some(error),
-    )
-    .await;
 }
 
-async fn spawn_child_if_current(
-    environment: &LocalEnvironment,
-    generation: u64,
-    spawn: impl FnOnce() -> Result<Child, EnvironmentRuntimeError>,
-) -> Result<bool, EnvironmentRuntimeError> {
-    let _lifecycle_guard = environment.lifecycle.lock().await;
-    if !is_current_generation(environment, generation) {
-        return Ok(false);
+fn network_id(environment: &LocalEnvironment) -> Option<String> {
+    match &environment.driver {
+        EnvironmentDriver::FullTonNetwork(driver) => Some(driver.location.network.id.clone()),
+        EnvironmentDriver::ActonSimulatedLocalnet { .. } => None,
     }
-    let child = spawn()?;
-    *environment.child.lock().await = Some(child);
-    Ok(true)
+}
+
+fn full_localnet(environment: &LocalEnvironment) -> Result<&FullLocalnet, EnvironmentRuntimeError> {
+    match &environment.driver {
+        EnvironmentDriver::FullTonNetwork(driver) => Ok(driver),
+        EnvironmentDriver::ActonSimulatedLocalnet { .. } => Err(snapshots_unavailable()),
+    }
+}
+
+async fn refresh_full_localnet(environment: &LocalEnvironment, network: acton_localnet::Network) {
+    let mut details = environment.details.write().await;
+    let imported_accounts = match &details.config {
+        EnvironmentConfig::FullTonNetwork {
+            imported_accounts, ..
+        } => imported_accounts.clone(),
+        _ => Vec::new(),
+    };
+    details.config = localnet::configuration(&network, imported_accounts);
+    details.runtime_endpoints = runtime_endpoints(&details.config);
+    details.status = localnet::status(network.status);
+    details.error = network.error;
+    details.startup_timings = network.startup_timings;
 }
 
 fn schedule_project_artifact_sync(runtime: &Arc<LocalProcessRuntimeInner>) {
@@ -2984,7 +1731,9 @@ async fn stop_environment(
     let _lifecycle_guard = environment.lifecycle.lock().await;
     ensure_environment_not_deleted(environment).await?;
     let current_status = environment.details.read().await.status;
-    if current_status == EnvironmentStatus::Stopped {
+    if current_status == EnvironmentStatus::Stopped
+        && !matches!(environment.driver, EnvironmentDriver::FullTonNetwork(_))
+    {
         if persist_intent {
             persist_environment_definition(runtime, environment, false).await?;
             environment
@@ -2996,8 +1745,12 @@ async fn stop_environment(
 
     environment.generation.fetch_add(1, Ordering::AcqRel);
     set_environment_status(environment, EnvironmentStatus::Stopping, None).await;
-    terminate_child(environment).await;
-    if let Err(error) = environment.driver.stop().await {
+    let result = async {
+        terminate_child(environment).await?;
+        environment.driver.stop().await
+    }
+    .await;
+    if let Err(error) = result {
         set_environment_status(
             environment,
             EnvironmentStatus::Failed,
@@ -3024,7 +1777,7 @@ async fn delete_environment_runtime(
     ensure_environment_not_deleted(environment).await?;
     environment.generation.fetch_add(1, Ordering::AcqRel);
     set_environment_status(environment, EnvironmentStatus::Stopping, None).await;
-    terminate_child(environment).await;
+    terminate_child(environment).await?;
     if let Err(error) = environment.driver.delete().await {
         set_environment_status(
             environment,
@@ -3079,9 +1832,6 @@ async fn restart_environment(
 
     persist_environment_definition(runtime, environment, true).await?;
     environment.resume_on_startup.store(true, Ordering::Release);
-    if let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver {
-        driver.recover_admin().await?;
-    }
     if let Err(error) = environment.driver.ensure_restartable() {
         set_environment_status(
             environment,
@@ -3092,7 +1842,7 @@ async fn restart_environment(
         return Err(error);
     }
     environment.generation.fetch_add(1, Ordering::AcqRel);
-    terminate_child(environment).await;
+    terminate_child(environment).await?;
     let child = match environment.driver.spawn_start() {
         Ok(child) => child,
         Err(error) => {
@@ -3107,9 +1857,6 @@ async fn restart_environment(
     };
     *environment.child.lock().await = Some(child);
     let generation = environment.generation.load(Ordering::Acquire);
-    if matches!(&environment.driver, EnvironmentDriver::FullTonNetwork(_)) {
-        prepare_environment_startup(environment).await;
-    }
     set_environment_status(environment, EnvironmentStatus::Starting, None).await;
     spawn_environment_monitor(Arc::clone(runtime), Arc::clone(environment), generation);
     Ok(environment.details.read().await.clone())
@@ -3137,7 +1884,9 @@ async fn fail_environment(environment: &LocalEnvironment, generation: u64, error
     if !is_current_generation(environment, generation) {
         return;
     }
-    terminate_child(environment).await;
+    if let Err(cleanup) = terminate_child(environment).await {
+        tracing::warn!(%cleanup, "Environment cleanup after failure did not complete");
+    }
     set_environment_status_if_current(
         environment,
         generation,
@@ -3147,13 +1896,19 @@ async fn fail_environment(environment: &LocalEnvironment, generation: u64, error
     .await;
 }
 
-async fn terminate_child(environment: &LocalEnvironment) {
+async fn terminate_child(environment: &LocalEnvironment) -> Result<(), EnvironmentRuntimeError> {
     let process = environment.child.lock().await.take();
     let Some(mut process) = process else {
-        return;
+        return Ok(());
     };
-    let _ = process.start_kill();
-    let _ = process.wait().await;
+    match &environment.driver {
+        EnvironmentDriver::FullTonNetwork(driver) => driver.shutdown_started(&mut process).await?,
+        EnvironmentDriver::ActonSimulatedLocalnet { .. } => {
+            let _ = process.start_kill();
+            let _ = process.wait().await;
+        }
+    }
+    Ok(())
 }
 
 async fn set_environment_status(
@@ -3167,148 +1922,6 @@ async fn set_environment_status(
 }
 
 #[cfg(test)]
-mod full_ton_start_tests {
-    use std::path::PathBuf;
-    use std::sync::Arc;
-    use std::sync::atomic::{AtomicBool, Ordering};
-
-    use expect_test::expect;
-    use tokio::sync::{Mutex, RwLock};
-
-    use super::{
-        EnvironmentConfig, EnvironmentDriver, EnvironmentEndpoints, EnvironmentRuntimeError,
-        EnvironmentStatus, FullTonImagePullKind, FullTonProcessOutcome, FullTonStartPhase,
-        LocalEnvironment, StudioEnvironment, full_ton_transition, spawn_child_if_current,
-    };
-
-    #[test]
-    fn startup_transition_table_cleans_up_only_after_compose_started() {
-        let image_pull = FullTonStartPhase::ImagePull(FullTonImagePullKind::IsolatedPublicImage);
-        let cases = [
-            (
-                FullTonStartPhase::LocalImageCheck,
-                FullTonProcessOutcome::Succeeded,
-            ),
-            (
-                FullTonStartPhase::LocalImageCheck,
-                FullTonProcessOutcome::Failed,
-            ),
-            (
-                FullTonStartPhase::LocalImageCheck,
-                FullTonProcessOutcome::TimedOut,
-            ),
-            (image_pull, FullTonProcessOutcome::Succeeded),
-            (image_pull, FullTonProcessOutcome::Failed),
-            (image_pull, FullTonProcessOutcome::TimedOut),
-            (
-                FullTonStartPhase::ComposeUp,
-                FullTonProcessOutcome::Succeeded,
-            ),
-            (FullTonStartPhase::ComposeUp, FullTonProcessOutcome::Failed),
-            (
-                FullTonStartPhase::ComposeUp,
-                FullTonProcessOutcome::TimedOut,
-            ),
-        ];
-        let actual = cases
-            .into_iter()
-            .map(|(phase, outcome)| {
-                format!(
-                    "{phase:?} + {outcome:?} => {:?}",
-                    full_ton_transition(phase, outcome)
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        expect![[r"LocalImageCheck + Succeeded => StartCompose
-LocalImageCheck + Failed => StartImagePull
-LocalImageCheck + TimedOut => StartImagePull
-ImagePull(IsolatedPublicImage) + Succeeded => StartCompose
-ImagePull(IsolatedPublicImage) + Failed => Failed { cleanup_compose: false }
-ImagePull(IsolatedPublicImage) + TimedOut => Failed { cleanup_compose: false }
-ComposeUp + Succeeded => Running
-ComposeUp + Failed => Failed { cleanup_compose: true }
-ComposeUp + TimedOut => Failed { cleanup_compose: true }"]]
-        .assert_eq(&actual);
-    }
-
-    #[tokio::test]
-    async fn cancelled_generation_cannot_spawn_the_next_startup_phase() {
-        let environment = test_environment();
-        let next_phase_spawned = Arc::new(AtomicBool::new(false));
-        let lifecycle_guard = environment.lifecycle.lock().await;
-        let task_environment = Arc::clone(&environment);
-        let task_spawned = Arc::clone(&next_phase_spawned);
-        let task = tokio::spawn(async move {
-            spawn_child_if_current(&task_environment, 1, move || {
-                task_spawned.store(true, Ordering::Release);
-                Err(EnvironmentRuntimeError::Internal {
-                    code: "unexpected_spawn",
-                    message: "cancelled phase was spawned".to_owned(),
-                })
-            })
-            .await
-        });
-
-        environment.generation.fetch_add(1, Ordering::AcqRel);
-        drop(lifecycle_guard);
-
-        let started = task
-            .await
-            .expect("startup task")
-            .expect("cancelled phase must not be spawned");
-        let actual = format!(
-            "started: {started}\nspawn called: {}\nchild installed: {}",
-            next_phase_spawned.load(Ordering::Acquire),
-            environment.child.lock().await.is_some(),
-        );
-        expect![[r"started: false
-spawn called: false
-child installed: false"]]
-        .assert_eq(&actual);
-    }
-
-    fn test_environment() -> Arc<LocalEnvironment> {
-        let config = EnvironmentConfig::ActonLocalnet {
-            port: 5411,
-            fork_network: None,
-            fork_block_number: None,
-            accounts: Vec::new(),
-            rate_limit: None,
-            response_delay_ms: None,
-            block_interval_ms: None,
-            no_mining: false,
-            mine_empty_blocks: false,
-        };
-        Arc::new(LocalEnvironment {
-            details: RwLock::new(StudioEnvironment::new(
-                "environment-1",
-                "Test environment",
-                EnvironmentStatus::Starting,
-                config.clone(),
-                EnvironmentEndpoints::default(),
-            )),
-            driver: EnvironmentDriver::ActonLocalnet {
-                acton_executable: PathBuf::from("acton"),
-                workspace_root: PathBuf::from("."),
-                db_path: PathBuf::from("localnet.sqlite"),
-                config,
-                port: 5411,
-            },
-            child: Mutex::new(None),
-            lifecycle: Mutex::new(()),
-            generation: 1.into(),
-            resume_on_startup: AtomicBool::new(true),
-            deleted: AtomicBool::new(false),
-            snapshot_operation: RwLock::new(None),
-            admin_operation: RwLock::new(None),
-            startup_compose_started_at: Mutex::new(None),
-        })
-    }
-}
-
-#[cfg(test)]
 mod external_environment_tests {
     use std::path::Path;
 
@@ -3319,21 +1932,19 @@ mod external_environment_tests {
 
     use super::{EnvironmentConfig, EnvironmentDriver, EnvironmentRuntimeError};
 
-    #[tokio::test]
-    async fn external_environment_is_rejected_without_materializing_a_data_directory() {
+    #[test]
+    fn external_environment_is_rejected_without_materializing_a_data_directory() {
         let workspace = tempdir().expect("temporary workspace");
         let data_dir = workspace.path().join("testnet");
         let result = EnvironmentDriver::new(
             Path::new("acton"),
             workspace.path(),
             &data_dir,
-            "testnet",
             &EnvironmentConfig::RemoteTonNetwork {
                 network: PublicTonNetwork::Testnet,
             },
             None,
-        )
-        .await;
+        );
         let error = match result {
             Ok(_) => "unexpected success".to_owned(),
             Err(EnvironmentRuntimeError::InvalidRequest { code, message }) => {

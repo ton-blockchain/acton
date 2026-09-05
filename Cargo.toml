@@ -36,6 +36,7 @@ acton-abi-catalog = { path = "crates/acton-abi-catalog" }
 acton-debug = { path = "crates/acton-debug", default-features = false }
 acton-source-trace = { path = "crates/acton-source-trace" }
 acton-studio = { path = "crates/acton-studio" }
+acton-localnet = { path = "crates/acton-localnet" }
 acton-mdman = { path = "crates/acton-mdman" }
 ton-objs = { path = "crates/ton-objs" }
 tolk-compiler = { path = "crates/tolk-compiler" }
@@ -110,6 +111,7 @@ serde_json = "1.0.145"
 indexmap = { version = "2.12.0", features = ["serde"] }
 serde-sarif = "0.8.0"
 schemars = { version = "0.8.22", features = ["derive"] }
+utoipa = { version = "5.5" }
 toml = "0.9.8"
 jsonschema = { version = "0.45.0", default-features = false }
 referencing = "0.45.0"
@@ -231,6 +233,7 @@ acton-config = { workspace = true }
 acton-abi-catalog = { workspace = true }
 acton-debug = { workspace = true, features = ["dap-server"] }
 acton-studio = { workspace = true }
+acton-localnet = { workspace = true }
 acton-mdman = { workspace = true }
 tolk-compiler = { workspace = true }
 tolk-source-map = { workspace = true }

@@ -139,7 +139,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
     setBusyAction("download-state")
     try {
       const state = await client.downloadState()
-      downloadBlob(state, `acton-localnet-state-${latestBlockSeqno ?? "latest"}.json`)
+      downloadBlob(state, `acton-simulated-localnet-state-${latestBlockSeqno ?? "latest"}.json`)
       showToast({
         variant: "success",
         title: "State downloaded",

@@ -7,7 +7,7 @@ Failed to send message to real network: could not reach network localnet while s
 - a firewall, proxy, or temporary service outage blocked the request
 
 Possible fix:
-- start localnet with acton localnet start
+- start localnet with acton simulated-localnet start
 - if localnet uses a custom port, check [localnet].port and [networks.localnet].api.v2 in Acton.toml
 
 Details:

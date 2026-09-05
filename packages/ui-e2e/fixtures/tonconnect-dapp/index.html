@@ -3,16 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Acton signData e2e dApp</title>
+    <title>Acton TON Connect e2e dApp</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
     <main>
       <p class="eyebrow">TON CONNECT E2E FIXTURE</p>
-      <h1>Sign data on localnet</h1>
+      <h1>TON Connect on localnet</h1>
       <p class="lead">
-        This temporary dApp creates a real TON Connect session and requests text or cell
-        signatures.
+        This temporary dApp creates a real TON Connect session and requests transactions or
+        signatures
       </p>
 
       <section aria-labelledby="connection-heading">
@@ -23,9 +23,15 @@
         <textarea id="connection-url" rows="5" readonly></textarea>
       </section>
 
+      <section aria-labelledby="transaction-heading">
+        <h2 id="transaction-heading">Transaction</h2>
+        <p>Request two transfers so the wallet can show a complete approval preview</p>
+        <button id="send-transaction" type="button" disabled>Request transaction</button>
+      </section>
+
       <section aria-labelledby="signature-heading">
         <h2 id="signature-heading">Signature</h2>
-        <p>Choose a human-readable text payload or a cell described by a TL-B schema.</p>
+        <p>Choose a human-readable text payload or a cell described by a TL-B schema</p>
         <div class="signature-actions">
           <button id="sign-text" type="button" disabled>Request text signature</button>
           <button id="sign-cell" type="button" disabled>Request cell signature</button>

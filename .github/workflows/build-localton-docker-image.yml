@@ -69,7 +69,7 @@ jobs:
           path: |
             localton-cargo-registry-cache
             localton-cargo-target-cache
-          key: localton-rust-build-cache-v1-${{ matrix.arch }}-${{ hashFiles('apps/localton/Cargo.toml', 'apps/localton/Cargo.lock', 'apps/localton/src/**/*.rs', 'apps/localton/xtask/Cargo.toml', 'apps/localton/xtask/src/**/*.rs') }}
+          key: localton-rust-build-cache-v1-${{ matrix.arch }}-${{ hashFiles('apps/localton/Cargo.toml', 'apps/localton/Cargo.lock', 'apps/localton/src/**/*.rs', 'apps/localton/xtask/Cargo.toml', 'apps/localton/xtask/src/**/*.rs', 'apps/localton/docker/ton-indexer-*.patch') }}
           restore-keys: |
             localton-rust-build-cache-v1-${{ matrix.arch }}-
 
@@ -82,7 +82,7 @@ jobs:
             localton-ton-indexer-go-build
             localton-ton-indexer-go-mod
             localton-ton-indexer-pip
-          key: localton-ton-indexer-build-cache-v1-${{ matrix.arch }}-${{ hashFiles('apps/localton/Dockerfile', 'apps/localton/docker/ton-indexer-*.patch') }}
+          key: localton-ton-indexer-build-cache-v1-${{ matrix.arch }}-${{ hashFiles('apps/localton/Dockerfile', 'apps/localton/Cargo.lock', 'apps/localton/xtask/Cargo.toml', 'apps/localton/xtask/src/**/*.rs', 'apps/localton/docker/ton-indexer-*.patch') }}
           restore-keys: |
             localton-ton-indexer-build-cache-v1-${{ matrix.arch }}-
 

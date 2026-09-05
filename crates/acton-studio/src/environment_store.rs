@@ -19,6 +19,7 @@ pub(crate) struct StoredEnvironment {
     pub(crate) name: String,
     pub(crate) config: EnvironmentConfig,
     pub(crate) resume_on_startup: bool,
+    pub(crate) network_id: Option<String>,
 }
 
 #[derive(Debug)]
@@ -33,7 +34,7 @@ struct EnvironmentFile {
     format_version: u32,
     id: String,
     name: String,
-    config: EnvironmentConfig,
+    config: serde_json::Value,
     resume_on_startup: bool,
 }
 
@@ -113,12 +114,33 @@ pub(crate) async fn load_environments(
             });
         }
 
+        // Studio persists only a network reference and its import labels. Localnet
+        // remains the source of truth for ports, genesis settings and topology.
+        let network_id = stored
+            .config
+            .get("networkId")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned);
+        let config = if stored.config["kind"] == "fullTonNetwork" {
+            let id = network_id.as_deref().ok_or_else(|| {
+                invalid_metadata("Full localnet environment is missing networkId".to_owned())
+            })?;
+            let location = crate::localnet::find_network(workspace_root, id).await?;
+            let imports = serde_json::from_value(stored.config["importedAccounts"].clone())
+                .map_err(|error| invalid_metadata(error.to_string()))?;
+            crate::localnet::configuration(&location.network, imports)
+        } else {
+            serde_json::from_value(stored.config)
+                .map_err(|error| invalid_metadata(error.to_string()))?
+        };
+
         records.push((
             number,
             StoredEnvironment {
                 id: stored.id,
                 name: stored.name,
-                config: stored.config,
+                config,
+                network_id,
                 resume_on_startup: stored.resume_on_startup,
             },
         ));
@@ -157,7 +179,17 @@ pub(crate) async fn persist_environment(
         format_version: ENVIRONMENT_FORMAT_VERSION,
         id: record.id.clone(),
         name: record.name.clone(),
-        config: record.config.clone(),
+        config: match &record.config {
+            EnvironmentConfig::FullTonNetwork {
+                imported_accounts, ..
+            } => serde_json::json!({
+                "kind": "fullTonNetwork", "networkId": record.network_id,
+                "importedAccounts": imported_accounts,
+            }),
+            config => {
+                serde_json::to_value(config).map_err(|error| invalid_metadata(error.to_string()))?
+            }
+        },
         resume_on_startup: record.resume_on_startup,
     };
     let mut bytes = serde_json::to_vec_pretty(&metadata).map_err(|error| {
@@ -291,30 +323,31 @@ mod tests {
         .unwrap();
         let loaded = load_environments(workspace.path()).await.unwrap();
 
-        expect![[r#"FILE
-{
-  "formatVersion": 1,
-  "id": "environment-2",
-  "name": "Forked network",
-  "config": {
-    "kind": "actonLocalnet",
-    "port": 5401,
-    "forkNetwork": "testnet",
-    "forkBlockNumber": 12345,
-    "accounts": [
-      "deployer"
-    ],
-    "rateLimit": 120,
-    "responseDelayMs": 15,
-    "blockIntervalMs": 1000,
-    "noMining": false,
-    "mineEmptyBlocks": true
-  },
-  "resumeOnStartup": false
-}
-LOADED
-environment-2 | Forked network | resume=false | {"kind":"actonLocalnet","port":5401,"forkNetwork":"testnet","forkBlockNumber":12345,"accounts":["deployer"],"rateLimit":120,"responseDelayMs":15,"blockIntervalMs":1000,"noMining":false,"mineEmptyBlocks":true}
-next_id=3"#]]
+        expect![[r#"
+            FILE
+            {
+              "formatVersion": 1,
+              "id": "environment-2",
+              "name": "Forked network",
+              "config": {
+                "accounts": [
+                  "deployer"
+                ],
+                "blockIntervalMs": 1000,
+                "forkBlockNumber": 12345,
+                "forkNetwork": "testnet",
+                "kind": "actonSimulatedLocalnet",
+                "mineEmptyBlocks": true,
+                "noMining": false,
+                "port": 5401,
+                "rateLimit": 120,
+                "responseDelayMs": 15
+              },
+              "resumeOnStartup": false
+            }
+            LOADED
+            environment-2 | Forked network | resume=false | {"kind":"actonSimulatedLocalnet","port":5401,"forkNetwork":"testnet","forkBlockNumber":12345,"accounts":["deployer"],"rateLimit":120,"responseDelayMs":15,"blockIntervalMs":1000,"noMining":false,"mineEmptyBlocks":true}
+            next_id=3"#]]
         .assert_eq(&format!(
             "FILE\n{}LOADED\n{}\nnext_id={}",
             file,
@@ -350,7 +383,7 @@ next_id=3"#]]
         }
         names.sort();
 
-        expect![[r#"environment-1 | Persistent network | resume=true | {"kind":"actonLocalnet","port":5401,"forkNetwork":"testnet","forkBlockNumber":12345,"accounts":["deployer"],"rateLimit":120,"responseDelayMs":15,"blockIntervalMs":1000,"noMining":false,"mineEmptyBlocks":true}
+        expect![[r#"environment-1 | Persistent network | resume=true | {"kind":"actonSimulatedLocalnet","port":5401,"forkNetwork":"testnet","forkBlockNumber":12345,"accounts":["deployer"],"rateLimit":120,"responseDelayMs":15,"blockIntervalMs":1000,"noMining":false,"mineEmptyBlocks":true}
 files=environment.json"#]]
         .assert_eq(&format!(
             "{}\nfiles={}",
@@ -435,7 +468,7 @@ environment_store_unsupported_version: <workspace>/.studio/environments/environm
         StoredEnvironment {
             id: id.to_owned(),
             name: name.to_owned(),
-            config: EnvironmentConfig::ActonLocalnet {
+            config: EnvironmentConfig::ActonSimulatedLocalnet {
                 port: 5401,
                 fork_network: Some("testnet".to_owned()),
                 fork_block_number: Some(12_345),
@@ -447,6 +480,7 @@ environment_store_unsupported_version: <workspace>/.studio/environments/environm
                 mine_empty_blocks: true,
             },
             resume_on_startup,
+            network_id: None,
         }
     }
 
@@ -493,17 +527,7 @@ environment_store_unsupported_version: <workspace>/.studio/environments/environm
             format_version,
             id: stored_id.to_owned(),
             name: "Stored".to_owned(),
-            config: EnvironmentConfig::FullTonNetwork {
-                api_v2_port: 8081,
-                api_v3_port: 8082,
-                admin_port: 8083,
-                config_port: 8084,
-                observability_port: 8085,
-                block_time_ms: None,
-                election_time_seconds: None,
-                imported_accounts: Vec::new(),
-                nodes: Vec::new(),
-            },
+            config: serde_json::json!({"kind": "fullTonNetwork", "networkId": "fixture", "importedAccounts": []}),
             resume_on_startup: false,
         };
         fs::write(

@@ -380,7 +380,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
             block.gen_software_capabilities === undefined ||
             block.fees_collected === undefined)
             ? client
-                .getRawBlockBoc(block, publicBlockNetwork)
+                .getRawBlockBoc(block)
                 .then(async cell => {
                   const {parseBlockMetadata} = await import("../cell-inspector/blockParser")
                   return parseBlockMetadata(cell)

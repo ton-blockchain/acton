@@ -153,6 +153,7 @@ async fn first_run_fetches_standard_global_config_and_configures_a_full_node() {
         no_observability: false,
         ton_bin_dir: None,
         celldb_in_memory: false,
+        dump: None,
         startup_timeout: 1,
     };
 

@@ -128,6 +128,15 @@
   padding: 0;
 }
 
+.scrollArea {
+  min-height: 0;
+  overflow: auto;
+}
+
+.scrollArea > .content {
+  overflow: visible;
+}
+
 .actions {
   box-sizing: border-box;
   display: flex;

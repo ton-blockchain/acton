@@ -107,7 +107,7 @@ impl<'a> LocalnetBuilder<'a> {
         } = self;
 
         let mut cmd = Command::new(acton_exe());
-        cmd.arg("localnet")
+        cmd.arg("simulated-localnet")
             .arg("start")
             .arg("--port")
             .arg(port.to_string());
@@ -127,7 +127,7 @@ impl<'a> LocalnetBuilder<'a> {
 
         let port_locks = release_port_reservation(port_reservation);
         let child = cmd.spawn().unwrap_or_else(|e| {
-            panic!("Failed to start `acton localnet start --port {port}`: {e}")
+            panic!("Failed to start `acton simulated-localnet start --port {port}`: {e}")
         });
 
         let mut handle = LocalnetHandle {
@@ -174,7 +174,7 @@ struct PortLock {
 
 impl PortLocks {
     fn try_acquire(ports: &[u16]) -> Option<Self> {
-        let dir = PathBuf::from("/tmp/acton-localnet-test-ports");
+        let dir = PathBuf::from("/tmp/acton-simulated-localnet-test-ports");
         fs::create_dir_all(&dir).expect("Failed to create localnet test port lock directory");
 
         let mut locks = Vec::with_capacity(ports.len());

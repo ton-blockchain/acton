@@ -64,6 +64,13 @@ export interface ValidatorSetConfiguration {
   readonly validators: readonly ValidatorConfiguration[]
 }
 
+export interface ElectionTimingConfiguration {
+  readonly validatorsElectedFor: number
+  readonly electionsStartBefore: number
+  readonly electionsEndBefore: number
+  readonly stakeHeldFor: number
+}
+
 export interface SuspendedAddressesConfiguration {
   readonly suspendedUntil: number
   readonly addresses: readonly string[]
@@ -121,6 +128,7 @@ export interface NetworkConfigParameter {
   readonly precompiledContracts?: readonly PrecompiledContractConfiguration[]
   readonly validatorRegistry?: ValidatorRegistryConfiguration
   readonly validatorSet?: ValidatorSetConfiguration
+  readonly electionTiming?: ElectionTimingConfiguration
   readonly suspendedAddresses?: SuspendedAddressesConfiguration
   readonly bridgeConfiguration?: BridgeConfiguration
   readonly parseError?: string
@@ -619,6 +627,7 @@ function parseConfigParameter(id: number, cell: Cell): NetworkConfigParameter {
     const precompiledContracts = id === 45 ? parsePrecompiledContracts(parsed) : undefined
     const validatorRegistry = id === 46 ? parseValidatorRegistry(parsed) : undefined
     const validatorSet = parseValidatorSet(id, parsed)
+    const electionTiming = id === 15 ? parseElectionTiming(parsed) : undefined
     const suspendedAddresses = id === 44 ? parseSuspendedAddresses(parsed) : undefined
     const bridgeConfiguration = parseBridgeConfiguration(id, parsed)
 
@@ -636,6 +645,7 @@ function parseConfigParameter(id: number, cell: Cell): NetworkConfigParameter {
       ...(precompiledContracts === undefined ? {} : {precompiledContracts}),
       ...(validatorRegistry === undefined ? {} : {validatorRegistry}),
       ...(validatorSet === undefined ? {} : {validatorSet}),
+      ...(electionTiming === undefined ? {} : {electionTiming}),
       ...(suspendedAddresses === undefined ? {} : {suspendedAddresses}),
       ...(bridgeConfiguration === undefined ? {} : {bridgeConfiguration}),
     }
@@ -1228,6 +1238,26 @@ const VALIDATOR_SET_FIELDS: Readonly<Record<number, string>> = {
   35: "cur_temp_validators",
   36: "next_validators",
   37: "next_temp_validators",
+}
+
+function parseElectionTiming(value: unknown): ElectionTimingConfiguration | undefined {
+  const timing = unwrapAnonymousConfigValue(value)
+  if (
+    timing?.kind !== "ConfigParam__15" ||
+    typeof timing.validators_elected_for !== "number" ||
+    typeof timing.elections_start_before !== "number" ||
+    typeof timing.elections_end_before !== "number" ||
+    typeof timing.stake_held_for !== "number"
+  ) {
+    return undefined
+  }
+
+  return {
+    validatorsElectedFor: timing.validators_elected_for,
+    electionsStartBefore: timing.elections_start_before,
+    electionsEndBefore: timing.elections_end_before,
+    stakeHeldFor: timing.stake_held_for,
+  }
 }
 
 function parseValidatorSet(id: number, value: unknown): ValidatorSetConfiguration | undefined {

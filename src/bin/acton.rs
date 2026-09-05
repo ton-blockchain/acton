@@ -947,12 +947,18 @@ enum Commands {
         command: LibraryCommand,
     },
     #[command(
-        about = "Manage local TON network",
-        after_help = detailed_help_pointer("localnet")
+        about = "Run Acton's simplified TON development environment",
+        long_about = "Run Acton's fast, deterministic TON development environment for local execution, forked-state workflows, and faucet funding. It produces TON-compatible blocks and exposes LiteAPI, TonCenter v2/v3, Streaming API, and Emulate API surfaces used by many contract and dApp workflows.\n\nActon simulated localnet is a custom simplified implementation, not a real TON network or validator cluster. It does not model validators, consensus, shard elections, or the full production node and indexer stack.",
+        after_help = detailed_help_pointer("simulated-localnet")
     )]
-    Localnet {
+    SimulatedLocalnet {
         #[command(subcommand)]
-        command: LocalnetCommand,
+        command: SimulatedLocalnetCommand,
+    },
+    #[command(about = "Run and manage real TON development networks")]
+    Localnet {
+        #[command(flatten)]
+        args: commands::localnet::LocalnetArgs,
     },
     #[command(about = "Manage Acton Studio")]
     Studio {
@@ -1126,10 +1132,13 @@ enum Commands {
 }
 
 #[derive(Subcommand, Clone)]
-pub enum LocalnetCommand {
-    #[command(about = "Start the local TON network")]
+pub enum SimulatedLocalnetCommand {
+    #[command(about = "Start Acton's simplified TON development environment")]
     Start {
-        #[arg(long, help = "Localnet server port (default: [localnet].port or 5411)")]
+        #[arg(
+            long,
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
+        )]
         port: Option<u16>,
         #[arg(
             long,
@@ -1177,7 +1186,7 @@ pub enum LocalnetCommand {
         block_interval_ms: Option<u64>,
         #[arg(
             long,
-            help = "Disable automatic block production; mine blocks manually with `acton localnet mine` (default: [localnet].no-mining)"
+            help = "Disable automatic block production; mine blocks manually with `acton simulated-localnet mine` (default: [localnet].no-mining)"
         )]
         no_mining: bool,
         #[arg(
@@ -1232,7 +1241,7 @@ pub enum LocalnetCommand {
         #[arg(
             long,
             short,
-            help = "Localnet server port (default: [localnet].port or 5411)"
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1250,7 +1259,7 @@ pub enum LocalnetCommand {
         #[arg(
             long,
             short,
-            help = "Localnet server port (default: [localnet].port or 5411)"
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1267,7 +1276,7 @@ pub enum LocalnetCommand {
         #[arg(
             long,
             short,
-            help = "Localnet server port (default: [localnet].port or 5411)"
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1280,7 +1289,7 @@ pub enum LocalnetCommand {
         #[arg(
             long,
             short,
-            help = "Localnet server port (default: [localnet].port or 5411)"
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1296,7 +1305,7 @@ pub enum LocalnetCommand {
         #[arg(
             long,
             short,
-            help = "Localnet server port (default: [localnet].port or 5411)"
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1307,7 +1316,7 @@ pub enum LocalnetCommand {
         #[arg(
             long,
             short,
-            help = "Localnet server port (default: [localnet].port or 5411)"
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Print machine-readable JSON")]
@@ -1318,12 +1327,12 @@ pub enum LocalnetCommand {
     #[command(about = "Dump or load the current localnet state")]
     State {
         #[command(subcommand)]
-        command: LocalnetStateCommand,
+        command: SimulatedLocalnetStateCommand,
     },
     #[command(about = "Manage named in-memory localnet checkpoints")]
     Checkpoint {
         #[command(subcommand)]
-        command: LocalnetCheckpointCommand,
+        command: SimulatedLocalnetCheckpointCommand,
     },
 }
 
@@ -1352,7 +1361,7 @@ pub enum StudioCommand {
 }
 
 #[derive(Subcommand, Clone)]
-pub enum LocalnetStateCommand {
+pub enum SimulatedLocalnetStateCommand {
     #[command(about = "Dump the current localnet state to a JSON file")]
     Dump {
         #[arg(help = "Output JSON file", value_name = "PATH")]
@@ -1362,7 +1371,7 @@ pub enum LocalnetStateCommand {
         #[arg(
             long,
             short,
-            help = "Localnet server port (default: [localnet].port or 5411)"
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1375,7 +1384,7 @@ pub enum LocalnetStateCommand {
         #[arg(
             long,
             short,
-            help = "Localnet server port (default: [localnet].port or 5411)"
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1384,7 +1393,7 @@ pub enum LocalnetStateCommand {
 }
 
 #[derive(Subcommand, Clone)]
-pub enum LocalnetCheckpointCommand {
+pub enum SimulatedLocalnetCheckpointCommand {
     #[command(about = "Create a named in-memory checkpoint")]
     Create {
         #[arg(help = "Checkpoint name", value_name = "NAME")]
@@ -1394,7 +1403,7 @@ pub enum LocalnetCheckpointCommand {
         #[arg(
             long,
             short,
-            help = "Localnet server port (default: [localnet].port or 5411)"
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1405,7 +1414,7 @@ pub enum LocalnetCheckpointCommand {
         #[arg(
             long,
             short,
-            help = "Localnet server port (default: [localnet].port or 5411)"
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1418,7 +1427,7 @@ pub enum LocalnetCheckpointCommand {
         #[arg(
             long,
             short,
-            help = "Localnet server port (default: [localnet].port or 5411)"
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1431,7 +1440,7 @@ pub enum LocalnetCheckpointCommand {
         #[arg(
             long,
             short,
-            help = "Localnet server port (default: [localnet].port or 5411)"
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1442,7 +1451,7 @@ pub enum LocalnetCheckpointCommand {
         #[arg(
             long,
             short,
-            help = "Localnet server port (default: [localnet].port or 5411)"
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1459,7 +1468,7 @@ pub enum LocalnetCheckpointCommand {
         #[arg(
             long,
             short,
-            help = "Localnet server port (default: [localnet].port or 5411)"
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1480,7 +1489,7 @@ pub enum LocalnetCheckpointCommand {
         #[arg(
             long,
             short,
-            help = "Localnet server port (default: [localnet].port or 5411)"
+            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1784,7 +1793,8 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("rpc", "<COMMAND>"),
         ("verify", "[CONTRACT_NAME]"),
         ("library", "<COMMAND>"),
-        // ("localnet", "<COMMAND>"),
+        ("simulated-localnet", "<COMMAND>"),
+        ("localnet", "<COMMAND>"),
         // ("studio", "<COMMAND>"),
         ("retrace", "<TX_HASH>"),
     ];
@@ -2153,7 +2163,7 @@ fn load_project_dotenv(project_roots_configured: bool) {
 
 fn configure_studio_public_network_routing(command: &Commands, project_roots_configured: bool) {
     if !project_roots_configured
-        || matches!(command, Commands::Studio { .. })
+        || matches!(command, Commands::Studio { .. } | Commands::Localnet { .. })
         || !configured_manifest_path().is_file()
     {
         return;
@@ -2708,6 +2718,7 @@ fn main() {
             ))
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
+        Commands::Localnet { args } => commands::localnet::localnet_cmd(args),
         Commands::Studio { command } => match command {
             StudioCommand::Start {
                 host,
@@ -2721,275 +2732,293 @@ fn main() {
                 rt.block_on(commands::studio::studio_start_cmd(host, port, !no_open))
             }
         },
-        Commands::Localnet { command } => match command {
-            LocalnetCommand::Start {
-                port,
-                fork_net,
-                fork_block_number,
-                accounts,
-                db_path,
-                rate_limit,
-                response_delay_ms,
-                block_interval_ms,
-                no_mining,
-                mine_empty_blocks,
-                load_state,
-                dump_state,
-                require_auth,
-                liteapi,
-                liteapi_port,
-            } => {
-                let resolved_localnet = resolve_localnet_settings(
+        Commands::SimulatedLocalnet { command } => {
+            match command {
+                SimulatedLocalnetCommand::Start {
                     port,
-                    db_path,
                     fork_net,
                     fork_block_number,
                     accounts,
+                    db_path,
                     rate_limit,
                     response_delay_ms,
                     block_interval_ms,
                     no_mining,
                     mine_empty_blocks,
-                );
-                let rt = tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .build()
-                    .expect("Failed to build tokio runtime");
-                rt.block_on(async {
-                    commands::localnet::localnet_start_cmd(
-                        resolved_localnet.port,
-                        resolved_localnet.db_path,
-                        resolved_localnet.fork_net,
-                        resolved_localnet.fork_block_number,
-                        resolved_localnet.accounts,
-                        resolved_localnet.rate_limit,
-                        resolved_localnet.response_delay_ms,
-                        resolved_localnet.block_interval_ms,
-                        resolved_localnet.no_mining,
-                        resolved_localnet.mine_empty_blocks,
-                        load_state,
-                        dump_state,
-                        require_auth,
-                        liteapi,
-                        liteapi_port,
-                    )
-                    .await
-                })
-            }
-            LocalnetCommand::Airdrop {
-                address,
-                amount,
-                port,
-                auth_token,
-            } => {
-                let port = resolve_localnet_port(port);
-                let rt = tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .build()
-                    .expect("Failed to build tokio runtime");
-                rt.block_on(async {
-                    commands::localnet::localnet_airdrop_cmd(&address, amount, port, auth_token)
+                    load_state,
+                    dump_state,
+                    require_auth,
+                    liteapi,
+                    liteapi_port,
+                } => {
+                    let resolved_localnet = resolve_localnet_settings(
+                        port,
+                        db_path,
+                        fork_net,
+                        fork_block_number,
+                        accounts,
+                        rate_limit,
+                        response_delay_ms,
+                        block_interval_ms,
+                        no_mining,
+                        mine_empty_blocks,
+                    );
+                    let rt = tokio::runtime::Builder::new_multi_thread()
+                        .enable_all()
+                        .build()
+                        .expect("Failed to build tokio runtime");
+                    rt.block_on(async {
+                        commands::simulated_localnet::simulated_localnet_start_cmd(
+                            resolved_localnet.port,
+                            resolved_localnet.db_path,
+                            resolved_localnet.fork_net,
+                            resolved_localnet.fork_block_number,
+                            resolved_localnet.accounts,
+                            resolved_localnet.rate_limit,
+                            resolved_localnet.response_delay_ms,
+                            resolved_localnet.block_interval_ms,
+                            resolved_localnet.no_mining,
+                            resolved_localnet.mine_empty_blocks,
+                            load_state,
+                            dump_state,
+                            require_auth,
+                            liteapi,
+                            liteapi_port,
+                        )
                         .await
-                })
-            }
-            LocalnetCommand::Mine {
-                blocks,
-                port,
-                auth_token,
-            } => {
-                let port = resolve_localnet_port(port);
-                let rt = tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .build()
-                    .expect("Failed to build tokio runtime");
-                rt.block_on(async {
-                    commands::localnet::localnet_mine_cmd(blocks, port, auth_token).await
-                })
-            }
-            LocalnetCommand::IncreaseTime {
-                seconds,
-                port,
-                auth_token,
-            } => {
-                let port = resolve_localnet_port(port);
-                let rt = tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .build()
-                    .expect("Failed to build tokio runtime");
-                rt.block_on(async {
-                    commands::localnet::localnet_increase_time_cmd(seconds, port, auth_token).await
-                })
-            }
-            LocalnetCommand::SetTime {
-                timestamp,
-                port,
-                auth_token,
-            } => {
-                let port = resolve_localnet_port(port);
-                let rt = tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .build()
-                    .expect("Failed to build tokio runtime");
-                rt.block_on(async {
-                    commands::localnet::localnet_set_time_cmd(timestamp, port, auth_token).await
-                })
-            }
-            LocalnetCommand::SetNextBlockTimestamp {
-                timestamp,
-                port,
-                auth_token,
-            } => {
-                let port = resolve_localnet_port(port);
-                let rt = tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .build()
-                    .expect("Failed to build tokio runtime");
-                rt.block_on(async {
-                    commands::localnet::localnet_set_next_block_timestamp_cmd(
+                    })
+                }
+                SimulatedLocalnetCommand::Airdrop {
+                    address,
+                    amount,
+                    port,
+                    auth_token,
+                } => {
+                    let port = resolve_localnet_port(port);
+                    let rt = tokio::runtime::Builder::new_multi_thread()
+                        .enable_all()
+                        .build()
+                        .expect("Failed to build tokio runtime");
+                    rt.block_on(async {
+                        commands::simulated_localnet::simulated_localnet_airdrop_cmd(
+                            &address, amount, port, auth_token,
+                        )
+                        .await
+                    })
+                }
+                SimulatedLocalnetCommand::Mine {
+                    blocks,
+                    port,
+                    auth_token,
+                } => {
+                    let port = resolve_localnet_port(port);
+                    let rt = tokio::runtime::Builder::new_multi_thread()
+                        .enable_all()
+                        .build()
+                        .expect("Failed to build tokio runtime");
+                    rt.block_on(async {
+                        commands::simulated_localnet::simulated_localnet_mine_cmd(
+                            blocks, port, auth_token,
+                        )
+                        .await
+                    })
+                }
+                SimulatedLocalnetCommand::IncreaseTime {
+                    seconds,
+                    port,
+                    auth_token,
+                } => {
+                    let port = resolve_localnet_port(port);
+                    let rt = tokio::runtime::Builder::new_multi_thread()
+                        .enable_all()
+                        .build()
+                        .expect("Failed to build tokio runtime");
+                    rt.block_on(async {
+                        commands::simulated_localnet::simulated_localnet_increase_time_cmd(
+                            seconds, port, auth_token,
+                        )
+                        .await
+                    })
+                }
+                SimulatedLocalnetCommand::SetTime {
+                    timestamp,
+                    port,
+                    auth_token,
+                } => {
+                    let port = resolve_localnet_port(port);
+                    let rt = tokio::runtime::Builder::new_multi_thread()
+                        .enable_all()
+                        .build()
+                        .expect("Failed to build tokio runtime");
+                    rt.block_on(async {
+                        commands::simulated_localnet::simulated_localnet_set_time_cmd(
+                            timestamp, port, auth_token,
+                        )
+                        .await
+                    })
+                }
+                SimulatedLocalnetCommand::SetNextBlockTimestamp {
+                    timestamp,
+                    port,
+                    auth_token,
+                } => {
+                    let port = resolve_localnet_port(port);
+                    let rt = tokio::runtime::Builder::new_multi_thread()
+                        .enable_all()
+                        .build()
+                        .expect("Failed to build tokio runtime");
+                    rt.block_on(async {
+                    commands::simulated_localnet::simulated_localnet_set_next_block_timestamp_cmd(
                         timestamp, port, auth_token,
                     )
                     .await
                 })
-            }
-            LocalnetCommand::Status {
-                port,
-                json,
-                auth_token,
-            } => {
-                let port = resolve_localnet_port(port);
-                let rt = tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .build()
-                    .expect("Failed to build tokio runtime");
-                rt.block_on(async {
-                    commands::localnet::localnet_status_cmd(port, json, auth_token).await
-                })
-            }
-            LocalnetCommand::State { command } => {
-                let rt = tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .build()
-                    .expect("Failed to build tokio runtime");
-                match command {
-                    LocalnetStateCommand::Dump {
-                        path,
-                        force,
-                        port,
-                        auth_token,
-                    } => {
-                        let port = resolve_localnet_port(port);
-                        rt.block_on(async {
-                            commands::localnet::localnet_state_dump_cmd(
-                                path, force, port, auth_token,
-                            )
-                            .await
-                        })
-                    }
-                    LocalnetStateCommand::Load {
-                        path,
-                        port,
-                        auth_token,
-                    } => {
-                        let port = resolve_localnet_port(port);
-                        rt.block_on(async {
-                            commands::localnet::localnet_state_load_cmd(path, port, auth_token)
+                }
+                SimulatedLocalnetCommand::Status {
+                    port,
+                    json,
+                    auth_token,
+                } => {
+                    let port = resolve_localnet_port(port);
+                    let rt = tokio::runtime::Builder::new_multi_thread()
+                        .enable_all()
+                        .build()
+                        .expect("Failed to build tokio runtime");
+                    rt.block_on(async {
+                        commands::simulated_localnet::simulated_localnet_status_cmd(
+                            port, json, auth_token,
+                        )
+                        .await
+                    })
+                }
+                SimulatedLocalnetCommand::State { command } => {
+                    let rt = tokio::runtime::Builder::new_multi_thread()
+                        .enable_all()
+                        .build()
+                        .expect("Failed to build tokio runtime");
+                    match command {
+                        SimulatedLocalnetStateCommand::Dump {
+                            path,
+                            force,
+                            port,
+                            auth_token,
+                        } => {
+                            let port = resolve_localnet_port(port);
+                            rt.block_on(async {
+                                commands::simulated_localnet::simulated_localnet_state_dump_cmd(
+                                    path, force, port, auth_token,
+                                )
                                 .await
-                        })
+                            })
+                        }
+                        SimulatedLocalnetStateCommand::Load {
+                            path,
+                            port,
+                            auth_token,
+                        } => {
+                            let port = resolve_localnet_port(port);
+                            rt.block_on(async {
+                                commands::simulated_localnet::simulated_localnet_state_load_cmd(
+                                    path, port, auth_token,
+                                )
+                                .await
+                            })
+                        }
                     }
                 }
-            }
-            LocalnetCommand::Checkpoint { command } => {
-                let rt = tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .build()
-                    .expect("Failed to build tokio runtime");
-                match command {
-                    LocalnetCheckpointCommand::Create {
-                        name,
-                        force,
-                        port,
-                        auth_token,
-                    } => {
-                        let port = resolve_localnet_port(port);
-                        rt.block_on(async {
-                            commands::localnet::localnet_checkpoint_create_cmd(
+                SimulatedLocalnetCommand::Checkpoint { command } => {
+                    let rt = tokio::runtime::Builder::new_multi_thread()
+                        .enable_all()
+                        .build()
+                        .expect("Failed to build tokio runtime");
+                    match command {
+                        SimulatedLocalnetCheckpointCommand::Create {
+                            name,
+                            force,
+                            port,
+                            auth_token,
+                        } => {
+                            let port = resolve_localnet_port(port);
+                            rt.block_on(async {
+                            commands::simulated_localnet::simulated_localnet_checkpoint_create_cmd(
                                 &name, force, port, auth_token,
                             )
                             .await
                         })
-                    }
-                    LocalnetCheckpointCommand::List { port, auth_token } => {
-                        let port = resolve_localnet_port(port);
-                        rt.block_on(async {
-                            commands::localnet::localnet_checkpoint_list_cmd(port, auth_token).await
+                        }
+                        SimulatedLocalnetCheckpointCommand::List { port, auth_token } => {
+                            let port = resolve_localnet_port(port);
+                            rt.block_on(async {
+                            commands::simulated_localnet::simulated_localnet_checkpoint_list_cmd(port, auth_token).await
                         })
-                    }
-                    LocalnetCheckpointCommand::Restore {
-                        name,
-                        port,
-                        auth_token,
-                    } => {
-                        let port = resolve_localnet_port(port);
-                        rt.block_on(async {
-                            commands::localnet::localnet_checkpoint_restore_cmd(
+                        }
+                        SimulatedLocalnetCheckpointCommand::Restore {
+                            name,
+                            port,
+                            auth_token,
+                        } => {
+                            let port = resolve_localnet_port(port);
+                            rt.block_on(async {
+                            commands::simulated_localnet::simulated_localnet_checkpoint_restore_cmd(
                                 &name, port, auth_token,
                             )
                             .await
                         })
-                    }
-                    LocalnetCheckpointCommand::Delete {
-                        name,
-                        port,
-                        auth_token,
-                    } => {
-                        let port = resolve_localnet_port(port);
-                        rt.block_on(async {
-                            commands::localnet::localnet_checkpoint_delete_cmd(
+                        }
+                        SimulatedLocalnetCheckpointCommand::Delete {
+                            name,
+                            port,
+                            auth_token,
+                        } => {
+                            let port = resolve_localnet_port(port);
+                            rt.block_on(async {
+                            commands::simulated_localnet::simulated_localnet_checkpoint_delete_cmd(
                                 &name, port, auth_token,
                             )
                             .await
                         })
-                    }
-                    LocalnetCheckpointCommand::Clear { port, auth_token } => {
-                        let port = resolve_localnet_port(port);
-                        rt.block_on(async {
-                            commands::localnet::localnet_checkpoint_clear_cmd(port, auth_token)
+                        }
+                        SimulatedLocalnetCheckpointCommand::Clear { port, auth_token } => {
+                            let port = resolve_localnet_port(port);
+                            rt.block_on(async {
+                            commands::simulated_localnet::simulated_localnet_checkpoint_clear_cmd(port, auth_token)
                                 .await
                         })
-                    }
-                    LocalnetCheckpointCommand::Export {
-                        name,
-                        out,
-                        force,
-                        port,
-                        auth_token,
-                    } => {
-                        let port = resolve_localnet_port(port);
-                        rt.block_on(async {
-                            commands::localnet::localnet_checkpoint_export_cmd(
+                        }
+                        SimulatedLocalnetCheckpointCommand::Export {
+                            name,
+                            out,
+                            force,
+                            port,
+                            auth_token,
+                        } => {
+                            let port = resolve_localnet_port(port);
+                            rt.block_on(async {
+                            commands::simulated_localnet::simulated_localnet_checkpoint_export_cmd(
                                 &name, out, force, port, auth_token,
                             )
                             .await
                         })
-                    }
-                    LocalnetCheckpointCommand::Import {
-                        path,
-                        name,
-                        force,
-                        port,
-                        auth_token,
-                    } => {
-                        let port = resolve_localnet_port(port);
-                        rt.block_on(async {
-                            commands::localnet::localnet_checkpoint_import_cmd(
+                        }
+                        SimulatedLocalnetCheckpointCommand::Import {
+                            path,
+                            name,
+                            force,
+                            port,
+                            auth_token,
+                        } => {
+                            let port = resolve_localnet_port(port);
+                            rt.block_on(async {
+                            commands::simulated_localnet::simulated_localnet_checkpoint_import_cmd(
                                 path, name, force, port, auth_token,
                             )
                             .await
                         })
+                        }
                     }
                 }
             }
-        },
+        }
     };
 
     if let Err(err) = result {
@@ -3018,6 +3047,7 @@ const fn command_checks_toolchain_version(command: &Commands) -> bool {
                 | Commands::Completions { .. }
                 | Commands::Doctor
                 | Commands::Studio { .. }
+                | Commands::Localnet { .. }
         )
 }
 

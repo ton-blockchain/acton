@@ -40,7 +40,7 @@ const apiReferenceSpecs: readonly ApiReferenceSpec[] = [
     capability: "controlApi",
     label: "Control API",
     path: "/api-reference/control",
-    specUrl: "/openapi/acton-localnet-control.openapi.json",
+    specUrl: "/openapi/acton-simulated-localnet-control.openapi.json",
     fallbackTag: "Localnet Control",
   },
 ]

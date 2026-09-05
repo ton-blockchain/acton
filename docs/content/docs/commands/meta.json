@@ -14,7 +14,7 @@
     "rpc",
     "verify",
     "library",
-    "!localnet",
+    "!simulated-localnet",
     "retrace",
     "run",
     "compile",
