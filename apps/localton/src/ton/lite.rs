@@ -47,7 +47,7 @@ fn ton_method_id(name: &str) -> u64 {
     u64::from(CRC16.checksum(name.as_bytes())) | 0x1_0000
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct BlockRef {
     pub workchain: i32,
     pub shard: String,
@@ -126,6 +126,153 @@ impl LocalLiteClient {
             "failed to connect to any configured liteserver: {}",
             failures.join("; ")
         ))
+    }
+
+    /// Downloads a complete state and authenticates its root against the block update.
+    pub async fn hardfork_sources(
+        &mut self,
+        cache_dir: &Path,
+    ) -> Result<ton_hardfork::HardforkSources> {
+        use ton_hardfork::{HardforkPrevBlock, HardforkSources, ShardSource};
+        use tycho_types::models::ShardIdent;
+        use tycho_types::prelude::HashBytes;
+        let head = self.inner.get_masterchain_info().await?.last;
+        let mc = self.complete_state(head.clone(), cache_dir).await?;
+        let state = mc.parse::<ShardStateUnsplit>()?;
+        let shards = state
+            .custom
+            .as_ref()
+            .context("Missing masterchain config")?
+            .load()?
+            .shards;
+        let mut basechain = None;
+        for entry in shards.iter() {
+            let (shard, descr) = entry?;
+            anyhow::ensure!(
+                shard == ShardIdent::BASECHAIN,
+                "Administrative edits currently require one unsplit basechain shard"
+            );
+            let id = BlockIdExt {
+                workchain: 0,
+                shard: shard.prefix() as i64,
+                seqno: descr.seqno as i32,
+                root_hash: tonutils::tl::Int256(descr.root_hash.0),
+                file_hash: tonutils::tl::Int256(descr.file_hash.0),
+            };
+            let cell = self.complete_state(id, cache_dir).await?;
+            basechain = Some(ShardSource {
+                shard,
+                state: cell,
+                prev: HardforkPrevBlock {
+                    seqno: descr.seqno,
+                    root_hash: descr.root_hash,
+                    file_hash: descr.file_hash,
+                },
+            });
+        }
+        anyhow::ensure!(
+            self.inner.get_masterchain_info().await?.last == head,
+            "Chain advanced while reading hardfork sources"
+        );
+        Ok(HardforkSources {
+            masterchain_state: mc,
+            masterchain_prev: HardforkPrevBlock {
+                seqno: head.seqno as u32,
+                root_hash: HashBytes(head.root_hash.0),
+                file_hash: HashBytes(head.file_hash.0),
+            },
+            basechain,
+        })
+    }
+
+    async fn checked_block(&mut self, id: BlockIdExt) -> Result<tycho_types::models::Block> {
+        let bytes = self.inner.get_block(id.clone()).await?;
+        let root = Boc::decode(&bytes)?;
+        anyhow::ensure!(
+            root.repr_hash().0 == id.root_hash.0 && Boc::file_hash(&bytes).0 == id.file_hash.0,
+            "Block hash mismatch"
+        );
+        Ok(root.parse()?)
+    }
+
+    /// Stock TON refuses getState for seqno > 1000. Bootstrap from an allowed
+    /// state, then authenticate and apply block updates. The reusable cache is
+    /// verified against the current chain, including after a snapshot restore.
+    async fn complete_state(&mut self, id: BlockIdExt, cache_dir: &Path) -> Result<Cell> {
+        let shard = format!("{:016x}", id.shard as u64);
+        let path = cache_dir.join(format!("{}-{shard}.boc", id.workchain));
+        let mut cached = None;
+        if let Ok(bytes) = std::fs::read(&path)
+            && let Ok(cell) = Boc::decode(bytes)
+            && let Ok(state) = cell.parse::<ShardStateUnsplit>()
+            && state.seqno <= id.seqno as u32
+            && state.shard_ident.workchain() == id.workchain
+            && state.shard_ident.prefix() == id.shard as u64
+        {
+            let block_id = self.lookup(id.workchain, &shard, state.seqno).await?;
+            if state.seqno > 0
+                && self
+                    .checked_block(block_id)
+                    .await?
+                    .state_update
+                    .load()?
+                    .new_hash
+                    == *cell.repr_hash()
+            {
+                cached = Some((state.seqno, cell));
+            }
+        }
+        let (mut seqno, mut cell) = match cached {
+            Some(value) => value,
+            None => {
+                let seqno = (id.seqno as u32).min(1000);
+                let seed = if seqno == id.seqno as u32 {
+                    id.clone()
+                } else {
+                    self.lookup(id.workchain, &shard, seqno).await?
+                };
+                let expected = if seqno == 0 {
+                    tycho_types::prelude::HashBytes(seed.root_hash.0)
+                } else {
+                    self.checked_block(seed.clone())
+                        .await?
+                        .state_update
+                        .load()?
+                        .new_hash
+                };
+                let cell = Boc::decode(self.inner.get_state(seed).await?.data)?;
+                anyhow::ensure!(
+                    *cell.repr_hash() == expected,
+                    "Initial state does not match its block"
+                );
+                (seqno, cell)
+            }
+        };
+        std::fs::create_dir_all(cache_dir)?;
+        while seqno < id.seqno as u32 {
+            seqno += 1;
+            let next = if seqno == id.seqno as u32 {
+                id.clone()
+            } else {
+                self.lookup(id.workchain, &shard, seqno).await?
+            };
+            let block = self.checked_block(next).await?;
+            let info = block.info.load()?;
+            anyhow::ensure!(
+                !info.after_merge && !info.after_split,
+                "Split and merged shard histories are not supported"
+            );
+            cell = block
+                .state_update
+                .load()?
+                .apply(&cell)
+                .context("State update does not extend the previous state")?;
+            if seqno % 128 == 0 {
+                save_state_cache(&path, &cell)?;
+            }
+        }
+        save_state_cache(&path, &cell)?;
+        Ok(cell)
     }
 
     pub async fn last(&mut self) -> Result<BlockRef> {
@@ -416,6 +563,13 @@ pub fn require_existing_config(path: &Path) -> Result<()> {
             path.display()
         ))
     }
+}
+
+fn save_state_cache(path: &Path, cell: &Cell) -> Result<()> {
+    let temp = path.with_extension("boc.tmp");
+    std::fs::write(&temp, Boc::encode(cell))?;
+    std::fs::rename(temp, path)?;
+    Ok(())
 }
 
 #[cfg(test)]

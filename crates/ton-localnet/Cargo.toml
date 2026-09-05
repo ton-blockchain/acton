@@ -11,6 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ton-hardfork.workspace = true
 acton-source-trace = { workspace = true }
 ton-executor = { workspace = true }
 ton-emulator = { workspace = true }
@@ -47,6 +48,9 @@ url = { workspace = true }
 rustc-hash = { workspace = true }
 thiserror = { workspace = true }
 tempfile = { workspace = true }
+
+[dev-dependencies]
+ton-fullnode-master = { workspace = true }
 
 [lints]
 workspace = true

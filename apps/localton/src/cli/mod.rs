@@ -76,6 +76,16 @@ pub enum Command {
     },
     /// Create and inspect a hardfork configuration.
     Hardfork(HardforkArgs),
+    /// Apply administrator-built hardfork blocks to this network.
+    Godmode {
+        #[command(subcommand)]
+        command: GodmodeCommand,
+    },
+    /// Read and change parameters of the blockchain configuration.
+    BlockchainConfig {
+        #[command(subcommand)]
+        command: BlockchainConfigCommand,
+    },
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -565,6 +575,59 @@ pub struct HardforkArgs {
     /// Output global configuration. Defaults under the state directory.
     #[arg(long)]
     pub output: Option<PathBuf>,
+}
+
+/// Changes to the blockchain configuration of this network.
+///
+/// The configuration smart contract accepts a signed request from the master key
+/// created with the zerostate, so a parameter changes immediately and without a
+/// validator vote. The value is checked against the release's TL-B schema first,
+/// because a configuration the collator rejects stops block production for good.
+#[derive(Debug, Clone, Subcommand)]
+pub enum BlockchainConfigCommand {
+    /// Set one configuration parameter to the value in a BoC file.
+    Set {
+        #[command(flatten)]
+        state: StateArgs,
+        /// Index of the configuration parameter.
+        #[arg(long, allow_negative_numbers = true)]
+        index: i32,
+        /// File with the serialized new value of the parameter.
+        #[arg(long)]
+        value: PathBuf,
+        /// Write the value even if it does not match the release's TL-B schema.
+        #[arg(long)]
+        force: bool,
+    },
+}
+
+/// Steps of one administrative graft, in the order they are performed.
+///
+/// A hardfork block only fits directly on top of the node's current top block,
+/// so production is suspended while that block is read and the new blocks are
+/// built. `install` publishes them, and `finish` restores normal networking once
+/// the node has applied them.
+#[derive(Debug, Clone, Subcommand)]
+pub enum GodmodeCommand {
+    /// Capture a stable head from a node restarted with suspended validator keys.
+    Observe(StateArgs),
+    /// Build an account-edit plan from JSON on stdin, while validation is suspended.
+    Prepare(StateArgs),
+    /// Verify that every planned block has been applied, while validation is suspended.
+    Verify(StateArgs),
+    /// Remove validator keys from a stopped node; restart it to observe the stable head.
+    Suspend(StateArgs),
+    /// Restore validator keys on a stopped node; restart it to resume production.
+    Resume(StateArgs),
+    /// Install one hardfork plan and publish its shard blocks.
+    Install {
+        #[command(flatten)]
+        state: StateArgs,
+        /// JSON hardfork plan produced by the block builder.
+        plan: PathBuf,
+    },
+    /// Restore networking on a stopped node after a verified graft.
+    Finish(StateArgs),
 }
 
 #[cfg(test)]

@@ -313,7 +313,17 @@ COPY --from=ton-index-classifier-builder /out/ton-indexer/classifier /opt/ton-in
 COPY apps/localton/docker/prepare-runtime.sh /tmp/prepare-runtime.sh
 RUN bash /tmp/prepare-runtime.sh "${TARGETARCH}"
 
+# Development image for administrative hardforks: both the CLI and account
+# indexer must be upgraded together. Native TON remains the pinned stock build.
+FROM localton-rust-only AS localton-admin-dev
+USER root
+COPY --from=ton-indexer-builder /out/ton-indexer/bin/ /opt/ton-indexer/bin/
+COPY --from=ton-indexer-builder /out/ton-indexer/lib/ /opt/ton-indexer/lib/
+LABEL org.ton.localton.admin-hardforks="1"
+USER localton
+
 FROM ubuntu:${UBUNTU_VERSION} AS runtime
+LABEL org.ton.localton.admin-hardforks="1"
 ARG BUILD_VERSION=dev
 ARG SOURCE_URL=https://github.com/ton-blockchain/acton
 ARG VCS_REF=unknown

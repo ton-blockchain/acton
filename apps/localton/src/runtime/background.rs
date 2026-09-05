@@ -54,7 +54,9 @@ pub fn start(layout: Layout, settings: &Settings) -> BackgroundTasks {
             receiver.clone(),
         )));
     }
-    if settings.validation.auto_participate || settings.validation.auto_reap {
+    if (settings.validation.auto_participate || settings.validation.auto_reap)
+        && !layout.node.db.join("validators.suspended.json").exists()
+    {
         let state = StateArgs {
             state_dir: layout.root.clone(),
         };

@@ -56,6 +56,7 @@ struct RuntimeDescriptor {
     project_name: String,
 }
 
+mod admin;
 mod compose;
 mod descriptor;
 mod diagnostics;

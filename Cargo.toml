@@ -29,6 +29,7 @@ repository = "https://github.com/ton-blockchain/acton"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
+ton-hardfork = { path = "crates/ton-hardfork" }
 # local crates
 acton-config = { path = "crates/acton-config" }
 acton-abi-catalog = { path = "crates/acton-abi-catalog" }
@@ -62,6 +63,7 @@ tasm-core = { path = "crates/tasm-core" }
 dap-client = { path = "crates/dap-client" }
 ton-api = { path = "crates/ton-api" }
 ton-liteapi = { path = "crates/ton-liteapi" }
+ton-fullnode-master = { path = "crates/ton-fullnode-master" }
 ton-retrace = { path = "crates/ton-retrace" }
 tolk-fmt = { path = "crates/tolk-fmt" }
 ton-networks = { path = "crates/ton-networks" }

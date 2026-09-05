@@ -20,6 +20,12 @@ pub(super) fn router() -> Router<ApiState> {
         .route("/v1/shutdown", post(shutdown))
         .route("/v1/network", get(network).delete(remove))
         .route("/v1/network/health", get(network_health))
+        .route(
+            "/v1/network/admin",
+            get(admin_operation)
+                .post(start_admin)
+                .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024)),
+        )
         .route("/v1/network/start", post(start))
         .route("/v1/network/stop", post(stop))
         .route("/v1/network/logs", get(logs))
@@ -206,4 +212,21 @@ async fn shutdown(State(state): State<ApiState>) -> Result<StatusCode, Error> {
     state.runtime.prepare_shutdown().await?;
     state.shutdown.notify_one();
     Ok(StatusCode::ACCEPTED)
+}
+
+async fn admin_operation(
+    State(state): State<ApiState>,
+) -> Result<Json<Option<crate::AdminOperation>>, Error> {
+    state.runtime.admin_operation().await.map(Json)
+}
+
+async fn start_admin(
+    State(state): State<ApiState>,
+    Json(request): Json<crate::AdminRequest>,
+) -> Result<(StatusCode, Json<crate::AdminOperation>), Error> {
+    state
+        .runtime
+        .start_admin(request)
+        .await
+        .map(|op| (StatusCode::ACCEPTED, Json(op)))
 }

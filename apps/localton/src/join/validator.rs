@@ -83,6 +83,15 @@ pub(super) async fn validation_loop(
 
     loop {
         interval.tick().await;
+        if toolchain
+            .layout
+            .node
+            .db
+            .join("validators.suspended.json")
+            .exists()
+        {
+            continue;
+        }
 
         if let Err(error) = validation_tick(&toolchain, &client, faucet.as_deref()).await {
             warn!(node = node_name, %error, "validator election tick failed");

@@ -66,6 +66,8 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
         crate::restore_environment_snapshot,
         crate::delete_environment_snapshot,
         crate::get_environment_snapshot_operation,
+        crate::start_admin_operation,
+        crate::get_admin_operation,
         crate::list_wallets,
         crate::sign_wallet,
         crate::get_environment_api_calls,

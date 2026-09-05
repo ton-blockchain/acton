@@ -30,6 +30,10 @@ const PATCHES: &[(&str, &str)] = &[
         "ton-indexer-localton-scanner.patch",
         include_str!("../../docker/ton-indexer-localton-scanner.patch"),
     ),
+    (
+        "ton-indexer-hardfork-accounts.patch",
+        include_str!("../../docker/ton-indexer-hardfork-accounts.patch"),
+    ),
 ];
 
 #[derive(Debug, Args)]

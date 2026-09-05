@@ -167,6 +167,8 @@ check-tolk:
     cargo run -- test
     cargo run -- fmt --check
     cargo run -- check
+    cd apps/localton/load-test && cargo run --manifest-path ../../../Cargo.toml -- build
+    cd apps/localton/load-test && cargo run --manifest-path ../../../Cargo.toml -- check
 
 check-ci: fmt-check check-docgen check-deps clippy typos check-schema check-tolk
 

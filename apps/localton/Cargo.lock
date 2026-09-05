@@ -1738,6 +1738,9 @@ dependencies = [
  "tempfile",
  "tokio",
  "ton",
+ "ton-fullnode-master",
+ "ton-hardfork",
+ "ton-liteapi",
  "tonutils",
  "tower-http",
  "tracing",
@@ -2823,6 +2826,16 @@ dependencies = [
  "cfg-if",
  "cpufeatures 0.2.17",
  "digest",
+ "sha2-asm",
+]
+
+[[package]]
+name = "sha2-asm"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b845214d6175804686b2bd482bcffe96651bb2d1200742b712003504a2dac1ab"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
@@ -3361,6 +3374,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "ton-fullnode-master"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "futures",
+ "tl-proto",
+ "tokio",
+ "tokio-util",
+ "ton-liteapi",
+ "tracing",
+ "tycho-types",
+]
+
+[[package]]
+name = "ton-hardfork"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "base64",
+ "hex",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "tycho-types",
+]
+
+[[package]]
 name = "ton-indexer-core"
 version = "1.1.0"
 dependencies = [
@@ -3383,6 +3423,29 @@ dependencies = [
  "tokio",
  "ton-indexer-core",
  "tonutils",
+]
+
+[[package]]
+name = "ton-liteapi"
+version = "1.1.0"
+dependencies = [
+ "aes",
+ "ctr",
+ "curve25519-dalek",
+ "derivative",
+ "futures",
+ "hex",
+ "log",
+ "pin-project",
+ "rand 0.8.7",
+ "serde",
+ "sha2",
+ "thiserror",
+ "tl-proto",
+ "tokio",
+ "tokio-tower",
+ "tokio-util",
+ "tower 0.5.3",
 ]
 
 [[package]]

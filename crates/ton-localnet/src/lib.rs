@@ -1,5 +1,5 @@
 pub mod api;
-mod block;
+pub mod block;
 mod error;
 pub mod executor;
 mod indexer;

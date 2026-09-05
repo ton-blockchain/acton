@@ -5,10 +5,10 @@
   "license": "MIT OR Apache-2.0",
   "author": "TON Core",
   "type": "module",
-  "main": "index.js",
   "exports": {
     "./faucet/FaucetPage": "./src/faucet/FaucetPage.tsx"
   },
+  "main": "index.js",
   "scripts": {
     "build": "tsc --noEmit && vite build && XDG_CONFIG_HOME=../../target/wrangler-config WRANGLER_LOG_PATH=../../target/wrangler-logs wrangler pages functions build functions --outdir dist --build-output-directory dist --compatibility-date 2026-06-18 && mv dist/index.js dist/_worker.js",
     "dev": "vite --port 3007",

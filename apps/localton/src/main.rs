@@ -22,6 +22,7 @@ async fn main() -> Result<()> {
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("localton=info")),
         )
+        .with_writer(std::io::stderr)
         .with_target(false)
         .without_time()
         .init();
@@ -40,5 +41,9 @@ async fn main() -> Result<()> {
         Command::Snapshot { command } => operations::snapshots::execute(command),
         Command::Validator { command } => operations::validators::execute(command).await,
         Command::Hardfork(args) => operations::hardfork::execute(args).await,
+        Command::Godmode { command } => operations::godmode::execute(command).await,
+        Command::BlockchainConfig { command } => {
+            operations::blockchain_config::execute(command).await
+        }
     }
 }

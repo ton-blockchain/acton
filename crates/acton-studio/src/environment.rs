@@ -589,6 +589,26 @@ pub trait EnvironmentRuntime: Send + Sync {
         })
     }
 
+    fn start_admin(
+        &self,
+        _environment_id: &str,
+        _request: crate::AdminRequest,
+    ) -> EnvironmentRuntimeFuture<'_, crate::AdminOperation> {
+        Box::pin(async {
+            Err(EnvironmentRuntimeError::Conflict {
+                code: "admin_unavailable",
+                message: "Administrative edits require a managed full TON network".into(),
+            })
+        })
+    }
+
+    fn admin_operation(
+        &self,
+        _environment_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, Option<crate::AdminOperation>> {
+        Box::pin(async { Ok(None) })
+    }
+
     fn list_snapshots(
         &self,
         _environment_id: &str,

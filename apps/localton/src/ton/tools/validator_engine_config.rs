@@ -5,14 +5,14 @@
 //! complete model prevents those changes from becoming recursive string-key edits
 //! over arbitrary JSON and makes an incompatible TON release fail during bootstrap.
 
-use std::{fs, path::Path};
+use std::{fs, net::SocketAddrV4, path::Path};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::storage::write_json_atomic;
 
-use super::types::{Ed25519PublicKey, KeyId};
+use super::types::{Ed25519PublicKey, KeyId, TonPublicKey};
 
 const CONTROL_PERMISSIONS: i32 = 15;
 
@@ -90,6 +90,52 @@ impl ValidatorEngineConfig {
             })
             .into_iter()
             .collect();
+    }
+
+    /// Removes every validator key so the engine runs as a plain full node.
+    ///
+    /// A hardfork block is only accepted when it sits exactly one block above the
+    /// node's top block, and that top block can only be observed while nothing is
+    /// producing new ones. Suspending validation freezes the chain without
+    /// touching the keyring, and the removed entries are returned so the caller
+    /// can put them back.
+    pub(crate) fn suspend_validation(&mut self) -> Vec<EngineValidator> {
+        std::mem::take(&mut self.validators)
+    }
+
+    /// Restores validator keys removed by [`Self::suspend_validation`].
+    pub(crate) fn resume_validation(&mut self, validators: Vec<EngineValidator>) {
+        self.validators = validators;
+    }
+
+    /// Returns whether the engine currently has any validator key.
+    pub(crate) fn validates(&self) -> bool {
+        !self.validators.is_empty()
+    }
+
+    /// Routes the node's block downloads to a local full-node master.
+    ///
+    /// `FullNodeImpl::get_query_sender` prefers this link over the public
+    /// overlays, which is how a hand-built shard block reaches the node: it
+    /// arrives as an ordinary download instead of a fork block, which the node
+    /// refuses outside the masterchain. The link also silences outbound
+    /// broadcasts, so it must be removed again once the block is applied.
+    pub(crate) fn set_full_node_master(&mut self, address: SocketAddrV4, key: TonPublicKey) {
+        self.fullnodeslaves = vec![FullNodeSlave {
+            constructor: FullNodeSlaveConstructor::Slave,
+            ip: u32::from(*address.ip()) as i32,
+            port: address.port(),
+            adnl: Ed25519PublicKey::new(key),
+        }];
+    }
+
+    pub(crate) fn restore_full_node_master(&mut self, original: &Self) {
+        self.fullnodeslaves = original.fullnodeslaves.clone();
+    }
+
+    /// Removes the full-node master link and returns the node to overlay mode.
+    pub(crate) fn clear_full_node_master(&mut self) {
+        self.fullnodeslaves.clear();
     }
 
     /// Returns keys already registered for an election round, if present.
@@ -194,7 +240,7 @@ enum DhtConstructor {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct EngineValidator {
+pub(crate) struct EngineValidator {
     #[serde(rename = "@type")]
     constructor: ValidatorConstructor,
     id: KeyId,

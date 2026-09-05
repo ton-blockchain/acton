@@ -375,14 +375,11 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
 
     try {
       const balanceBefore = await getTestnetBalance(testnetClient, testnetAddress)
-      const challenge = await requestFaucetChallenge(
-        testnetAddress,
-        {
-          signal: controller.signal,
-          baseUrl: props.faucetBaseUrl,
-          authorized: githubAuthEnabled,
-        },
-      )
+      const challenge = await requestFaucetChallenge(testnetAddress, {
+        signal: controller.signal,
+        baseUrl: props.faucetBaseUrl,
+        authorized: githubAuthEnabled,
+      })
       setPhase("solving")
       updateToast(toastId, {
         variant: "loading",
@@ -416,16 +413,11 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
         description: statusDescription("claiming"),
         durationMs: 60_000,
       })
-      const claim = await submitFaucetClaim(
-        testnetAddress,
-        challenge,
-        solution.nonce,
-        {
-          signal: controller.signal,
-          baseUrl: props.faucetBaseUrl,
-          authorized: githubAuthEnabled,
-        },
-      )
+      const claim = await submitFaucetClaim(testnetAddress, challenge, solution.nonce, {
+        signal: controller.signal,
+        baseUrl: props.faucetBaseUrl,
+        authorized: githubAuthEnabled,
+      })
       setUsage(recordFaucetRequest(Date.now(), requestLimit, requestWindowMs))
       setPhase("waiting")
       updateToast(toastId, {
@@ -451,9 +443,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
             {statusDescription(finalPhase)}
             <br />
             <br />
-            <Link to={faucetAddressPath(props, testnetAddress)}>
-              View on Testnet
-            </Link>
+            <Link to={faucetAddressPath(props, testnetAddress)}>View on Testnet</Link>
           </span>
         ),
         durationMs: 10_000,
@@ -787,9 +777,7 @@ function abortError(): Error {
 }
 
 function faucetAddressPath(props: FaucetPageProps, address: string): string {
-  return (
-    props.addressPath?.(address) ?? `/address/${encodeURIComponent(address)}?network=testnet`
-  )
+  return props.addressPath?.(address) ?? `/address/${encodeURIComponent(address)}?network=testnet`
 }
 
 function isRunningPhase(phase: FaucetPhase): boolean {

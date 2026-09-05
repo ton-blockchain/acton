@@ -1,5 +1,6 @@
 //! One owner per state directory and one mutation at a time per network.
 
+mod admin;
 mod health;
 mod lifecycle;
 mod nodes;
@@ -38,6 +39,7 @@ struct Entry {
     data_dir: PathBuf,
     record: RwLock<Network>,
     mutation: Arc<Mutex<()>>,
+    admin_operation: RwLock<Option<crate::AdminOperation>>,
 }
 
 impl Runtime {
@@ -56,6 +58,13 @@ impl Runtime {
         storage::validate_id(&record.id)?;
         if record.config.port_base == 0 || record.config.port_base > 65531 {
             return Err(Error::invalid("Invalid persisted port range"));
+        }
+
+        if root.join("admin-recovery.json").exists() {
+            let driver = DockerNetwork::load(&root, &record).await?.ok_or_else(|| {
+                Error::invalid("Administrative recovery requires its deployment descriptor")
+            })?;
+            driver.recover_admin().await?;
         }
 
         if let Some(op) = &mut record.operation
@@ -88,6 +97,7 @@ impl Runtime {
                     data_dir: root.clone(),
                     record: RwLock::new(record),
                     mutation: Arc::new(Mutex::new(())),
+                    admin_operation: RwLock::new(None),
                 }),
                 root,
                 _lock: lock,

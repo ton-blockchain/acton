@@ -30,6 +30,7 @@ tokio = "1.47"
 tracing = "0.1"
 
 [dependencies]
+ton-hardfork = { path = "../../crates/ton-hardfork" }
 anyhow = "1.0"
 async-trait.workspace = true
 axum = { version = "0.8", features = ["json", "query", "tokio", "http1"] }
@@ -55,9 +56,12 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10"
+tempfile.workspace = true
 tar = "0.4.46"
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 ton = "0.4.1"
+ton-fullnode-master = { path = "../../crates/ton-fullnode-master" }
+ton-liteapi = { path = "../../crates/ton-liteapi" }
 tonutils = { version = "1.1.0", features = ["full"] }
 tower-http = { version = "0.6", features = ["fs"] }
 tracing.workspace = true
@@ -68,7 +72,6 @@ zip = { version = "4.6", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 expect-test.workspace = true
-tempfile.workspace = true
 
 [build-dependencies]
 chrono = "0.4"

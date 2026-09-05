@@ -516,6 +516,39 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         })
     }
 
+    fn start_admin(
+        &self,
+        environment_id: &str,
+        request: crate::AdminRequest,
+    ) -> EnvironmentRuntimeFuture<'_, crate::AdminOperation> {
+        let id = environment_id.to_owned();
+        Box::pin(async move {
+            let environment = find_environment(&self.inner, &id).await?;
+            full_localnet(&environment)?
+                .client()
+                .await?
+                .start_admin(&request)
+                .await
+                .map_err(localnet::error)
+        })
+    }
+
+    fn admin_operation(
+        &self,
+        environment_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, Option<crate::AdminOperation>> {
+        let id = environment_id.to_owned();
+        Box::pin(async move {
+            let environment = find_environment(&self.inner, &id).await?;
+            full_localnet(&environment)?
+                .client()
+                .await?
+                .admin_operation()
+                .await
+                .map_err(localnet::error)
+        })
+    }
+
     fn list_snapshots(
         &self,
         environment_id: &str,

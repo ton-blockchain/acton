@@ -7,6 +7,9 @@ license.workspace = true
 publish = false
 
 [dependencies]
+base64.workspace = true
+chrono.workspace = true
+ton-hardfork.workspace = true
 axum.workspace = true
 dunce.workspace = true
 fs2.workspace = true
@@ -30,5 +33,4 @@ tower.workspace = true
 workspace = true
 
 [lib]
-test = false
 doctest = false

@@ -13,6 +13,8 @@ pub const TON_RELEASE: &str = "v2026.08";
 
 pub const VALIDATOR_CONSOLE_PORT: u16 = 4441;
 pub const VALIDATOR_ADNL_PORT: u16 = 4442;
+/// Loopback port the local full-node master serves administrator-built blocks on.
+pub const BLOCK_SOURCE_PORT: u16 = 4443;
 pub const LITESERVER_PORT: u16 = 18_004;
 pub const DHT_PORT: u16 = 6302;
 pub const OUT_PORT: u16 = 3272;
