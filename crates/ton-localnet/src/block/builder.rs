@@ -34,17 +34,11 @@ pub(crate) fn create_block_boc(ctx: BlockBuildContext<'_>) -> anyhow::Result<Blo
         .iter()
         .try_fold(0u128, |acc, tx| acc.checked_add(tx.tx_meta.total_fees))
         .context("Block fees overflow")?;
-    let value_flow = ValueFlow {
-        from_prev_block: CurrencyCollection::new(
-            new_state
-                .total_balance
-                .checked_add(fees_collected)
-                .context("Block value flow overflow")?,
-        ),
-        to_next_block: CurrencyCollection::new(new_state.total_balance),
-        fees_collected: CurrencyCollection::new(fees_collected),
-        ..ValueFlow::default()
-    };
+    let value_flow = build_value_flow(
+        old_state.total_balance,
+        new_state.total_balance,
+        fees_collected,
+    )?;
     let extra = BlockExtra {
         in_msg_description: Lazy::new(&build_in_msg_descr(ctx.transactions)?)
             .context("Failed to wrap inbound message descriptor")?,
@@ -73,6 +67,35 @@ pub(crate) fn create_block_boc(ctx: BlockBuildContext<'_>) -> anyhow::Result<Blo
         block_hash,
         state: new_state,
     })
+}
+
+/// Builds the block value flow from the totals on either side of the block.
+///
+/// `ValidateQuery::check_value_flow` compares `from_prev_blk` and `to_next_blk`
+/// against the sums over the old and the new account dictionaries, so those two
+/// fields have to be exactly those totals. Whatever value crosses the shard
+/// boundary is the difference between them, and it is reported as `imported` or
+/// `exported` — which is also what keeps `ValueFlow::validate` balanced.
+fn build_value_flow(
+    old_total: u128,
+    new_total: u128,
+    fees_collected: u128,
+) -> anyhow::Result<ValueFlow> {
+    let consumed = new_total
+        .checked_add(fees_collected)
+        .context("Block value flow overflow")?;
+    let mut value_flow = ValueFlow {
+        from_prev_block: CurrencyCollection::new(old_total),
+        to_next_block: CurrencyCollection::new(new_total),
+        fees_collected: CurrencyCollection::new(fees_collected),
+        ..ValueFlow::default()
+    };
+    if consumed >= old_total {
+        value_flow.imported = CurrencyCollection::new(consumed - old_total);
+    } else {
+        value_flow.exported = CurrencyCollection::new(old_total - consumed);
+    }
+    Ok(value_flow)
 }
 
 fn shard_state_update(

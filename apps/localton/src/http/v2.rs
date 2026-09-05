@@ -257,7 +257,10 @@ fn network_fingerprint(global_config: &Path) -> Result<String> {
         .pointer("/validator/init_block")
         .or_else(|| config.pointer("/validator/zero_state"))
         .context("global config has neither validator.init_block nor validator.zero_state")?;
-    Ok(hex::encode(Sha256::digest(serde_json::to_vec(genesis)?)))
+    // Tonlib persists its trusted chain head. A new hardfork needs a fresh
+    // cache even when the zerostate and initial block are unchanged.
+    let chain = (genesis, config.pointer("/validator/hardforks"));
+    Ok(hex::encode(Sha256::digest(serde_json::to_vec(&chain)?)))
 }
 
 fn yaml_path(path: &Path) -> Result<String> {
@@ -361,5 +364,18 @@ mod tests {
         assert_eq!(first.len(), 64);
         assert_eq!(second.len(), 64);
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn tonlib_keystore_fingerprint_changes_with_hardforks() {
+        let temp = tempdir().unwrap();
+        let path = temp.path().join("global.config.json");
+        let mut config = serde_json::json!({"validator": {"zero_state": {"root_hash": "same"}}});
+        fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+        let before = network_fingerprint(&path).unwrap();
+        config["validator"]["hardforks"] =
+            serde_json::json!([{ "seqno": 42, "root_hash": "fork" }]);
+        fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+        assert_ne!(before, network_fingerprint(&path).unwrap());
     }
 }

@@ -276,6 +276,9 @@ RUN git init -q /src/ton-indexer \
         /tmp/ton-indexer-v3-catchup.patch \
         /tmp/ton-indexer-localton-scanner.patch
 
+COPY apps/localton/docker/ton-indexer-hardfork-accounts.patch /tmp/ton-indexer-hardfork-accounts.patch
+RUN git -C /src/ton-indexer apply /tmp/ton-indexer-hardfork-accounts.patch
+
 RUN --mount=type=cache,id=ton-indexer-ccache,target=/ccache \
     cmake \
         -S /src/ton-indexer/ton-index-worker \
@@ -333,7 +336,17 @@ RUN --mount=type=cache,id=ton-indexer-pip,target=/root/.cache/pip \
         -r /src/ton-indexer/indexer/requirements.txt \
     && cp -a /src/ton-indexer/indexer /out/ton-indexer/classifier
 
+# Development image for administrative hardforks: both the CLI and account
+# indexer must be upgraded together. Native TON remains the pinned stock build.
+FROM localton-rust-only AS localton-admin-dev
+USER root
+COPY --from=ton-indexer-builder /out/ton-indexer/bin/ /opt/ton-indexer/bin/
+COPY --from=ton-indexer-builder /out/ton-indexer/lib/ /opt/ton-indexer/lib/
+LABEL org.ton.localton.admin-hardforks="1"
+USER localton
+
 FROM ubuntu:${UBUNTU_VERSION} AS runtime
+LABEL org.ton.localton.admin-hardforks="1"
 ARG BUILD_VERSION=dev
 ARG SOURCE_URL=https://github.com/ton-blockchain/acton
 ARG VCS_REF=unknown

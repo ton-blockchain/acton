@@ -1,0 +1,17 @@
+#!/usr/bin/fift -s
+// Checks one configuration parameter value against the TL-B schema of the
+// pinned TON release, using the same `is-valid-config?` word the official
+// tooling uses. The configuration smart contract stores whatever it is given,
+// and the collator rejects an invalid configuration only afterwards - by which
+// point block production has already stopped for good.
+"TonUtil.fif" include
+
+{ ."usage: " @' $0 type ." <index> <value-boc>" cr 1 halt } : usage
+$# 2 <> ' usage if
+
+$1 parse-int =: idx
+$2 =: boc-filename
+
+boc-filename file>B B>boc
+idx is-valid-config? not abort"not a valid value for the chosen configuration parameter"
+."valid" cr

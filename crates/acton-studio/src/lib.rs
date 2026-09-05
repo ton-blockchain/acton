@@ -23,6 +23,8 @@ use ton::ton_core::types::TonAddress;
 #[cfg(debug_assertions)]
 use tower_http::services::{ServeDir, ServeFile};
 
+mod admin;
+pub use admin::{AdminOperation, AdminRequest};
 mod api_calls;
 mod contract_facade;
 mod contract_registry;
@@ -348,6 +350,12 @@ impl StudioServer {
             .route(
                 "/environments/{environment_id}/snapshot-operation",
                 get(get_environment_snapshot_operation),
+            )
+            .route(
+                "/environments/{environment_id}/admin",
+                get(get_admin_operation)
+                    .post(start_admin_operation)
+                    .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024)),
             )
             .route("/environments/{environment_id}/wallets", get(list_wallets))
             .route(
@@ -1208,6 +1216,45 @@ fn public_environment(mut environment: StudioEnvironment) -> StudioEnvironment {
         .then(|| format!("{environment_root}/observability")),
     };
     environment
+}
+
+/// Apply account edits through a coordinated hardfork, or update a config parameter.
+/// Account edits contain a raw address and a type: balance (decimal nanotons),
+/// code/data/replace (base64 `BoC`), freeze, uninit or delete. Reuse the UUID only
+/// when retrying the same request. Poll GET for completion after this response.
+#[utoipa::path(post, path = "/api/v1/environments/{environment_id}/admin", tag = "Environments",
+    params(("environment_id" = String, Path, description = "Environment id")),
+    request_body = AdminRequest,
+    responses((status = 200, body = AdminOperation), (status = 409, body = StudioApiErrorBody)))]
+async fn start_admin_operation(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+    Json(request): Json<AdminRequest>,
+) -> Result<Json<AdminOperation>, StudioApiError> {
+    Ok(Json(
+        state
+            .environment_runtime
+            .start_admin(&environment_id, request)
+            .await
+            .map_err(StudioApiError)?,
+    ))
+}
+
+/// Read the current or most recent administrative operation.
+#[utoipa::path(get, path = "/api/v1/environments/{environment_id}/admin", tag = "Environments",
+    params(("environment_id" = String, Path, description = "Environment id")),
+    responses((status = 200, body = Option<AdminOperation>), (status = 404, body = StudioApiErrorBody)))]
+async fn get_admin_operation(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+) -> Result<Json<Option<AdminOperation>>, StudioApiError> {
+    Ok(Json(
+        state
+            .environment_runtime
+            .admin_operation(&environment_id)
+            .await
+            .map_err(StudioApiError)?,
+    ))
 }
 
 async fn proxy_environment_rpc_root(

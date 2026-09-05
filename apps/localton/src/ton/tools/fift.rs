@@ -61,13 +61,29 @@ pub trait Fift: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct OfficialFift {
     binaries: TonBinaries,
+    interpreter: &'static str,
 }
 
 impl OfficialFift {
     /// Binds the interpreter adapter to one validated TON distribution so
     /// workflows do not depend directly on release lookup or executable paths.
     pub fn new(binaries: TonBinaries) -> Self {
-        Self { binaries }
+        Self {
+            binaries,
+            interpreter: "fift",
+        }
+    }
+
+    /// Binds the adapter to the interpreter that knows the block TL-B schema.
+    ///
+    /// Plain `fift` defines `config-valid?` as a stub that accepts everything and
+    /// prints a warning; only `create-state` links the real validator. Scripts
+    /// that check blockchain data have to run there instead.
+    pub fn with_block_schema(binaries: TonBinaries) -> Self {
+        Self {
+            binaries,
+            interpreter: "create-state",
+        }
     }
 
     // Release libraries precede workflow paths to preserve the existing
@@ -81,7 +97,7 @@ impl OfficialFift {
                 .chain(request.include_paths.iter().cloned()),
         )
         .context("failed to build Fift FIFTPATH")?;
-        let mut command = Command::new(self.binaries.command("fift"));
+        let mut command = Command::new(self.binaries.command(self.interpreter));
         command
             // `-s` selects script mode in the official interpreter. It must stay
             // adapter-owned because omitting it changes how positional arguments
@@ -112,7 +128,7 @@ impl Fift for OfficialFift {
                 script = %request.script.display(),
                 "running Fift script"
             );
-            run_checked("fift run script", self.command(&request)?, context.timeout)
+            run_checked(self.interpreter, self.command(&request)?, context.timeout)
                 .await
                 .map(|output| FiftOutput {
                     stdout: output.stdout,

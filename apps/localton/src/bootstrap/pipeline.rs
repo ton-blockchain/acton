@@ -15,7 +15,7 @@ use crate::{
     binaries::TonBinaries,
     cli::BootstrapArgs,
     http, node,
-    operations::status::print_connection_details,
+    operations::{godmode, status::print_connection_details},
     runtime::{self, ProcessRegistry},
     storage::{Layout, Manifest},
     storage::{NodeRole, Settings},
@@ -42,6 +42,8 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
 
     // Keep exclusive ownership until every child and in-process service stops.
     let _state_lock = acquire_lock(&layout.lock)?;
+    godmode::recover_install(&layout)?;
+    crate::operations::godmode::invalidate_observation(&layout.node)?;
 
     let state_exists = layout.manifest.is_file();
     let settings = prepare_settings(&layout, &args)?;
@@ -101,6 +103,9 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
             &processes,
         )
         .await?;
+        // Administrator-built shard blocks are not in any overlay, so the node
+        // downloads them from this loopback source while a graft is in flight.
+        let _block_source = godmode::serve_staged(&layout.node, 0).await?;
         let genesis_runtime = node::start(
             &layout,
             &layout.node,

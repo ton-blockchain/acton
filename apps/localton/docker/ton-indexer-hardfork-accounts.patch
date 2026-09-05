@@ -1,0 +1,79 @@
+--- a/ton-index-worker/tondb-scanner/src/DataParser.cpp
++++ b/ton-index-worker/tondb-scanner/src/DataParser.cpp
+@@ -14,7 +14,10 @@
+ 
+ void ParseQuery::start_up() {
+   td::Timer timer;
+-  auto status = parse_impl();
++  auto status = [&]() -> td::Status {
++    try { return parse_impl(); }
++    catch (const vm::VmError& error) { return td::Status::Error(PSLICE() << "Cannot parse block state: " << error.get_msg()); }
++  }();
+   g_statistics.record_time(PARSE_SEQNO, timer.elapsed() * 1e3);
+   
+   if(status.is_error()) {
+@@ -51,6 +54,44 @@
+                                                         block_ds.block_data->block_id(), 
+                                                         block::ConfigInfo::needCapabilities | block::ConfigInfo::needLibraries));
+       g_statistics.record_time(PARSE_CONFIG, config_timer.elapsed() * 1e6);
++    }
++
++    // Hardfork account edits have no transaction. Read their state-dictionary
++    // differences directly; never fabricate a Transaction to drive indexing.
++    if (info.vert_seqno_incr) {
++      vm::CellSlice update{vm::NoVm(), blk.state_update};
++      block::gen::ShardStateUnsplit::Record before, after;
++      // The old side of a Merkle update contains pruned branches. Resolve its
++      // authenticated root in the retained cell database before traversing it.
++      TRY_RESULT(old_root, cell_db_reader_->load_cell(update.prefetch_ref(0)->get_hash(0).as_slice()));
++      if (!tlb::unpack_cell(old_root, before) ||
++          !tlb::unpack_cell(block_ds.block_state, after)) {
++        return td::Status::Error("Cannot unpack hardfork states");
++      }
++      if (before.accounts->get_hash(0) != after.accounts->get_hash(0)) {
++      vm::AugmentedDictionary old_accounts{vm::load_cell_slice_ref(before.accounts), 256, block::tlb::aug_ShardAccounts};
++      vm::AugmentedDictionary new_accounts{vm::load_cell_slice_ref(after.accounts), 256, block::tlb::aug_ShardAccounts};
++      td::Status error;
++      bool ok = old_accounts.scan_diff(new_accounts,
++          [&](td::ConstBitPtr key, int bits, td::Ref<vm::CellSlice> old_value, td::Ref<vm::CellSlice> new_value) {
++        if (bits != 256) { return false; }
++        td::Bits256 addr; addr.bits().copy_from(key, 256);
++        block::gen::ShardAccount::Record record;
++        auto value = new_value.not_null() ? new_accounts.extract_value(new_value) : old_accounts.extract_value(old_value);
++        if (!tlb::csr_unpack(value, record)) { return false; }
++        auto account_cell = record.account;
++        if (new_value.is_null()) {
++          vm::CellBuilder builder; builder.store_long(0, 1); account_cell = builder.finalize();
++        }
++        auto account = block::gen::t_Account.get_tag(vm::load_cell_slice(account_cell)) == block::gen::Account::account_none
++            ? parse_none_account(account_cell, block::StdAddress(schema_block.workchain, addr), info.gen_utime, record.last_trans_hash, record.last_trans_lt)
++            : parse_account(account_cell, info.gen_utime, record.last_trans_hash, record.last_trans_lt);
++        if (account.is_error()) { error = account.move_as_error(); return false; }
++        result->account_states_.push_back(account.move_as_ok());
++        return true;
++      }, 0);
++      if (!ok) { return error.is_error() ? std::move(error) : td::Status::Error("Invalid hardfork account difference"); }
++      }
+     }
+ 
+     // transactions and messages
+--- a/ton-index-worker/ton-index-postgres/src/InsertManagerPostgres.cpp
++++ b/ton-index-worker/ton-index-postgres/src/InsertManagerPostgres.cpp
+@@ -996,7 +996,7 @@
+       for (const auto& account_state : task.parsed_block_->account_states_) {
+         auto account_addr = convert::to_raw_address(account_state.account);
+         auto it = latest_account_states.find(account_addr);
+-        if (it == latest_account_states.end() || it->second.last_trans_lt < account_state.last_trans_lt) {
++        if (it == latest_account_states.end() || std::tie(it->second.timestamp, it->second.last_trans_lt) < std::tie(account_state.timestamp, account_state.last_trans_lt)) {
+           latest_account_states[account_addr] = account_state;
+         }
+       }
+@@ -2426,7 +2426,7 @@
+     "last_trans_hash", "last_trans_lt", "frozen_hash", "data_hash", "code_hash", "data_boc", "code_boc"
+   };
+   PopulateTableStream stream(txn, "latest_account_states", columns, 1000, false);
+-  stream.setConflictDoUpdate({"account"}, "latest_account_states.last_trans_lt < EXCLUDED.last_trans_lt");
++  stream.setConflictDoUpdate({"account"}, "(latest_account_states.timestamp, latest_account_states.last_trans_lt) < (EXCLUDED.timestamp, EXCLUDED.last_trans_lt)");
+ 
+   for (const auto& row : prepared_batch_->latest_account_states) {
+     stream.insert_row(row);

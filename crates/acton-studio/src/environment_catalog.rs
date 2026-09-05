@@ -171,6 +171,20 @@ impl EnvironmentRuntime for EnvironmentCatalogRuntime {
             .enter_full_ton_validation(environment_id, node_id)
     }
 
+    fn start_admin(
+        &self,
+        id: &str,
+        request: crate::AdminRequest,
+    ) -> EnvironmentRuntimeFuture<'_, crate::AdminOperation> {
+        self.managed.start_admin(id, request)
+    }
+    fn admin_operation(
+        &self,
+        id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, Option<crate::AdminOperation>> {
+        self.managed.admin_operation(id)
+    }
+
     fn list_snapshots(
         &self,
         environment_id: &str,

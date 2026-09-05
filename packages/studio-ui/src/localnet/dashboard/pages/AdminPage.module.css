@@ -1,0 +1,68 @@
+.page {
+  width: 100%;
+  max-width: 820px;
+  margin-inline: auto;
+  display: grid;
+  gap: 16px;
+}
+.notice,
+.status,
+.form {
+  padding: 22px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+  background: var(--acton-color-surface-raised);
+}
+.notice {
+  background: color-mix(in srgb, var(--acton-color-primary) 6%, var(--acton-color-surface));
+}
+.page p {
+  color: var(--acton-color-text-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 8px 0 0;
+  overflow-wrap: anywhere;
+}
+.form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 20px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.form label {
+  color: var(--acton-color-text);
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-top: 10px;
+}
+.form select,
+.form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 8px;
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text);
+  font: inherit;
+}
+.form textarea {
+  resize: vertical;
+  font-family: var(--acton-font-mono);
+  font-size: 0.8rem;
+}
+.form select:focus-visible,
+.form textarea:focus-visible {
+  outline: 2px solid var(--acton-color-primary);
+  outline-offset: 2px;
+}
+.form fieldset:disabled {
+  opacity: 0.6;
+}
+.page .error {
+  color: var(--acton-color-danger, #db5656);
+  white-space: pre-wrap;
+  margin-bottom: 12px;
+}

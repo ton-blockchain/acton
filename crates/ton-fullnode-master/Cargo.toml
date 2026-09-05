@@ -1,0 +1,27 @@
+[package]
+name = "ton-fullnode-master"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+ton-liteapi = { workspace = true }
+anyhow = { workspace = true }
+futures = { workspace = true }
+tl-proto = { workspace = true }
+tokio = { workspace = true, features = ["net", "rt", "sync", "macros"] }
+tokio-util = { workspace = true, features = ["codec"] }
+tracing = { workspace = true }
+tycho-types = { workspace = true }
+
+[lints]
+workspace = true
+
+[lib]
+doctest = false

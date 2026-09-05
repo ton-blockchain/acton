@@ -197,6 +197,9 @@ fn restore(paths: &SnapshotArgs, id: &str) -> Result<SnapshotInfo> {
             rollback_state_entries(&state_dir, &staging, &backup)?;
             return Err(error).context("restored snapshot is incomplete");
         }
+        // A restored chain can be behind tonlib's cached trusted head, even
+        // when its genesis and hardfork list match. Rebuild this derived cache.
+        remove_dir_if_exists(&layout.root.join("services/ton-http-api-v2/keystore"))?;
         RuntimeState::new().save_atomic(&layout.runtime)?;
         Ok(())
     })();
@@ -662,7 +665,13 @@ mod tests {
 
         let created = create(&fixture.paths, Some("Before upgrade".to_owned())).unwrap();
         fs::write(fixture.layout.node.db.join("marker"), b"after").unwrap();
+        let service = fixture.layout.root.join("services/ton-http-api-v2");
+        fs::create_dir_all(service.join("keystore")).unwrap();
+        fs::write(service.join("keystore/head"), b"future block").unwrap();
+        fs::write(service.join("config.yaml"), b"keep config").unwrap();
         let restored = restore(&fixture.paths, &created.id).unwrap();
+        assert!(!service.join("keystore").exists());
+        assert!(service.join("config.yaml").exists());
         let listed = list(&fixture.paths).unwrap();
         let actual = format!(
             "name: {:?}\narchive smaller than excluded log: {}\nrestored marker: {}\nlisted snapshots: {}\nruntime seqno after restore: {:?}\nrestored same snapshot: {}",

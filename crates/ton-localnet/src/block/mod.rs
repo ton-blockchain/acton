@@ -1,8 +1,10 @@
 mod account_blocks;
 mod builder;
+pub mod hardfork;
 mod masterchain;
 mod merkle;
 mod messages;
+pub mod proof;
 mod state;
 pub(crate) mod types;
 

@@ -11,7 +11,8 @@ fail-on-diff = false
 [test.mutation]
 
 [lint]
-exclude = ["tests/**", "**/templates/**", "packages/test-ui/e2e/**", "crates/ton-language-server-core/tests/fixtures/**", "crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/**"]
+# The Localton load test has its own imports; check-ci lints it separately.
+exclude = ["tests/**", "**/templates/**", "packages/test-ui/e2e/**", "crates/ton-language-server-core/tests/fixtures/**", "crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/**", "apps/localton/load-test/**"]
 
 [fmt]
 ignore = ["crates/tolk-compiler/**", "crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/**", "tests/integration/snapshots/check/**"]

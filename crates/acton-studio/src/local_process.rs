@@ -81,6 +81,7 @@ struct LocalEnvironment {
     resume_on_startup: AtomicBool,
     deleted: AtomicBool,
     snapshot_operation: RwLock<Option<EnvironmentSnapshotOperation>>,
+    admin_operation: RwLock<Option<crate::AdminOperation>>,
     startup_compose_started_at: Mutex<Option<Instant>>,
 }
 
@@ -348,6 +349,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 resume_on_startup: AtomicBool::new(true),
                 deleted: AtomicBool::new(false),
                 snapshot_operation: RwLock::new(None),
+                admin_operation: RwLock::new(None),
                 startup_compose_started_at: Mutex::new(None),
             });
             if matches!(&environment.driver, EnvironmentDriver::FullTonNetwork(_)) {
@@ -888,6 +890,79 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         })
     }
 
+    fn start_admin(
+        &self,
+        environment_id: &str,
+        request: crate::AdminRequest,
+    ) -> EnvironmentRuntimeFuture<'_, crate::AdminOperation> {
+        let id = environment_id.to_owned();
+        let runtime = Arc::clone(&self.inner);
+        Box::pin(async move {
+            request.validate()?;
+            let environment = find_environment(&runtime, &id).await?;
+            let _guard = environment.lifecycle.try_lock().map_err(|_| admin_busy())?;
+            ensure_environment_not_deleted(&environment).await?;
+            if let Some(previous) = environment.admin_operation.read().await.as_ref()
+                && previous.is_active()
+            {
+                return Err(admin_busy());
+            }
+            if let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver
+                && let Some(previous) = driver.saved_admin_operation(Some(&request)).await?
+            {
+                return Ok(previous);
+            }
+            ensure_no_active_snapshot(&environment).await?;
+            if !matches!(environment.driver, EnvironmentDriver::FullTonNetwork(_))
+                || environment.details.read().await.status != EnvironmentStatus::Running
+            {
+                return Err(EnvironmentRuntimeError::Conflict {
+                    code: "admin_unavailable",
+                    message: "Start the full TON network before editing its state".into(),
+                });
+            }
+            let operation = crate::AdminOperation {
+                id: request.id().into(),
+                phase: "preparing".into(),
+                started_at: Utc::now().to_rfc3339(),
+                finished_at: None,
+                error: None,
+                block_seqno: None,
+            };
+            if let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver {
+                driver.save_admin_operation(&request, &operation).await?;
+            }
+            *environment.admin_operation.write().await = Some(operation.clone());
+            tokio::spawn(run_admin_operation(
+                Arc::clone(&runtime),
+                Arc::clone(&environment),
+                request,
+            ));
+            Ok(operation)
+        })
+    }
+
+    fn admin_operation(
+        &self,
+        environment_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, Option<crate::AdminOperation>> {
+        let id = environment_id.to_owned();
+        Box::pin(async move {
+            let env = find_environment(&self.inner, &id).await?;
+            let operation = env.admin_operation.read().await.clone();
+            if operation.is_some() {
+                return Ok(operation);
+            }
+            let Ok(_guard) = env.lifecycle.try_lock() else {
+                return Ok(None);
+            };
+            if let EnvironmentDriver::FullTonNetwork(driver) = &env.driver {
+                return driver.saved_admin_operation(None).await;
+            }
+            Ok(None)
+        })
+    }
+
     fn list_snapshots(
         &self,
         environment_id: &str,
@@ -1078,6 +1153,64 @@ mod imported_contract_tests {
             &serde_json::to_string_pretty(&actual).expect("serializable contract registrations"),
         );
     }
+}
+
+fn admin_busy() -> EnvironmentRuntimeError {
+    EnvironmentRuntimeError::Conflict {
+        code: "admin_busy",
+        message: "Wait for the administrative operation to finish".into(),
+    }
+}
+
+async fn run_admin_operation(
+    runtime: Arc<LocalProcessRuntimeInner>,
+    environment: Arc<LocalEnvironment>,
+    request: crate::AdminRequest,
+) {
+    let _guard = environment.lifecycle.lock().await;
+    environment.generation.fetch_add(1, Ordering::AcqRel);
+    terminate_child(&environment).await;
+    set_environment_status(&environment, EnvironmentStatus::Starting, None).await;
+    let details = environment.details.read().await.clone();
+    let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver else {
+        return;
+    };
+    let EnvironmentConfig::FullTonNetwork { nodes, .. } = &details.config else {
+        return;
+    };
+    let result = driver
+        .apply_admin(nodes, &request, &environment.admin_operation)
+        .await;
+    // The driver returns with the complete environment running, or leaves the
+    // recovery journal intact if restoring the backups also failed.
+    let failed_recovery = result.is_err() && !driver.admin_is_running().await;
+    set_environment_status(
+        &environment,
+        if failed_recovery {
+            EnvironmentStatus::Failed
+        } else {
+            EnvironmentStatus::Running
+        },
+        result.as_ref().err().map(ToString::to_string),
+    )
+    .await;
+    if let Some(op) = environment.admin_operation.write().await.as_mut() {
+        op.phase = if result.is_ok() {
+            "completed"
+        } else {
+            "failed"
+        }
+        .into();
+        op.finished_at = Some(Utc::now().to_rfc3339());
+        match result {
+            Ok(seqno) => op.block_seqno = Some(seqno),
+            Err(error) => op.error = Some(error.to_string()),
+        }
+        if let Err(error) = driver.save_admin_operation(&request, op).await {
+            tracing::error!(%error, "Failed to persist administrative operation result");
+        }
+    }
+    schedule_project_artifact_sync(&runtime);
 }
 
 async fn start_snapshot_operation(
@@ -1477,6 +1610,16 @@ async fn finish_snapshot_operation(
 async fn ensure_no_active_snapshot(
     environment: &LocalEnvironment,
 ) -> Result<(), EnvironmentRuntimeError> {
+    if environment
+        .admin_operation
+        .read()
+        .await
+        .as_ref()
+        .is_some_and(crate::AdminOperation::is_active)
+    {
+        return Err(admin_busy());
+    }
+
     if environment
         .snapshot_operation
         .read()
@@ -1956,6 +2099,7 @@ async fn restore_environment(
         resume_on_startup: AtomicBool::new(record.resume_on_startup),
         deleted: AtomicBool::new(false),
         snapshot_operation: RwLock::new(None),
+        admin_operation: RwLock::new(None),
         startup_compose_started_at: Mutex::new(None),
     });
     if status == EnvironmentStatus::Starting
@@ -2935,6 +3079,9 @@ async fn restart_environment(
 
     persist_environment_definition(runtime, environment, true).await?;
     environment.resume_on_startup.store(true, Ordering::Release);
+    if let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver {
+        driver.recover_admin().await?;
+    }
     if let Err(error) = environment.driver.ensure_restartable() {
         set_environment_status(
             environment,
@@ -3155,6 +3302,7 @@ child installed: false"]]
             resume_on_startup: AtomicBool::new(true),
             deleted: AtomicBool::new(false),
             snapshot_operation: RwLock::new(None),
+            admin_operation: RwLock::new(None),
             startup_compose_started_at: Mutex::new(None),
         })
     }

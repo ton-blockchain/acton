@@ -223,6 +223,7 @@ dependencies = [
  "tokio",
  "ton",
  "ton-api",
+ "ton-hardfork",
  "toncenter-keys",
  "tower 0.5.2",
  "tower-http",
@@ -5717,6 +5718,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "ton-fullnode-master"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "futures",
+ "tl-proto 0.5.3",
+ "tokio",
+ "tokio-util",
+ "ton-liteapi",
+ "tracing",
+ "tycho-types",
+]
+
+[[package]]
+name = "ton-hardfork"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "base64",
+ "hex",
+ "rustc-hash 2.1.1",
+ "serde",
+ "serde_json",
+ "tycho-types",
+]
+
+[[package]]
 name = "ton-indexer-contracts"
 version = "1.1.0"
 dependencies = [
@@ -5891,6 +5919,8 @@ dependencies = [
  "ton-api",
  "ton-emulator",
  "ton-executor",
+ "ton-fullnode-master",
+ "ton-hardfork",
  "ton-indexer-contracts",
  "ton-liteapi",
  "ton-networks",

@@ -1,3 +1,6 @@
+#[path = "full_ton_admin.rs"]
+mod admin;
+use base64::Engine as _;
 use std::ffi::OsStr;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
@@ -231,7 +234,7 @@ impl FullTonNetworkDriver {
                 ),
             })?;
 
-        Ok(Self {
+        let driver = Self {
             compose_file,
             compose_config,
             docker_target,
@@ -239,7 +242,9 @@ impl FullTonNetworkDriver {
             image,
             project_name,
             startup_log_file: data_dir.join(STARTUP_LOG_FILE),
-        })
+        };
+        driver.recover_admin().await?;
+        Ok(driver)
     }
 
     /// Adds one validator-engine instance without duplicating the shared HTTP APIs or indexer.

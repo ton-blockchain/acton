@@ -13,6 +13,7 @@ import {
   LayoutGrid,
   RadioTower,
   Search as SearchIcon,
+  Settings2,
   Wallet,
   Waypoints,
 } from "lucide-react"
@@ -95,6 +96,7 @@ const environmentItems: SidebarItem[] = [
   {label: "Wallets", icon: Wallet, path: "/wallets"},
   {label: "Faucet", icon: HandCoins, path: "/faucet"},
   {label: "Snapshots", icon: Archive, path: "/snapshots"},
+  {label: "Admin actions", icon: Settings2, path: "/admin"},
 ]
 
 const apiCallsItem: SidebarItem = {
@@ -219,11 +221,13 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
     environment?.config.kind === "actonLocalnet" ? formatForkNetworkLabel(forkNetwork) : undefined
   const visibleStandaloneItems = supports(environment, "simulator") ? standaloneItems : []
   const visibleEnvironmentItems = environmentItems.filter(item =>
-    item.path === "/wallets"
-      ? supports(environment, "wallets")
-      : item.path === "/snapshots"
-        ? supports(environment, "snapshots")
-        : supportsAny(environment, "gramFaucet", "jettonFaucet"),
+    item.path === "/admin"
+      ? environment?.config.kind === "fullTonNetwork" && environment.lifecycle === "managed"
+      : item.path === "/wallets"
+        ? supports(environment, "wallets")
+        : item.path === "/snapshots"
+          ? supports(environment, "snapshots")
+          : supportsAny(environment, "gramFaucet", "jettonFaucet"),
   )
   const visibleApiReferenceItems = apiReferenceItems.filter(item => {
     if (item.path === "/api-reference/v2") return supports(environment, "apiV2")

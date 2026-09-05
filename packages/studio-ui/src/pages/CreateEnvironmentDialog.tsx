@@ -361,10 +361,7 @@ export function CreateEnvironmentDialog({
                 onChange={updateImportedAccount}
                 onRemove={removeImportedAccount}
               />
-              <Disclosure
-                label="Network timing"
-                contentClassName={styles.advancedContent}
-              >
+              <Disclosure label="Network timing" contentClassName={styles.advancedContent}>
                 <div className={styles.formGrid}>
                   <Input
                     label="Block time"

@@ -72,6 +72,8 @@ pub async fn run(args: JoinArgs) -> Result<()> {
     layout.create_dirs()?;
 
     let _state_lock = acquire_lock(&layout.lock)?;
+    crate::operations::godmode::recover_install(&layout)?;
+    crate::operations::godmode::invalidate_observation(&layout.node)?;
     let processes = ProcessRegistry::default();
 
     // Install signal handling before any TON process starts. Otherwise Ctrl+C
@@ -107,6 +109,12 @@ pub async fn run(args: JoinArgs) -> Result<()> {
             .await
             .with_context(|| format!("failed to initialize joined node `{node_name}`"))?;
 
+            // Install hardfork config before engine startup, including joined nodes.
+            let manifest = crate::storage::NodeManifest::load(&node_layout.manifest, &node_settings.name)?;
+            if let Some(key) = manifest.liteserver_public_key() {
+                GlobalConfig::load(&layout.global_config)?.with_local_liteserver(node_settings.liteserver_port, key).save_atomic(&node_layout.global_config)?;
+            }
+            let _block_source = crate::operations::godmode::serve_staged(&node_layout, 0).await?;
             let mut runtime = node::start(
                 &layout,
                 &node_layout,
@@ -193,7 +201,7 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                 .save_atomic(&node_layout.global_config)?;
 
             let toolchain = toolchain.with_node_config(&node_layout);
-            apply_network_validator_config(&toolchain).await?;
+            if !layout.node.db.join("validators.suspended.json").exists() { apply_network_validator_config(&toolchain).await?; }
 
             info!(
                 endpoint = %format!("127.0.0.1:{}", local_liteserver.port),

@@ -38,6 +38,7 @@ import {ContractsPage} from "./dashboard/pages/ContractsPage"
 import {NftsPage} from "./dashboard/pages/NftsPage"
 import {NetworkPage} from "./dashboard/pages/NetworkPage"
 import {SettingsPage} from "./dashboard/pages/SettingsPage"
+import {AdminPage} from "./dashboard/pages/AdminPage"
 import {SnapshotsPage} from "./dashboard/pages/SnapshotsPage"
 import {SourceCatalogPage} from "./dashboard/pages/SourceCatalogPage"
 import {TokensPage} from "./dashboard/pages/TokensPage"
@@ -70,6 +71,7 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/explorer/config": "Network config",
   "/explorer/suspended": "Suspended addresses",
   "/settings": "Settings",
+  "/admin": "Admin actions",
   "/snapshots": "Snapshots",
   "/integrate": "Integrate",
   "/api-reference/v2": "API Reference v2",
@@ -97,6 +99,7 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/explorer/config": "Protocol parameters active in this network",
   "/explorer/suspended": "Addresses restricted by the network configuration",
   "/settings": "Manage environment identity, network behavior and mining",
+  "/admin": "Edit accounts and blockchain configuration",
   "/snapshots": "Create and restore persistent network snapshots",
   "/integrate": "Connect Acton projects, applications and TON-compatible tools to this network",
   "/api-reference/v2": "Explore the v2 API",
@@ -400,6 +403,19 @@ const AppContent: FC<AppContentProps> = ({
                       onEnvironmentChange={onEnvironmentChange}
                       onEnvironmentDelete={onEnvironmentDelete}
                     />
+                  </DashboardPage>
+                ) : (
+                  fallback
+                )
+              }
+            />
+            <Route
+              path={path("/admin")}
+              element={
+                runtime.environment?.config.kind === "fullTonNetwork" &&
+                runtime.environment.lifecycle === "managed" ? (
+                  <DashboardPage>
+                    <AdminPage key={runtime.environment.id} environment={runtime.environment} />
                   </DashboardPage>
                 ) : (
                   fallback
