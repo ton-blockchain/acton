@@ -1,7 +1,8 @@
 # Administrative actions in full Studio environments
 
 Studio's **Admin actions** page edits account balances, code, data and lifecycle
-state, replaces a complete `ShardAccount`, and updates configuration parameters.
+state, and replaces a complete `ShardAccount`. Configuration parameters are edited
+separately on **Network → Config**.
 It is available for managed full TON environments. Account edits use hardforks
 accepted by the pinned, unmodified TON validator-engine.
 
@@ -11,7 +12,7 @@ indexer. For development, reuse the pinned image's native TON and API layers:
 ```sh
 docker build -f apps/localton/Dockerfile --target localton-admin-dev \
   -t acton-localton:admin .
-ACTON_LOCALNET_IMAGE=acton-localton:admin acton studio
+ACTON_LOCALNET_IMAGE=acton-localton:admin acton studio start
 ```
 
 Create a full environment with this image. Existing environments retain their

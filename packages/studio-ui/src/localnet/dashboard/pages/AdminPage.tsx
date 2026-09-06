@@ -41,16 +41,15 @@ function cellBoc(value: string): string {
 export const AdminPage: FC<{readonly environment: StudioEnvironment}> = ({environment}) => {
   const [params] = useSearchParams()
   const [address, setAddress] = useState(params.get("address") ?? "")
-  const [action, setAction] = useState<AdminAccountChange["type"] | "config">("balance")
+  const [action, setAction] = useState<AdminAccountChange["type"]>("balance")
   const [value, setValue] = useState("")
-  const [index, setIndex] = useState("")
   const [operation, setOperation] = useState<AdminOperation | null>(null)
   const [error, setError] = useState<string>()
   const [submitting, setSubmitting] = useState(false)
   const [loaded, setLoaded] = useState(false)
   // Retain the exact request after an ambiguous response. Retrying must not
   // create a second hardfork, even if the first HTTP response was lost.
-  const pending = useRef<AdminRequest | null>(null)
+  const pending = useRef<Extract<AdminRequest, {kind: "accounts"}> | null>(null)
   const [uncertain, setUncertain] = useState(false)
   const active = operation !== null && operation.finishedAt === null
 
@@ -92,33 +91,23 @@ export const AdminPage: FC<{readonly environment: StudioEnvironment}> = ({enviro
     try {
       if (!pending.current) {
         const id = crypto.randomUUID()
-        if (action === "config") {
-          if (
-            !/^-?\d+$/.test(index) ||
-            Number(index) < -2_147_483_648 ||
-            Number(index) > 2_147_483_647
-          )
-            throw new Error("Enter a signed 32-bit parameter number")
-          pending.current = {id, kind: "config", index: Number(index), boc: cellBoc(value)}
+        const target = Address.parse(address.trim())
+        if (target.workChain !== 0 && target.workChain !== -1)
+          throw new Error("Only workchains 0 and -1 are supported")
+        let change: AdminAccountChange
+        if (action === "balance") {
+          if (!/^\d+(\.\d{1,9})?$/.test(value.trim()))
+            throw new Error("Enter a nonnegative TON amount with at most 9 decimal places")
+          change = {type: action, balance: toNano(value.trim()).toString()}
+        } else if (action === "code" || action === "data" || action === "replace") {
+          change = {type: action, boc: cellBoc(value)}
         } else {
-          const target = Address.parse(address.trim())
-          if (target.workChain !== 0 && target.workChain !== -1)
-            throw new Error("Only workchains 0 and -1 are supported")
-          let change: AdminAccountChange
-          if (action === "balance") {
-            if (!/^\d+(\.\d{1,9})?$/.test(value.trim()))
-              throw new Error("Enter a nonnegative TON amount with at most 9 decimal places")
-            change = {type: action, balance: toNano(value.trim()).toString()}
-          } else if (action === "code" || action === "data" || action === "replace") {
-            change = {type: action, boc: cellBoc(value)}
-          } else {
-            change = {type: action}
-          }
-          pending.current = {
-            id,
-            kind: "accounts",
-            edits: [{address: target.toRawString(), ...change}],
-          }
+          change = {type: action}
+        }
+        pending.current = {
+          id,
+          kind: "accounts",
+          edits: [{address: target.toRawString(), ...change}],
         }
       }
       const result = await startStudioAdminOperation(environment.id, pending.current)
@@ -136,7 +125,7 @@ export const AdminPage: FC<{readonly environment: StudioEnvironment}> = ({enviro
     }
   }
 
-  const needsValue = ["balance", "code", "data", "replace", "config"].includes(action)
+  const needsValue = ["balance", "code", "data", "replace"].includes(action)
   const disabled = active || submitting || uncertain
   return (
     <div className={styles.page}>
@@ -178,31 +167,15 @@ export const AdminPage: FC<{readonly environment: StudioEnvironment}> = ({enviro
             <option value="uninit">Make account uninitialized</option>
             <option value="delete">Delete account</option>
             <option value="replace">Replace complete ShardAccount</option>
-            <option value="config">Set configuration parameter</option>
           </select>
-          {action === "config" ? (
-            <>
-              <label htmlFor="admin-index">Parameter number</label>
-              <Input
-                id="admin-index"
-                value={index}
-                onChange={event => setIndex(event.target.value)}
-                placeholder="21"
-                required
-              />
-            </>
-          ) : (
-            <>
-              <label htmlFor="admin-address">Account address</label>
-              <Input
-                id="admin-address"
-                value={address}
-                onChange={event => setAddress(event.target.value)}
-                placeholder="0:… or EQ…"
-                required
-              />
-            </>
-          )}
+          <label htmlFor="admin-address">Account address</label>
+          <Input
+            id="admin-address"
+            value={address}
+            onChange={event => setAddress(event.target.value)}
+            placeholder="0:… or EQ…"
+            required
+          />
           {needsValue && (
             <>
               <label htmlFor="admin-value">
@@ -237,12 +210,6 @@ export const AdminPage: FC<{readonly environment: StudioEnvironment}> = ({enviro
             <p>Replaces the active state with its StateInit hash, preserving the balance.</p>
           )}
           {action === "delete" && <p>Removes the account, including its balance, code and data.</p>}
-          {action === "config" && (
-            <p>
-              The configuration contract applies the parameter. The operation waits for confirmation
-              and checks that blocks continue to be produced.
-            </p>
-          )}
         </fieldset>
         {error && (
           <p role="alert" className={styles.error}>
