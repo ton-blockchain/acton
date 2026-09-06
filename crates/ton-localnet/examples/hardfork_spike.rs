@@ -30,11 +30,11 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use ton_fullnode_master::{BlockSource, ServedBlock};
-use ton_liteapi::adnl::crypto::{KeyPair, SecretKey};
-use ton_localnet::block::hardfork::{
+use ton_hardfork::{
     HardforkBlock, HardforkPrevBlock, HardforkSources, ShardSource, build_hardfork,
     request::{AccountChange, AccountEdit, account_batch},
 };
+use ton_liteapi::adnl::crypto::{KeyPair, SecretKey};
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 use tycho_types::models::account::AccountState;

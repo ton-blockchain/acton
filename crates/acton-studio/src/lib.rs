@@ -1356,7 +1356,7 @@ fn public_environment(mut environment: StudioEnvironment) -> StudioEnvironment {
     environment
 }
 
-/// Apply account edits through a coordinated hardfork, or update a config parameter.
+/// Apply account edits through a coordinated hardfork.
 /// Account edits contain a raw address and a type: balance (decimal nanotons),
 /// code/data/replace (base64 `BoC`), freeze, uninit or delete. Reuse the UUID only
 /// when retrying the same request. Poll GET for completion after this response.

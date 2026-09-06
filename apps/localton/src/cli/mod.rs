@@ -81,11 +81,6 @@ pub enum Command {
         #[command(subcommand)]
         command: GodmodeCommand,
     },
-    /// Read and change parameters of the blockchain configuration.
-    BlockchainConfig {
-        #[command(subcommand)]
-        command: BlockchainConfigCommand,
-    },
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -374,12 +369,15 @@ pub enum LiteCommand {
     Account {
         #[command(flatten)]
         state: StateArgs,
+        // A raw masterchain address starts with `-1:`, not a CLI option.
+        #[arg(allow_hyphen_values = true)]
         address: String,
     },
     /// Execute a get method and print its TVM stack.
     RunMethod {
         #[command(flatten)]
         state: StateArgs,
+        #[arg(allow_hyphen_values = true)]
         address: String,
         method: String,
         /// Integer TVM stack arguments in decimal or `0x` hexadecimal form.
@@ -395,6 +393,7 @@ pub enum LiteCommand {
     Block {
         #[command(flatten)]
         state: StateArgs,
+        #[arg(allow_negative_numbers = true)]
         workchain: i32,
         shard: String,
         seqno: u32,
@@ -403,6 +402,7 @@ pub enum LiteCommand {
     Transactions {
         #[command(flatten)]
         state: StateArgs,
+        #[arg(allow_negative_numbers = true)]
         workchain: i32,
         shard: String,
         seqno: u32,
@@ -577,30 +577,6 @@ pub struct HardforkArgs {
     pub output: Option<PathBuf>,
 }
 
-/// Changes to the blockchain configuration of this network.
-///
-/// The configuration smart contract accepts a signed request from the master key
-/// created with the zerostate, so a parameter changes immediately and without a
-/// validator vote. The value is checked against the release's TL-B schema first,
-/// because a configuration the collator rejects stops block production for good.
-#[derive(Debug, Clone, Subcommand)]
-pub enum BlockchainConfigCommand {
-    /// Set one configuration parameter to the value in a BoC file.
-    Set {
-        #[command(flatten)]
-        state: StateArgs,
-        /// Index of the configuration parameter.
-        #[arg(long, allow_negative_numbers = true)]
-        index: i32,
-        /// File with the serialized new value of the parameter.
-        #[arg(long)]
-        value: PathBuf,
-        /// Write the value even if it does not match the release's TL-B schema.
-        #[arg(long)]
-        force: bool,
-    },
-}
-
 /// Steps of one administrative graft, in the order they are performed.
 ///
 /// A hardfork block only fits directly on top of the node's current top block,
@@ -633,6 +609,49 @@ pub enum GodmodeCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lite_queries_accept_raw_masterchain_addresses() {
+        let address = format!("-1:{}", "33".repeat(32));
+
+        for command in ["account", "run-method"] {
+            let mut args = vec!["localton", "lite", command, address.as_str()];
+            if command == "run-method" {
+                args.push("seqno");
+            }
+
+            let cli = Cli::try_parse_from(args).unwrap();
+            let parsed_address = match cli.command {
+                Command::Lite {
+                    command:
+                        LiteCommand::Account { address, .. } | LiteCommand::RunMethod { address, .. },
+                } => address,
+                _ => panic!("expected an account query"),
+            };
+
+            assert_eq!(parsed_address, address);
+        }
+    }
+
+    #[test]
+    fn lite_block_queries_accept_masterchain_id() {
+        for command in ["block", "transactions"] {
+            let cli =
+                Cli::try_parse_from(["localton", "lite", command, "-1", "8000000000000000", "42"])
+                    .unwrap();
+
+            let workchain = match cli.command {
+                Command::Lite {
+                    command:
+                        LiteCommand::Block { workchain, .. }
+                        | LiteCommand::Transactions { workchain, .. },
+                } => workchain,
+                _ => panic!("expected a block query"),
+            };
+
+            assert_eq!(workchain, -1);
+        }
+    }
 
     #[test]
     fn bootstrap_accepts_block_time_in_milliseconds() {

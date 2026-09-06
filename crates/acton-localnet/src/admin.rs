@@ -4,7 +4,7 @@ use crate::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use tokio::sync::RwLock;
-use ton_hardfork::request::{AccountEdit, decode_cell};
+use ton_hardfork::request::AccountEdit;
 use uuid::Uuid;
 
 /// A durable mutation whose ID identifies both its payload and retry history.
@@ -16,11 +16,6 @@ pub enum AdminRequest {
         id: String,
         #[schema(value_type = Vec<serde_json::Value>)]
         edits: Vec<AccountEdit>,
-    },
-    Config {
-        id: String,
-        index: i32,
-        boc: String,
     },
 }
 
@@ -43,9 +38,8 @@ impl AdminRequest {
     /// Returns the client-generated key used to reconcile retries after a lost response.
     #[must_use]
     pub fn id(&self) -> &str {
-        match self {
-            Self::Accounts { id, .. } | Self::Config { id, .. } => id,
-        }
+        let Self::Accounts { id, .. } = self;
+        id
     }
 
     /// Rejects invalid transport payloads before acquiring the network mutation lock.
@@ -58,23 +52,17 @@ impl AdminRequest {
 
         Uuid::parse_str(self.id()).map_err(|e| fail(e.to_string()))?;
 
-        match self {
-            Self::Accounts { edits, .. } => {
-                if edits.is_empty() || edits.len() > 100 {
-                    return Err(fail("An operation must contain 1–100 edits".into()));
-                }
-                let mut seen = BTreeSet::new();
+        let Self::Accounts { edits, .. } = self;
+        if edits.is_empty() || edits.len() > 100 {
+            return Err(fail("An operation must contain 1–100 edits".into()));
+        }
 
-                for edit in edits {
-                    let address = edit.validate().map_err(|e| fail(e.to_string()))?;
+        let mut seen = BTreeSet::new();
+        for edit in edits {
+            let address = edit.validate().map_err(|e| fail(e.to_string()))?;
 
-                    if !seen.insert(address.to_string()) {
-                        return Err(fail(format!("Duplicate account: {address}")));
-                    }
-                }
-            }
-            Self::Config { boc, .. } => {
-                decode_cell(boc).map_err(|e| fail(e.to_string()))?;
+            if !seen.insert(address.to_string()) {
+                return Err(fail(format!("Duplicate account: {address}")));
             }
         }
 

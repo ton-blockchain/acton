@@ -500,7 +500,7 @@ test("validation and operation failures use toasts without repeating after dismi
 })
 
 test("admin cell edits accept common BoC encodings and binary files", async ({page}) => {
-  const requests: Extract<AdminRequest, {kind: "accounts"}>[] = []
+  const requests: AdminRequest[] = []
   await page.route("**/api/v1/**", async route => {
     const path = new URL(route.request().url()).pathname
     if (path.endsWith("/admin")) {

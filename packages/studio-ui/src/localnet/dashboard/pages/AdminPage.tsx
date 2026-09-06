@@ -36,7 +36,6 @@ const phases: Record<string, string> = {
   building: "Building hardfork",
   installing: "Installing hardfork",
   verifying: "Verifying state on every node",
-  configuring: "Updating blockchain configuration",
   resuming: "Checking block production",
   indexing: "Waiting for the indexer",
   restoring: "Restoring previous state",
@@ -101,7 +100,7 @@ export const AdminPage: FC<{readonly environment: StudioEnvironment}> = ({enviro
 
   // Retain the exact request after an ambiguous response. Retrying must not
   // create a second hardfork, even if the first HTTP response was lost.
-  const pending = useRef<Extract<AdminRequest, {kind: "accounts"}> | null>(null)
+  const pending = useRef<AdminRequest | null>(null)
   const [uncertain, setUncertain] = useState(false)
   const active = operation !== null && operation.finishedAt === null
   const watchedOperationId = useRef<string | null>(null)
@@ -325,8 +324,8 @@ export const AdminPage: FC<{readonly environment: StudioEnvironment}> = ({enviro
         }
 
         pending.current = {
-          id,
           kind: "accounts",
+          id,
           edits: [{address: target.toRawString(), ...change}],
         }
       }

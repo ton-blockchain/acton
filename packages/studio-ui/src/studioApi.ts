@@ -743,13 +743,11 @@ export type AdminAccountChange =
   | {readonly type: "freeze" | "delete"}
   | {readonly type: "uninit"; readonly balance?: string}
 
-export type AdminRequest =
-  | {
-      readonly kind: "accounts"
-      readonly id: string
-      readonly edits: readonly ({readonly address: string} & AdminAccountChange)[]
-    }
-  | {readonly kind: "config"; readonly id: string; readonly index: number; readonly boc: string}
+export interface AdminRequest {
+  readonly kind: "accounts"
+  readonly id: string
+  readonly edits: readonly ({readonly address: string} & AdminAccountChange)[]
+}
 
 export interface AdminOperation {
   readonly id: string

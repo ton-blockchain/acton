@@ -6,7 +6,6 @@ use super::{
 };
 use crate::{AdminOperation, AdminRequest, Status, admin::phase};
 use crate::{Error, Node};
-use base64::Engine as _;
 use std::collections::BTreeMap;
 use std::process::Stdio;
 use tokio::{
@@ -270,6 +269,7 @@ impl DockerNetwork {
         phase(operation, "backingUp").await;
         let mut journal = Recovery::default();
         self.save_recovery(&journal).await?;
+
         for service in services {
             let name = format!("Before edit {} ({service})", request.id());
             let directory = format!("{LOCALTON_SNAPSHOT_DIR}/admin/{}/{service}", request.id());
@@ -299,89 +299,71 @@ impl DockerNetwork {
             );
             self.save_recovery(&journal).await?;
         }
+
+        // Recovery can restore the cluster only after every node has a backup.
+        // Persist that boundary before changing validator configuration.
         journal.ready = true;
         self.save_recovery(&journal).await?;
-        let seqno = match request {
-            AdminRequest::Accounts { edits, .. } => {
-                phase(operation, "suspending").await;
-                for service in services {
-                    self.offline_admin(service, &["godmode", "suspend"], None)
-                        .await?;
-                }
-                self.start_core(services).await?;
-                let head = self.wait_live("localton", "observe").await?;
-                for service in &services[1..] {
-                    let theirs = self.wait_live(service, "observe").await?;
-                    if theirs != head {
-                        return Err(failure(format!(
-                            "Node {service} has a different head; no hardfork was installed"
-                        )));
-                    }
-                }
-                phase(operation, "building").await;
-                let plan = self
-                    .live_admin(
-                        "localton",
-                        &["godmode", "prepare"],
-                        Some(serde_json::to_vec(edits).map_err(failure)?),
-                    )
-                    .await?;
-                let seqno = plan["masterchain"]["seqno"]
-                    .as_u64()
-                    .ok_or_else(|| failure("Invalid hardfork plan"))?
-                    as u32;
-                let encoded = serde_json::to_vec(&plan).map_err(failure)?;
-                self.stop().await?;
-                phase(operation, "installing").await;
-                for service in services {
-                    self.offline_admin(
-                        service,
-                        &["godmode", "install", "-"],
-                        Some(encoded.clone()),
-                    )
-                    .await?;
-                }
-                self.start_core(services).await?;
-                phase(operation, "verifying").await;
-                for service in services {
-                    self.wait_live(service, "verify").await?;
-                }
-                self.stop().await?;
-                for service in services {
-                    self.offline_admin(service, &["godmode", "finish"], None)
-                        .await?;
-                    self.offline_admin(service, &["godmode", "resume"], None)
-                        .await?;
-                }
-                seqno
-            }
-            AdminRequest::Config { index, boc, .. } => {
-                self.start_core(services).await?;
-                self.wait_ready().await?;
-                phase(operation, "configuring").await;
-                let bytes = base64::engine::general_purpose::STANDARD
-                    .decode(boc.trim())
-                    .map_err(failure)?;
-                self.live_admin(
-                    "localton",
-                    &[
-                        "blockchain-config",
-                        "set",
-                        "--index",
-                        &index.to_string(),
-                        "--value",
-                        "-",
-                    ],
-                    Some(bytes),
-                )
+
+        phase(operation, "suspending").await;
+        for service in services {
+            self.offline_admin(service, &["godmode", "suspend"], None)
                 .await?;
-                self.live_admin("localton", &["lite", "last"], None).await?["seqno"]
-                    .as_u64()
-                    .ok_or_else(|| failure("Invalid chain head"))? as u32
+        }
+
+        self.start_core(services).await?;
+        let head = self.wait_live("localton", "observe").await?;
+
+        // One shared plan must be grafted onto the same head on every node.
+        for service in &services[1..] {
+            let theirs = self.wait_live(service, "observe").await?;
+            if theirs != head {
+                return Err(failure(format!(
+                    "Node {service} has a different head; no hardfork was installed"
+                )));
             }
-        };
+        }
+
+        phase(operation, "building").await;
+        let AdminRequest::Accounts { edits, .. } = request;
+        let plan = self
+            .live_admin(
+                "localton",
+                &["godmode", "prepare"],
+                Some(serde_json::to_vec(edits).map_err(failure)?),
+            )
+            .await?;
+        let seqno = plan["masterchain"]["seqno"]
+            .as_u64()
+            .ok_or_else(|| failure("Invalid hardfork plan"))? as u32;
+        let encoded = serde_json::to_vec(&plan).map_err(failure)?;
+
+        self.stop().await?;
+        phase(operation, "installing").await;
+
+        for service in services {
+            self.offline_admin(service, &["godmode", "install", "-"], Some(encoded.clone()))
+                .await?;
+        }
+
+        self.start_core(services).await?;
+        phase(operation, "verifying").await;
+
+        for service in services {
+            self.wait_live(service, "verify").await?;
+        }
+
+        self.stop().await?;
+        for service in services {
+            self.offline_admin(service, &["godmode", "finish"], None)
+                .await?;
+            self.offline_admin(service, &["godmode", "resume"], None)
+                .await?;
+        }
+
         phase(operation, "resuming").await;
         self.start_core(services).await?;
+
         // Acceptance is insufficient: exercise ordinary collation after the edit.
         let deadline = Instant::now() + ADMIN_TIMEOUT;
         loop {
@@ -406,6 +388,7 @@ impl DockerNetwork {
             }
             sleep(Duration::from_secs(1)).await;
         }
+
         phase(operation, "indexing").await;
         self.start_all().await?;
         let client = reqwest::Client::builder()
@@ -436,17 +419,6 @@ impl DockerNetwork {
             .await
             .map_err(failure)?;
         Ok(seqno)
-    }
-
-    async fn wait_ready(&self) -> Result<(), Error> {
-        let deadline = Instant::now() + ADMIN_TIMEOUT;
-        loop {
-            match self.live_admin("localton", &["lite", "last"], None).await {
-                Ok(_) => return Ok(()),
-                Err(error) if Instant::now() >= deadline => return Err(error),
-                Err(_) => sleep(Duration::from_secs(1)).await,
-            }
-        }
     }
 
     async fn start_core(&self, services: &[String]) -> Result<(), Error> {
@@ -890,7 +862,9 @@ mod tests {
 
             // A masterchain-only balance edit must update global supply too.
             // Resumed native block production checks the resulting state rules.
-            let masterchain_address = format!("-1:{}", "33".repeat(32));
+            // Keep the fixture separate from the Elector at -1:333...333,
+            // whose balance changes as it receives ordinary block rewards.
+            let masterchain_address = format!("-1:{}", "a4".repeat(32));
             let masterchain_edit = serde_json::from_value(serde_json::json!({
                 "kind": "accounts",
                 "id": Uuid::new_v4().to_string(),

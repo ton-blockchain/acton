@@ -364,8 +364,15 @@ async fn admin_api_validates_before_touching_a_stopped_network() {
     .expect("network");
     let runtime = Runtime::open(&location.path).await.expect("runtime");
     let app = http::router(runtime, "secret".to_owned(), Arc::new(Notify::new()));
-    let edit = json!({"kind":"accounts", "id":uuid::Uuid::new_v4().to_string(),
-        "edits":[{"address":format!("0:{}", "11".repeat(32)), "type":"balance", "balance":"1"}]});
+    let edit = json!({
+        "kind": "accounts",
+        "id": uuid::Uuid::new_v4().to_string(),
+        "edits": [{
+            "address": format!("0:{}", "11".repeat(32)),
+            "type": "balance",
+            "balance": "1"
+        }]
+    });
     let unauthorized = request(&app, Method::POST, "/v1/network/admin", edit.clone(), None).await;
     assert_eq!(unauthorized.0, 401);
     let stopped = request(

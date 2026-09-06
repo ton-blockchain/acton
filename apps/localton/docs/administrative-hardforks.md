@@ -117,4 +117,5 @@ The error and environment logs provide details for diagnosis.
 
 Use **Network / Config** to edit blockchain configuration parameters. This page
 submits changes through the configuration contract. Account actions use hardforks.
-Both workflows save recovery snapshots and check that block production resumes.
+Configuration updates confirm activation in the masterchain. They do not use the
+administrative hardfork workflow or its automatic recovery snapshots.

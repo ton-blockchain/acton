@@ -42,8 +42,5 @@ async fn main() -> Result<()> {
         Command::Validator { command } => operations::validators::execute(command).await,
         Command::Hardfork(args) => operations::hardfork::execute(args).await,
         Command::Godmode { command } => operations::godmode::execute(command).await,
-        Command::BlockchainConfig { command } => {
-            operations::blockchain_config::execute(command).await
-        }
     }
 }

@@ -27,7 +27,6 @@
 //! blocks. The coordinator stops and restarts the nodes to suspend validation,
 //! install the fork and restore ordinary networking.
 
-pub mod account_blocks;
 pub mod proof;
 pub mod request;
 
@@ -78,18 +77,16 @@ pub struct HardforkPrevBlock {
 }
 
 /// One account change to bake into a hardfork block.
+///
+/// Administrative writes replace state directly; they do not execute messages
+/// or create transaction history. Indexers must read the changed shard state
+/// even when the account's last transaction remains unchanged.
 #[derive(Debug, Clone)]
 pub struct AccountWrite {
     /// Account id inside its shard.
     pub address: HashBytes,
     /// Replacement account record, or `None` to delete the account.
     pub account: Option<Box<ShardAccount>>,
-    /// Transaction to record for this account, when the change is the result of
-    /// executing a message rather than a plain state overwrite.
-    ///
-    /// Currently rejected by the builder: transaction records require matching
-    /// message descriptors and outgoing queues, which administrative edits do not create.
-    pub transaction: Option<RecordedTransaction>,
 }
 
 impl AccountWrite {
@@ -99,7 +96,6 @@ impl AccountWrite {
         Self {
             address,
             account: Some(Box::new(account)),
-            transaction: None,
         }
     }
 
@@ -109,34 +105,8 @@ impl AccountWrite {
         Self {
             address,
             account: None,
-            transaction: None,
         }
     }
-
-    /// Records a transaction alongside the account change.
-    #[must_use]
-    pub fn with_transaction(mut self, transaction: RecordedTransaction) -> Self {
-        self.transaction = Some(transaction);
-        self
-    }
-}
-
-/// A transaction the caller executed and wants the fork block to contain.
-///
-/// The logical time has to lie inside the block's logical time window, which
-/// [`logical_time_window`] returns for the same sources.
-#[derive(Debug, Clone)]
-pub struct RecordedTransaction {
-    /// Exact serialized `Transaction` cell.
-    pub cell: Cell,
-    /// Logical time of the transaction.
-    pub lt: u64,
-    /// Fees charged by the transaction.
-    pub total_fees: CurrencyCollection,
-    /// Account-state hash before the transaction.
-    pub old_state_hash: HashBytes,
-    /// Account-state hash after the transaction.
-    pub new_state_hash: HashBytes,
 }
 
 /// Account changes of one administrative request, grouped by chain.
@@ -250,23 +220,6 @@ impl HardforkPlan {
     }
 }
 
-/// Returns the aligned start of a hardfork's logical time window for the supplied states.
-pub fn logical_time_window(sources: &HardforkSources) -> anyhow::Result<u64> {
-    let mc_state = sources
-        .masterchain_state
-        .parse::<ShardStateUnsplit>()
-        .context("Failed to parse previous masterchain state")?;
-    let mut base_lt = mc_state.gen_lt;
-    if let Some(shard) = &sources.basechain {
-        let shard_state = shard
-            .state
-            .parse::<ShardStateUnsplit>()
-            .context("Failed to parse previous basechain state")?;
-        base_lt = base_lt.max(shard_state.gen_lt);
-    }
-    align_lt(base_lt)
-}
-
 /// Builds the hardfork blocks that apply `batch` to the live chain in `sources`.
 pub fn build_hardfork(
     sources: &HardforkSources,
@@ -276,17 +229,6 @@ pub fn build_hardfork(
     if batch.is_empty() {
         bail!("hardfork batch is empty");
     }
-
-    // Reject unsupported execution metadata before deriving the LT window.
-    // In particular, a caller-supplied u64::MAX LT must never overflow here.
-    ensure!(
-        batch
-            .masterchain
-            .iter()
-            .chain(&batch.basechain)
-            .all(|write| write.transaction.is_none()),
-        "Recorded transactions are not supported: hardfork message descriptors and outgoing queues must be built together"
-    );
 
     let old_mc_state = sources
         .masterchain_state
@@ -1295,32 +1237,6 @@ mod tests {
             };
             sources.masterchain_state = state_cell;
         }
-    }
-
-    #[test]
-    fn unsupported_transactions_fail_before_logical_time_arithmetic() {
-        let address = HashBytes([0x11; 32]);
-        let batch = AdminBatch {
-            masterchain: vec![
-                AccountWrite::set(address, account(address, 1)).with_transaction(
-                    RecordedTransaction {
-                        cell: Cell::default(),
-                        lt: u64::MAX,
-                        total_fees: CurrencyCollection::ZERO,
-                        old_state_hash: HashBytes::ZERO,
-                        new_state_hash: HashBytes::ZERO,
-                    },
-                ),
-            ],
-            basechain: Vec::new(),
-        };
-
-        let error = build_hardfork(&sources(), 200, &batch).unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .starts_with("Recorded transactions are not supported")
-        );
     }
 
     #[test]
