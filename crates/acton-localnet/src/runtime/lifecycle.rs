@@ -171,11 +171,14 @@ impl Runtime {
         }
 
         if !entry.data_dir.join("runtime.json").exists() {
-            entry.record.write().await.status = Status::Stopped;
+            let mut record = entry.record.write().await;
+            if record.status != Status::Failed {
+                record.status = Status::Stopped;
+            }
             return;
         }
 
-        let result = match self.driver(entry).await {
+        let result = match self.driver(entry, false).await {
             Ok(driver) => driver.status().await,
             Err(error) => Err(error),
         };
@@ -205,7 +208,13 @@ impl Runtime {
             return Ok(());
         }
         if !entry.data_dir.join("runtime.json").exists() {
-            entry.record.write().await.status = Status::Stopped;
+            // A prerequisite failure has no containers to stop. Keep its diagnosis
+            // visible after the short-lived CLI owner shuts down its service.
+            let mut record = entry.record.write().await;
+            if record.status != Status::Failed {
+                record.status = Status::Stopped;
+            }
+            drop(record);
             return Self::save(entry).await;
         }
 
@@ -213,7 +222,7 @@ impl Runtime {
         let id = entry.record.read().await.id.clone();
         log::info!("operation=shutdown target={id} duration_ms=0 outcome=running");
         entry.record.write().await.status = Status::Stopping;
-        let result = match self.driver(entry).await {
+        let result = match self.driver(entry, false).await {
             Ok(driver) => driver.stop().await,
             Err(error) => Err(error),
         };

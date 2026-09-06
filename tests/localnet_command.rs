@@ -19,6 +19,9 @@ mod selection;
 #[path = "localnet_command/offline.rs"]
 mod offline;
 
+#[path = "localnet_command/docker_prerequisites.rs"]
+mod docker_prerequisites;
+
 #[path = "localnet_command/shutdown.rs"]
 mod shutdown;
 
@@ -239,6 +242,7 @@ async fn cli_and_http_share_lifecycle_snapshots_and_persisted_state() {
           "snapshotStatus": "completed",
           "startSteps": [
             "preparing",
+            "checkingDocker",
             "checkingImage",
             "startingContainers",
             "waitingForApis"

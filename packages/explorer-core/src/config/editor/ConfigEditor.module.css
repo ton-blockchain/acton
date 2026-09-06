@@ -1,0 +1,125 @@
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 20px;
+  min-width: 0;
+}
+
+.wideField,
+.fields > .fields,
+.group,
+.map {
+  grid-column: 1 / -1;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.map {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 8px;
+}
+
+.map legend {
+  padding: 0 6px;
+  font-size: var(--acton-font-size-sm);
+  font-weight: 500;
+}
+
+.mapEntry {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 0 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.mapKey {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.mapKey > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.flags {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.hint,
+.muted,
+.rawLabel {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.rawField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-2);
+  min-width: 0;
+}
+
+.rawLabel {
+  font-size: var(--acton-font-size-compact);
+}
+
+.raw {
+  display: block;
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+  box-sizing: border-box;
+  padding: 12px;
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 8px;
+  font: var(--acton-font-size-sm) / 1.6 var(--acton-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.raw:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.tabs {
+  margin-bottom: 18px;
+}
+
+.errorDescription {
+  display: grid;
+  gap: var(--acton-space-2);
+}
+
+.conditionContent pre {
+  padding: var(--acton-space-2) var(--acton-space-4);
+  word-break: normal;
+}
+
+.conditionContent code {
+  font: inherit;
+}
+
+@media (max-width: 640px) {
+  .fields,
+  .flags {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

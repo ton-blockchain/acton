@@ -523,6 +523,35 @@ pub trait EnvironmentRuntime: Send + Sync {
         })
     }
 
+    /// Submits a config mutation to the full localnet owner; Studio never signs it.
+    fn update_network_config(
+        &self,
+        _environment_id: &str,
+        _request: acton_localnet::UpdateNetworkConfig,
+    ) -> EnvironmentRuntimeFuture<'_, acton_localnet::Operation> {
+        Box::pin(async {
+            Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_config_unavailable",
+                message: "Configuration editing is available for Full localnet environments"
+                    .to_owned(),
+            })
+        })
+    }
+
+    /// Reads durable mutation progress without resubmitting an accepted request.
+    fn localnet_operation(
+        &self,
+        _environment_id: &str,
+        _operation_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, acton_localnet::Operation> {
+        Box::pin(async {
+            Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_config_unavailable",
+                message: "Localnet operations are unavailable for this environment".to_owned(),
+            })
+        })
+    }
+
     fn add_full_ton_node(
         &self,
         _environment_id: &str,

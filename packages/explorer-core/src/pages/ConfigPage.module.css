@@ -99,7 +99,7 @@
 
 .parameterHeader {
   display: grid;
-  grid-template-columns: minmax(42px, max-content) minmax(0, 1fr);
+  grid-template-columns: minmax(42px, max-content) minmax(0, 1fr) auto;
   gap: 12px;
   padding: 17px 18px 14px;
   padding-inline-start: 24px;
@@ -108,6 +108,32 @@
 .parameterId {
   align-self: start;
   justify-self: start;
+}
+
+.parameterActions {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: start;
+  justify-self: end;
+}
+
+.immutableLabel {
+  display: inline-flex;
+  min-height: 1.5rem;
+  align-items: center;
+  gap: var(--acton-space-1-5);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-compact);
+  line-height: 1.2;
+}
+
+.editAction {
+  --acton-inline-button-gap: var(--acton-space-2);
+}
+
+.editAction .editIcon {
+  width: 0.875rem;
+  height: 0.875rem;
 }
 
 .parameterAnchor {
@@ -225,6 +251,70 @@
 .parsedValue {
   padding: 13px 14px;
   background: var(--acton-color-surface);
+}
+
+.configValueDiff {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 10px;
+}
+
+.configValueDiffAdded {
+  min-width: 0;
+}
+
+.configValueDiffSnapshot {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--acton-color-surface);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+}
+
+.configValueDiffBefore {
+  border-color: color-mix(in srgb, var(--acton-color-diff-removed) 28%, var(--acton-color-border));
+}
+
+.configValueDiffAfter {
+  border-color: color-mix(in srgb, var(--acton-color-diff-added) 28%, var(--acton-color-border));
+}
+
+.configValueDiffLabel {
+  margin: 0;
+  padding: 8px 12px;
+  color: var(--acton-color-text-muted);
+  border-block-end: 1px solid var(--acton-color-border);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 16px;
+}
+
+.configValueDiffBefore .configValueDiffLabel {
+  background: var(--acton-color-diff-removed-surface);
+  color: var(--acton-color-diff-removed-text);
+}
+
+.configValueDiffAfter .configValueDiffLabel {
+  background: var(--acton-color-diff-added-surface);
+  color: var(--acton-color-diff-added-text);
+}
+
+.configValueDiffContent {
+  min-width: 0;
+}
+
+.configValueDiffArrow {
+  align-self: center;
+  justify-self: center;
+  width: 16px;
+  height: 16px;
+  color: var(--acton-color-text-muted);
+}
+
+.configValueDiffRaw {
+  margin: 0;
 }
 
 .globalIdValue {
@@ -401,6 +491,32 @@
   grid-column: 1 / -1;
 }
 
+.configValueGridItemChanged {
+  margin: -6px -8px;
+  padding: 6px 8px;
+  border-radius: var(--acton-radius-control-sm);
+}
+
+.configValueCollectionItemChanged {
+  border-radius: var(--acton-radius-control-sm);
+}
+
+.configValueDiffBefore .configValueCollectionItemChanged {
+  background: var(--acton-color-diff-removed-surface);
+}
+
+.configValueDiffAfter .configValueCollectionItemChanged {
+  background: var(--acton-color-diff-added-surface);
+}
+
+.configValueDiffBefore .configValueGridItemChanged {
+  background: var(--acton-color-diff-removed-surface);
+}
+
+.configValueDiffAfter .configValueGridItemChanged {
+  background: var(--acton-color-diff-added-surface);
+}
+
 .configValueGridGroup {
   display: flex;
   flex-direction: column;
@@ -464,6 +580,14 @@
 .configParameterIdAnchor .parameterAnchorIcon {
   width: 14px;
   height: 14px;
+}
+
+.configValueDiffBefore .configParameterIdAnchor.configValueCollectionItemChanged {
+  color: var(--acton-color-diff-removed-text);
+}
+
+.configValueDiffAfter .configParameterIdAnchor.configValueCollectionItemChanged {
+  color: var(--acton-color-diff-added-text);
 }
 
 .configParameterIdTooltip {
@@ -623,7 +747,7 @@
   }
 
   .parameterHeader {
-    grid-template-columns: minmax(34px, max-content) minmax(0, 1fr);
+    grid-template-columns: minmax(34px, max-content) minmax(0, 1fr) auto;
     gap: 9px;
     padding-inline: 14px;
     padding-inline-start: 20px;
@@ -644,5 +768,13 @@
 
   .configValueGridItemWide {
     grid-column: auto;
+  }
+
+  .configValueDiff {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .configValueDiffArrow {
+    transform: rotate(90deg);
   }
 }

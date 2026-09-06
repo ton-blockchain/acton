@@ -34,6 +34,7 @@ mod local_artifacts;
 mod local_process;
 mod local_test_process;
 mod localnet;
+mod network_config;
 mod openapi;
 mod test_api;
 mod test_run;
@@ -365,6 +366,14 @@ impl StudioServer {
             .route(
                 "/environments/{environment_id}/restart",
                 post(restart_environment),
+            )
+            .route(
+                "/environments/{environment_id}/network/config",
+                post(network_config::update),
+            )
+            .route(
+                "/environments/{environment_id}/localnet-operations/{operation_id}",
+                get(network_config::operation),
             )
             .route(
                 "/environments/{environment_id}/health",

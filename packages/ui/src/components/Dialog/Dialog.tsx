@@ -15,13 +15,15 @@ export interface DialogProps {
   readonly contentPadding?: "default" | "none"
   readonly description?: ReactNode
   readonly dismissible?: boolean
-  /** Pins actions below a scrollable header and body, keeping them reachable on short screens */
+  /** Pins actions below the scrollable body, keeping the header and actions reachable */
   readonly footer?: ReactNode
   /** Changes header composition without replacing the accessible title and description */
   readonly headerClassName?: string
   readonly leadingIcon?: ReactNode
   readonly maxWidth?: CSSProperties["maxWidth"]
   readonly onOpenChange: (open: boolean) => void
+  /** Lets callers clear dialog content after the closing animation, avoiding a visible reset */
+  readonly onOpenChangeComplete?: (open: boolean) => void
   readonly open: boolean
   readonly title: ReactNode
 }
@@ -40,6 +42,7 @@ export function Dialog({
   leadingIcon,
   maxWidth,
   onOpenChange,
+  onOpenChangeComplete,
   open,
   title,
 }: DialogProps) {
@@ -84,7 +87,11 @@ export function Dialog({
   )
 
   return (
-    <DialogBase.Root open={open} onOpenChange={handleOpenChange}>
+    <DialogBase.Root
+      open={open}
+      onOpenChange={handleOpenChange}
+      onOpenChangeComplete={onOpenChangeComplete}
+    >
       <DialogBase.Portal>
         <DialogBase.Backdrop className={styles.backdrop} data-theme={theme} />
         <DialogBase.Viewport className={styles.viewport}>
@@ -98,13 +105,9 @@ export function Dialog({
                 : ({"--acton-dialog-max-width": toCssSize(maxWidth)} as CSSProperties)
             }
           >
-            {footer === undefined || footer === null ? (
-              content
-            ) : (
-              <>
-                <div className={styles.scrollArea}>{content}</div>
-                {footer}
-              </>
+            {content}
+            {footer !== undefined && footer !== null && (
+              <div className={styles.footer}>{footer}</div>
             )}
           </DialogBase.Popup>
         </DialogBase.Viewport>

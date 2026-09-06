@@ -11,10 +11,20 @@ root = Path(os.environ['LOCALNET_TEST_DIR'])
 marker = root / 'running'
 network_marker = marker
 
-if (root / 'docker-unavailable').exists():
+if (root / 'docker-unavailable').exists() and not ('context' in args or args[:3] == ['compose', 'version', '--short']):
     raise SystemExit('Docker daemon is unavailable')
 
-if 'compose' in args:
+if 'info' in args:
+    if (root / 'docker-denied').exists():
+        raise SystemExit('permission denied while trying to connect to the Docker daemon socket')
+    if (root / 'docker-timeout').exists():
+        time.sleep(30)
+    print('27.0.0')
+elif 'compose' in args and 'version' in args:
+    if (root / 'compose-unavailable').exists():
+        raise SystemExit("docker: 'compose' is not a docker command")
+    print('2.29.0')
+elif 'compose' in args:
     compose_path = Path(args[args.index('-f') + 1])
     network_marker = compose_path.parent / 'fixture-running'
     command = args[args.index('-f') + 2:]

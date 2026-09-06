@@ -61,6 +61,8 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
         crate::stop_environment,
         crate::restart_environment,
         crate::get_environment_health,
+        crate::network_config::update,
+        crate::network_config::operation,
         crate::list_environment_snapshots,
         crate::create_environment_snapshot,
         crate::restore_environment_snapshot,

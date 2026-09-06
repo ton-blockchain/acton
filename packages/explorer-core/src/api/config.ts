@@ -591,7 +591,8 @@ function loadConfigDictionary(rootCell: Cell): Dictionary<number, Cell> {
   )
 }
 
-function parseConfigParameter(id: number, cell: Cell): NetworkConfigParameter {
+/** Decodes one parameter for shared explorer and configuration-editor previews. */
+export function parseConfigParameter(id: number, cell: Cell): NetworkConfigParameter {
   const metadata = getConfigParameterMetadata(id)
   const parameter: NetworkConfigParameter = {
     id,

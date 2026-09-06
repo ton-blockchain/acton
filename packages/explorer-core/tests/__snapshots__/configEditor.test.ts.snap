@@ -1,0 +1,349 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`network configuration editor preserves every known parameter bit-for-bit in mainnet-config-84773657 1`] = `
+[
+  {
+    "id": 0,
+    "unchanged": true,
+  },
+  {
+    "id": 1,
+    "unchanged": true,
+  },
+  {
+    "id": 2,
+    "unchanged": true,
+  },
+  {
+    "id": 4,
+    "unchanged": true,
+  },
+  {
+    "id": 5,
+    "unchanged": true,
+  },
+  {
+    "id": 7,
+    "unchanged": true,
+  },
+  {
+    "id": 8,
+    "unchanged": true,
+  },
+  {
+    "id": 9,
+    "unchanged": true,
+  },
+  {
+    "id": 10,
+    "unchanged": true,
+  },
+  {
+    "id": 11,
+    "unchanged": true,
+  },
+  {
+    "id": 12,
+    "unchanged": true,
+  },
+  {
+    "id": 13,
+    "unchanged": true,
+  },
+  {
+    "id": 14,
+    "unchanged": true,
+  },
+  {
+    "id": 15,
+    "unchanged": true,
+  },
+  {
+    "id": 16,
+    "unchanged": true,
+  },
+  {
+    "id": 17,
+    "unchanged": true,
+  },
+  {
+    "id": 18,
+    "unchanged": true,
+  },
+  {
+    "id": 19,
+    "unchanged": true,
+  },
+  {
+    "id": 20,
+    "unchanged": true,
+  },
+  {
+    "id": 21,
+    "unchanged": true,
+  },
+  {
+    "id": 22,
+    "unchanged": true,
+  },
+  {
+    "id": 23,
+    "unchanged": true,
+  },
+  {
+    "id": 24,
+    "unchanged": true,
+  },
+  {
+    "id": 25,
+    "unchanged": true,
+  },
+  {
+    "id": 28,
+    "unchanged": true,
+  },
+  {
+    "id": 29,
+    "unchanged": true,
+  },
+  {
+    "id": 30,
+    "unchanged": true,
+  },
+  {
+    "id": 31,
+    "unchanged": true,
+  },
+  {
+    "id": 32,
+    "unchanged": true,
+  },
+  {
+    "id": 34,
+    "unchanged": true,
+  },
+  {
+    "id": 43,
+    "unchanged": true,
+  },
+  {
+    "id": 44,
+    "unchanged": true,
+  },
+  {
+    "id": 45,
+    "unchanged": true,
+  },
+  {
+    "id": 71,
+    "unchanged": true,
+  },
+  {
+    "id": 72,
+    "unchanged": true,
+  },
+  {
+    "id": 79,
+    "unchanged": true,
+  },
+]
+`;
+
+exports[`network configuration editor preserves every known parameter bit-for-bit in testnet-config-80890417 1`] = `
+[
+  {
+    "id": 0,
+    "unchanged": true,
+  },
+  {
+    "id": 1,
+    "unchanged": true,
+  },
+  {
+    "id": 2,
+    "unchanged": true,
+  },
+  {
+    "id": 4,
+    "unchanged": true,
+  },
+  {
+    "id": 5,
+    "unchanged": true,
+  },
+  {
+    "id": 6,
+    "unchanged": true,
+  },
+  {
+    "id": 7,
+    "unchanged": true,
+  },
+  {
+    "id": 8,
+    "unchanged": true,
+  },
+  {
+    "id": 9,
+    "unchanged": true,
+  },
+  {
+    "id": 10,
+    "unchanged": true,
+  },
+  {
+    "id": 11,
+    "unchanged": true,
+  },
+  {
+    "id": 12,
+    "unchanged": true,
+  },
+  {
+    "id": 13,
+    "unchanged": true,
+  },
+  {
+    "id": 14,
+    "unchanged": true,
+  },
+  {
+    "id": 15,
+    "unchanged": true,
+  },
+  {
+    "id": 16,
+    "unchanged": true,
+  },
+  {
+    "id": 17,
+    "unchanged": true,
+  },
+  {
+    "id": 18,
+    "unchanged": true,
+  },
+  {
+    "id": 19,
+    "unchanged": true,
+  },
+  {
+    "id": 20,
+    "unchanged": true,
+  },
+  {
+    "id": 21,
+    "unchanged": true,
+  },
+  {
+    "id": 22,
+    "unchanged": true,
+  },
+  {
+    "id": 23,
+    "unchanged": true,
+  },
+  {
+    "id": 24,
+    "unchanged": true,
+  },
+  {
+    "id": 25,
+    "unchanged": true,
+  },
+  {
+    "id": 28,
+    "unchanged": true,
+  },
+  {
+    "id": 29,
+    "unchanged": true,
+  },
+  {
+    "id": 30,
+    "unchanged": true,
+  },
+  {
+    "id": 31,
+    "unchanged": true,
+  },
+  {
+    "id": 32,
+    "unchanged": true,
+  },
+  {
+    "id": 34,
+    "unchanged": true,
+  },
+  {
+    "id": 43,
+    "unchanged": true,
+  },
+  {
+    "id": 44,
+    "unchanged": true,
+  },
+  {
+    "id": 45,
+    "unchanged": true,
+  },
+  {
+    "id": 46,
+    "unchanged": true,
+  },
+  {
+    "id": 71,
+    "unchanged": true,
+  },
+  {
+    "id": 72,
+    "unchanged": true,
+  },
+  {
+    "id": 79,
+    "unchanged": true,
+  },
+  {
+    "id": 81,
+    "unchanged": true,
+  },
+]
+`;
+
+exports[`network configuration editor retains exact GRAM values beyond JS integer precision and rejects fractional nanograms 1`] = `
+{
+  "kind": "ConfigParam__17",
+  "max_stake": "9907199254740993.123456789",
+  "max_stake_factor": "4.5",
+  "min_stake": "9007199254740993.123456789",
+  "min_total_stake": "9907199254740993.123456789",
+}
+`;
+
+exports[`network configuration editor edits signed parameter lists and detects duplicate keys before serialization 1`] = `
+{
+  "critical_params": [
+    {
+      "key": "0",
+      "value": {
+        "kind": "True",
+      },
+    },
+    {
+      "key": "-999",
+      "value": {
+        "kind": "True",
+      },
+    },
+  ],
+  "kind": "ConfigParam__10",
+}
+`;
+
+exports[`network configuration editor preserves fractional fixed-point prices and full workchain address keys 1`] = `
+{
+  "address": "0:abababababababababababababababababababababababababababababababab",
+  "decimal": "281474.9767106559999847412109375",
+  "restored": "18446744073709551615",
+}
+`;

@@ -3,7 +3,7 @@ import type {FC} from "react"
 
 import styles from "./GlobalCapabilities.module.css"
 
-const GLOBAL_CAPABILITIES = [
+export const GLOBAL_CAPABILITIES = [
   {
     value: 1,
     name: "capIhrEnabled",

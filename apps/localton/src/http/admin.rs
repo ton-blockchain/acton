@@ -25,7 +25,7 @@ use crate::{
 use super::{
     FUND_ACCOUNT_PATH, RunningService, cors,
     error::{ErrorResponse, HttpError},
-    faucet, server,
+    faucet, network_config, server,
 };
 
 #[derive(OpenApi)]
@@ -39,7 +39,8 @@ use super::{
         settings_handler,
         wallets_handler,
         processes_handler,
-        faucet::fund_account_handler
+        faucet::fund_account_handler,
+        network_config::update_handler
     ),
     components(schemas(
         RuntimeState,
@@ -49,7 +50,9 @@ use super::{
         faucet::FundAccountRequest,
         faucet::FundAccountResponse,
         faucet::FundAccountErrorResponse,
-        ErrorResponse
+        ErrorResponse,
+        network_config::UpdateRequest,
+        network_config::UpdateResult
     )),
     tags((name = "administration", description = "Local network administration"))
 )]
@@ -60,6 +63,13 @@ struct AdminState {
     layout: Layout,
     processes: ProcessRegistry,
     faucet: faucet::State,
+    network_config: network_config::State,
+}
+
+impl FromRef<AdminState> for network_config::State {
+    fn from_ref(state: &AdminState) -> Self {
+        state.network_config.clone()
+    }
 }
 
 impl FromRef<AdminState> for faucet::State {
@@ -81,6 +91,7 @@ pub(super) async fn start(
     );
     let state_dir = layout.root.clone();
     let state = AdminState {
+        network_config: network_config::State::new(layout.clone(), backend.clone()),
         layout,
         processes,
         faucet: faucet::State::new(backend, state_dir),
@@ -92,6 +103,7 @@ pub(super) async fn start(
         .route("/v1/wallets", get(wallets_handler))
         .route("/v1/processes", get(processes_handler));
     if settings.services.ton_http_api.enabled {
+        app = app.route("/v1/network/config", post(network_config::update_handler));
         app = app.route(
             FUND_ACCOUNT_PATH,
             post(faucet::fund_account_handler).options(cors::preflight),

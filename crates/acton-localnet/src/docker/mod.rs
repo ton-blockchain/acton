@@ -60,6 +60,7 @@ mod compose;
 mod descriptor;
 mod diagnostics;
 mod nodes;
+mod prerequisites;
 mod process;
 mod progress;
 mod snapshots;
@@ -104,10 +105,11 @@ impl DockerNetwork {
         data_dir: &Path,
         workspace_root: &Path,
         network: &Network,
+        verify_docker: bool,
     ) -> Result<Self, Error> {
         let runtime_file = data_dir.join(RUNTIME_DESCRIPTOR_FILE);
-        let runtime = match load_runtime_descriptor(&runtime_file).await? {
-            Some(runtime) => runtime,
+        let (runtime, is_new) = match load_runtime_descriptor(&runtime_file).await? {
+            Some(runtime) => (runtime, false),
             None => {
                 let image = std::env::var("ACTON_LOCALNET_IMAGE")
                     .unwrap_or_else(|_| DEFAULT_LOCALTON_IMAGE.to_owned());
@@ -118,11 +120,17 @@ impl DockerNetwork {
                     docker_target: resolve_docker_target().await?,
                     project_name: compose_project_name(workspace_root, &network.id, Uuid::new_v4()),
                 };
-                write_runtime_descriptor(&runtime_file, &runtime).await?;
-                runtime
+                (runtime, true)
             }
         };
         validate_image_reference(&runtime.image)?;
+        if verify_docker {
+            prerequisites::check(&runtime.docker_target).await?;
+        }
+        if is_new {
+            write_runtime_descriptor(&runtime_file, &runtime).await?;
+        }
+
         let RuntimeDescriptor {
             image,
             docker_target,

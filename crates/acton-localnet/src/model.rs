@@ -252,7 +252,7 @@ pub struct NetworkState {
 
 /// Operation progress survives client disconnects. A service restart marks active
 /// operations interrupted and reconciles Docker instead of replaying mutations.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Operation {
     pub id: String,
@@ -283,7 +283,7 @@ pub struct Operation {
 
 /// Completed phases remain visible even when they finish between client polls.
 /// Durations are measured by the owning service, independently of client latency.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationStep {
     pub phase: String,
@@ -294,7 +294,7 @@ pub struct OperationStep {
 ///
 /// `total` is absent when Docker has not announced the complete workload. Clients
 /// must then display the observed count without inventing a completion percentage.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationProgress {
     pub completed: u64,
@@ -304,7 +304,7 @@ pub struct OperationProgress {
 }
 
 /// Terminal states are durable; closing a polling client never cancels `Running`.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum OperationStatus {
     Running,

@@ -303,6 +303,10 @@ impl DockerNetwork {
             }
         }
 
+        if let Some(error) = super::prerequisites::runtime_failure(&message) {
+            return error.to_string();
+        }
+
         if let Some(diagnostics) = self.failed_container_diagnostics().await {
             message.push_str("\n\nFailed container logs:\n");
             message.push_str(&diagnostics);

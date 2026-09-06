@@ -5,6 +5,7 @@ use crate::{Error, Operation, OperationStatus, OperationStep, Status, storage};
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use tokio::io::AsyncWriteExt;
 
 #[derive(Clone)]
 pub(crate) enum Action {
@@ -17,6 +18,7 @@ pub(crate) enum Action {
     CreateSnapshot { name: Option<String> },
     RestoreSnapshot { id: String },
     DeleteSnapshot { id: String },
+    UpdateConfig(crate::UpdateNetworkConfig),
 }
 
 impl Action {
@@ -32,6 +34,7 @@ impl Action {
             Self::CreateSnapshot { .. } => "createSnapshot",
             Self::RestoreSnapshot { .. } => "restoreSnapshot",
             Self::DeleteSnapshot { .. } => "deleteSnapshot",
+            Self::UpdateConfig(_) => "updateConfig",
         }
     }
 }
@@ -46,6 +49,14 @@ pub(super) struct Context {
 
 impl Runtime {
     pub(crate) async fn submit(&self, action: Action) -> Result<Operation, Error> {
+        if let Action::UpdateConfig(request) = &action
+            && (request.boc.is_empty() || request.boc.len() > 1_000_000)
+        {
+            return Err(Error::invalid(
+                "Parameter BoC must contain between 1 and 1000000 characters",
+            ));
+        }
+
         if let Action::CreateSnapshot { name: Some(name) } = &action
             && (name.trim().is_empty() || name.trim().chars().count() > 80)
         {
@@ -115,6 +126,25 @@ impl Runtime {
                 }
                 Err(error) => {
                     let message = format!("{error}\nFull log: {}", context.operation.log_path);
+                    // Preflight failures happen before a Docker child opens startup.log.
+                    // The diagnostic path in the API and CLI must still point to a real file.
+                    let logged = async {
+                        let mut log = tokio::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(&context.operation.log_path)
+                            .await?;
+                        log.write_all(format!("\n{error}\n").as_bytes()).await
+                    }
+                    .await;
+                    if let Err(log_error) = logged {
+                        log::error!(
+                            "operation={} target={} outcome=log_failed path={} error={log_error}",
+                            context.operation.kind,
+                            context.operation.id,
+                            context.operation.log_path
+                        );
+                    }
                     context.operation.status = OperationStatus::Failed;
                     "failed".clone_into(&mut context.operation.phase);
                     context.operation.error = Some(message.clone());
@@ -222,6 +252,10 @@ impl Context {
     async fn execute(&mut self, action: Action) -> Result<Value, Error> {
         self.phase("preparing").await?;
 
+        if let Action::UpdateConfig(request) = action {
+            return self.update_network_config(request).await;
+        }
+
         // Stopped definitions have no Docker resources until their first start.
         // Basic lifecycle commands must remain usable without materializing them.
         {
@@ -244,7 +278,16 @@ impl Context {
             }
         }
 
-        let driver = self.runtime.driver(&self.entry).await?;
+        let starting = matches!(action, Action::Start);
+        if starting {
+            let mut record = self.entry.record.write().await;
+            record.status = Status::Starting;
+            record.error = None;
+            record.startup_timings = None;
+            drop(record);
+            self.phase("checkingDocker").await?;
+        }
+        let driver = self.runtime.driver(&self.entry, starting).await?;
         match action {
             Action::Start => {
                 self.start(&driver).await?;
@@ -306,6 +349,9 @@ impl Context {
                 storage::validate_id(&id)?;
                 self.phase("deletingArchive").await?;
                 driver.delete_snapshot(&id).await?;
+            }
+            Action::UpdateConfig(_) => {
+                unreachable!("config updates are handled before materializing Docker")
             }
         }
 

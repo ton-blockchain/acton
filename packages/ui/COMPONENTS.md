@@ -194,6 +194,9 @@ Use InlineButton for embedded command actions inside rows, cards, details
 panels, and compact metadata groups. It keeps real button semantics but does not
 draw a boxed control surface.
 
+Set `--acton-inline-button-gap` on the button to adjust icon-to-label spacing
+without changing the component's focus or hover behavior.
+
 ### Variants
 
 - `default`: neutral embedded action inside dense UI.
@@ -1156,6 +1159,8 @@ base64, hex, hashes, parsed data, tables, or trace sections.
 - `onValueChange`: updates selected tab from click or keyboard navigation.
   It may return a Promise when switching tabs requires async loading.
 - `children`: the complete panel content for the current tab.
+- `variant`: `"connected"` joins tabs to the default bordered panel;
+  `"standalone"` rounds the tab group on all corners and leaves content unframed.
 - `loading`: shows loading fallback for externally managed async state.
 - `loadingValue`: optional tab value to mark selected while external loading is
   active.
@@ -1169,6 +1174,7 @@ base64, hex, hashes, parsed data, tables, or trace sections.
 - Code viewer with several data formats
 - Long scrollable panel content
 - Arbitrary table or structured content
+- Standalone tabs above form fields without a full-width divider
 - Promise-based tab loading with skeleton fallback
 - Horizontal tab overflow on narrow screens
 - Keyboard focus and arrow navigation
@@ -1186,9 +1192,8 @@ base64, hex, hashes, parsed data, tables, or trace sections.
 - Use `Skeleton` or `SkeletonText` for custom `loadingFallback` layouts.
 - Use `panelClassName` for content-specific sizing; do not bake code/table
   assumptions into ContentTabs.
-- Use a future segmented control instead for small view-mode switches without a
-  connected content panel.
-- Do not use ContentTabs when tabs do not share the same framed content area.
+- Use `variant="standalone"` for alternate forms or representations that do not
+  need a shared frame. Keep their content inside the accessible tab panel.
 
 ## PillTabs
 
@@ -1678,6 +1683,9 @@ the modal frame and scroll behavior while callers own the domain content.
 - `description`: optional accessible supporting text below the title.
 - `open` and `onOpenChange`: controlled state, including Escape, close-button,
   and outside-press changes.
+- `onOpenChangeComplete`: called after opening or closing animations finish.
+  Keep the title and content mounted while closing; clear drafts when this
+  callback receives `false` to avoid a visible reset during the exit animation.
 - `maxWidth`: caps the shared responsive popup width.
 - `busy`: sets `aria-busy` and blocks Escape, outside press, and the standard
   close action while an operation is running.
@@ -1686,8 +1694,8 @@ the modal frame and scroll behavior while callers own the domain content.
 - `contentClassName`: caller-owned content layout hook.
 - `headerClassName`: custom header composition, such as a centered request
   identity. Keep the accessible title, description, and close action intact.
-- `footer`: pinned actions outside the scrollable header and body. Use this
-  when request details can exceed the viewport height.
+- `footer`: pinned actions below the scrollable body. The header and close
+  action stay visible when request details exceed the viewport height.
 - `closeLabel`: accessible label for the standard close action.
 - `DialogActions`: shared footer alignment for dialog buttons. Set
   `stackOnMobile` when full-width mobile actions are easier to use.

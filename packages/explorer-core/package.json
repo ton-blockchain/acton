@@ -6,6 +6,7 @@
   "author": "TON Core",
   "type": "module",
   "exports": {
+    "./config/ParameterEditor": "./src/config/editor/ParameterEditor.tsx",
     "./api/client": "./src/api/client.ts",
     "./api/config": "./src/api/config.ts",
     "./api/compilerAbi": "./src/api/compilerAbi.ts",
@@ -64,6 +65,7 @@
     "fmt": "biome format --write .",
     "fmt:check": "biome format .",
     "generate:block-tlb": "bun scripts/generate-block-tlb.ts",
+    "generate:config-editor": "bun scripts/generate-config-editor-schema.ts",
     "lint": "biome check --formatter-enabled=false .",
     "lint:fix": "biome check --formatter-enabled=false --write .",
     "precommit": "bun fmt && bun lint && bun build && bun test",

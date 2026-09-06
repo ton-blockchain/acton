@@ -2,7 +2,7 @@
 
 use super::{
     COMPOSE_DELETE_TIMEOUT, COMPOSE_STOP_TIMEOUT, COMPOSE_WAIT_TIMEOUT_SECONDS, DockerNetwork,
-    DockerTarget, descriptor::docker_text,
+    DockerTarget, descriptor::docker_text, prerequisites,
 };
 use crate::Error;
 use std::{ffi::OsStr, fs::OpenOptions, process::Stdio, time::Duration};
@@ -95,10 +95,9 @@ impl DockerNetwork {
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
             .kill_on_drop(true);
-        command.spawn().map_err(|error| Error::Internal {
-            code: "environment_start_failed",
-            message: format!("Failed to {operation}: {error}"),
-        })
+        command
+            .spawn()
+            .map_err(|error| prerequisites::spawn_error(&error, operation))
     }
 
     pub(crate) async fn stop(&self) -> Result<(), Error> {
@@ -215,16 +214,7 @@ impl DockerNetwork {
     }
 
     pub(super) fn docker_command(&self) -> Command {
-        let mut command = Command::new("docker");
-        match &self.docker_target {
-            DockerTarget::Context(context) => {
-                command.arg("--context").arg(context);
-            }
-            DockerTarget::Host(host) => {
-                command.arg("--host").arg(host);
-            }
-        }
-        command
+        self.docker_target.command()
     }
 
     async fn docker_text<I, S>(&self, args: I) -> Result<String, Error>
@@ -266,16 +256,16 @@ impl DockerNetwork {
                     operation_timeout.as_secs()
                 ),
             })?
-            .map_err(|error| Error::Internal {
-                code,
-                message: format!("Failed to {operation}: {error}"),
-            })?;
+            .map_err(|error| prerequisites::spawn_error(&error, operation))?;
         if output.status.success() {
             return Ok(output);
         }
 
         let stderr = String::from_utf8_lossy(&output.stderr);
         let details = stderr.trim();
+        if let Some(error) = prerequisites::runtime_failure(details) {
+            return Err(error);
+        }
         Err(Error::Internal {
             code,
             message: if details.is_empty() {

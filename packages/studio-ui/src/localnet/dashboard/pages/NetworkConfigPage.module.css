@@ -1,0 +1,24 @@
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  flex-shrink: 0;
+  padding: var(--acton-space-4) var(--acton-space-5);
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.blockLink {
+  color: var(--acton-color-accent);
+  text-decoration: none;
+}
+
+.blockLink:hover {
+  text-decoration: underline;
+}
+
+.blockLink:focus-visible {
+  border-radius: var(--acton-radius-control-sm);
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}

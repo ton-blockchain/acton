@@ -10,6 +10,7 @@ mod error;
 pub mod http;
 pub mod inspection;
 mod model;
+mod network_config;
 pub mod process;
 mod runtime;
 mod storage;
@@ -21,5 +22,6 @@ pub use model::{
     OperationProgress, OperationStatus, OperationStep, PortOptions, ServiceHealth,
     ServiceHealthStatus, Snapshot, StartupTimings, Status,
 };
+pub use network_config::UpdateNetworkConfig;
 pub use runtime::Runtime;
 pub use storage::{ServiceDescriptor, service_descriptor_path};

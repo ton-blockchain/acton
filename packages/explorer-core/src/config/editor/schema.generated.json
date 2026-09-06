@@ -1,0 +1,2541 @@
+{
+  "parameters": {
+    "0": "ConfigParam__",
+    "1": "ConfigParam__1",
+    "2": "ConfigParam__2",
+    "3": "ConfigParam__3",
+    "4": "ConfigParam__4",
+    "5": "ConfigParam__5",
+    "6": "ConfigParam__6",
+    "7": "ConfigParam__7",
+    "8": "ConfigParam__8",
+    "9": "ConfigParam__9",
+    "10": "ConfigParam__10",
+    "11": "ConfigParam__11",
+    "12": "ConfigParam__12",
+    "13": "ConfigParam__13",
+    "14": "ConfigParam__14",
+    "15": "ConfigParam__15",
+    "16": "ConfigParam__16",
+    "17": "ConfigParam__17",
+    "18": "ConfigParam__18",
+    "19": "ConfigParam__19",
+    "20": "ConfigParam_config_mc_gas_prices",
+    "21": "ConfigParam_config_gas_prices",
+    "22": "ConfigParam_config_mc_block_limits",
+    "23": "ConfigParam_config_block_limits",
+    "24": "ConfigParam_config_mc_fwd_prices",
+    "25": "ConfigParam_config_fwd_prices",
+    "28": "ConfigParam__26",
+    "29": "ConfigParam__27",
+    "30": "ConfigParam__28",
+    "31": "ConfigParam__29",
+    "32": "ConfigParam__30",
+    "33": "ConfigParam__31",
+    "34": "ConfigParam__32",
+    "35": "ConfigParam__33",
+    "36": "ConfigParam__34",
+    "37": "ConfigParam__35",
+    "39": "ConfigParam__36",
+    "40": "ConfigParam__37",
+    "43": "ConfigParam__38",
+    "44": "ConfigParam__39",
+    "45": "ConfigParam__40",
+    "46": "ConfigParam__41",
+    "71": "ConfigParam__42",
+    "72": "ConfigParam__43",
+    "73": "ConfigParam__44",
+    "79": "ConfigParam__45",
+    "81": "ConfigParam__46",
+    "82": "ConfigParam__47"
+  },
+  "definitions": {
+    "ConfigParam": {
+      "type": "union",
+      "options": [
+        {
+          "type": "ref",
+          "name": "ConfigParam__"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__1"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__2"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__3"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__4"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__5"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__6"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__7"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__8"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__9"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__10"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__11"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__12"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__13"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__14"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__15"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__16"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__17"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__18"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__19"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam_config_mc_gas_prices"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam_config_gas_prices"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam_config_mc_block_limits"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam_config_block_limits"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam_config_mc_fwd_prices"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam_config_fwd_prices"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__26"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__27"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__28"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__29"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__30"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__31"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__32"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__33"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__34"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__35"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__36"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__37"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__38"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__39"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__40"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__41"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__42"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__43"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__44"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__45"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__46"
+        },
+        {
+          "type": "ref",
+          "name": "ConfigParam__47"
+        }
+      ]
+    },
+    "ConfigParam__": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__"
+        },
+        "config_addr": {
+          "type": "buffer"
+        }
+      }
+    },
+    "ConfigParam__1": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__1"
+        },
+        "elector_addr": {
+          "type": "buffer"
+        }
+      }
+    },
+    "ConfigParam__2": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__2"
+        },
+        "minter_addr": {
+          "type": "buffer"
+        }
+      }
+    },
+    "ConfigParam__3": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__3"
+        },
+        "fee_collector_addr": {
+          "type": "buffer"
+        }
+      }
+    },
+    "ConfigParam__4": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__4"
+        },
+        "dns_root_addr": {
+          "type": "buffer"
+        }
+      }
+    },
+    "ConfigParam__5": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__5"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "BurningConfig"
+        }
+      }
+    },
+    "BurningConfig": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "BurningConfig"
+        },
+        "blackhole_addr": {
+          "type": "maybe",
+          "value": {
+            "type": "buffer"
+          }
+        },
+        "fee_burn_num": {
+          "type": "number"
+        },
+        "fee_burn_denom": {
+          "type": "number"
+        }
+      }
+    },
+    "ConfigParam__6": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__6"
+        },
+        "mint_new_price": {
+          "type": "bigint"
+        },
+        "mint_add_price": {
+          "type": "bigint"
+        }
+      }
+    },
+    "ConfigParam__7": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__7"
+        },
+        "to_mint": {
+          "type": "ref",
+          "name": "ExtraCurrencyCollection"
+        }
+      }
+    },
+    "ExtraCurrencyCollection": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ExtraCurrencyCollection"
+        },
+        "dict": {
+          "type": "map",
+          "key": {
+            "type": "number"
+          },
+          "value": {
+            "type": "bigint"
+          }
+        }
+      }
+    },
+    "ConfigParam__8": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__8"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "GlobalVersion"
+        }
+      }
+    },
+    "GlobalVersion": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "GlobalVersion"
+        },
+        "version": {
+          "type": "number"
+        },
+        "capabilities": {
+          "type": "bigint"
+        }
+      }
+    },
+    "ConfigParam__9": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__9"
+        },
+        "mandatory_params": {
+          "type": "map",
+          "key": {
+            "type": "number"
+          },
+          "value": {
+            "type": "ref",
+            "name": "True"
+          }
+        }
+      }
+    },
+    "True": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "True"
+        }
+      }
+    },
+    "ConfigParam__10": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__10"
+        },
+        "critical_params": {
+          "type": "map",
+          "key": {
+            "type": "number"
+          },
+          "value": {
+            "type": "ref",
+            "name": "True"
+          }
+        }
+      }
+    },
+    "ConfigParam__11": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__11"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "ConfigVotingSetup"
+        }
+      }
+    },
+    "ConfigVotingSetup": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigVotingSetup"
+        },
+        "normal_params": {
+          "type": "ref",
+          "name": "ConfigProposalSetup"
+        },
+        "critical_params": {
+          "type": "ref",
+          "name": "ConfigProposalSetup"
+        }
+      }
+    },
+    "ConfigProposalSetup": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigProposalSetup"
+        },
+        "min_tot_rounds": {
+          "type": "number"
+        },
+        "max_tot_rounds": {
+          "type": "number"
+        },
+        "min_wins": {
+          "type": "number"
+        },
+        "max_losses": {
+          "type": "number"
+        },
+        "min_store_sec": {
+          "type": "number"
+        },
+        "max_store_sec": {
+          "type": "number"
+        },
+        "bit_price": {
+          "type": "number"
+        },
+        "_cell_price": {
+          "type": "number"
+        }
+      }
+    },
+    "ConfigParam__12": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__12"
+        },
+        "workchains": {
+          "type": "map",
+          "key": {
+            "type": "number"
+          },
+          "value": {
+            "type": "ref",
+            "name": "WorkchainDescr"
+          }
+        }
+      }
+    },
+    "WorkchainDescr": {
+      "type": "union",
+      "options": [
+        {
+          "type": "ref",
+          "name": "WorkchainDescr_workchain"
+        },
+        {
+          "type": "ref",
+          "name": "WorkchainDescr_workchain_v2"
+        }
+      ]
+    },
+    "WorkchainDescr_workchain": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "WorkchainDescr_workchain"
+        },
+        "enabled_since": {
+          "type": "number"
+        },
+        "monitor_min_split": {
+          "type": "number"
+        },
+        "min_split": {
+          "type": "number"
+        },
+        "max_split": {
+          "type": "number"
+        },
+        "basic": {
+          "type": "number"
+        },
+        "active": {
+          "type": "ref",
+          "name": "Bool"
+        },
+        "accept_msgs": {
+          "type": "ref",
+          "name": "Bool"
+        },
+        "flags": {
+          "type": "number"
+        },
+        "zerostate_root_hash": {
+          "type": "buffer"
+        },
+        "zerostate_file_hash": {
+          "type": "buffer"
+        },
+        "version": {
+          "type": "number"
+        },
+        "format": {
+          "type": "ref",
+          "name": "WorkchainFormat"
+        }
+      }
+    },
+    "Bool": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "Bool"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      }
+    },
+    "WorkchainFormat": {
+      "type": "union",
+      "options": [
+        {
+          "type": "ref",
+          "name": "WorkchainFormat_wfmt_basic"
+        },
+        {
+          "type": "ref",
+          "name": "WorkchainFormat_wfmt_ext"
+        }
+      ]
+    },
+    "WorkchainFormat_wfmt_basic": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "WorkchainFormat_wfmt_basic"
+        },
+        "vm_version": {
+          "type": "number"
+        },
+        "vm_mode": {
+          "type": "bigint"
+        }
+      }
+    },
+    "WorkchainFormat_wfmt_ext": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "WorkchainFormat_wfmt_ext"
+        },
+        "min_addr_len": {
+          "type": "number"
+        },
+        "max_addr_len": {
+          "type": "number"
+        },
+        "addr_len_step": {
+          "type": "number"
+        },
+        "workchain_type_id": {
+          "type": "number"
+        }
+      }
+    },
+    "WorkchainDescr_workchain_v2": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "WorkchainDescr_workchain_v2"
+        },
+        "enabled_since": {
+          "type": "number"
+        },
+        "monitor_min_split": {
+          "type": "number"
+        },
+        "min_split": {
+          "type": "number"
+        },
+        "max_split": {
+          "type": "number"
+        },
+        "basic": {
+          "type": "number"
+        },
+        "active": {
+          "type": "ref",
+          "name": "Bool"
+        },
+        "accept_msgs": {
+          "type": "ref",
+          "name": "Bool"
+        },
+        "flags": {
+          "type": "number"
+        },
+        "zerostate_root_hash": {
+          "type": "buffer"
+        },
+        "zerostate_file_hash": {
+          "type": "buffer"
+        },
+        "version": {
+          "type": "number"
+        },
+        "format": {
+          "type": "ref",
+          "name": "WorkchainFormat"
+        },
+        "split_merge_timings": {
+          "type": "ref",
+          "name": "WcSplitMergeTimings"
+        },
+        "persistent_state_split_depth": {
+          "type": "number"
+        }
+      }
+    },
+    "WcSplitMergeTimings": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "WcSplitMergeTimings"
+        },
+        "split_merge_delay": {
+          "type": "number"
+        },
+        "split_merge_interval": {
+          "type": "number"
+        },
+        "min_split_merge_interval": {
+          "type": "number"
+        },
+        "max_split_merge_delay": {
+          "type": "number"
+        }
+      }
+    },
+    "ConfigParam__13": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__13"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "ComplaintPricing"
+        }
+      }
+    },
+    "ComplaintPricing": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ComplaintPricing"
+        },
+        "deposit": {
+          "type": "bigint"
+        },
+        "bit_price": {
+          "type": "bigint"
+        },
+        "_cell_price": {
+          "type": "bigint"
+        }
+      }
+    },
+    "ConfigParam__14": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__14"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "BlockCreateFees"
+        }
+      }
+    },
+    "BlockCreateFees": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "BlockCreateFees"
+        },
+        "masterchain_block_fee": {
+          "type": "bigint"
+        },
+        "basechain_block_fee": {
+          "type": "bigint"
+        }
+      }
+    },
+    "ConfigParam__15": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__15"
+        },
+        "validators_elected_for": {
+          "type": "number"
+        },
+        "elections_start_before": {
+          "type": "number"
+        },
+        "elections_end_before": {
+          "type": "number"
+        },
+        "stake_held_for": {
+          "type": "number"
+        }
+      }
+    },
+    "ConfigParam__16": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__16"
+        },
+        "max_validators": {
+          "type": "number"
+        },
+        "max_main_validators": {
+          "type": "number"
+        },
+        "min_validators": {
+          "type": "number"
+        }
+      }
+    },
+    "ConfigParam__17": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__17"
+        },
+        "min_stake": {
+          "type": "bigint"
+        },
+        "max_stake": {
+          "type": "bigint"
+        },
+        "min_total_stake": {
+          "type": "bigint"
+        },
+        "max_stake_factor": {
+          "type": "number"
+        }
+      }
+    },
+    "ConfigParam__18": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__18"
+        },
+        "anon0": {
+          "type": "map",
+          "key": {
+            "type": "number"
+          },
+          "value": {
+            "type": "ref",
+            "name": "StoragePrices"
+          }
+        }
+      }
+    },
+    "StoragePrices": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "StoragePrices"
+        },
+        "utime_since": {
+          "type": "number"
+        },
+        "bit_price_ps": {
+          "type": "bigint"
+        },
+        "_cell_price_ps": {
+          "type": "bigint"
+        },
+        "mc_bit_price_ps": {
+          "type": "bigint"
+        },
+        "mc_cell_price_ps": {
+          "type": "bigint"
+        }
+      }
+    },
+    "ConfigParam__19": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__19"
+        },
+        "global_id": {
+          "type": "number"
+        }
+      }
+    },
+    "ConfigParam_config_mc_gas_prices": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam_config_mc_gas_prices"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "GasLimitsPrices"
+        }
+      }
+    },
+    "GasLimitsPrices": {
+      "type": "union",
+      "options": [
+        {
+          "type": "ref",
+          "name": "GasLimitsPrices_gas_prices"
+        },
+        {
+          "type": "ref",
+          "name": "GasLimitsPrices_gas_prices_ext"
+        },
+        {
+          "type": "ref",
+          "name": "GasLimitsPrices_gas_flat_pfx"
+        }
+      ]
+    },
+    "GasLimitsPrices_gas_prices": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "GasLimitsPrices_gas_prices"
+        },
+        "gas_price": {
+          "type": "bigint"
+        },
+        "gas_limit": {
+          "type": "bigint"
+        },
+        "gas_credit": {
+          "type": "bigint"
+        },
+        "block_gas_limit": {
+          "type": "bigint"
+        },
+        "freeze_due_limit": {
+          "type": "bigint"
+        },
+        "delete_due_limit": {
+          "type": "bigint"
+        }
+      }
+    },
+    "GasLimitsPrices_gas_prices_ext": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "GasLimitsPrices_gas_prices_ext"
+        },
+        "gas_price": {
+          "type": "bigint"
+        },
+        "gas_limit": {
+          "type": "bigint"
+        },
+        "special_gas_limit": {
+          "type": "bigint"
+        },
+        "gas_credit": {
+          "type": "bigint"
+        },
+        "block_gas_limit": {
+          "type": "bigint"
+        },
+        "freeze_due_limit": {
+          "type": "bigint"
+        },
+        "delete_due_limit": {
+          "type": "bigint"
+        }
+      }
+    },
+    "GasLimitsPrices_gas_flat_pfx": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "GasLimitsPrices_gas_flat_pfx"
+        },
+        "flat_gas_limit": {
+          "type": "bigint"
+        },
+        "flat_gas_price": {
+          "type": "bigint"
+        },
+        "other": {
+          "type": "ref",
+          "name": "GasLimitsPrices"
+        }
+      }
+    },
+    "ConfigParam_config_gas_prices": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam_config_gas_prices"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "GasLimitsPrices"
+        }
+      }
+    },
+    "ConfigParam_config_mc_block_limits": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam_config_mc_block_limits"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "BlockLimits"
+        }
+      }
+    },
+    "BlockLimits": {
+      "type": "union",
+      "options": [
+        {
+          "type": "ref",
+          "name": "BlockLimits_block_limits"
+        },
+        {
+          "type": "ref",
+          "name": "BlockLimits_block_limits_v2"
+        }
+      ]
+    },
+    "BlockLimits_block_limits": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "BlockLimits_block_limits"
+        },
+        "bytes": {
+          "type": "ref",
+          "name": "ParamLimits"
+        },
+        "gas": {
+          "type": "ref",
+          "name": "ParamLimits"
+        },
+        "lt_delta": {
+          "type": "ref",
+          "name": "ParamLimits"
+        }
+      }
+    },
+    "ParamLimits": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ParamLimits"
+        },
+        "underload": {
+          "type": "number"
+        },
+        "soft_limit": {
+          "type": "number"
+        },
+        "hard_limit": {
+          "type": "number"
+        }
+      }
+    },
+    "BlockLimits_block_limits_v2": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "BlockLimits_block_limits_v2"
+        },
+        "bytes": {
+          "type": "ref",
+          "name": "ParamLimits"
+        },
+        "gas": {
+          "type": "ref",
+          "name": "ParamLimits"
+        },
+        "lt_delta": {
+          "type": "ref",
+          "name": "ParamLimits"
+        },
+        "collated_data": {
+          "type": "ref",
+          "name": "ParamLimits"
+        },
+        "imported_msg_queue": {
+          "type": "ref",
+          "name": "ImportedMsgQueueLimits"
+        }
+      }
+    },
+    "ImportedMsgQueueLimits": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ImportedMsgQueueLimits"
+        },
+        "max_bytes": {
+          "type": "number"
+        },
+        "max_msgs": {
+          "type": "number"
+        }
+      }
+    },
+    "ConfigParam_config_block_limits": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam_config_block_limits"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "BlockLimits"
+        }
+      }
+    },
+    "ConfigParam_config_mc_fwd_prices": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam_config_mc_fwd_prices"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "MsgForwardPrices"
+        }
+      }
+    },
+    "MsgForwardPrices": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "MsgForwardPrices"
+        },
+        "lump_price": {
+          "type": "bigint"
+        },
+        "bit_price": {
+          "type": "bigint"
+        },
+        "_cell_price": {
+          "type": "bigint"
+        },
+        "ihr_price_factor": {
+          "type": "number"
+        },
+        "first_frac": {
+          "type": "number"
+        },
+        "next_frac": {
+          "type": "number"
+        }
+      }
+    },
+    "ConfigParam_config_fwd_prices": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam_config_fwd_prices"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "MsgForwardPrices"
+        }
+      }
+    },
+    "ConfigParam__26": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__26"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "CatchainConfig"
+        }
+      }
+    },
+    "CatchainConfig": {
+      "type": "union",
+      "options": [
+        {
+          "type": "ref",
+          "name": "CatchainConfig_catchain_config"
+        },
+        {
+          "type": "ref",
+          "name": "CatchainConfig_catchain_config_new"
+        }
+      ]
+    },
+    "CatchainConfig_catchain_config": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "CatchainConfig_catchain_config"
+        },
+        "mc_catchain_lifetime": {
+          "type": "number"
+        },
+        "shard_catchain_lifetime": {
+          "type": "number"
+        },
+        "shard_validators_lifetime": {
+          "type": "number"
+        },
+        "shard_validators_num": {
+          "type": "number"
+        }
+      }
+    },
+    "CatchainConfig_catchain_config_new": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "CatchainConfig_catchain_config_new"
+        },
+        "flags": {
+          "type": "number"
+        },
+        "shuffle_mc_validators": {
+          "type": "ref",
+          "name": "Bool"
+        },
+        "mc_catchain_lifetime": {
+          "type": "number"
+        },
+        "shard_catchain_lifetime": {
+          "type": "number"
+        },
+        "shard_validators_lifetime": {
+          "type": "number"
+        },
+        "shard_validators_num": {
+          "type": "number"
+        }
+      }
+    },
+    "ConfigParam__27": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__27"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "ConsensusConfig"
+        }
+      }
+    },
+    "ConsensusConfig": {
+      "type": "union",
+      "options": [
+        {
+          "type": "ref",
+          "name": "ConsensusConfig_consensus_config"
+        },
+        {
+          "type": "ref",
+          "name": "ConsensusConfig_consensus_config_new"
+        },
+        {
+          "type": "ref",
+          "name": "ConsensusConfig_consensus_config_v3"
+        },
+        {
+          "type": "ref",
+          "name": "ConsensusConfig_consensus_config_v4"
+        }
+      ]
+    },
+    "ConsensusConfig_consensus_config": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConsensusConfig_consensus_config"
+        },
+        "round_candidates": {
+          "type": "number"
+        },
+        "next_candidate_delay_ms": {
+          "type": "number"
+        },
+        "consensus_timeout_ms": {
+          "type": "number"
+        },
+        "fast_attempts": {
+          "type": "number"
+        },
+        "attempt_duration": {
+          "type": "number"
+        },
+        "catchain_max_deps": {
+          "type": "number"
+        },
+        "max_block_bytes": {
+          "type": "number"
+        },
+        "max_collated_bytes": {
+          "type": "number"
+        }
+      }
+    },
+    "ConsensusConfig_consensus_config_new": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConsensusConfig_consensus_config_new"
+        },
+        "flags": {
+          "type": "number"
+        },
+        "new_catchain_ids": {
+          "type": "ref",
+          "name": "Bool"
+        },
+        "round_candidates": {
+          "type": "number"
+        },
+        "next_candidate_delay_ms": {
+          "type": "number"
+        },
+        "consensus_timeout_ms": {
+          "type": "number"
+        },
+        "fast_attempts": {
+          "type": "number"
+        },
+        "attempt_duration": {
+          "type": "number"
+        },
+        "catchain_max_deps": {
+          "type": "number"
+        },
+        "max_block_bytes": {
+          "type": "number"
+        },
+        "max_collated_bytes": {
+          "type": "number"
+        }
+      }
+    },
+    "ConsensusConfig_consensus_config_v3": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConsensusConfig_consensus_config_v3"
+        },
+        "flags": {
+          "type": "number"
+        },
+        "new_catchain_ids": {
+          "type": "ref",
+          "name": "Bool"
+        },
+        "round_candidates": {
+          "type": "number"
+        },
+        "next_candidate_delay_ms": {
+          "type": "number"
+        },
+        "consensus_timeout_ms": {
+          "type": "number"
+        },
+        "fast_attempts": {
+          "type": "number"
+        },
+        "attempt_duration": {
+          "type": "number"
+        },
+        "catchain_max_deps": {
+          "type": "number"
+        },
+        "max_block_bytes": {
+          "type": "number"
+        },
+        "max_collated_bytes": {
+          "type": "number"
+        },
+        "proto_version": {
+          "type": "number"
+        }
+      }
+    },
+    "ConsensusConfig_consensus_config_v4": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConsensusConfig_consensus_config_v4"
+        },
+        "flags": {
+          "type": "number"
+        },
+        "use_quic": {
+          "type": "ref",
+          "name": "Bool"
+        },
+        "new_catchain_ids": {
+          "type": "ref",
+          "name": "Bool"
+        },
+        "round_candidates": {
+          "type": "number"
+        },
+        "next_candidate_delay_ms": {
+          "type": "number"
+        },
+        "consensus_timeout_ms": {
+          "type": "number"
+        },
+        "fast_attempts": {
+          "type": "number"
+        },
+        "attempt_duration": {
+          "type": "number"
+        },
+        "catchain_max_deps": {
+          "type": "number"
+        },
+        "max_block_bytes": {
+          "type": "number"
+        },
+        "max_collated_bytes": {
+          "type": "number"
+        },
+        "proto_version": {
+          "type": "number"
+        },
+        "catchain_max_blocks_coeff": {
+          "type": "number"
+        }
+      }
+    },
+    "ConfigParam__28": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__28"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "NewConsensusConfigAll"
+        }
+      }
+    },
+    "NewConsensusConfigAll": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "NewConsensusConfigAll"
+        },
+        "mc": {
+          "type": "maybe",
+          "value": {
+            "type": "ref",
+            "name": "NewConsensusConfig"
+          }
+        },
+        "shard": {
+          "type": "maybe",
+          "value": {
+            "type": "ref",
+            "name": "NewConsensusConfig"
+          }
+        }
+      }
+    },
+    "NewConsensusConfig": {
+      "type": "union",
+      "options": [
+        {
+          "type": "ref",
+          "name": "NewConsensusConfig_simplex_config"
+        },
+        {
+          "type": "ref",
+          "name": "NewConsensusConfig_simplex_config_v2"
+        }
+      ]
+    },
+    "NewConsensusConfig_simplex_config": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "NewConsensusConfig_simplex_config"
+        },
+        "flags": {
+          "type": "number"
+        },
+        "use_quic": {
+          "type": "ref",
+          "name": "Bool"
+        },
+        "target_rate_ms": {
+          "type": "number"
+        },
+        "slots_per_leader_window": {
+          "type": "number"
+        },
+        "first_block_timeout_ms": {
+          "type": "number"
+        },
+        "max_leader_window_desync": {
+          "type": "number"
+        }
+      }
+    },
+    "NewConsensusConfig_simplex_config_v2": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "NewConsensusConfig_simplex_config_v2"
+        },
+        "flags": {
+          "type": "number"
+        },
+        "protocol_version": {
+          "type": "number"
+        },
+        "use_quic": {
+          "type": "ref",
+          "name": "Bool"
+        },
+        "slots_per_leader_window": {
+          "type": "number"
+        },
+        "noncritical_params": {
+          "type": "map",
+          "key": {
+            "type": "number"
+          },
+          "value": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "ConfigParam__29": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__29"
+        },
+        "fundamental_smc_addr": {
+          "type": "map",
+          "key": {
+            "type": "bigint"
+          },
+          "value": {
+            "type": "ref",
+            "name": "True"
+          }
+        }
+      }
+    },
+    "ConfigParam__30": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__30"
+        },
+        "prev_validators": {
+          "type": "ref",
+          "name": "ValidatorSet"
+        }
+      }
+    },
+    "ValidatorSet": {
+      "type": "union",
+      "options": [
+        {
+          "type": "ref",
+          "name": "ValidatorSet_validators"
+        },
+        {
+          "type": "ref",
+          "name": "ValidatorSet_validators_ext"
+        }
+      ]
+    },
+    "ValidatorSet_validators": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ValidatorSet_validators"
+        },
+        "utime_since": {
+          "type": "number"
+        },
+        "utime_until": {
+          "type": "number"
+        },
+        "total": {
+          "type": "number"
+        },
+        "main": {
+          "type": "number"
+        },
+        "list": {
+          "type": "map",
+          "key": {
+            "type": "number"
+          },
+          "value": {
+            "type": "ref",
+            "name": "ValidatorDescr"
+          }
+        }
+      }
+    },
+    "ValidatorDescr": {
+      "type": "union",
+      "options": [
+        {
+          "type": "ref",
+          "name": "ValidatorDescr_validator"
+        },
+        {
+          "type": "ref",
+          "name": "ValidatorDescr_validator_addr"
+        }
+      ]
+    },
+    "ValidatorDescr_validator": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ValidatorDescr_validator"
+        },
+        "public_key": {
+          "type": "ref",
+          "name": "SigPubKey"
+        },
+        "weight": {
+          "type": "bigint"
+        }
+      }
+    },
+    "SigPubKey": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "SigPubKey"
+        },
+        "pubkey": {
+          "type": "buffer"
+        }
+      }
+    },
+    "ValidatorDescr_validator_addr": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ValidatorDescr_validator_addr"
+        },
+        "public_key": {
+          "type": "ref",
+          "name": "SigPubKey"
+        },
+        "weight": {
+          "type": "bigint"
+        },
+        "adnl_addr": {
+          "type": "buffer"
+        }
+      }
+    },
+    "ValidatorSet_validators_ext": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ValidatorSet_validators_ext"
+        },
+        "utime_since": {
+          "type": "number"
+        },
+        "utime_until": {
+          "type": "number"
+        },
+        "total": {
+          "type": "number"
+        },
+        "main": {
+          "type": "number"
+        },
+        "total_weight": {
+          "type": "bigint"
+        },
+        "list": {
+          "type": "map",
+          "key": {
+            "type": "number"
+          },
+          "value": {
+            "type": "ref",
+            "name": "ValidatorDescr"
+          }
+        }
+      }
+    },
+    "ConfigParam__31": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__31"
+        },
+        "prev_temp_validators": {
+          "type": "ref",
+          "name": "ValidatorSet"
+        }
+      }
+    },
+    "ConfigParam__32": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__32"
+        },
+        "cur_validators": {
+          "type": "ref",
+          "name": "ValidatorSet"
+        }
+      }
+    },
+    "ConfigParam__33": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__33"
+        },
+        "cur_temp_validators": {
+          "type": "ref",
+          "name": "ValidatorSet"
+        }
+      }
+    },
+    "ConfigParam__34": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__34"
+        },
+        "next_validators": {
+          "type": "ref",
+          "name": "ValidatorSet"
+        }
+      }
+    },
+    "ConfigParam__35": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__35"
+        },
+        "next_temp_validators": {
+          "type": "ref",
+          "name": "ValidatorSet"
+        }
+      }
+    },
+    "ConfigParam__36": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__36"
+        },
+        "anon0": {
+          "type": "map",
+          "key": {
+            "type": "bigint"
+          },
+          "value": {
+            "type": "ref",
+            "name": "ValidatorSignedTempKey"
+          }
+        }
+      }
+    },
+    "ValidatorSignedTempKey": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ValidatorSignedTempKey"
+        },
+        "key": {
+          "type": "ref",
+          "name": "ValidatorTempKey"
+        },
+        "signature": {
+          "type": "ref",
+          "name": "CryptoSignature"
+        }
+      }
+    },
+    "ValidatorTempKey": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ValidatorTempKey"
+        },
+        "adnl_addr": {
+          "type": "buffer"
+        },
+        "temp_public_key": {
+          "type": "ref",
+          "name": "SigPubKey"
+        },
+        "seqno": {
+          "type": "number"
+        },
+        "valid_until": {
+          "type": "number"
+        }
+      }
+    },
+    "CryptoSignature": {
+      "type": "union",
+      "options": [
+        {
+          "type": "ref",
+          "name": "CryptoSignature_chained_signature"
+        },
+        {
+          "type": "ref",
+          "name": "CryptoSignature__"
+        }
+      ]
+    },
+    "CryptoSignature_chained_signature": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "CryptoSignature_chained_signature"
+        },
+        "signed_cert": {
+          "type": "ref",
+          "name": "SignedCertificate"
+        },
+        "temp_key_signature": {
+          "type": "ref",
+          "name": "CryptoSignatureSimple"
+        }
+      }
+    },
+    "SignedCertificate": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "SignedCertificate"
+        },
+        "certificate": {
+          "type": "ref",
+          "name": "Certificate"
+        },
+        "certificate_signature": {
+          "type": "ref",
+          "name": "CryptoSignature"
+        }
+      }
+    },
+    "Certificate": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "Certificate"
+        },
+        "temp_key": {
+          "type": "ref",
+          "name": "SigPubKey"
+        },
+        "valid_since": {
+          "type": "number"
+        },
+        "valid_until": {
+          "type": "number"
+        }
+      }
+    },
+    "CryptoSignatureSimple": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "CryptoSignatureSimple"
+        },
+        "R": {
+          "type": "buffer"
+        },
+        "s": {
+          "type": "buffer"
+        }
+      }
+    },
+    "CryptoSignature__": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "CryptoSignature__"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "CryptoSignatureSimple"
+        }
+      }
+    },
+    "ConfigParam__37": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__37"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "MisbehaviourPunishmentConfig"
+        }
+      }
+    },
+    "MisbehaviourPunishmentConfig": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "MisbehaviourPunishmentConfig"
+        },
+        "default_flat_fine": {
+          "type": "bigint"
+        },
+        "default_proportional_fine": {
+          "type": "number"
+        },
+        "severity_flat_mult": {
+          "type": "number"
+        },
+        "severity_proportional_mult": {
+          "type": "number"
+        },
+        "unpunishable_interval": {
+          "type": "number"
+        },
+        "long_interval": {
+          "type": "number"
+        },
+        "long_flat_mult": {
+          "type": "number"
+        },
+        "long_proportional_mult": {
+          "type": "number"
+        },
+        "medium_interval": {
+          "type": "number"
+        },
+        "medium_flat_mult": {
+          "type": "number"
+        },
+        "medium_proportional_mult": {
+          "type": "number"
+        }
+      }
+    },
+    "ConfigParam__38": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__38"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "SizeLimitsConfig"
+        }
+      }
+    },
+    "SizeLimitsConfig": {
+      "type": "union",
+      "options": [
+        {
+          "type": "ref",
+          "name": "SizeLimitsConfig_size_limits_config"
+        },
+        {
+          "type": "ref",
+          "name": "SizeLimitsConfig_size_limits_config_v2"
+        },
+        {
+          "type": "ref",
+          "name": "SizeLimitsConfig_size_limits_config_v3"
+        }
+      ]
+    },
+    "SizeLimitsConfig_size_limits_config": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "SizeLimitsConfig_size_limits_config"
+        },
+        "max_msg_bits": {
+          "type": "number"
+        },
+        "max_msg_cells": {
+          "type": "number"
+        },
+        "max_library_cells": {
+          "type": "number"
+        },
+        "max_vm_data_depth": {
+          "type": "number"
+        },
+        "max_ext_msg_size": {
+          "type": "number"
+        },
+        "max_ext_msg_depth": {
+          "type": "number"
+        }
+      }
+    },
+    "SizeLimitsConfig_size_limits_config_v2": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "SizeLimitsConfig_size_limits_config_v2"
+        },
+        "max_msg_bits": {
+          "type": "number"
+        },
+        "max_msg_cells": {
+          "type": "number"
+        },
+        "max_library_cells": {
+          "type": "number"
+        },
+        "max_vm_data_depth": {
+          "type": "number"
+        },
+        "max_ext_msg_size": {
+          "type": "number"
+        },
+        "max_ext_msg_depth": {
+          "type": "number"
+        },
+        "max_acc_state_cells": {
+          "type": "number"
+        },
+        "max_mc_acc_state_cells": {
+          "type": "number"
+        },
+        "max_acc_public_libraries": {
+          "type": "number"
+        },
+        "defer_out_queue_size_limit": {
+          "type": "number"
+        },
+        "max_msg_extra_currencies": {
+          "type": "number"
+        },
+        "max_acc_fixed_prefix_length": {
+          "type": "number"
+        },
+        "acc_state_cells_for_storage_dict": {
+          "type": "number"
+        },
+        "max_transaction_library_loads": {
+          "type": "maybe",
+          "value": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "SizeLimitsConfig_size_limits_config_v3": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "SizeLimitsConfig_size_limits_config_v3"
+        },
+        "max_msg_bits": {
+          "type": "number"
+        },
+        "max_msg_cells": {
+          "type": "number"
+        },
+        "max_library_cells": {
+          "type": "number"
+        },
+        "max_vm_data_depth": {
+          "type": "number"
+        },
+        "max_ext_msg_size": {
+          "type": "number"
+        },
+        "max_ext_msg_depth": {
+          "type": "number"
+        },
+        "max_acc_state_cells": {
+          "type": "number"
+        },
+        "max_mc_acc_state_cells": {
+          "type": "number"
+        },
+        "max_acc_public_libraries": {
+          "type": "number"
+        },
+        "defer_out_queue_size_limit": {
+          "type": "number"
+        },
+        "max_msg_extra_currencies": {
+          "type": "number"
+        },
+        "max_acc_fixed_prefix_length": {
+          "type": "number"
+        },
+        "acc_state_cells_for_storage_dict": {
+          "type": "number"
+        },
+        "max_transaction_library_loads": {
+          "type": "maybe",
+          "value": {
+            "type": "number"
+          }
+        },
+        "max_total_msg_bits": {
+          "type": "number"
+        },
+        "max_total_msg_cells": {
+          "type": "number"
+        }
+      }
+    },
+    "ConfigParam__39": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__39"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "SuspendedAddressList"
+        }
+      }
+    },
+    "SuspendedAddressList": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "SuspendedAddressList"
+        },
+        "addresses": {
+          "type": "map",
+          "key": {
+            "type": "bigint"
+          },
+          "value": {
+            "type": "ref",
+            "name": "Unit"
+          }
+        },
+        "suspended_until": {
+          "type": "number"
+        }
+      }
+    },
+    "Unit": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "Unit"
+        }
+      }
+    },
+    "ConfigParam__40": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__40"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "PrecompiledContractsConfig"
+        }
+      }
+    },
+    "PrecompiledContractsConfig": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "PrecompiledContractsConfig"
+        },
+        "list": {
+          "type": "map",
+          "key": {
+            "type": "bigint"
+          },
+          "value": {
+            "type": "ref",
+            "name": "PrecompiledSmc"
+          }
+        }
+      }
+    },
+    "PrecompiledSmc": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "PrecompiledSmc"
+        },
+        "gas_usage": {
+          "type": "bigint"
+        }
+      }
+    },
+    "ConfigParam__41": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__41"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "ValRegistryConfig"
+        }
+      }
+    },
+    "ValRegistryConfig": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ValRegistryConfig"
+        },
+        "contract_address": {
+          "type": "buffer"
+        },
+        "max_collators_per_validator": {
+          "type": "number"
+        },
+        "new_code_hash": {
+          "type": "maybe",
+          "value": {
+            "type": "bigint"
+          }
+        }
+      }
+    },
+    "ConfigParam__42": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__42"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "OracleBridgeParams"
+        }
+      }
+    },
+    "OracleBridgeParams": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "OracleBridgeParams"
+        },
+        "bridge_address": {
+          "type": "buffer"
+        },
+        "oracle_mutlisig_address": {
+          "type": "buffer"
+        },
+        "oracles": {
+          "type": "map",
+          "key": {
+            "type": "bigint"
+          },
+          "value": {
+            "type": "bigint"
+          }
+        },
+        "external_chain_address": {
+          "type": "buffer"
+        }
+      }
+    },
+    "ConfigParam__43": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__43"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "OracleBridgeParams"
+        }
+      }
+    },
+    "ConfigParam__44": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__44"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "OracleBridgeParams"
+        }
+      }
+    },
+    "ConfigParam__45": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__45"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "JettonBridgeParams"
+        }
+      }
+    },
+    "JettonBridgeParams": {
+      "type": "union",
+      "options": [
+        {
+          "type": "ref",
+          "name": "JettonBridgeParams_jetton_bridge_params_v0"
+        },
+        {
+          "type": "ref",
+          "name": "JettonBridgeParams_jetton_bridge_params_v1"
+        }
+      ]
+    },
+    "JettonBridgeParams_jetton_bridge_params_v0": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "JettonBridgeParams_jetton_bridge_params_v0"
+        },
+        "bridge_address": {
+          "type": "buffer"
+        },
+        "oracles_address": {
+          "type": "buffer"
+        },
+        "oracles": {
+          "type": "map",
+          "key": {
+            "type": "bigint"
+          },
+          "value": {
+            "type": "bigint"
+          }
+        },
+        "state_flags": {
+          "type": "number"
+        },
+        "burn_bridge_fee": {
+          "type": "bigint"
+        }
+      }
+    },
+    "JettonBridgeParams_jetton_bridge_params_v1": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "JettonBridgeParams_jetton_bridge_params_v1"
+        },
+        "bridge_address": {
+          "type": "buffer"
+        },
+        "oracles_address": {
+          "type": "buffer"
+        },
+        "oracles": {
+          "type": "map",
+          "key": {
+            "type": "bigint"
+          },
+          "value": {
+            "type": "bigint"
+          }
+        },
+        "state_flags": {
+          "type": "number"
+        },
+        "prices": {
+          "type": "ref",
+          "name": "JettonBridgePrices"
+        },
+        "external_chain_address": {
+          "type": "buffer"
+        }
+      }
+    },
+    "JettonBridgePrices": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "JettonBridgePrices"
+        },
+        "bridge_burn_fee": {
+          "type": "bigint"
+        },
+        "bridge_mint_fee": {
+          "type": "bigint"
+        },
+        "wallet_min_tons_for_storage": {
+          "type": "bigint"
+        },
+        "wallet_gas_consumption": {
+          "type": "bigint"
+        },
+        "minter_min_tons_for_storage": {
+          "type": "bigint"
+        },
+        "discover_gas_consumption": {
+          "type": "bigint"
+        }
+      }
+    },
+    "ConfigParam__46": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__46"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "JettonBridgeParams"
+        }
+      }
+    },
+    "ConfigParam__47": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ConfigParam__47"
+        },
+        "anon0": {
+          "type": "ref",
+          "name": "JettonBridgeParams"
+        }
+      }
+    }
+  }
+}

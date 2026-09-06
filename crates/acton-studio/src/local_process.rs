@@ -408,6 +408,67 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         })
     }
 
+    fn update_network_config(
+        &self,
+        environment_id: &str,
+        request: acton_localnet::UpdateNetworkConfig,
+    ) -> EnvironmentRuntimeFuture<'_, acton_localnet::Operation> {
+        let environment_id = environment_id.to_owned();
+
+        Box::pin(async move {
+            let environment = find_environment(&self.inner, &environment_id).await?;
+            ensure_environment_not_deleted(&environment).await?;
+
+            match &environment.driver {
+                EnvironmentDriver::FullTonNetwork(driver) => driver
+                    .client()
+                    .await?
+                    .update_network_config(&request)
+                    .await
+                    .map_err(localnet::error),
+                EnvironmentDriver::ActonSimulatedLocalnet { .. } => {
+                    Err(EnvironmentRuntimeError::Conflict {
+                        code: "environment_config_unavailable",
+                        message:
+                            "Configuration editing is available for Full localnet environments"
+                                .to_owned(),
+                    })
+                }
+            }
+        })
+    }
+
+    fn localnet_operation(
+        &self,
+        environment_id: &str,
+        operation_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, acton_localnet::Operation> {
+        let environment_id = environment_id.to_owned();
+        let operation_id = operation_id.to_owned();
+
+        Box::pin(async move {
+            let environment = find_environment(&self.inner, &environment_id).await?;
+            ensure_environment_not_deleted(&environment).await?;
+
+            match &environment.driver {
+                EnvironmentDriver::FullTonNetwork(driver) => driver
+                    .client()
+                    .await?
+                    .operation(&operation_id)
+                    .await
+                    .map_err(localnet::error),
+                EnvironmentDriver::ActonSimulatedLocalnet { .. } => {
+                    Err(EnvironmentRuntimeError::Conflict {
+                        code: "environment_config_unavailable",
+                        message:
+                            "Configuration editing is available for Full localnet environments"
+                                .to_owned(),
+                    })
+                }
+            }
+        })
+    }
+
     fn add_full_ton_node(
         &self,
         environment_id: &str,

@@ -105,6 +105,7 @@ impl Activity {
 
     pub(super) fn operation(&mut self, operation: &Operation) {
         let (verb, message) = match operation.phase.as_str() {
+            "checkingDocker" => ("Checking", "Docker Engine and Compose availability"),
             "checkingImage" => ("Checking", "Localton Docker image"),
             "pullingImage" => ("Pulling", "Localton Docker image"),
             "startingContainers" => ("Starting", "Docker services"),

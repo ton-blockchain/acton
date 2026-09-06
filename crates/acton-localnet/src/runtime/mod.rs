@@ -2,6 +2,7 @@
 
 mod health;
 mod lifecycle;
+mod network_config;
 mod nodes;
 mod operations;
 mod progress;
@@ -118,7 +119,7 @@ impl Runtime {
             return Ok(Vec::new());
         }
 
-        self.driver(&entry).await?.list_snapshots().await
+        self.driver(&entry, false).await?.list_snapshots().await
     }
 
     /// Returns a bounded tail of the deployment log; the complete log stays on
@@ -140,9 +141,11 @@ impl Runtime {
         Ok(entry)
     }
 
-    async fn driver(&self, entry: &Entry) -> Result<DockerNetwork, Error> {
+    async fn driver(&self, entry: &Entry, verify_docker: bool) -> Result<DockerNetwork, Error> {
         let record = entry.record.read().await.clone();
-        let driver = DockerNetwork::materialize(&entry.data_dir, &self.inner.root, &record).await?;
+        let driver =
+            DockerNetwork::materialize(&entry.data_dir, &self.inner.root, &record, verify_docker)
+                .await?;
         entry.record.write().await.state = Some(driver.state_location());
 
         Ok(driver)

@@ -22,6 +22,7 @@ mod config;
 mod cors;
 mod error;
 mod faucet;
+mod network_config;
 mod observability;
 mod proxy;
 mod server;

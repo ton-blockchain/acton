@@ -140,6 +140,31 @@ impl EnvironmentRuntime for EnvironmentCatalogRuntime {
         self.managed.health(environment_id)
     }
 
+    fn update_network_config(
+        &self,
+        environment_id: &str,
+        request: acton_localnet::UpdateNetworkConfig,
+    ) -> EnvironmentRuntimeFuture<'_, acton_localnet::Operation> {
+        if let Some(error) = lifecycle_unavailable(environment_id, "configured") {
+            return error;
+        }
+
+        self.managed.update_network_config(environment_id, request)
+    }
+
+    fn localnet_operation(
+        &self,
+        environment_id: &str,
+        operation_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, acton_localnet::Operation> {
+        if let Some(error) = lifecycle_unavailable(environment_id, "configured") {
+            return error;
+        }
+
+        self.managed
+            .localnet_operation(environment_id, operation_id)
+    }
+
     fn add_full_ton_node(
         &self,
         environment_id: &str,

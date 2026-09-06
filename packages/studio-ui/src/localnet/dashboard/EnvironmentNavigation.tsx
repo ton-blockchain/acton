@@ -78,6 +78,7 @@ const networkItems: NestedSidebarItem[] = [
   {label: "Overview", path: "/network"},
   {label: "Nodes", path: "/network/nodes"},
   {label: "Validators", path: "/network/validators"},
+  {label: "Config", path: "/network/config"},
   {label: "Health", path: "/network/health"},
 ]
 
@@ -221,8 +222,10 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
       ? formatForkNetworkLabel(forkNetwork)
       : undefined
   const visibleStandaloneItems = supports(environment, "simulator") ? standaloneItems : []
-  const visibleNetworkItems = networkItems.filter(
-    item => item.path !== "/network/health" || supports(environment, "health"),
+  const visibleNetworkItems = networkItems.filter(item =>
+    item.path === "/network/config"
+      ? environment?.config.kind === "fullTonNetwork"
+      : item.path !== "/network/health" || supports(environment, "health"),
   )
   const visibleEnvironmentItems = environmentItems.filter(item =>
     item.path === "/wallets"

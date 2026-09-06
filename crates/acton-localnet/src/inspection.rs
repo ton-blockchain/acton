@@ -62,6 +62,7 @@ pub async fn status(root: &Path) -> Result<Network, Error> {
     let observed = async {
         match DockerNetwork::load(root, &network).await? {
             Some(driver) => driver.status().await,
+            None if network.status == Status::Failed => Ok(Status::Failed),
             None => Ok(Status::Stopped),
         }
     }
