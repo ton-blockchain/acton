@@ -5,6 +5,7 @@
 
 pub mod admin;
 pub use admin::{AdminOperation, AdminRequest};
+pub mod activity;
 pub mod catalog;
 pub mod client;
 mod docker;

@@ -202,6 +202,7 @@ impl Runtime {
         self.prepare_shutdown().await?;
         let entry = &self.inner.entry;
         let _guard = entry.mutation.lock().await;
+        self.stop_activity().await?;
         if entry.record.read().await.status == Status::Deleted {
             return Ok(());
         }

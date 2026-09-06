@@ -66,12 +66,17 @@ impl Runtime {
         entry.record.write().await.status = Status::Starting;
         Self::save(&entry).await?;
         *entry.admin_request.write().await = Some(request.clone());
+        let runtime = self.clone();
         tokio::spawn(async move {
             let _guard = guard;
             let nodes = entry.record.read().await.nodes.clone();
-            let result = driver
-                .apply_admin(&nodes, &request, &entry.admin_operation)
-                .await;
+            let result = async {
+                runtime.stop_activity().await?;
+                driver
+                    .apply_admin(&nodes, &request, &entry.admin_operation)
+                    .await
+            }
+            .await;
             let running = result.is_ok() || driver.admin_is_running(&nodes).await;
             {
                 let mut record = entry.record.write().await;
@@ -167,6 +172,24 @@ mod tests {
                 operation.block_seqno = Some(123);
             }
             *entry.admin_operation.write().await = Some(operation.clone());
+            if !completed {
+                for start in [false, true] {
+                    let result = tokio::time::timeout(
+                        std::time::Duration::from_secs(1),
+                        runtime
+                            .configure_activity(crate::activity::ActivityConfig::default(), start),
+                    )
+                    .await
+                    .expect("activity must reject an admin operation without waiting for its lock");
+                    assert!(matches!(
+                        result,
+                        Err(Error::Conflict {
+                            code: "operation_in_progress",
+                            ..
+                        })
+                    ));
+                }
+            }
             let retry = runtime.start_admin(request.clone()).await.unwrap();
             assert_eq!(
                 serde_json::to_value(retry).unwrap(),

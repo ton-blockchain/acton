@@ -1,0 +1,23 @@
+--- NftCollection.tolk
++++ NftCollection.tolk
+@@ -138,0 +139,2 @@
++// Activity items carry complete on-chain TEP-64 metadata, including inline art.
++// Returning the individual cell avoids any dependency on a metadata HTTP server.
+@@ -141,14 +143,3 @@
+-    individualNftContent: string,
+-): Cell<OffchainMetadataReply> {
+-    val storage = lazy NftCollectionStorage.load();
+-    val content = lazy storage.content.load();
+-
+-    // construct a response from "common content" and "individual content";
+-    // for example:
+-    // common content = "https://site.org/my-collection/"
+-    // individual nft = "my-picture-123.png"  (probably, a long string, snake-encoded)
+-    // result         = concatenation
+-    var b = StringBuilder.create();
+-    b.append(content.commonContent);
+-    b.append(individualNftContent);
+-    return OffchainMetadataReply { string: b.build() }.toCell();
++    individualNftContent: cell,
++): cell {
++    return individualNftContent;

@@ -79,9 +79,23 @@ impl Client {
         path: &str,
         body: Option<Value>,
     ) -> Result<T, Error> {
+        self.request_with_timeout(method, path, body, Duration::from_secs(30))
+            .await
+    }
+
+    /// Keeps error handling and authentication identical for operations whose
+    /// response must wait for a bounded drain of work already submitted on chain.
+    async fn request_with_timeout<T: DeserializeOwned>(
+        &self,
+        method: Method,
+        path: &str,
+        body: Option<Value>,
+        timeout: Duration,
+    ) -> Result<T, Error> {
         let mut request = self
             .http
             .request(method, format!("{}{path}", self.descriptor.url))
+            .timeout(timeout)
             .bearer_auth(&self.descriptor.token);
 
         if let Some(body) = body {

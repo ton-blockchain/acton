@@ -6,6 +6,44 @@ use reqwest::Method;
 use serde_json::json;
 
 impl Client {
+    /// Reads generator settings and counters from the owning localnet process.
+    pub async fn activity(&self) -> Result<crate::activity::ActivityState, Error> {
+        self.request(Method::GET, "/v1/network/activity", None)
+            .await
+    }
+
+    /// Saves a workload or starts it once. Transport errors never retry a start.
+    pub async fn configure_activity(
+        &self,
+        config: crate::activity::ActivityConfig,
+        start: bool,
+    ) -> Result<crate::activity::ActivityState, Error> {
+        let (method, path) = if start {
+            (Method::POST, "/v1/network/activity/start")
+        } else {
+            (Method::PUT, "/v1/network/activity")
+        };
+        self.request(
+            method,
+            path,
+            Some(serde_json::to_value(config).map_err(|error| Error::invalid(error.to_string()))?),
+        )
+        .await
+    }
+
+    /// Stops the current run without deleting its configuration or history.
+    pub async fn stop_activity(&self) -> Result<crate::activity::ActivityState, Error> {
+        // A faucet request can take 60 seconds. Let the service drain it rather
+        // than reporting a transport failure while cancellation is still working.
+        self.request_with_timeout(
+            Method::POST,
+            "/v1/network/activity/stop",
+            None,
+            std::time::Duration::from_secs(120),
+        )
+        .await
+    }
+
     /// Reads current state and progress without waiting for an active mutation.
     pub async fn network(&self) -> Result<Network, Error> {
         self.request(Method::GET, "/v1/network", None).await

@@ -40,6 +40,7 @@ import {ContractPage} from "./dashboard/pages/ContractPage"
 import {ContractsPage} from "./dashboard/pages/ContractsPage"
 import {NftsPage} from "./dashboard/pages/NftsPage"
 import {NetworkPage} from "./dashboard/pages/NetworkPage"
+import {ActivityPage} from "./dashboard/pages/ActivityPage"
 import {StatsPage} from "./dashboard/pages/StatsPage"
 import {SettingsPage} from "./dashboard/pages/SettingsPage"
 import {AdminPage} from "./dashboard/pages/AdminPage"
@@ -62,6 +63,7 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/dashboard": "Dashboard",
   "/network/health": "Health",
   "/network/config": "Config",
+  "/network/activity": "Activity",
   "/network": "Network overview",
   "/network/nodes": "Nodes and synchronization",
   "/network/validators": "Validators",
@@ -93,6 +95,7 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/dashboard": "Network status and recent activity",
   "/network/health": "API readiness, indexer lag and service health",
   "/network/config": "Update on-chain configuration parameters",
+  "/network/activity": "Generate on-chain transfers, tokens and NFTs in your Full localnet",
   "/network": "Throughput, topology and consensus health",
   "/network/nodes": "Node availability, synchronization and diagnostics",
   "/network/validators": "Elections, validator sets and block production",
@@ -219,6 +222,7 @@ const AppContent: FC<AppContentProps> = ({
   const [isAddContractOpen, setIsAddContractOpen] = useState(false)
   const [isCreateSnapshotOpen, setIsCreateSnapshotOpen] = useState(false)
   const [configActions, setConfigActions] = useState<ReactNode>()
+  const [activityActions, setActivityActions] = useState<ReactNode>()
   const localPathname = pathname.slice(basePath.length) || "/"
   const allowsOverflow =
     localPathname === "/faucet" ||
@@ -262,7 +266,12 @@ const AppContent: FC<AppContentProps> = ({
     runtime.environment?.endpoints.apiV3 ??
     runtime.environment?.endpoints.apiV2 ??
     runtime.environment?.endpoints.control
-  const headerActions = localPathname === "/network/config" ? configActions : undefined
+  const headerActions =
+    localPathname === "/network/config"
+      ? configActions
+      : localPathname === "/network/activity"
+        ? activityActions
+        : undefined
 
   useLayoutEffect(() => {
     onShellChange({
@@ -325,6 +334,22 @@ const AppContent: FC<AppContentProps> = ({
                   )}
                 </DashboardPage>,
               )}
+            />
+            <Route
+              path={path("/network/activity")}
+              element={
+                isFullLocalnet && runtime.environment ? (
+                  <DashboardPage>
+                    <ActivityPage
+                      key={runtime.environment.id}
+                      environment={runtime.environment}
+                      onActionsChange={setActivityActions}
+                    />
+                  </DashboardPage>
+                ) : (
+                  fallback
+                )
+              }
             />
             {(["/network", "/network/nodes", "/network/validators"] as const).map(networkPath => (
               <Route

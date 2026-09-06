@@ -413,6 +413,41 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         })
     }
 
+    fn network_activity(
+        &self,
+        environment_id: &str,
+        command: Option<acton_localnet::activity::ActivityCommand>,
+    ) -> EnvironmentRuntimeFuture<'_, acton_localnet::activity::ActivityState> {
+        use acton_localnet::activity::ActivityCommand;
+
+        let environment_id = environment_id.to_owned();
+        Box::pin(async move {
+            let environment = find_environment(&self.inner, &environment_id).await?;
+            let _guard = environment.lifecycle.lock().await;
+            ensure_environment_not_deleted(&environment).await?;
+
+            let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver else {
+                return Err(EnvironmentRuntimeError::Conflict {
+                    code: "environment_activity_unavailable",
+                    message: "Activity generation is available for Full localnet environments"
+                        .to_owned(),
+                });
+            };
+            let client = driver.client().await?;
+            match command {
+                None => client.activity().await,
+                Some(ActivityCommand::Save(config)) => {
+                    client.configure_activity(config, false).await
+                }
+                Some(ActivityCommand::Start(config)) => {
+                    client.configure_activity(config, true).await
+                }
+                Some(ActivityCommand::Stop) => client.stop_activity().await,
+            }
+            .map_err(localnet::error)
+        })
+    }
+
     fn update_network_config(
         &self,
         environment_id: &str,

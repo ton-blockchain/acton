@@ -27,6 +27,9 @@ pub(super) fn router() -> Router<ApiState> {
                 .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024)),
         )
         .route("/v1/network/config", post(update_config))
+        .route("/v1/network/activity", get(activity).put(save_activity))
+        .route("/v1/network/activity/start", post(start_activity))
+        .route("/v1/network/activity/stop", post(stop_activity))
         .route("/v1/network/start", post(start))
         .route("/v1/network/stop", post(stop))
         .route("/v1/network/logs", get(logs))
@@ -56,6 +59,40 @@ pub(super) fn router() -> Router<ApiState> {
 
 async fn network(State(state): State<ApiState>) -> Json<crate::Network> {
     Json(state.runtime.get().await)
+}
+
+async fn activity(
+    State(state): State<ApiState>,
+) -> Result<Json<crate::activity::ActivityState>, Error> {
+    state.runtime.activity().await.map(Json)
+}
+
+async fn save_activity(
+    State(state): State<ApiState>,
+    Json(config): Json<crate::activity::ActivityConfig>,
+) -> Result<Json<crate::activity::ActivityState>, Error> {
+    state
+        .runtime
+        .configure_activity(config, false)
+        .await
+        .map(Json)
+}
+
+async fn start_activity(
+    State(state): State<ApiState>,
+    Json(config): Json<crate::activity::ActivityConfig>,
+) -> Result<Json<crate::activity::ActivityState>, Error> {
+    state
+        .runtime
+        .configure_activity(config, true)
+        .await
+        .map(Json)
+}
+
+async fn stop_activity(
+    State(state): State<ApiState>,
+) -> Result<Json<crate::activity::ActivityState>, Error> {
+    state.runtime.stop_activity().await.map(Json)
 }
 
 async fn update_config(

@@ -35,6 +35,7 @@ mod local_artifacts;
 mod local_process;
 mod local_test_process;
 mod localnet;
+mod network_activity;
 mod network_config;
 mod openapi;
 mod test_api;
@@ -379,6 +380,18 @@ impl StudioServer {
             .route(
                 "/environments/{environment_id}/network/config",
                 post(network_config::update),
+            )
+            .route(
+                "/environments/{environment_id}/network/activity",
+                get(network_activity::get).put(network_activity::save),
+            )
+            .route(
+                "/environments/{environment_id}/network/activity/start",
+                post(network_activity::start),
+            )
+            .route(
+                "/environments/{environment_id}/network/activity/stop",
+                post(network_activity::stop),
             )
             .route(
                 "/environments/{environment_id}/localnet-operations/{operation_id}",

@@ -506,6 +506,22 @@ pub type EnvironmentRuntimeFuture<'a, T> =
     Pin<Box<dyn Future<Output = Result<T, EnvironmentRuntimeError>> + Send + 'a>>;
 
 pub trait EnvironmentRuntime: Send + Sync {
+    /// Delegates background traffic to a managed full localnet. The localnet process
+    /// owns scheduling, credentials, cancellation and persistent run counters.
+    fn network_activity(
+        &self,
+        _environment_id: &str,
+        _command: Option<acton_localnet::activity::ActivityCommand>,
+    ) -> EnvironmentRuntimeFuture<'_, acton_localnet::activity::ActivityState> {
+        Box::pin(async {
+            Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_activity_unavailable",
+                message: "Activity generation is available for Full localnet environments"
+                    .to_owned(),
+            })
+        })
+    }
+
     fn list(&self) -> EnvironmentRuntimeFuture<'_, Vec<StudioEnvironment>>;
 
     fn get(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment>;

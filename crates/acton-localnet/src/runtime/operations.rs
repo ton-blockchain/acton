@@ -235,6 +235,16 @@ impl Context {
     async fn execute(&mut self, action: Action) -> Result<Value, Error> {
         self.phase("preparing").await?;
 
+        if matches!(
+            action,
+            Action::Stop
+                | Action::Delete
+                | Action::CreateSnapshot { .. }
+                | Action::RestoreSnapshot { .. }
+        ) {
+            self.runtime.stop_activity().await?;
+        }
+
         if let Action::UpdateConfig(request) = action {
             return self.update_network_config(request).await;
         }

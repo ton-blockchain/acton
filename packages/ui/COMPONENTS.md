@@ -2478,6 +2478,23 @@ space surrounds it.
   variants to InlineLoader.
 - Use a progress component instead when completion can be measured.
 
+## Slider
+
+Status: ready
+
+Import: `import {Slider} from "@acton/ui"`
+
+Use Slider for a bounded numeric value adjusted by dragging or with the keyboard.
+Supply `value`, `onValueChange`, and an accessible label through `aria-label` or
+`aria-labelledby`. The default range is 0 to 100; `min`, `max`, and `step` can
+change it. Use `aria-valuetext` when a numeric value needs units or context.
+
+The track and thumb inherit the component's `color`. Keep the displayed value
+outside the slider and use `disabled` while settings cannot be changed.
+Native arrow keys, Home, End, mouse, and touch interactions stay available.
+
+Review keyboard focus, disabled state, endpoints, touch targets, and both themes.
+
 ## Checkbox
 
 Status: ready

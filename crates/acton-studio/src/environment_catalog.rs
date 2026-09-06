@@ -153,6 +153,18 @@ impl EnvironmentRuntime for EnvironmentCatalogRuntime {
         self.managed.update_network_config(environment_id, request)
     }
 
+    fn network_activity(
+        &self,
+        environment_id: &str,
+        command: Option<acton_localnet::activity::ActivityCommand>,
+    ) -> EnvironmentRuntimeFuture<'_, acton_localnet::activity::ActivityState> {
+        if let Some(error) = lifecycle_unavailable(environment_id, "configured") {
+            return error;
+        }
+
+        self.managed.network_activity(environment_id, command)
+    }
+
     fn localnet_operation(
         &self,
         environment_id: &str,

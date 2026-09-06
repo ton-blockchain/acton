@@ -1,5 +1,6 @@
 //! One owner per state directory and one mutation at a time per network.
 
+mod activity;
 mod admin;
 mod health;
 mod lifecycle;
@@ -34,6 +35,8 @@ struct Inner {
     admission: Mutex<bool>,
     closing: tokio::sync::watch::Sender<bool>,
     health_history: Mutex<VecDeque<crate::NetworkHealthSample>>,
+    activity: Arc<RwLock<crate::activity::ActivityState>>,
+    activity_control: Mutex<activity::Control>,
 }
 
 struct Entry {
@@ -92,6 +95,7 @@ impl Runtime {
             record.status = Status::Unknown;
         }
         storage::write_json(&path, &record).await?;
+        let activity = activity::load(&root).await?;
 
         Ok(Self {
             inner: Arc::new(Inner {
@@ -107,6 +111,8 @@ impl Runtime {
                 admission: Mutex::new(true),
                 closing: tokio::sync::watch::channel(false).0,
                 health_history: Mutex::new(VecDeque::new()),
+                activity: Arc::new(RwLock::new(activity)),
+                activity_control: Mutex::new(activity::Control::default()),
             }),
         })
     }

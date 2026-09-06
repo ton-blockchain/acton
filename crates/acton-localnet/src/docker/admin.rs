@@ -672,7 +672,11 @@ mod tests {
             let request: AdminRequest = serde_json::from_value(serde_json::json!({"kind": "accounts", "id": Uuid::new_v4().to_string(), "edits": [{"address": address, "type": "balance", "balance": "42000000000"}]})).unwrap();
             let runtime = Runtime::open(&location.path).await?;
             runtime.reconcile().await;
+            runtime.configure_activity(crate::activity::ActivityConfig::default(), true).await?;
             let seqno = run_edit(&runtime, request).await?;
+            if runtime.activity().await?.status != crate::activity::ActivityStatus::Stopped {
+                return Err(failure("Activity generator was not stopped before the hardfork"));
+            }
             eprintln!("Hardfork completed at {seqno}");
             let account = driver.live_admin("localton", &["lite", "account", &address], None).await?;
             if account["balance_nano"] != "42000000000" { return Err(failure(format!("Incorrect native account: {account}"))); }

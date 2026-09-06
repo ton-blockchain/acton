@@ -1,0 +1,164 @@
+//! Self-contained sample assets, following kit's inline SVG / TEP-64 approach.
+//! Names come from a local vocabulary; generated SVG has no scripts or remote resources.
+
+use anyhow::Result;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
+use rand::{Rng, seq::SliceRandom};
+use sha2::{Digest, Sha256};
+use tycho_types::{
+    cell::{Cell, CellBuilder, HashBytes},
+    dict::Dict,
+};
+
+const ADJECTIVES: &[&str] = &[
+    "Amber", "Arctic", "Astral", "Azure", "Coral", "Crimson", "Crystal", "Golden", "Indigo",
+    "Ivory", "Jade", "Lunar", "Misty", "Neon", "Silver", "Solar",
+];
+
+const TOKENS: &[&str] = &[
+    "Bloom", "Comet", "Coral", "Drift", "Echo", "Flare", "Flux", "Grove", "Halo", "Mint", "Orbit",
+    "Pearl", "Pulse", "Spark", "Tide", "Wave",
+];
+
+const COLLECTIONS: &[&str] = &[
+    "Archives",
+    "Artifacts",
+    "Dreams",
+    "Gardens",
+    "Horizons",
+    "Islands",
+    "Legends",
+    "Relics",
+    "Sanctuaries",
+    "Sketches",
+    "Souvenirs",
+    "Treasures",
+];
+
+const ITEMS: &[&str] = &[
+    "Compass", "Crown", "Crystal", "Feather", "Fox", "Lantern", "Lotus", "Lynx", "Moth", "Owl",
+    "Phoenix", "Shell", "Stag", "Star", "Totem", "Whale",
+];
+
+const PALETTES: &[(&str, &str)] = &[
+    ("#19376d", "#75c9ff"),
+    ("#3b2068", "#c5a0ff"),
+    ("#71334b", "#ffb49b"),
+    ("#165a50", "#a4efc8"),
+    ("#6b471d", "#ffe098"),
+    ("#5b2444", "#f2a2dc"),
+    ("#243972", "#acbbff"),
+    ("#1c555d", "#94e6eb"),
+];
+
+// Original geometric illustrations keep the on-chain payload small while giving
+// each generated asset a distinct silhouette and color combination.
+const GLYPHS: &[&str] = &[
+    r#"<path d="M64 26 91 54 64 102 37 54Z M37 54h54 M64 26 54 54 64 102 74 54Z"/>"#,
+    r#"<circle cx="64" cy="64" r="25"/><ellipse cx="64" cy="64" rx="46" ry="13" transform="rotate(-30 64 64)"/>"#,
+    r#"<path d="m64 23 10 29 31 1-25 19 9 30-25-18-25 18 9-30-25-19 31-1Z"/>"#,
+    r#"<path d="M34 82c10-37 50-37 60 0 M34 82c20 13 40 13 60 0 M44 66V44l16 11m8 0 16-11v22 M50 76h2m24 0h2 M60 85l4 4 4-4"/>"#,
+    r#"<path d="M64 102V26 M64 77C32 74 28 55 32 42c24 0 34 19 32 35Z M64 91c32-3 36-22 32-35-24 0-34 19-32 35Z"/>"#,
+    r#"<path d="M25 54c13-24 26-24 39 0s26 24 39 0 M25 74c13-24 26-24 39 0s26 24 39 0"/>"#,
+    r#"<circle cx="64" cy="64" r="33"/><path d="m64 31 12 33-12 33-12-33Z M31 64h66"/>"#,
+    r#"<path d="M86 32c-42-15-72 39-36 65 18 14 43 6 53-13-40 9-62-31-17-52Z"/>"#,
+];
+
+/// A single immutable identity, generated once before deployment and stored on chain.
+/// Collections and items use the same format as Jettons, without token-only fields.
+pub(super) struct Asset {
+    name: String,
+    symbol: Option<String>,
+    image: String,
+}
+
+impl Asset {
+    pub(super) fn jetton() -> Self {
+        Self::random(TOKENS, true)
+    }
+
+    pub(super) fn collection() -> Self {
+        Self::random(COLLECTIONS, false)
+    }
+
+    pub(super) fn item() -> Self {
+        Self::random(ITEMS, false)
+    }
+
+    fn random(nouns: &[&str], token: bool) -> Self {
+        let mut rng = rand::thread_rng();
+        let adjective = ADJECTIVES.choose(&mut rng).expect("nonempty vocabulary");
+        let noun = nouns.choose(&mut rng).expect("nonempty vocabulary");
+        let name = format!("{adjective} {noun}");
+        let symbol = token.then(|| format!("{}{}", &adjective[..2], &noun[..3]).to_uppercase());
+        let (background, foreground) = PALETTES.choose(&mut rng).expect("nonempty palette");
+        let glyph = GLYPHS.choose(&mut rng).expect("nonempty artwork");
+        let angle = rng.gen_range(0..360);
+        let outline = if token {
+            r#"<circle cx="64" cy="64" r="64"/>"#
+        } else {
+            r#"<rect width="128" height="128" rx="24"/>"#
+        };
+        let inset = if token {
+            r#"<circle cx="64" cy="64" r="54"/>"#
+        } else {
+            r#"<rect x="10" y="10" width="108" height="108" rx="18"/>"#
+        };
+        let svg = format!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 128 128">
+<defs><clipPath id="outline">{outline}</clipPath><linearGradient id="bg" gradientTransform="rotate({angle} .5 .5)"><stop stop-color="{background}"/><stop offset="1" stop-color="{foreground}"/></linearGradient></defs>
+<g clip-path="url(#outline)">
+<rect width="128" height="128" fill="url(#bg)"/>
+<circle cx="100" cy="25" r="40" fill="{foreground}" opacity=".18"/>
+<g fill="{background}" opacity=".35">{inset}</g>
+<g fill="none" stroke="{foreground}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">{glyph}</g>
+</g>
+</svg>"#,
+        );
+
+        Self {
+            name,
+            symbol,
+            image: format!("data:image/svg+xml;base64,{}", STANDARD.encode(svg)),
+        }
+    }
+
+    pub(super) fn cell(&self) -> Result<Cell> {
+        let mut attributes = Dict::<HashBytes, Cell>::new();
+        let mut fields = vec![
+            ("name", self.name.as_str()),
+            ("description", "Generated by Acton for localnet testing"),
+            ("image", self.image.as_str()),
+        ];
+        if let Some(symbol) = &self.symbol {
+            fields.push(("symbol", symbol));
+            fields.push(("decimals", "9"));
+        }
+
+        for (key, value) in fields {
+            let mut bytes = Vec::with_capacity(value.len() + 1);
+            bytes.push(0); // TEP-64 SnakeData prefix belongs only in the root cell.
+            bytes.extend_from_slice(value.as_bytes());
+            attributes.set(
+                HashBytes(Sha256::digest(key.as_bytes()).into()),
+                snake(&bytes)?,
+            )?;
+        }
+        Ok(CellBuilder::build_from((0u8, attributes))?)
+    }
+}
+
+/// Encodes long strings across ordinary cells, preserving byte order and keeping
+/// the continuation cells free of prefixes. Inline SVG exceeds a single cell.
+pub(super) fn snake(bytes: &[u8]) -> Result<Cell> {
+    let mut next = None;
+    for chunk in bytes.chunks(127).rev() {
+        let mut builder = CellBuilder::new();
+        builder.store_raw(chunk, (chunk.len() * 8) as u16)?;
+        if let Some(next) = next {
+            builder.store_reference(next)?;
+        }
+        next = Some(builder.build()?);
+    }
+    Ok(next.unwrap_or_default())
+}

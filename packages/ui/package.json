@@ -49,6 +49,7 @@
     "./components/raw-data-block": "./src/components/RawDataBlock/index.ts",
     "./components/search-input": "./src/components/SearchInput/index.ts",
     "./components/select": "./src/components/Select/index.ts",
+    "./components/slider": "./src/components/Slider/index.ts",
     "./components/skeleton": "./src/components/Skeleton/index.ts",
     "./components/source-location-value": "./src/components/SourceLocationValue/index.ts",
     "./components/technical-value": "./src/components/TechnicalValue/index.ts",
