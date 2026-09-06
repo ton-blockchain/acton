@@ -41,6 +41,7 @@ struct Entry {
     record: RwLock<Network>,
     mutation: Arc<Mutex<()>>,
     admin_operation: RwLock<Option<crate::AdminOperation>>,
+    admin_request: RwLock<Option<crate::AdminRequest>>,
 }
 
 impl Runtime {
@@ -99,6 +100,7 @@ impl Runtime {
                     record: RwLock::new(record),
                     mutation: Arc::new(Mutex::new(())),
                     admin_operation: RwLock::new(None),
+                    admin_request: RwLock::new(None),
                 }),
                 root,
                 _lock: lock,

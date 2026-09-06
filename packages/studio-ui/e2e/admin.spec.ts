@@ -28,15 +28,20 @@ test("admin form submits nanotons and tracks a detached operation across reload"
 }) => {
   let operation: AdminOperation | null = null
   let submitted: AdminRequest | undefined
+  let status: StudioEnvironment["status"] = "running"
+  let startingPolls = 0
   await page.route("**/api/v1/**", async route => {
     const path = new URL(route.request().url()).pathname
     let body: unknown = []
     if (path === "/api/v1/info")
       body = {protocolVersion: 1, serverVersion: "test", workspace: {name: "test"}}
-    else if (path === "/api/v1/environments") body = [environment]
-    else if (path.endsWith("/admin")) {
+    else if (path === "/api/v1/environments") {
+      if (status === "starting") startingPolls += 1
+      body = [{...environment, status}]
+    } else if (path.endsWith("/admin")) {
       if (route.request().method() === "POST") {
         submitted = route.request().postDataJSON() as AdminRequest
+        status = "starting"
         operation = {
           id: submitted.id,
           phase: "installing",
@@ -63,8 +68,11 @@ test("admin form submits nanotons and tracks a detached operation across reload"
     })
   await expect(page.getByText("Installing hardfork", {exact: true})).toBeVisible()
   await expect(page.getByLabel("Account address")).toBeDisabled()
+  await expect.poll(() => startingPolls).toBeGreaterThanOrEqual(2)
+  await expect(page.getByLabel("Account address")).toHaveValue(`0:${"11".repeat(32)}`)
   await page.reload()
   await expect(page.getByText("Installing hardfork", {exact: true})).toBeVisible()
+  status = "running"
   operation = {
     id: submitted?.id ?? "",
     startedAt: new Date().toISOString(),
@@ -116,4 +124,31 @@ test("ambiguous HTTP failure retries the exact same request", async ({page}) => 
   await page.getByRole("button", {name: "Retry same operation"}).click()
   expect(requests).toHaveLength(2)
   expect(requests[0]).toEqual(requests[1])
+})
+
+test("failed environment keeps administrative error visible across reload", async ({page}) => {
+  await page.route("**/api/v1/**", async route => {
+    const path = new URL(route.request().url()).pathname
+    await route.fulfill({
+      json: path.endsWith("/info")
+        ? {protocolVersion: 1, serverVersion: "test"}
+        : path.endsWith("/environments")
+          ? [{...environment, status: "failed", error: "Recovery needs attention"}]
+          : path.endsWith("/admin")
+            ? {
+                id: "failed-edit",
+                phase: "failed",
+                startedAt: new Date().toISOString(),
+                finishedAt: new Date().toISOString(),
+                error: "Cold backup could not be restored",
+                blockSeqno: null,
+              }
+            : [],
+    })
+  })
+  await page.goto("/virtual-environments/environment-1/admin")
+  await expect(page.getByText("Cold backup could not be restored", {exact: true})).toBeVisible()
+  await expect(page.getByRole("button", {name: "Apply changes", exact: true})).toBeDisabled()
+  await page.reload()
+  await expect(page.getByText("Cold backup could not be restored", {exact: true})).toBeVisible()
 })

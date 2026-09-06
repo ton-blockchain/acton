@@ -86,14 +86,8 @@ impl DockerNetwork {
             Err(e) => return Err(failure(e)),
         };
         let saved: SavedOperation = serde_json::from_slice(&bytes).map_err(failure)?;
-        if let Some(request) = request
-            && serde_json::to_value(request).map_err(failure)?
-                != serde_json::to_value(&saved.request).map_err(failure)?
-        {
-            return Err(Error::Conflict {
-                code: "admin_id_reused",
-                message: "This operation id belongs to a different request".into(),
-            });
+        if let Some(request) = request {
+            request.check_retry(&saved.request)?;
         }
         let mut op = saved.operation;
         if op.is_active() {
@@ -154,6 +148,10 @@ impl DockerNetwork {
             }
             self.reset_indexer().await?;
         }
+        // Opening the owner only reconciles Docker; it does not start services.
+        // Retain the journal until the entire deployment is back, even when the
+        // crash happened before backups were ready and no state was changed.
+        self.start_all().await?;
         // Keep recovery archives in their own namespace; a joined-node archive must
         // never appear as a restorable genesis snapshot in the Studio snapshot list.
         tokio::fs::remove_file(path).await.map_err(failure)
@@ -199,14 +197,14 @@ impl DockerNetwork {
         let result = self.admin_work(&services, request, operation).await;
         if let Err(error) = result {
             phase(operation, "restoring").await;
-            if let Err(restore) = self.recover_admin().await {
+            let recovery = if self.has_admin_recovery() {
+                self.recover_admin().await
+            } else {
+                self.start_all().await
+            };
+            if let Err(restore) = recovery {
                 return Err(failure(format!(
                     "{error}. Recovery also failed: {restore}. Cold backups and the recovery journal have been retained."
-                )));
-            }
-            if let Err(start) = self.start_all().await {
-                return Err(failure(format!(
-                    "{error}. State was restored, but restarting failed: {start}"
                 )));
             }
             return Err(error);
@@ -545,7 +543,11 @@ mod tests {
     use crate::{NetworkConfig, Runtime, docker::DockerTarget};
 
     async fn run_edit(runtime: &Runtime, request: AdminRequest) -> Result<u32, Error> {
-        runtime.start_admin(request).await?;
+        let accepted = runtime.start_admin(request.clone()).await?;
+        let retried = runtime.start_admin(request).await?;
+        if retried.id != accepted.id || !retried.is_active() {
+            return Err(failure("Retry did not return the active operation"));
+        }
         if !matches!(runtime.snapshots().await, Err(Error::Conflict { .. })) {
             return Err(failure(
                 "Snapshots were not excluded during an administrative operation",
@@ -692,6 +694,44 @@ mod tests {
             if !driver.admin_is_running(&nodes).await { return Err(failure("Environment did not recover")); }
             let account = driver.live_admin("localton", &["lite", "account", &address], None).await?;
             if account["balance_nano"] != "43000000000" { return Err(failure(format!("Incorrect native account: {account}"))); }
+            drop(runtime);
+            for ready in [false, true] {
+                driver.stop().await?;
+                let mut journal = Recovery::default();
+                if ready {
+                    for service in ["localton", "node-1"] {
+                        let directory = format!("{LOCALTON_SNAPSHOT_DIR}/admin/recovery-test/{service}");
+                        let snapshot = driver.offline_admin(service,
+                            &["snapshot", "create", "--snapshot-dir", &directory], None).await?;
+                        journal.backups.insert(service.into(), Backup {
+                            id: snapshot["id"].as_str().ok_or_else(|| failure("Missing snapshot id"))?.into(),
+                            directory,
+                        });
+                    }
+                    journal.ready = true;
+                }
+                driver.save_recovery(&journal).await?;
+                if ready {
+                    // Simulate the crash after validator suspension; restoring the
+                    // cold archives must recover election keys as well as accounts.
+                    for service in ["localton", "node-1"] {
+                        driver.offline_admin(service, &["godmode", "suspend"], None).await?;
+                    }
+                }
+                // No explicit start: opening the new owner must finish recovery.
+                let reopened = Runtime::open(&location.path).await?;
+                reopened.reconcile().await;
+                if reopened.get().await.status != crate::Status::Running || driver.has_admin_recovery() {
+                    return Err(failure(format!("Startup recovery did not complete (ready={ready})")));
+                }
+                for service in ["localton", "node-1"] {
+                    let account = driver.live_admin(service, &["lite", "account", &address], None).await?;
+                    if account["balance_nano"] != "43000000000" {
+                        return Err(failure(format!("Recovery lost account state on {service}: {account}")));
+                    }
+                }
+                eprintln!("Startup recovery restarted both nodes (ready={ready})");
+            }
             Ok(())
         }.await;
         if result.is_err() {

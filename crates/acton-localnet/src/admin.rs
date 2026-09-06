@@ -18,6 +18,19 @@ pub enum AdminRequest {
     },
 }
 impl AdminRequest {
+    pub(crate) fn check_retry(&self, previous: &Self) -> Result<(), Error> {
+        let value = |request: &Self| {
+            serde_json::to_value(request).map_err(|error| Error::invalid(error.to_string()))
+        };
+        if value(self)? != value(previous)? {
+            return Err(Error::Conflict {
+                code: "admin_id_reused",
+                message: "This operation id belongs to a different request".into(),
+            });
+        }
+        Ok(())
+    }
+
     #[must_use]
     pub fn id(&self) -> &str {
         match self {

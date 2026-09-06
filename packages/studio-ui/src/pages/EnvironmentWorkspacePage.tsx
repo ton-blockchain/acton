@@ -42,7 +42,12 @@ export function EnvironmentWorkspacePage({
   const isSnapshotsPage =
     location.pathname === `${basePath}/snapshots` && supports(environment, "snapshots")
   const isSettingsPage = location.pathname === `${basePath}/settings` && isManaged
-  const canOpenWorkspace = environment?.status === "running" || isSnapshotsPage || isSettingsPage
+  const isAdminPage =
+    location.pathname === `${basePath}/admin` &&
+    isManaged &&
+    environment?.config.kind === "fullTonNetwork"
+  const canOpenWorkspace =
+    environment?.status === "running" || isSnapshotsPage || isSettingsPage || isAdminPage
 
   useEffect(() => {
     if (canOpenWorkspace) return

@@ -15,6 +15,18 @@ impl Runtime {
             });
         }
         let entry = self.entry().await?;
+        // Admission serializes submissions; the mutation lock belongs to the
+        // running task. A retry observes that task without treating it as crashed.
+        let previous = entry.admin_request.read().await.clone();
+        if let Some(previous) = previous
+            && previous.id() == request.id()
+        {
+            request.check_retry(&previous)?;
+            let current = entry.admin_operation.read().await.clone();
+            if let Some(operation) = current {
+                return Ok(operation);
+            }
+        }
         let guard = Arc::clone(&entry.mutation)
             .try_lock_owned()
             .map_err(|_| Error::busy())?;
@@ -53,6 +65,7 @@ impl Runtime {
         *entry.admin_operation.write().await = Some(operation.clone());
         entry.record.write().await.status = Status::Starting;
         Self::save(&entry).await?;
+        *entry.admin_request.write().await = Some(request.clone());
         tokio::spawn(async move {
             let _guard = guard;
             let nodes = entry.record.read().await.nodes.clone();
@@ -116,6 +129,73 @@ impl Runtime {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn retries_observe_the_owned_operation_while_mutations_are_locked() {
+        let temp = tempfile::tempdir().unwrap();
+        let location = crate::catalog::create(
+            temp.path(),
+            crate::CreateNetwork {
+                name: "admin-retry".into(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let runtime = Runtime::open(&location.path).await.unwrap();
+        let entry = &runtime.inner.entry;
+        let request: AdminRequest = serde_json::from_value(serde_json::json!({
+            "kind":"accounts", "id":uuid::Uuid::new_v4().to_string(),
+            "edits":[{"address":format!("0:{}", "11".repeat(32)), "type":"balance", "balance":"1"}]
+        }))
+        .unwrap();
+        let mut operation = AdminOperation {
+            id: request.id().into(),
+            phase: "installing".into(),
+            started_at: chrono::Utc::now().to_rfc3339(),
+            finished_at: None,
+            error: None,
+            block_seqno: None,
+        };
+        *entry.admin_request.write().await = Some(request.clone());
+        entry.record.write().await.status = Status::Starting;
+        let _guard = entry.mutation.lock().await;
+        for completed in [false, true] {
+            if completed {
+                operation.phase = "completed".into();
+                operation.finished_at = Some(chrono::Utc::now().to_rfc3339());
+                operation.block_seqno = Some(123);
+            }
+            *entry.admin_operation.write().await = Some(operation.clone());
+            let retry = runtime.start_admin(request.clone()).await.unwrap();
+            assert_eq!(
+                serde_json::to_value(retry).unwrap(),
+                serde_json::to_value(&operation).unwrap()
+            );
+            let mut changed = serde_json::to_value(&request).unwrap();
+            changed["edits"][0]["balance"] = "2".into();
+            assert!(matches!(
+                runtime
+                    .start_admin(serde_json::from_value(changed.clone()).unwrap())
+                    .await,
+                Err(Error::Conflict {
+                    code: "admin_id_reused",
+                    ..
+                })
+            ));
+            changed["id"] = uuid::Uuid::new_v4().to_string().into();
+            assert!(matches!(
+                runtime
+                    .start_admin(serde_json::from_value(changed).unwrap())
+                    .await,
+                Err(Error::Conflict {
+                    code: "operation_in_progress",
+                    ..
+                })
+            ));
+        }
+        assert!(!location.path.join("runtime.json").exists());
+    }
 
     #[tokio::test]
     async fn admin_rejects_stopped_nodes_before_creating_an_operation() {
