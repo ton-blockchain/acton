@@ -1463,6 +1463,8 @@ renders the scrollable `pre/code` area and owns copy button state.
 - `customContent`: a complete pre-rendered code viewer that replaces the
   built-in `pre/code`. Use it when a highlighter already returns its own
   `<pre>` or structured HTML.
+- `--acton-raw-data-header-background` and `--acton-raw-data-header-font-weight`:
+  optional CSS overrides for embedded disclosure headers.
 
 ### States To Review Visually
 

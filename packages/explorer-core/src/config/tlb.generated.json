@@ -1,0 +1,2741 @@
+{
+  "parameters": {
+    "0": {
+      "line": 623,
+      "roots": [
+        212
+      ],
+      "dependencies": []
+    },
+    "1": {
+      "line": 624,
+      "roots": [
+        213
+      ],
+      "dependencies": []
+    },
+    "2": {
+      "line": 625,
+      "roots": [
+        214
+      ],
+      "dependencies": []
+    },
+    "3": {
+      "line": 626,
+      "roots": [
+        215
+      ],
+      "dependencies": []
+    },
+    "4": {
+      "line": 627,
+      "roots": [
+        216
+      ],
+      "dependencies": []
+    },
+    "5": {
+      "line": 632,
+      "roots": [
+        218
+      ],
+      "dependencies": [
+        {
+          "declaration": 217,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "BurningConfig"
+        },
+        {
+          "declaration": 6,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Maybe"
+        },
+        {
+          "declaration": 7,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Maybe"
+        }
+      ]
+    },
+    "6": {
+      "line": 634,
+      "roots": [
+        219
+      ],
+      "dependencies": [
+        {
+          "declaration": 48,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "Grams"
+        },
+        {
+          "declaration": 46,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "VarUInteger"
+        }
+      ]
+    },
+    "7": {
+      "line": 635,
+      "roots": [
+        220
+      ],
+      "dependencies": [
+        {
+          "declaration": 50,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ExtraCurrencyCollection"
+        },
+        {
+          "declaration": 20,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 46,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "VarUInteger"
+        },
+        {
+          "declaration": 12,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 13,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 11,
+          "depth": 5,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "8": {
+      "line": 638,
+      "roots": [
+        222
+      ],
+      "dependencies": [
+        {
+          "declaration": 221,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "GlobalVersion"
+        }
+      ]
+    },
+    "9": {
+      "line": 639,
+      "roots": [
+        223
+      ],
+      "dependencies": [
+        {
+          "declaration": 12,
+          "depth": 1,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 1,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "True"
+        },
+        {
+          "declaration": 13,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 11,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "10": {
+      "line": 640,
+      "roots": [
+        224
+      ],
+      "dependencies": [
+        {
+          "declaration": 12,
+          "depth": 1,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 1,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "True"
+        },
+        {
+          "declaration": 13,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 11,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "11": {
+      "line": 646,
+      "roots": [
+        227
+      ],
+      "dependencies": [
+        {
+          "declaration": 226,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ConfigVotingSetup"
+        },
+        {
+          "declaration": 225,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ConfigProposalSetup"
+        }
+      ]
+    },
+    "12": {
+      "line": 687,
+      "roots": [
+        235
+      ],
+      "dependencies": [
+        {
+          "declaration": 20,
+          "depth": 1,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 1,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 233,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "WorkchainDescr"
+        },
+        {
+          "declaration": 234,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "WorkchainDescr"
+        },
+        {
+          "declaration": 12,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 2,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "Bool"
+        },
+        {
+          "declaration": 3,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "Bool"
+        },
+        {
+          "declaration": 230,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "WorkchainFormat"
+        },
+        {
+          "declaration": 231,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "WorkchainFormat"
+        },
+        {
+          "declaration": 232,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "WcSplitMergeTimings"
+        },
+        {
+          "declaration": 13,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 11,
+          "depth": 4,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "13": {
+      "line": 690,
+      "roots": [
+        237
+      ],
+      "dependencies": [
+        {
+          "declaration": 236,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ComplaintPricing"
+        },
+        {
+          "declaration": 48,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "Grams"
+        },
+        {
+          "declaration": 46,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "VarUInteger"
+        }
+      ]
+    },
+    "14": {
+      "line": 694,
+      "roots": [
+        239
+      ],
+      "dependencies": [
+        {
+          "declaration": 238,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "BlockCreateFees"
+        },
+        {
+          "declaration": 48,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "Grams"
+        },
+        {
+          "declaration": 46,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "VarUInteger"
+        }
+      ]
+    },
+    "15": {
+      "line": 696,
+      "roots": [
+        240
+      ],
+      "dependencies": []
+    },
+    "16": {
+      "line": 700,
+      "roots": [
+        241
+      ],
+      "dependencies": []
+    },
+    "17": {
+      "line": 706,
+      "roots": [
+        242
+      ],
+      "dependencies": [
+        {
+          "declaration": 48,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "Grams"
+        },
+        {
+          "declaration": 46,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "VarUInteger"
+        }
+      ]
+    },
+    "18": {
+      "line": 710,
+      "roots": [
+        244
+      ],
+      "dependencies": [
+        {
+          "declaration": 12,
+          "depth": 1,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 243,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "StoragePrices"
+        },
+        {
+          "declaration": 13,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 11,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "19": {
+      "line": 712,
+      "roots": [
+        245
+      ],
+      "dependencies": []
+    },
+    "20": {
+      "line": 725,
+      "roots": [
+        249
+      ],
+      "dependencies": [
+        {
+          "declaration": 246,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "GasLimitsPrices"
+        },
+        {
+          "declaration": 247,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "GasLimitsPrices"
+        },
+        {
+          "declaration": 248,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "GasLimitsPrices"
+        }
+      ]
+    },
+    "21": {
+      "line": 726,
+      "roots": [
+        250
+      ],
+      "dependencies": [
+        {
+          "declaration": 246,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "GasLimitsPrices"
+        },
+        {
+          "declaration": 247,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "GasLimitsPrices"
+        },
+        {
+          "declaration": 248,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "GasLimitsPrices"
+        }
+      ]
+    },
+    "22": {
+      "line": 737,
+      "roots": [
+        255
+      ],
+      "dependencies": [
+        {
+          "declaration": 253,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "BlockLimits"
+        },
+        {
+          "declaration": 254,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "BlockLimits"
+        },
+        {
+          "declaration": 251,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ParamLimits"
+        },
+        {
+          "declaration": 252,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ImportedMsgQueueLimits"
+        }
+      ]
+    },
+    "23": {
+      "line": 738,
+      "roots": [
+        256
+      ],
+      "dependencies": [
+        {
+          "declaration": 253,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "BlockLimits"
+        },
+        {
+          "declaration": 254,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "BlockLimits"
+        },
+        {
+          "declaration": 251,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ParamLimits"
+        },
+        {
+          "declaration": 252,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ImportedMsgQueueLimits"
+        }
+      ]
+    },
+    "24": {
+      "line": 747,
+      "roots": [
+        258
+      ],
+      "dependencies": [
+        {
+          "declaration": 257,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "MsgForwardPrices"
+        }
+      ]
+    },
+    "25": {
+      "line": 749,
+      "roots": [
+        259
+      ],
+      "dependencies": [
+        {
+          "declaration": 257,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "MsgForwardPrices"
+        }
+      ]
+    },
+    "28": {
+      "line": 787,
+      "roots": [
+        266
+      ],
+      "dependencies": [
+        {
+          "declaration": 260,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "CatchainConfig"
+        },
+        {
+          "declaration": 261,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "CatchainConfig"
+        },
+        {
+          "declaration": 2,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "Bool"
+        },
+        {
+          "declaration": 3,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "Bool"
+        }
+      ]
+    },
+    "29": {
+      "line": 788,
+      "roots": [
+        267
+      ],
+      "dependencies": [
+        {
+          "declaration": 262,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ConsensusConfig"
+        },
+        {
+          "declaration": 263,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ConsensusConfig"
+        },
+        {
+          "declaration": 264,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ConsensusConfig"
+        },
+        {
+          "declaration": 265,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ConsensusConfig"
+        },
+        {
+          "declaration": 2,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "Bool"
+        },
+        {
+          "declaration": 3,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "Bool"
+        }
+      ]
+    },
+    "30": {
+      "line": 800,
+      "roots": [
+        271
+      ],
+      "dependencies": [
+        {
+          "declaration": 270,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "NewConsensusConfigAll"
+        },
+        {
+          "declaration": 6,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Maybe"
+        },
+        {
+          "declaration": 7,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Maybe"
+        },
+        {
+          "declaration": 268,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "NewConsensusConfig"
+        },
+        {
+          "declaration": 269,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "NewConsensusConfig"
+        },
+        {
+          "declaration": 2,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "Bool"
+        },
+        {
+          "declaration": 3,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "Bool"
+        },
+        {
+          "declaration": 20,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 12,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 13,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 11,
+          "depth": 6,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 6,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 6,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "31": {
+      "line": 802,
+      "roots": [
+        272
+      ],
+      "dependencies": [
+        {
+          "declaration": 20,
+          "depth": 1,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 1,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 1,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "True"
+        },
+        {
+          "declaration": 12,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 13,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 11,
+          "depth": 4,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "32": {
+      "line": 803,
+      "roots": [
+        273
+      ],
+      "dependencies": [
+        {
+          "declaration": 210,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ValidatorSet"
+        },
+        {
+          "declaration": 211,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ValidatorSet"
+        },
+        {
+          "declaration": 12,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 208,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ValidatorDescr"
+        },
+        {
+          "declaration": 209,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ValidatorDescr"
+        },
+        {
+          "declaration": 20,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 13,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 199,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "SigPubKey"
+        },
+        {
+          "declaration": 11,
+          "depth": 4,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "33": {
+      "line": 804,
+      "roots": [
+        274
+      ],
+      "dependencies": [
+        {
+          "declaration": 210,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ValidatorSet"
+        },
+        {
+          "declaration": 211,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ValidatorSet"
+        },
+        {
+          "declaration": 12,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 208,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ValidatorDescr"
+        },
+        {
+          "declaration": 209,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ValidatorDescr"
+        },
+        {
+          "declaration": 20,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 13,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 199,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "SigPubKey"
+        },
+        {
+          "declaration": 11,
+          "depth": 4,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "34": {
+      "line": 805,
+      "roots": [
+        275
+      ],
+      "dependencies": [
+        {
+          "declaration": 210,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ValidatorSet"
+        },
+        {
+          "declaration": 211,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ValidatorSet"
+        },
+        {
+          "declaration": 12,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 208,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ValidatorDescr"
+        },
+        {
+          "declaration": 209,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ValidatorDescr"
+        },
+        {
+          "declaration": 20,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 13,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 199,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "SigPubKey"
+        },
+        {
+          "declaration": 11,
+          "depth": 4,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "35": {
+      "line": 806,
+      "roots": [
+        276
+      ],
+      "dependencies": [
+        {
+          "declaration": 210,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ValidatorSet"
+        },
+        {
+          "declaration": 211,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ValidatorSet"
+        },
+        {
+          "declaration": 12,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 208,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ValidatorDescr"
+        },
+        {
+          "declaration": 209,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ValidatorDescr"
+        },
+        {
+          "declaration": 20,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 13,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 199,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "SigPubKey"
+        },
+        {
+          "declaration": 11,
+          "depth": 4,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "36": {
+      "line": 807,
+      "roots": [
+        277
+      ],
+      "dependencies": [
+        {
+          "declaration": 210,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ValidatorSet"
+        },
+        {
+          "declaration": 211,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ValidatorSet"
+        },
+        {
+          "declaration": 12,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 208,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ValidatorDescr"
+        },
+        {
+          "declaration": 209,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ValidatorDescr"
+        },
+        {
+          "declaration": 20,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 13,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 199,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "SigPubKey"
+        },
+        {
+          "declaration": 11,
+          "depth": 4,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "37": {
+      "line": 808,
+      "roots": [
+        278
+      ],
+      "dependencies": [
+        {
+          "declaration": 210,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ValidatorSet"
+        },
+        {
+          "declaration": 211,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ValidatorSet"
+        },
+        {
+          "declaration": 12,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 208,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ValidatorDescr"
+        },
+        {
+          "declaration": 209,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ValidatorDescr"
+        },
+        {
+          "declaration": 20,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 13,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 199,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "SigPubKey"
+        },
+        {
+          "declaration": 11,
+          "depth": 4,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "39": {
+      "line": 812,
+      "roots": [
+        281
+      ],
+      "dependencies": [
+        {
+          "declaration": 20,
+          "depth": 1,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 1,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 280,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ValidatorSignedTempKey"
+        },
+        {
+          "declaration": 12,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 201,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "CryptoSignature"
+        },
+        {
+          "declaration": 206,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "CryptoSignature"
+        },
+        {
+          "declaration": 279,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "ValidatorTempKey"
+        },
+        {
+          "declaration": 13,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 200,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "CryptoSignatureSimple"
+        },
+        {
+          "declaration": 205,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "SignedCertificate"
+        },
+        {
+          "declaration": 199,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "SigPubKey"
+        },
+        {
+          "declaration": 11,
+          "depth": 4,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 203,
+          "depth": 4,
+          "parameterized": false,
+          "typeName": "Certificate"
+        }
+      ]
+    },
+    "40": {
+      "line": 821,
+      "roots": [
+        283
+      ],
+      "dependencies": [
+        {
+          "declaration": 282,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "MisbehaviourPunishmentConfig"
+        },
+        {
+          "declaration": 48,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "Grams"
+        },
+        {
+          "declaration": 46,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "VarUInteger"
+        }
+      ]
+    },
+    "43": {
+      "line": 836,
+      "roots": [
+        287
+      ],
+      "dependencies": [
+        {
+          "declaration": 284,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "SizeLimitsConfig"
+        },
+        {
+          "declaration": 285,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "SizeLimitsConfig"
+        },
+        {
+          "declaration": 286,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "SizeLimitsConfig"
+        },
+        {
+          "declaration": 6,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Maybe"
+        },
+        {
+          "declaration": 7,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Maybe"
+        }
+      ]
+    },
+    "44": {
+      "line": 840,
+      "roots": [
+        289
+      ],
+      "dependencies": [
+        {
+          "declaration": 288,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "SuspendedAddressList"
+        },
+        {
+          "declaration": 20,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 0,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "Unit"
+        },
+        {
+          "declaration": 12,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 13,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 11,
+          "depth": 5,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "45": {
+      "line": 844,
+      "roots": [
+        292
+      ],
+      "dependencies": [
+        {
+          "declaration": 291,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "PrecompiledContractsConfig"
+        },
+        {
+          "declaration": 20,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 290,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "PrecompiledSmc"
+        },
+        {
+          "declaration": 12,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 13,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 11,
+          "depth": 5,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "46": {
+      "line": 846,
+      "roots": [
+        293
+      ],
+      "dependencies": [
+        {
+          "declaration": 383,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ValRegistryConfig"
+        },
+        {
+          "declaration": 6,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Maybe"
+        },
+        {
+          "declaration": 7,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "Maybe"
+        }
+      ]
+    },
+    "71": {
+      "line": 849,
+      "roots": [
+        295
+      ],
+      "dependencies": [
+        {
+          "declaration": 294,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "OracleBridgeParams"
+        },
+        {
+          "declaration": 20,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 12,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 13,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 11,
+          "depth": 5,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "72": {
+      "line": 850,
+      "roots": [
+        296
+      ],
+      "dependencies": [
+        {
+          "declaration": 294,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "OracleBridgeParams"
+        },
+        {
+          "declaration": 20,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 12,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 13,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 11,
+          "depth": 5,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "73": {
+      "line": 851,
+      "roots": [
+        297
+      ],
+      "dependencies": [
+        {
+          "declaration": 294,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "OracleBridgeParams"
+        },
+        {
+          "declaration": 20,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 12,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 13,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 11,
+          "depth": 5,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "79": {
+      "line": 863,
+      "roots": [
+        301
+      ],
+      "dependencies": [
+        {
+          "declaration": 299,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "JettonBridgeParams"
+        },
+        {
+          "declaration": 300,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "JettonBridgeParams"
+        },
+        {
+          "declaration": 49,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "Coins"
+        },
+        {
+          "declaration": 20,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 298,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "JettonBridgePrices"
+        },
+        {
+          "declaration": 48,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "Grams"
+        },
+        {
+          "declaration": 12,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 46,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "VarUInteger"
+        },
+        {
+          "declaration": 13,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 11,
+          "depth": 5,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "81": {
+      "line": 864,
+      "roots": [
+        302
+      ],
+      "dependencies": [
+        {
+          "declaration": 299,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "JettonBridgeParams"
+        },
+        {
+          "declaration": 300,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "JettonBridgeParams"
+        },
+        {
+          "declaration": 49,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "Coins"
+        },
+        {
+          "declaration": 20,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 298,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "JettonBridgePrices"
+        },
+        {
+          "declaration": 48,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "Grams"
+        },
+        {
+          "declaration": 12,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 46,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "VarUInteger"
+        },
+        {
+          "declaration": 13,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 11,
+          "depth": 5,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    },
+    "82": {
+      "line": 865,
+      "roots": [
+        303
+      ],
+      "dependencies": [
+        {
+          "declaration": 299,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "JettonBridgeParams"
+        },
+        {
+          "declaration": 300,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "JettonBridgeParams"
+        },
+        {
+          "declaration": 49,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "Coins"
+        },
+        {
+          "declaration": 20,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 21,
+          "depth": 2,
+          "parameterized": true,
+          "typeName": "HashmapE"
+        },
+        {
+          "declaration": 298,
+          "depth": 2,
+          "parameterized": false,
+          "typeName": "JettonBridgePrices"
+        },
+        {
+          "declaration": 48,
+          "depth": 3,
+          "parameterized": false,
+          "typeName": "Grams"
+        },
+        {
+          "declaration": 12,
+          "depth": 3,
+          "parameterized": true,
+          "typeName": "Hashmap"
+        },
+        {
+          "declaration": 46,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "VarUInteger"
+        },
+        {
+          "declaration": 13,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 14,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HashmapNode"
+        },
+        {
+          "declaration": 15,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 16,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 17,
+          "depth": 4,
+          "parameterized": true,
+          "typeName": "HmLabel"
+        },
+        {
+          "declaration": 11,
+          "depth": 5,
+          "parameterized": false,
+          "typeName": "Bit"
+        },
+        {
+          "declaration": 18,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        },
+        {
+          "declaration": 19,
+          "depth": 5,
+          "parameterized": true,
+          "typeName": "Unary"
+        }
+      ]
+    }
+  },
+  "declarations": {
+    "0": "unit$_ = Unit;",
+    "1": "true$_ = True;",
+    "2": "bool_false$0 = Bool;",
+    "3": "bool_true$1 = Bool;",
+    "6": "nothing$0 {X:Type} = Maybe X;",
+    "7": "just$1\n  {X:Type}\n  value:X = Maybe X;",
+    "11": "bit$_ (## 1) = Bit;",
+    "12": "hm_edge#_\n  {n:#}\n  {X:Type}\n  {l:#}\n  {m:#}\n  label:(HmLabel ~l n)\n  {n = (~m) + l}\n  node:(HashmapNode m X) = Hashmap n X;",
+    "13": "hmn_leaf#_\n  {X:Type}\n  value:X = HashmapNode 0 X;",
+    "14": "hmn_fork#_\n  {n:#}\n  {X:Type}\n  left:^(Hashmap n X)\n  right:^(Hashmap n X) = HashmapNode (n + 1) X;",
+    "15": "hml_short$0\n  {m:#}\n  {n:#}\n  len:(Unary ~n)\n  {n <= m}\n  s:(n * Bit) = HmLabel ~n m;",
+    "16": "hml_long$10\n  {m:#}\n  n:(#<= m)\n  s:(n * Bit) = HmLabel ~n m;",
+    "17": "hml_same$11\n  {m:#}\n  v:Bit\n  n:(#<= m) = HmLabel ~n m;",
+    "18": "unary_zero$0 = Unary ~0;",
+    "19": "unary_succ$1\n  {n:#}\n  x:(Unary ~n) = Unary ~(n + 1);",
+    "20": "hme_empty$0\n  {n:#}\n  {X:Type} = HashmapE n X;",
+    "21": "hme_root$1\n  {n:#}\n  {X:Type}\n  root:^(Hashmap n X) = HashmapE n X;",
+    "46": "var_uint$_\n  {n:#}\n  len:(#< n)\n  value:(uint (len * 8)) = VarUInteger n;",
+    "48": "nanograms$_ amount:(VarUInteger 16) = Grams;",
+    "49": "_ grams:Grams = Coins;",
+    "50": "extra_currencies$_ dict:(HashmapE 32 (VarUInteger 32))\n                 = ExtraCurrencyCollection;",
+    "199": "ed25519_pubkey#8e81278a pubkey:bits256 = SigPubKey;",
+    "200": "ed25519_signature#5\n  R:bits256\n  s:bits256 = CryptoSignatureSimple;",
+    "201": "_ CryptoSignatureSimple = CryptoSignature;",
+    "203": "certificate#4\n  temp_key:SigPubKey\n  valid_since:uint32\n  valid_until:uint32 = Certificate;",
+    "205": "signed_certificate$_\n  certificate:Certificate\n  certificate_signature:CryptoSignature = SignedCertificate;",
+    "206": "chained_signature#f\n  signed_cert:^SignedCertificate\n  temp_key_signature:CryptoSignatureSimple = CryptoSignature;",
+    "208": "validator#53\n  public_key:SigPubKey\n  weight:uint64 = ValidatorDescr;",
+    "209": "validator_addr#73\n  public_key:SigPubKey\n  weight:uint64\n  adnl_addr:bits256 = ValidatorDescr;",
+    "210": "validators#11\n  utime_since:uint32\n  utime_until:uint32\n  total:(## 16)\n  main:(## 16)\n  { main <= total }\n  { main >= 1 }\n  list:(Hashmap 16 ValidatorDescr) = ValidatorSet;",
+    "211": "validators_ext#12\n  utime_since:uint32\n  utime_until:uint32\n  total:(## 16)\n  main:(## 16)\n  { main <= total }\n  { main >= 1 }\n  total_weight:uint64\n  list:(HashmapE 16 ValidatorDescr) = ValidatorSet;",
+    "212": "_ config_addr:bits256 = ConfigParam 0;",
+    "213": "_ elector_addr:bits256 = ConfigParam 1;",
+    "214": "_ minter_addr:bits256 = ConfigParam 2;",
+    "215": "_ fee_collector_addr:bits256 = ConfigParam 3;",
+    "216": "_ dns_root_addr:bits256 = ConfigParam 4;",
+    "217": "burning_config#01\n  blackhole_addr:(Maybe bits256)\n  fee_burn_num:#\n  fee_burn_denom:#\n  { fee_burn_num <= fee_burn_denom }\n  { fee_burn_denom >= 1 } = BurningConfig;",
+    "218": "_ BurningConfig = ConfigParam 5;",
+    "219": "_\n  mint_new_price:Grams\n  mint_add_price:Grams = ConfigParam 6;",
+    "220": "_ to_mint:ExtraCurrencyCollection = ConfigParam 7;",
+    "221": "capabilities#c4\n  version:uint32\n  capabilities:uint64 = GlobalVersion;",
+    "222": "_ GlobalVersion = ConfigParam 8;",
+    "223": "_ mandatory_params:(Hashmap 32 True) = ConfigParam 9;",
+    "224": "_ critical_params:(Hashmap 32 True) = ConfigParam 10;",
+    "225": "cfg_vote_cfg#36\n  min_tot_rounds:(## 8)\n  max_tot_rounds:(## 8)\n  { min_tot_rounds <= max_tot_rounds }\n  min_wins:uint8\n  max_losses:uint8\n  min_store_sec:(## 32)\n  max_store_sec:(## 32)\n  { min_store_sec <= max_store_sec }\n  bit_price:uint32\n  cell_price:uint32 = ConfigProposalSetup;",
+    "226": "cfg_vote_setup#91\n  normal_params:^ConfigProposalSetup\n  critical_params:^ConfigProposalSetup = ConfigVotingSetup;",
+    "227": "_ ConfigVotingSetup = ConfigParam 11;",
+    "230": "wfmt_basic#1\n  vm_version:int32\n  vm_mode:uint64 = WorkchainFormat 1;",
+    "231": "wfmt_ext#0\n  min_addr_len:(## 12)\n  max_addr_len:(## 12)\n  addr_len_step:(## 12)\n  { min_addr_len >= 64 }\n  { min_addr_len <= max_addr_len }\n  { max_addr_len <= 1023 }\n  { addr_len_step <= 1023 }\n  workchain_type_id:(## 32)\n  { workchain_type_id >= 1 } = WorkchainFormat 0;",
+    "232": "wc_split_merge_timings#0\n  split_merge_delay:uint32\n  split_merge_interval:uint32\n  min_split_merge_interval:uint32\n  max_split_merge_delay:uint32 = WcSplitMergeTimings;",
+    "233": "workchain#a6\n  enabled_since:uint32\n  monitor_min_split:(## 8)\n  min_split:(## 8)\n  max_split:(## 8)\n  { monitor_min_split <= min_split }\n  { min_split <= max_split }\n  { max_split <= 60 }\n  basic:(## 1)\n  active:Bool\n  accept_msgs:Bool\n  flags:(## 13)\n  { flags = 0 }\n  zerostate_root_hash:bits256\n  zerostate_file_hash:bits256\n  version:uint32\n  format:(WorkchainFormat basic) = WorkchainDescr;",
+    "234": "workchain_v2#a7\n  enabled_since:uint32\n  monitor_min_split:(## 8)\n  min_split:(## 8)\n  max_split:(## 8)\n  { monitor_min_split <= min_split }\n  { min_split <= max_split }\n  { max_split <= 60 }\n  basic:(## 1)\n  active:Bool\n  accept_msgs:Bool\n  flags:(## 13)\n  { flags = 0 }\n  zerostate_root_hash:bits256\n  zerostate_file_hash:bits256\n  version:uint32\n  format:(WorkchainFormat basic)\n  split_merge_timings:WcSplitMergeTimings\n  persistent_state_split_depth:(## 8)\n  { persistent_state_split_depth <= 63 } = WorkchainDescr;",
+    "235": "_ workchains:(HashmapE 32 WorkchainDescr) = ConfigParam 12;",
+    "236": "complaint_prices#1a\n  deposit:Grams\n  bit_price:Grams\n  cell_price:Grams = ComplaintPricing;",
+    "237": "_ ComplaintPricing = ConfigParam 13;",
+    "238": "block_grams_created#6b\n  masterchain_block_fee:Grams\n  basechain_block_fee:Grams = BlockCreateFees;",
+    "239": "_ BlockCreateFees = ConfigParam 14;",
+    "240": "_\n  validators_elected_for:uint32\n  elections_start_before:uint32\n  elections_end_before:uint32\n  stake_held_for:uint32 = ConfigParam 15;",
+    "241": "_\n  max_validators:(## 16)\n  max_main_validators:(## 16)\n  min_validators:(## 16)\n  { max_validators >= max_main_validators }\n  { max_main_validators >= min_validators }\n  { min_validators >= 1 } = ConfigParam 16;",
+    "242": "_\n  min_stake:Grams\n  max_stake:Grams\n  min_total_stake:Grams\n  max_stake_factor:uint32 = ConfigParam 17;",
+    "243": "_#cc\n  utime_since:uint32\n  bit_price_ps:uint64\n  cell_price_ps:uint64\n  mc_bit_price_ps:uint64\n  mc_cell_price_ps:uint64 = StoragePrices;",
+    "244": "_ (Hashmap 32 StoragePrices) = ConfigParam 18;",
+    "245": "_ global_id:int32 = ConfigParam 19;",
+    "246": "gas_prices#dd\n  gas_price:uint64\n  gas_limit:uint64\n  gas_credit:uint64\n  block_gas_limit:uint64\n  freeze_due_limit:uint64\n  delete_due_limit:uint64 = GasLimitsPrices;",
+    "247": "gas_prices_ext#de\n  gas_price:uint64\n  gas_limit:uint64\n  special_gas_limit:uint64\n  gas_credit:uint64\n  block_gas_limit:uint64\n  freeze_due_limit:uint64\n  delete_due_limit:uint64 = GasLimitsPrices;",
+    "248": "gas_flat_pfx#d1\n  flat_gas_limit:uint64\n  flat_gas_price:uint64\n  other:GasLimitsPrices = GasLimitsPrices;",
+    "249": "config_mc_gas_prices#_ GasLimitsPrices = ConfigParam 20;",
+    "250": "config_gas_prices#_ GasLimitsPrices = ConfigParam 21;",
+    "251": "param_limits#c3\n  underload:#\n  soft_limit:#\n  { underload <= soft_limit }\n  hard_limit:#\n  { soft_limit <= hard_limit } = ParamLimits;",
+    "252": "imported_msg_queue_limits#d3\n  max_bytes:#\n  max_msgs:# = ImportedMsgQueueLimits;",
+    "253": "block_limits#5d\n  bytes:ParamLimits\n  gas:ParamLimits\n  lt_delta:ParamLimits = BlockLimits;",
+    "254": "block_limits_v2#5e\n  bytes:ParamLimits\n  gas:ParamLimits\n  lt_delta:ParamLimits\n  collated_data:ParamLimits\n  imported_msg_queue:ImportedMsgQueueLimits = BlockLimits;",
+    "255": "config_mc_block_limits#_ BlockLimits = ConfigParam 22;",
+    "256": "config_block_limits#_ BlockLimits = ConfigParam 23;",
+    "257": "msg_forward_prices#ea\n  lump_price:uint64\n  bit_price:uint64\n  cell_price:uint64\n  ihr_price_factor:uint32\n  first_frac:uint16\n  next_frac:uint16 = MsgForwardPrices;",
+    "258": "config_mc_fwd_prices#_ MsgForwardPrices = ConfigParam 24;",
+    "259": "config_fwd_prices#_ MsgForwardPrices = ConfigParam 25;",
+    "260": "catchain_config#c1\n  mc_catchain_lifetime:(## 32)\n  { mc_catchain_lifetime >= 1 }\n  shard_catchain_lifetime:(## 32)\n  { shard_catchain_lifetime >= 1 }\n  shard_validators_lifetime:(## 32)\n  { shard_validators_lifetime >= 1 }\n  shard_validators_num:(## 32)\n  { shard_validators_num >= 1 } = CatchainConfig;",
+    "261": "catchain_config_new#c2\n  flags:(## 7)\n  { flags = 0 }\n  shuffle_mc_validators:Bool\n  mc_catchain_lifetime:(## 32)\n  { mc_catchain_lifetime >= 1 }\n  shard_catchain_lifetime:(## 32)\n  { shard_catchain_lifetime >= 1 }\n  shard_validators_lifetime:(## 32)\n  { shard_validators_lifetime >= 1 }\n  shard_validators_num:(## 32)\n  { shard_validators_num >= 1 } = CatchainConfig;",
+    "262": "consensus_config#d6\n  round_candidates:#\n  { round_candidates >= 1 }\n  next_candidate_delay_ms:uint32\n  consensus_timeout_ms:uint32\n  fast_attempts:uint32\n  attempt_duration:uint32\n  catchain_max_deps:uint32\n  max_block_bytes:uint32\n  max_collated_bytes:uint32 = ConsensusConfig;",
+    "263": "consensus_config_new#d7\n  flags:(## 7)\n  { flags = 0 }\n  new_catchain_ids:Bool\n  round_candidates:(## 8)\n  { round_candidates >= 1 }\n  next_candidate_delay_ms:uint32\n  consensus_timeout_ms:uint32\n  fast_attempts:uint32\n  attempt_duration:uint32\n  catchain_max_deps:uint32\n  max_block_bytes:uint32\n  max_collated_bytes:uint32 = ConsensusConfig;",
+    "264": "consensus_config_v3#d8\n  flags:(## 7)\n  { flags = 0 }\n  new_catchain_ids:Bool\n  round_candidates:(## 8)\n  { round_candidates >= 1 }\n  next_candidate_delay_ms:uint32\n  consensus_timeout_ms:uint32\n  fast_attempts:uint32\n  attempt_duration:uint32\n  catchain_max_deps:uint32\n  max_block_bytes:uint32\n  max_collated_bytes:uint32\n  proto_version:uint16 = ConsensusConfig;",
+    "265": "consensus_config_v4#d9\n  flags:(## 6)\n  { flags = 0 }\n  use_quic:Bool\n  new_catchain_ids:Bool\n  round_candidates:(## 8)\n  { round_candidates >= 1 }\n  next_candidate_delay_ms:uint32\n  consensus_timeout_ms:uint32\n  fast_attempts:uint32\n  attempt_duration:uint32\n  catchain_max_deps:uint32\n  max_block_bytes:uint32\n  max_collated_bytes:uint32\n  proto_version:uint16\n  catchain_max_blocks_coeff:uint32 = ConsensusConfig;",
+    "266": "_ CatchainConfig = ConfigParam 28;",
+    "267": "_ ConsensusConfig = ConfigParam 29;",
+    "268": "simplex_config#21\n  flags:(## 7)\n  use_quic:Bool\n  target_rate_ms:uint32\n  slots_per_leader_window:(## 32)\n  { slots_per_leader_window >= 1 }\n  first_block_timeout_ms:uint32\n  max_leader_window_desync:uint32 = NewConsensusConfig;",
+    "269": "simplex_config_v2#22\n  flags:(## 5)\n  protocol_version:(## 2)\n  use_quic:Bool\n  slots_per_leader_window:(## 32)\n  { slots_per_leader_window >= 1 }\n  noncritical_params:(HashmapE 8 uint32) = NewConsensusConfig;",
+    "270": "new_consensus_config_all#10\n  mc:(Maybe ^NewConsensusConfig)\n  shard:(Maybe ^NewConsensusConfig) = NewConsensusConfigAll;",
+    "271": "_ NewConsensusConfigAll = ConfigParam 30;",
+    "272": "_ fundamental_smc_addr:(HashmapE 256 True) = ConfigParam 31;",
+    "273": "_ prev_validators:ValidatorSet = ConfigParam 32;",
+    "274": "_ prev_temp_validators:ValidatorSet = ConfigParam 33;",
+    "275": "_ cur_validators:ValidatorSet = ConfigParam 34;",
+    "276": "_ cur_temp_validators:ValidatorSet = ConfigParam 35;",
+    "277": "_ next_validators:ValidatorSet = ConfigParam 36;",
+    "278": "_ next_temp_validators:ValidatorSet = ConfigParam 37;",
+    "279": "validator_temp_key#3\n  adnl_addr:bits256\n  temp_public_key:SigPubKey\n  seqno:#\n  valid_until:uint32 = ValidatorTempKey;",
+    "280": "signed_temp_key#4\n  key:^ValidatorTempKey\n  signature:CryptoSignature = ValidatorSignedTempKey;",
+    "281": "_ (HashmapE 256 ValidatorSignedTempKey) = ConfigParam 39;",
+    "282": "misbehaviour_punishment_config_v1#01\n  default_flat_fine:Grams\n  default_proportional_fine:uint32\n  severity_flat_mult:uint16\n  severity_proportional_mult:uint16\n  unpunishable_interval:uint16\n  long_interval:uint16\n  long_flat_mult:uint16\n  long_proportional_mult:uint16\n  medium_interval:uint16\n  medium_flat_mult:uint16\n  medium_proportional_mult:uint16 = MisbehaviourPunishmentConfig;",
+    "283": "_ MisbehaviourPunishmentConfig = ConfigParam 40;",
+    "284": "size_limits_config#01\n  max_msg_bits:uint32\n  max_msg_cells:uint32\n  max_library_cells:uint32\n  max_vm_data_depth:uint16\n  max_ext_msg_size:uint32\n  max_ext_msg_depth:uint16 = SizeLimitsConfig;",
+    "285": "size_limits_config_v2#02\n  max_msg_bits:uint32\n  max_msg_cells:uint32\n  max_library_cells:uint32\n  max_vm_data_depth:uint16\n  max_ext_msg_size:uint32\n  max_ext_msg_depth:uint16\n  max_acc_state_cells:uint32\n  max_mc_acc_state_cells:uint32\n  max_acc_public_libraries:uint32\n  defer_out_queue_size_limit:uint32\n  max_msg_extra_currencies:uint32\n  max_acc_fixed_prefix_length:uint8\n  acc_state_cells_for_storage_dict:uint32\n  max_transaction_library_loads:(Maybe uint32) = SizeLimitsConfig;",
+    "286": "size_limits_config_v3#03\n  max_msg_bits:uint32\n  max_msg_cells:uint32\n  max_library_cells:uint32\n  max_vm_data_depth:uint16\n  max_ext_msg_size:uint32\n  max_ext_msg_depth:uint16\n  max_acc_state_cells:uint32\n  max_mc_acc_state_cells:uint32\n  max_acc_public_libraries:uint32\n  defer_out_queue_size_limit:uint32\n  max_msg_extra_currencies:uint32\n  max_acc_fixed_prefix_length:uint8\n  acc_state_cells_for_storage_dict:uint32\n  max_transaction_library_loads:(Maybe uint32)\n  max_total_msg_bits:uint32\n  max_total_msg_cells:uint32 = SizeLimitsConfig;",
+    "287": "_ SizeLimitsConfig = ConfigParam 43;",
+    "288": "suspended_address_list#00\n  addresses:(HashmapE 288 Unit)\n  suspended_until:uint32 = SuspendedAddressList;",
+    "289": "_ SuspendedAddressList = ConfigParam 44;",
+    "290": "precompiled_smc#b0 gas_usage:uint64 = PrecompiledSmc;",
+    "291": "precompiled_contracts_config#c0 list:(HashmapE 256 PrecompiledSmc) = PrecompiledContractsConfig;",
+    "292": "_ PrecompiledContractsConfig = ConfigParam 45;",
+    "293": "_ ValRegistryConfig = ConfigParam 46;",
+    "294": "oracle_bridge_params#_\n  bridge_address:bits256\n  oracle_mutlisig_address:bits256\n  oracles:(HashmapE 256 uint256)\n  external_chain_address:bits256 = OracleBridgeParams;",
+    "295": "_ OracleBridgeParams = ConfigParam 71;",
+    "296": "_ OracleBridgeParams = ConfigParam 72;",
+    "297": "_ OracleBridgeParams = ConfigParam 73;",
+    "298": "jetton_bridge_prices#_\n  bridge_burn_fee:Coins\n  bridge_mint_fee:Coins\n  wallet_min_tons_for_storage:Coins\n  wallet_gas_consumption:Coins\n  minter_min_tons_for_storage:Coins\n  discover_gas_consumption:Coins = JettonBridgePrices;",
+    "299": "jetton_bridge_params_v0#00\n  bridge_address:bits256\n  oracles_address:bits256\n  oracles:(HashmapE 256 uint256)\n  state_flags:uint8\n  burn_bridge_fee:Coins = JettonBridgeParams;",
+    "300": "jetton_bridge_params_v1#01\n  bridge_address:bits256\n  oracles_address:bits256\n  oracles:(HashmapE 256 uint256)\n  state_flags:uint8\n  prices:^JettonBridgePrices\n  external_chain_address:bits256 = JettonBridgeParams;",
+    "301": "_ JettonBridgeParams = ConfigParam 79;",
+    "302": "_ JettonBridgeParams = ConfigParam 81;",
+    "303": "_ JettonBridgeParams = ConfigParam 82;",
+    "383": "val_registry_config#3601163e\n  contract_address:bits256\n  max_collators_per_validator:uint32\n  new_code_hash:(Maybe uint256) = ValRegistryConfig;"
+  },
+  "source": {
+    "revision": "3d478cbde854be03a18ab2a59f8fc3c565cf7d14",
+    "sha256": "d940a095d86f76d8c1dd43424767383b920952b1c89831ee03fc0ab9a90b6b23",
+    "url": "https://github.com/ton-blockchain/ton/blob/3d478cbde854be03a18ab2a59f8fc3c565cf7d14/crypto/block/block.tlb"
+  }
+}

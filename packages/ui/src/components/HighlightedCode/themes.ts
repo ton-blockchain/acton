@@ -12,6 +12,32 @@ export const jetbrainsDarculaTheme: ThemeRegistration = {
     "editor.selectionBackground": "#214283",
   },
   tokenColors: [
+    // TL-B distinguishes serialization fields, types and implicit parameters.
+    // Language-specific scopes keep the other code viewers' palettes intact.
+    {
+      scope: "entity.name.function.constructor.tlb",
+      settings: {foreground: "#56A8F5"},
+    },
+    {
+      scope: "entity.name.type.tlb",
+      settings: {foreground: "#A2BA6D"},
+    },
+    {
+      scope: "variable.other.property.tlb",
+      settings: {foreground: "#C77DBB"},
+    },
+    {
+      scope: "variable.parameter.tlb",
+      settings: {foreground: "#D5B778"},
+    },
+    {
+      scope: "support.type.primitive.tlb",
+      settings: {foreground: "#CF8E6D"},
+    },
+    {
+      scope: "keyword.operator.tlb",
+      settings: {foreground: "#8FA8C7"},
+    },
     {
       scope: ["comment", "punctuation.definition.comment", "string.comment"],
       settings: {foreground: "#7A7E85"},
@@ -121,6 +147,30 @@ export const jetbrainsLightTheme: ThemeRegistration = {
     "editor.selectionBackground": "#D4DFFF",
   },
   tokenColors: [
+    {
+      scope: "entity.name.function.constructor.tlb",
+      settings: {foreground: "#005CC5"},
+    },
+    {
+      scope: "entity.name.type.tlb",
+      settings: {foreground: "#176947"},
+    },
+    {
+      scope: "variable.other.property.tlb",
+      settings: {foreground: "#871094"},
+    },
+    {
+      scope: "variable.parameter.tlb",
+      settings: {foreground: "#8A5300"},
+    },
+    {
+      scope: "support.type.primitive.tlb",
+      settings: {foreground: "#9C3C00"},
+    },
+    {
+      scope: "keyword.operator.tlb",
+      settings: {foreground: "#65748A"},
+    },
     {
       scope: ["comment", "punctuation.definition.comment", "string.comment"],
       settings: {foreground: "#8C8C8C"},

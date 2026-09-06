@@ -27,15 +27,15 @@ impl Runtime {
                 return Ok(operation);
             }
         }
-        let guard = Arc::clone(&entry.mutation)
-            .try_lock_owned()
-            .map_err(|_| Error::busy())?;
         let network = entry.record.read().await.clone();
         if let Some(driver) = crate::docker::DockerNetwork::load(&entry.data_dir, &network).await?
             && let Some(previous) = driver.saved_admin_operation(Some(&request)).await?
         {
             return Ok(previous);
         }
+        let guard = Arc::clone(&entry.mutation)
+            .try_lock_owned()
+            .map_err(|_| Error::busy())?;
         if network.status != Status::Running {
             return Err(Error::Conflict {
                 code: "admin_unavailable",
@@ -218,6 +218,90 @@ mod tests {
             ));
         }
         assert!(!location.path.join("runtime.json").exists());
+    }
+
+    #[tokio::test]
+    async fn historical_retries_do_not_wait_for_or_replace_a_newer_operation() {
+        let temp = tempfile::tempdir().unwrap();
+        let location = crate::catalog::create(
+            temp.path(),
+            crate::CreateNetwork {
+                name: "historical-retry".into(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        crate::storage::write_json(&location.path.join("runtime.json"), &serde_json::json!({
+            "version":2,"image":"unused","dockerTarget":{"kind":"context","value":"unused"},"projectName":"unused"
+        })).await.unwrap();
+        let runtime = Runtime::open(&location.path).await.unwrap();
+        let driver = crate::docker::DockerNetwork::load(&location.path, &runtime.get().await)
+            .await
+            .unwrap()
+            .unwrap();
+        let request = || {
+            serde_json::from_value::<AdminRequest>(serde_json::json!({
+            "kind":"accounts", "id":uuid::Uuid::new_v4().to_string(),
+            "edits":[{"address":format!("0:{}", "11".repeat(32)), "type":"balance", "balance":"1"}]
+        })).unwrap()
+        };
+        let old = request();
+        let current = request();
+        let operation = |id: &str| AdminOperation {
+            id: id.into(),
+            phase: "installing".into(),
+            started_at: chrono::Utc::now().to_rfc3339(),
+            finished_at: None,
+            error: None,
+            block_seqno: None,
+        };
+        *runtime.inner.entry.admin_request.write().await = Some(current.clone());
+        *runtime.inner.entry.admin_operation.write().await = Some(operation(current.id()));
+        let _guard = runtime.inner.entry.mutation.lock().await;
+        for interrupted in [false, true] {
+            let mut earlier = operation(old.id());
+            if !interrupted {
+                earlier.phase = "completed".into();
+                earlier.finished_at = Some(chrono::Utc::now().to_rfc3339());
+                earlier.block_seqno = Some(42);
+            }
+            driver.save_admin_operation(&old, &earlier).await.unwrap();
+            driver
+                .save_admin_operation(&current, &operation(current.id()))
+                .await
+                .unwrap();
+            let retry = runtime.start_admin(old.clone()).await.unwrap();
+            assert_eq!(retry.id, old.id());
+            assert_eq!(
+                retry.phase,
+                if interrupted { "failed" } else { "completed" }
+            );
+            assert!(!retry.is_active());
+            let mut changed = serde_json::to_value(&old).unwrap();
+            changed["edits"][0]["balance"] = "2".into();
+            assert!(matches!(
+                runtime
+                    .start_admin(serde_json::from_value(changed).unwrap())
+                    .await,
+                Err(Error::Conflict {
+                    code: "admin_id_reused",
+                    ..
+                })
+            ));
+            let latest: String =
+                crate::storage::read_json(&location.path.join("admin-operations/latest.json"))
+                    .await
+                    .unwrap();
+            assert_eq!(latest, current.id());
+            assert!(
+                runtime
+                    .start_admin(current.clone())
+                    .await
+                    .unwrap()
+                    .is_active()
+            );
+        }
     }
 
     #[tokio::test]

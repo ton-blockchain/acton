@@ -1,4 +1,5 @@
 pub(crate) mod actonscan_opcodes;
+pub(crate) mod config_tlb;
 pub(crate) mod deploy_explorer;
 pub(crate) mod dist;
 pub(crate) mod github_cleanup;

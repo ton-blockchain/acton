@@ -46,6 +46,23 @@ impl DockerNetwork {
         request: &AdminRequest,
         operation: &AdminOperation,
     ) -> Result<(), Error> {
+        self.save_admin_record(request, operation).await?;
+        let latest = self
+            .compose_file
+            .with_file_name("admin-operations")
+            .join("latest.json");
+        let temp = latest.with_extension("json.tmp");
+        tokio::fs::write(&temp, serde_json::to_vec(&operation.id).map_err(failure)?)
+            .await
+            .map_err(failure)?;
+        tokio::fs::rename(temp, latest).await.map_err(failure)
+    }
+
+    async fn save_admin_record(
+        &self,
+        request: &AdminRequest,
+        operation: &AdminOperation,
+    ) -> Result<(), Error> {
         let dir = self.compose_file.with_file_name("admin-operations");
         tokio::fs::create_dir_all(&dir).await.map_err(failure)?;
         let path = dir.join(format!("{}.json", operation.id));
@@ -57,13 +74,7 @@ impl DockerNetwork {
         tokio::fs::write(&temp, serde_json::to_vec(&record).map_err(failure)?)
             .await
             .map_err(failure)?;
-        tokio::fs::rename(temp, &path).await.map_err(failure)?;
-        let latest = dir.join("latest.json");
-        let temp = latest.with_extension("json.tmp");
-        tokio::fs::write(&temp, serde_json::to_vec(&operation.id).map_err(failure)?)
-            .await
-            .map_err(failure)?;
-        tokio::fs::rename(temp, latest).await.map_err(failure)
+        tokio::fs::rename(temp, &path).await.map_err(failure)
     }
 
     pub(crate) async fn saved_admin_operation(
@@ -94,7 +105,9 @@ impl DockerNetwork {
             op.phase = "failed".into();
             op.finished_at = Some(chrono::Utc::now().to_rfc3339());
             op.error = Some("The localnet service restarted before the operation result was recorded. Recovery ran before startup; inspect the account before submitting another edit.".into());
-            self.save_admin_operation(&saved.request, &op).await?;
+            // An old interrupted ID can be retried while a newer operation runs.
+            // Finalizing its record must not replace that operation's latest ID.
+            self.save_admin_record(&saved.request, &op).await?;
         }
         Ok(Some(op))
     }

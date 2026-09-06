@@ -1,6 +1,7 @@
 // Derive editor structure from the same generated TL-B types as the explorer.
 // Keeping this mechanical avoids a second handwritten blockchain schema.
 import {readFile, writeFile} from "node:fs/promises"
+import process from "node:process"
 
 const input = await readFile(
   new URL("../src/cell-inspector/block.tlb.generated.ts", import.meta.url),
@@ -106,7 +107,12 @@ const parameters = Object.fromEntries(
 )
 
 const output = {parameters, definitions}
-await writeFile(
-  new URL("../src/config/editor/schema.generated.json", import.meta.url),
-  `${JSON.stringify(output, null, 2)}\n`,
-)
+const outputUrl = new URL("../src/config/editor/schema.generated.json", import.meta.url)
+const content = `${JSON.stringify(output, null, 2)}\n`
+if (process.argv.includes("--check")) {
+  if ((await readFile(outputUrl, "utf8")) !== content) {
+    throw new Error(`Generated config editor schema is out of date: ${outputUrl.pathname}`)
+  }
+} else {
+  await writeFile(outputUrl, content)
+}

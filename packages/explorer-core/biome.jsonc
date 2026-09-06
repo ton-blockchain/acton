@@ -3,7 +3,12 @@
   "root": false,
   "extends": "//",
   "files": {
-    "includes": ["**", "!!src/cell-inspector/block.tlb.generated.ts"]
+    "includes": [
+      "**",
+      "!!src/cell-inspector/block.tlb.generated.ts",
+      "!!src/config/tlb.generated.json",
+      "!!src/config/tlb.parameters.generated.json"
+    ]
   },
   "linter": {
     "rules": {

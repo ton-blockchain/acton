@@ -32,6 +32,8 @@ import {
 import {ArrowRight, ChevronDown, ExternalLink, Link2, Pencil, Search} from "lucide-react"
 import {
   createContext,
+  lazy,
+  Suspense,
   useContext,
   useEffect,
   useMemo,
@@ -67,12 +69,15 @@ import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {GlobalCapabilities} from "../components/GlobalCapabilities"
 import type {TelegramWalletContractBytecode} from "../config/configParameterMinus123"
+import tlbParameterIds from "../config/tlb.parameters.generated.json"
 import {useConfigNavigation} from "../hooks/useConfigNavigation"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useOpenExplorerPath} from "../hooks/useOpenExplorerPath"
 import styles from "./ConfigPage.module.css"
 import {getExternalAccountExplorerLink} from "./configExternalAccount"
+
+const ConfigParameterTlb = lazy(() => import("../config/ConfigParameterTlb"))
 
 interface ConfigPageProps {
   readonly client: TonClient
@@ -347,13 +352,12 @@ export function ConfigParameterCard({
     parameter.validatorSet !== undefined ||
     parameter.suspendedAddresses !== undefined ||
     parameter.bridgeConfiguration !== undefined
-  const [activeTab, setActiveTab] = useState<"raw" | "value">(hasValueTab ? "value" : "raw")
-  const tabs = hasValueTab
-    ? [
-        {label: "Value", value: "value" as const},
-        {label: "Raw cell", value: "raw" as const},
-      ]
-    : [{label: "Raw cell", value: "raw" as const}]
+  const [activeTab, setActiveTab] = useState<"raw" | "value" | "tlb">(hasValueTab ? "value" : "raw")
+  const tabs = [
+    ...(hasValueTab ? [{label: "Value", value: "value" as const}] : []),
+    {label: "Raw cell", value: "raw" as const},
+    ...(tlbParameterIds.includes(parameter.id) ? [{label: "TL-B", value: "tlb" as const}] : []),
+  ]
 
   return (
     <article id={`config-parameter-${parameter.id}`} className={styles.parameterCard}>
@@ -381,15 +385,26 @@ export function ConfigParameterCard({
         className={styles.parameterTabs}
         onValueChange={setActiveTab}
         panelClassName={`${styles.parameterTabPanel} ${
-          activeTab === "raw" || (activeTab === "value" && hasCompactValue)
-            ? styles.compactParameterTabPanel
-            : ""
+          activeTab !== "value" || hasCompactValue ? styles.compactParameterTabPanel : ""
         }`}
         tabs={tabs}
         value={activeTab}
       >
         {activeTab === "value" ? (
           <ConfigParameterValue parameter={parameter} />
+        ) : activeTab === "tlb" ? (
+          <Suspense
+            fallback={
+              <RawDataBlock
+                value=""
+                variant="embedded"
+                loading
+                loadingLabel="Loading TL-B schema"
+              />
+            }
+          >
+            <ConfigParameterTlb id={parameter.id} />
+          </Suspense>
         ) : (
           <RawDataBlock
             className={styles.parameterBoc}

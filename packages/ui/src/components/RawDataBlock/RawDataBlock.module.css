@@ -31,7 +31,7 @@
   gap: var(--acton-space-3);
   padding: 0 var(--acton-space-3) 1px var(--acton-space-4);
   border-bottom: 0;
-  background: var(--acton-color-surface-raised);
+  background: var(--acton-raw-data-header-background, var(--acton-color-surface-raised));
 }
 
 .rawDataBlock[data-expanded="true"] .header::after {
@@ -64,7 +64,7 @@
   cursor: pointer;
   font: inherit;
   font-size: var(--acton-font-size-compact);
-  font-weight: var(--acton-font-weight-medium);
+  font-weight: var(--acton-raw-data-header-font-weight, var(--acton-font-weight-medium));
   line-height: 1.2;
   text-align: left;
   transition: color var(--acton-duration-fast) var(--acton-ease-standard);
@@ -104,7 +104,7 @@
 div.headerTitle {
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-compact);
-  font-weight: var(--acton-font-weight-medium);
+  font-weight: var(--acton-raw-data-header-font-weight, var(--acton-font-weight-medium));
   line-height: 1.2;
 }
 

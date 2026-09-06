@@ -419,6 +419,8 @@ pub fn build_hardfork(
 /// A built basechain block together with what the masterchain block needs from it.
 struct BuiltShardBlock {
     block: HardforkBlock,
+    old_balance: CurrencyCollection,
+    new_balance: CurrencyCollection,
     shard: ShardIdent,
     start_lt: u64,
     end_lt: u64,
@@ -476,6 +478,8 @@ fn build_shard_block(
         accounts: Lazy::new(&accounts).context("Failed to wrap basechain shard accounts")?,
         total_balance: accounts.root_extra().balance.clone(),
         master_ref: Some(mc_prev_ref.clone()),
+        // TON only maintains the public library registry in the masterchain.
+        // Non-masterchain validators require this dictionary to stay empty.
         ..old_state.clone()
     };
     let new_state_cell = CellBuilder::build_from(&new_state)
@@ -521,6 +525,8 @@ fn build_shard_block(
     )?;
 
     Ok(BuiltShardBlock {
+        old_balance: old_state.total_balance,
+        new_balance: new_state.total_balance,
         shard: source.shard,
         start_lt,
         end_lt,
@@ -556,6 +562,27 @@ fn build_masterchain_block(
     let libraries = updated_libraries(old_state, writes)?;
 
     let mut extra = old_extra.clone();
+    // Administrative balance changes mint or remove supply without ordinary
+    // transactions. Account for both chains, including extra currencies; retain
+    // supply held in queues, validator fees and every untouched shard.
+    let mut global_balance = extra
+        .global_balance
+        .checked_sub(&old_state.total_balance)
+        .context("Global balance is below the old masterchain balance")?;
+    if let Some(shard) = basechain {
+        global_balance = global_balance
+            .checked_sub(&shard.old_balance)
+            .context("Global balance is below the old shard balance")?;
+    }
+    global_balance = global_balance
+        .checked_add(&accounts.root_extra().balance)
+        .context("Global balance overflow after masterchain edits")?;
+    if let Some(shard) = basechain {
+        global_balance = global_balance
+            .checked_add(&shard.new_balance)
+            .context("Global balance overflow after basechain edits")?;
+    }
+    extra.global_balance = global_balance;
     // A key block always starts a new masterchain catchain session.
     extra.validator_info.catchain_seqno = extra
         .validator_info
@@ -1098,6 +1125,127 @@ mod tests {
                 file_hash: HashBytes([0xbb; 32]),
             },
             basechain: None,
+        }
+    }
+
+    fn two_chain_sources() -> HardforkSources {
+        use tycho_types::models::block::ShardDescription;
+        let mut sources = sources();
+        let mut mc = sources
+            .masterchain_state
+            .parse::<ShardStateUnsplit>()
+            .unwrap();
+        let mut shard = mc.clone();
+        shard.shard_ident = ShardIdent::BASECHAIN;
+        shard.custom = None;
+        let prev = sources.masterchain_prev.clone();
+        let descr = ShardDescription {
+            seqno: prev.seqno,
+            reg_mc_seqno: prev.seqno,
+            start_lt: PREV_GEN_LT - LT_ALIGN,
+            end_lt: PREV_GEN_LT,
+            root_hash: prev.root_hash,
+            file_hash: prev.file_hash,
+            before_split: false,
+            before_merge: false,
+            want_split: false,
+            want_merge: false,
+            nx_cc_updated: false,
+            next_catchain_seqno: 0,
+            next_validator_shard: ShardIdent::BASECHAIN.prefix(),
+            min_ref_mc_seqno: prev.seqno,
+            gen_utime: 100,
+            split_merge_at: None,
+            fees_collected: CurrencyCollection::ZERO,
+            funds_created: CurrencyCollection::ZERO,
+        };
+        let mut extra = mc.custom.as_ref().unwrap().load().unwrap();
+        extra.shards = ShardHashes::from_shards([(&ShardIdent::BASECHAIN, &descr)]).unwrap();
+        extra
+            .global_balance
+            .other
+            .as_dict_mut()
+            .set(7, tycho_types::num::VarUint248::new(500))
+            .unwrap();
+        mc.custom = Some(Lazy::new(&extra).unwrap());
+        sources.masterchain_state = CellBuilder::build_from(&mc).unwrap();
+        sources.basechain = Some(ShardSource {
+            shard: ShardIdent::BASECHAIN,
+            state: CellBuilder::build_from(&shard).unwrap(),
+            prev,
+        });
+        sources
+    }
+
+    #[test]
+    fn global_supply_tracks_repeated_balance_edits_on_both_chains() {
+        let mut sources = two_chain_sources();
+        let address = HashBytes([0x11; 32]);
+        for (mc_balance, shard_balance) in [(10, 100), (5, 50), (0, 0), (20, 25)] {
+            let write = |workchain, balance| {
+                if balance == 0 {
+                    return AccountWrite::remove(address);
+                }
+                let mut record = account(address, balance);
+                let mut value = record.load_account().unwrap().unwrap();
+                value.address = IntAddr::Std(StdAddr::new(workchain, address));
+                value
+                    .balance
+                    .other
+                    .as_dict_mut()
+                    .set(7, tycho_types::num::VarUint248::new(balance * 2))
+                    .unwrap();
+                record.account = Lazy::new(&OptionalAccount(Some(value))).unwrap();
+                AccountWrite::set(address, record)
+            };
+            let plan = build_hardfork(
+                &sources,
+                200,
+                &AdminBatch {
+                    masterchain: vec![write(-1, mc_balance)],
+                    basechain: vec![write(0, shard_balance)],
+                },
+            )
+            .unwrap();
+            let mc_cell = Boc::decode(&plan.masterchain.state_boc).unwrap();
+            let mc = mc_cell.parse::<ShardStateUnsplit>().unwrap();
+            let extra = mc.custom.as_ref().unwrap().load().unwrap();
+            assert_eq!(
+                extra.global_balance.tokens,
+                Tokens::new(1000 + mc_balance + shard_balance)
+            );
+            assert_eq!(
+                extra
+                    .global_balance
+                    .other
+                    .as_dict()
+                    .get(7)
+                    .unwrap()
+                    .unwrap(),
+                tycho_types::num::VarUint248::new(500 + (mc_balance + shard_balance) * 2)
+            );
+            let shard = plan.basechain.unwrap();
+            let shard_cell = Boc::decode(&shard.state_boc).unwrap();
+            assert_eq!(
+                shard_cell
+                    .parse::<ShardStateUnsplit>()
+                    .unwrap()
+                    .total_balance
+                    .tokens,
+                Tokens::new(shard_balance)
+            );
+            let previous = |block: &HardforkBlock| HardforkPrevBlock {
+                seqno: block.seqno,
+                root_hash: block.root_hash,
+                file_hash: block.file_hash,
+            };
+            sources.masterchain_prev = previous(&plan.masterchain);
+            sources.masterchain_state = mc_cell;
+            sources.basechain = Some(ShardSource {
+                shard: ShardIdent::BASECHAIN,
+                state: shard_cell,
+                prev: previous(&shard),
+            });
         }
     }
 

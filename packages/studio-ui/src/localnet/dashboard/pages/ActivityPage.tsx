@@ -97,11 +97,13 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
 
   useEffect(() => {
     mounted.current = true
-    let timer: ReturnType<typeof setTimeout> | undefined
+    let polling = false
     const controller = new AbortController()
     let reportedError = false
 
     const poll = async () => {
+      if (polling || controller.signal.aborted) return
+      polling = true
       try {
         if (!mutating.current) {
           const version = revision.current
@@ -152,15 +154,16 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
           }
         }
       } finally {
-        if (!controller.signal.aborted) timer = setTimeout(poll, 2000)
+        polling = false
       }
     }
     void poll()
+    const timer = setInterval(() => void poll(), 2000)
 
     return () => {
       mounted.current = false
       controller.abort()
-      clearTimeout(timer)
+      clearInterval(timer)
     }
   }, [environment.id, environment.name, retry, showToast])
 
@@ -381,9 +384,7 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
                   checked={draft.randomizeBatchSize}
                   disabled={!editable}
                   title="Choose a new size from 2 to the maximum for each batch scenario"
-                  onChange={event =>
-                    setDraft({...draft, randomizeBatchSize: event.target.checked})
-                  }
+                  onChange={event => setDraft({...draft, randomizeBatchSize: event.target.checked})}
                 />
               </div>
             </div>

@@ -1,0 +1,137 @@
+name: Update TON TL-B
+
+on:
+  schedule:
+    # Every Monday at 05:23 UTC
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: update-block-tlb
+  cancel-in-progress: false
+
+permissions: { }
+
+jobs:
+  update:
+    name: Update schema and generated artifacts
+    if: github.repository == 'ton-blockchain/acton'
+    runs-on: ubicloud-standard-2-ubuntu-2204
+    timeout-minutes: 30
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: update-block-tlb
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - name: Install dependencies
+        run: bun ci
+
+      - name: Update TON schema and regenerate artifacts
+        working-directory: packages/explorer-core
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun run generate:block-tlb --update
+
+      - name: Check for changes
+        id: changes
+        # language=Bash
+        run: |
+          if git diff --quiet -- packages/explorer-core/src/cell-inspector/block.tlb.source.json; then
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "changed=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Update TL-B display snapshots
+        if: steps.changes.outputs.changed == 'true'
+        working-directory: packages/explorer-core
+        # Only refresh presentation snapshots; integrity expectations stay fixed
+        run: bun test tests/configTlb.test.ts --test-name-pattern 'keeps root declarations' --update-snapshots
+
+      - name: Validate schema and Explorer
+        if: steps.changes.outputs.changed == 'true'
+        working-directory: packages/explorer-core
+        run: |
+          bun run generate:block-tlb --check
+          bun run test
+          bun run build
+
+      - name: Create or update pull request
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPDATE_BRANCH: automation/update-block-tlb
+        # language=Bash
+        run: |
+          gh auth setup-git
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          source_file=packages/explorer-core/src/cell-inspector/block.tlb.source.json
+          previous_revision=$(git show "HEAD:${source_file}" | jq -r '.revision')
+          revision=$(jq -r '.revision' "${source_file}")
+
+          git switch --create "${UPDATE_BRANCH}"
+          git add \
+            packages/explorer-core/src/cell-inspector/block.tlb \
+            packages/explorer-core/src/cell-inspector/block.tlb.source.json \
+            packages/explorer-core/src/cell-inspector/block.tlb.generated.ts \
+            packages/explorer-core/src/config/tlb.generated.json \
+            packages/explorer-core/src/config/tlb.parameters.generated.json \
+            packages/explorer-core/src/config/editor/schema.generated.json \
+            packages/explorer-core/tests/__snapshots__/configTlb.test.ts.snap
+          git commit --message "chore(explorer): update TON TL-B schema"
+
+          remote_sha=$(git ls-remote --heads origin "${UPDATE_BRANCH}" | awk '{print $1}')
+          if [[ -n "${remote_sha}" ]]; then
+            git push origin "HEAD:refs/heads/${UPDATE_BRANCH}" \
+              --force-with-lease="refs/heads/${UPDATE_BRANCH}:${remote_sha}"
+          else
+            git push --set-upstream origin "${UPDATE_BRANCH}"
+          fi
+
+          body_file="${RUNNER_TEMP}/block-tlb-pr.md"
+          cat > "${body_file}" <<EOF
+          Updates the pinned [block.tlb](https://github.com/ton-blockchain/ton/blob/${revision}/crypto/block/block.tlb) and regenerates the Explorer decoder, configuration schemas, parameter index and TL-B display snapshots.
+
+          [Upstream changes](https://github.com/ton-blockchain/ton/compare/${previous_revision}...${revision})
+
+          Validation: reproducible generation, Explorer tests and TypeScript checks passed in the [update workflow](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}).
+          EOF
+
+          pull_request=$(gh pr list \
+            --repo "${GITHUB_REPOSITORY}" \
+            --head "${UPDATE_BRANCH}" \
+            --state open \
+            --json number \
+            --jq '.[0].number')
+
+          if [[ -z "${pull_request}" ]]; then
+            gh pr create \
+              --repo "${GITHUB_REPOSITORY}" \
+              --base master \
+              --head "${UPDATE_BRANCH}" \
+              --title "chore(explorer): update TON TL-B schema" \
+              --body-file "${body_file}"
+          else
+            gh pr edit "${pull_request}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --body-file "${body_file}"
+          fi

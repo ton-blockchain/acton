@@ -1,0 +1,477 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 0 1`] = `"_ config_addr:bits256 = ConfigParam 0;"`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 0 additional types 1`] = `""`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 7 1`] = `
+"_ to_mint:ExtraCurrencyCollection = ConfigParam 7;
+
+extra_currencies$_ dict:(HashmapE 32 (VarUInteger 32))
+                 = ExtraCurrencyCollection;"
+`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 7 additional types 1`] = `
+"hme_empty$0
+  {n:#}
+  {X:Type} = HashmapE n X;
+
+hme_root$1
+  {n:#}
+  {X:Type}
+  root:^(Hashmap n X) = HashmapE n X;
+
+var_uint$_
+  {n:#}
+  len:(#< n)
+  value:(uint (len * 8)) = VarUInteger n;
+
+hm_edge#_
+  {n:#}
+  {X:Type}
+  {l:#}
+  {m:#}
+  label:(HmLabel ~l n)
+  {n = (~m) + l}
+  node:(HashmapNode m X) = Hashmap n X;
+
+hmn_leaf#_
+  {X:Type}
+  value:X = HashmapNode 0 X;
+
+hmn_fork#_
+  {n:#}
+  {X:Type}
+  left:^(Hashmap n X)
+  right:^(Hashmap n X) = HashmapNode (n + 1) X;
+
+hml_short$0
+  {m:#}
+  {n:#}
+  len:(Unary ~n)
+  {n <= m}
+  s:(n * Bit) = HmLabel ~n m;
+
+hml_long$10
+  {m:#}
+  n:(#<= m)
+  s:(n * Bit) = HmLabel ~n m;
+
+hml_same$11
+  {m:#}
+  v:Bit
+  n:(#<= m) = HmLabel ~n m;
+
+bit$_ (## 1) = Bit;
+
+unary_zero$0 = Unary ~0;
+
+unary_succ$1
+  {n:#}
+  x:(Unary ~n) = Unary ~(n + 1);"
+`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 9 1`] = `"_ mandatory_params:(Hashmap 32 True) = ConfigParam 9;"`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 9 additional types 1`] = `
+"hm_edge#_
+  {n:#}
+  {X:Type}
+  {l:#}
+  {m:#}
+  label:(HmLabel ~l n)
+  {n = (~m) + l}
+  node:(HashmapNode m X) = Hashmap n X;
+
+true$_ = True;
+
+hmn_leaf#_
+  {X:Type}
+  value:X = HashmapNode 0 X;
+
+hmn_fork#_
+  {n:#}
+  {X:Type}
+  left:^(Hashmap n X)
+  right:^(Hashmap n X) = HashmapNode (n + 1) X;
+
+hml_short$0
+  {m:#}
+  {n:#}
+  len:(Unary ~n)
+  {n <= m}
+  s:(n * Bit) = HmLabel ~n m;
+
+hml_long$10
+  {m:#}
+  n:(#<= m)
+  s:(n * Bit) = HmLabel ~n m;
+
+hml_same$11
+  {m:#}
+  v:Bit
+  n:(#<= m) = HmLabel ~n m;
+
+bit$_ (## 1) = Bit;
+
+unary_zero$0 = Unary ~0;
+
+unary_succ$1
+  {n:#}
+  x:(Unary ~n) = Unary ~(n + 1);"
+`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 11 1`] = `
+"_ ConfigVotingSetup = ConfigParam 11;
+
+cfg_vote_setup#91
+  normal_params:^ConfigProposalSetup
+  critical_params:^ConfigProposalSetup = ConfigVotingSetup;
+
+cfg_vote_cfg#36
+  min_tot_rounds:(## 8)
+  max_tot_rounds:(## 8)
+  { min_tot_rounds <= max_tot_rounds }
+  min_wins:uint8
+  max_losses:uint8
+  min_store_sec:(## 32)
+  max_store_sec:(## 32)
+  { min_store_sec <= max_store_sec }
+  bit_price:uint32
+  cell_price:uint32 = ConfigProposalSetup;"
+`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 11 additional types 1`] = `""`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 12 1`] = `
+"_ workchains:(HashmapE 32 WorkchainDescr) = ConfigParam 12;
+
+workchain#a6
+  enabled_since:uint32
+  monitor_min_split:(## 8)
+  min_split:(## 8)
+  max_split:(## 8)
+  { monitor_min_split <= min_split }
+  { min_split <= max_split }
+  { max_split <= 60 }
+  basic:(## 1)
+  active:Bool
+  accept_msgs:Bool
+  flags:(## 13)
+  { flags = 0 }
+  zerostate_root_hash:bits256
+  zerostate_file_hash:bits256
+  version:uint32
+  format:(WorkchainFormat basic) = WorkchainDescr;
+
+workchain_v2#a7
+  enabled_since:uint32
+  monitor_min_split:(## 8)
+  min_split:(## 8)
+  max_split:(## 8)
+  { monitor_min_split <= min_split }
+  { min_split <= max_split }
+  { max_split <= 60 }
+  basic:(## 1)
+  active:Bool
+  accept_msgs:Bool
+  flags:(## 13)
+  { flags = 0 }
+  zerostate_root_hash:bits256
+  zerostate_file_hash:bits256
+  version:uint32
+  format:(WorkchainFormat basic)
+  split_merge_timings:WcSplitMergeTimings
+  persistent_state_split_depth:(## 8)
+  { persistent_state_split_depth <= 63 } = WorkchainDescr;
+
+wc_split_merge_timings#0
+  split_merge_delay:uint32
+  split_merge_interval:uint32
+  min_split_merge_interval:uint32
+  max_split_merge_delay:uint32 = WcSplitMergeTimings;"
+`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 12 additional types 1`] = `
+"hme_empty$0
+  {n:#}
+  {X:Type} = HashmapE n X;
+
+hme_root$1
+  {n:#}
+  {X:Type}
+  root:^(Hashmap n X) = HashmapE n X;
+
+hm_edge#_
+  {n:#}
+  {X:Type}
+  {l:#}
+  {m:#}
+  label:(HmLabel ~l n)
+  {n = (~m) + l}
+  node:(HashmapNode m X) = Hashmap n X;
+
+bool_false$0 = Bool;
+
+bool_true$1 = Bool;
+
+wfmt_basic#1
+  vm_version:int32
+  vm_mode:uint64 = WorkchainFormat 1;
+
+wfmt_ext#0
+  min_addr_len:(## 12)
+  max_addr_len:(## 12)
+  addr_len_step:(## 12)
+  { min_addr_len >= 64 }
+  { min_addr_len <= max_addr_len }
+  { max_addr_len <= 1023 }
+  { addr_len_step <= 1023 }
+  workchain_type_id:(## 32)
+  { workchain_type_id >= 1 } = WorkchainFormat 0;
+
+hmn_leaf#_
+  {X:Type}
+  value:X = HashmapNode 0 X;
+
+hmn_fork#_
+  {n:#}
+  {X:Type}
+  left:^(Hashmap n X)
+  right:^(Hashmap n X) = HashmapNode (n + 1) X;
+
+hml_short$0
+  {m:#}
+  {n:#}
+  len:(Unary ~n)
+  {n <= m}
+  s:(n * Bit) = HmLabel ~n m;
+
+hml_long$10
+  {m:#}
+  n:(#<= m)
+  s:(n * Bit) = HmLabel ~n m;
+
+hml_same$11
+  {m:#}
+  v:Bit
+  n:(#<= m) = HmLabel ~n m;
+
+bit$_ (## 1) = Bit;
+
+unary_zero$0 = Unary ~0;
+
+unary_succ$1
+  {n:#}
+  x:(Unary ~n) = Unary ~(n + 1);"
+`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 17 1`] = `
+"_
+  min_stake:Grams
+  max_stake:Grams
+  min_total_stake:Grams
+  max_stake_factor:uint32 = ConfigParam 17;
+
+nanograms$_ amount:(VarUInteger 16) = Grams;"
+`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 17 additional types 1`] = `
+"var_uint$_
+  {n:#}
+  len:(#< n)
+  value:(uint (len * 8)) = VarUInteger n;"
+`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 20 1`] = `
+"config_mc_gas_prices#_ GasLimitsPrices = ConfigParam 20;
+
+gas_prices#dd
+  gas_price:uint64
+  gas_limit:uint64
+  gas_credit:uint64
+  block_gas_limit:uint64
+  freeze_due_limit:uint64
+  delete_due_limit:uint64 = GasLimitsPrices;
+
+gas_prices_ext#de
+  gas_price:uint64
+  gas_limit:uint64
+  special_gas_limit:uint64
+  gas_credit:uint64
+  block_gas_limit:uint64
+  freeze_due_limit:uint64
+  delete_due_limit:uint64 = GasLimitsPrices;
+
+gas_flat_pfx#d1
+  flat_gas_limit:uint64
+  flat_gas_price:uint64
+  other:GasLimitsPrices = GasLimitsPrices;"
+`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 20 additional types 1`] = `""`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 31 1`] = `"_ fundamental_smc_addr:(HashmapE 256 True) = ConfigParam 31;"`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 31 additional types 1`] = `
+"hme_empty$0
+  {n:#}
+  {X:Type} = HashmapE n X;
+
+hme_root$1
+  {n:#}
+  {X:Type}
+  root:^(Hashmap n X) = HashmapE n X;
+
+true$_ = True;
+
+hm_edge#_
+  {n:#}
+  {X:Type}
+  {l:#}
+  {m:#}
+  label:(HmLabel ~l n)
+  {n = (~m) + l}
+  node:(HashmapNode m X) = Hashmap n X;
+
+hmn_leaf#_
+  {X:Type}
+  value:X = HashmapNode 0 X;
+
+hmn_fork#_
+  {n:#}
+  {X:Type}
+  left:^(Hashmap n X)
+  right:^(Hashmap n X) = HashmapNode (n + 1) X;
+
+hml_short$0
+  {m:#}
+  {n:#}
+  len:(Unary ~n)
+  {n <= m}
+  s:(n * Bit) = HmLabel ~n m;
+
+hml_long$10
+  {m:#}
+  n:(#<= m)
+  s:(n * Bit) = HmLabel ~n m;
+
+hml_same$11
+  {m:#}
+  v:Bit
+  n:(#<= m) = HmLabel ~n m;
+
+bit$_ (## 1) = Bit;
+
+unary_zero$0 = Unary ~0;
+
+unary_succ$1
+  {n:#}
+  x:(Unary ~n) = Unary ~(n + 1);"
+`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 34 1`] = `
+"_ cur_validators:ValidatorSet = ConfigParam 34;
+
+validators#11
+  utime_since:uint32
+  utime_until:uint32
+  total:(## 16)
+  main:(## 16)
+  { main <= total }
+  { main >= 1 }
+  list:(Hashmap 16 ValidatorDescr) = ValidatorSet;
+
+validators_ext#12
+  utime_since:uint32
+  utime_until:uint32
+  total:(## 16)
+  main:(## 16)
+  { main <= total }
+  { main >= 1 }
+  total_weight:uint64
+  list:(HashmapE 16 ValidatorDescr) = ValidatorSet;
+
+validator#53
+  public_key:SigPubKey
+  weight:uint64 = ValidatorDescr;
+
+validator_addr#73
+  public_key:SigPubKey
+  weight:uint64
+  adnl_addr:bits256 = ValidatorDescr;"
+`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 34 additional types 1`] = `
+"hm_edge#_
+  {n:#}
+  {X:Type}
+  {l:#}
+  {m:#}
+  label:(HmLabel ~l n)
+  {n = (~m) + l}
+  node:(HashmapNode m X) = Hashmap n X;
+
+hme_empty$0
+  {n:#}
+  {X:Type} = HashmapE n X;
+
+hme_root$1
+  {n:#}
+  {X:Type}
+  root:^(Hashmap n X) = HashmapE n X;
+
+hmn_leaf#_
+  {X:Type}
+  value:X = HashmapNode 0 X;
+
+hmn_fork#_
+  {n:#}
+  {X:Type}
+  left:^(Hashmap n X)
+  right:^(Hashmap n X) = HashmapNode (n + 1) X;
+
+hml_short$0
+  {m:#}
+  {n:#}
+  len:(Unary ~n)
+  {n <= m}
+  s:(n * Bit) = HmLabel ~n m;
+
+hml_long$10
+  {m:#}
+  n:(#<= m)
+  s:(n * Bit) = HmLabel ~n m;
+
+hml_same$11
+  {m:#}
+  v:Bit
+  n:(#<= m) = HmLabel ~n m;
+
+ed25519_pubkey#8e81278a pubkey:bits256 = SigPubKey;
+
+bit$_ (## 1) = Bit;
+
+unary_zero$0 = Unary ~0;
+
+unary_succ$1
+  {n:#}
+  x:(Unary ~n) = Unary ~(n + 1);"
+`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 46 1`] = `
+"_ ValRegistryConfig = ConfigParam 46;
+
+val_registry_config#3601163e
+  contract_address:bits256
+  max_collators_per_validator:uint32
+  new_code_hash:(Maybe uint256) = ValRegistryConfig;"
+`;
+
+exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 46 additional types 1`] = `
+"nothing$0 {X:Type} = Maybe X;
+
+just$1
+  {X:Type}
+  value:X = Maybe X;"
+`;
