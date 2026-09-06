@@ -142,8 +142,9 @@ export function EnvironmentWorkspacePage({
         {visibleError ? (
           <RawDataBlock
             className={styles.errorDetails}
-            title={environmentError && !requestError ? "Docker output" : "Error details"}
+            title="Error details"
             value={visibleError}
+            wrap
             copyLabel="error details"
             maxHeight="24rem"
           />

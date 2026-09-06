@@ -30,6 +30,16 @@ impl Runtime {
                 message: "Start the full TON network before editing its state".into(),
             });
         }
+        // Every managed node must share the observed head and receive the fork.
+        // A stopped node can be behind and must not be restarted implicitly.
+        if network.nodes.iter().any(|node| node.stopped) {
+            return Err(Error::Conflict {
+                code: "admin_node_stopped",
+                message:
+                    "Start all managed nodes and let them synchronize before editing network state"
+                        .into(),
+            });
+        }
         let driver = self.driver(&entry).await?;
         let operation = AdminOperation {
             id: request.id().into(),
@@ -49,7 +59,7 @@ impl Runtime {
             let result = driver
                 .apply_admin(&nodes, &request, &entry.admin_operation)
                 .await;
-            let running = result.is_ok() || driver.admin_is_running().await;
+            let running = result.is_ok() || driver.admin_is_running(&nodes).await;
             {
                 let mut record = entry.record.write().await;
                 record.status = if running {
@@ -106,6 +116,47 @@ impl Runtime {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn admin_rejects_stopped_nodes_before_creating_an_operation() {
+        let temp = tempfile::tempdir().unwrap();
+        let location = crate::catalog::create(
+            temp.path(),
+            crate::CreateNetwork {
+                name: "admin-stopped-node".into(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let runtime = Runtime::open(&location.path).await.unwrap();
+        {
+            let mut network = runtime.inner.entry.record.write().await;
+            network.status = Status::Running;
+            network.nodes.push(crate::Node {
+                id: "node-1".into(),
+                name: "replica".into(),
+                validator: false,
+                port_base: 19000,
+                stopped: true,
+            });
+        }
+        let request = serde_json::from_value(serde_json::json!({
+            "kind":"accounts", "id":uuid::Uuid::new_v4().to_string(),
+            "edits":[{"address":format!("0:{}", "11".repeat(32)), "type":"balance", "balance":"1"}]
+        }))
+        .unwrap();
+        assert!(matches!(
+            runtime.start_admin(request).await,
+            Err(Error::Conflict {
+                code: "admin_node_stopped",
+                ..
+            })
+        ));
+        assert!(runtime.admin_operation().await.unwrap().is_none());
+        assert_eq!(runtime.get().await.status, Status::Running);
+        assert!(!location.path.join("runtime.json").exists());
+    }
 
     #[tokio::test]
     async fn admin_respects_service_admission_and_the_shared_mutation_lock() {

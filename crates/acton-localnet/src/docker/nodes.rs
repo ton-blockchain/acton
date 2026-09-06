@@ -9,6 +9,45 @@ use std::time::Duration;
 use tokio::time::timeout;
 
 impl DockerNetwork {
+    /// Starts or gracefully stops one service without removing its container or state volume.
+    /// Explicit service selection and --no-deps leave the network owner and peer nodes alone.
+    pub(crate) async fn node_running(
+        &self,
+        nodes: &[Node],
+        id: &str,
+        running: bool,
+    ) -> Result<(), Error> {
+        self.write_compose(nodes).await?;
+        let mut command = self.compose_command();
+        if running {
+            command
+                .args(["up", "-d", "--no-deps", "--wait", "--wait-timeout"])
+                .arg(COMPOSE_WAIT_TIMEOUT_SECONDS.to_string())
+                .arg(id);
+        } else {
+            command.args(["stop", "--timeout", "30", id]);
+        }
+        self.run_command(
+            command,
+            if running {
+                "start the node"
+            } else {
+                "stop the node"
+            },
+            if running {
+                "environment_node_start_failed"
+            } else {
+                "environment_node_stop_failed"
+            },
+            if running {
+                Duration::from_secs(u64::from(COMPOSE_WAIT_TIMEOUT_SECONDS) + 10)
+            } else {
+                COMPOSE_NODE_REMOVE_TIMEOUT
+            },
+        )
+        .await
+    }
+
     /// Adds one validator-engine instance without duplicating the shared HTTP APIs or indexer.
     ///
     /// The compose definition is persisted before Docker starts the service so a localnet service restart
@@ -188,7 +227,7 @@ impl DockerNetwork {
         Ok(())
     }
 
-    pub(super) async fn write_compose(&self, nodes: &[Node]) -> Result<(), Error> {
+    pub(crate) async fn write_compose(&self, nodes: &[Node]) -> Result<(), Error> {
         let temp_path = self
             .compose_file
             .with_extension(format!("yaml.{}.tmp", std::process::id()));

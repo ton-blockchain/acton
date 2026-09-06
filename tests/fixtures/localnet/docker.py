@@ -19,6 +19,20 @@ if 'compose' in args:
     network_marker = compose_path.parent / 'fixture-running'
     command = args[args.index('-f') + 2:]
     verb = command[0]
+    nodes = json.loads((compose_path.parent / 'network.json').read_text())['nodes']
+    selected_node = next((node for node in nodes if node['id'] == command[-1]), None)
+    node_marker = lambda node: compose_path.parent / ('fixture-running-' + node['id'])
+
+    if selected_node and verb in ['up', 'stop']:
+        with (root / 'node-events').open('a') as output:
+            output.write(json.dumps({'node': selected_node['id'], 'command': command}) + '\n')
+        if (root / 'fail-node-operation').exists():
+            raise SystemExit('Fixture node operation failed')
+        if verb == 'up':
+            node_marker(selected_node).touch()
+        else:
+            node_marker(selected_node).unlink(missing_ok=True)
+        raise SystemExit(0)
 
     if verb in ['up', 'stop', 'down']:
         with (root / 'network-events').open('a') as output:
@@ -42,12 +56,19 @@ if 'compose' in args:
                     # starts them again; startup progress must not report failure.
                     state, health, exit_code = 'exited', '', 143
             states.append({'Service': name, 'State': state, 'Health': health, 'ExitCode': exit_code})
+        for node in nodes:
+            running = node_marker(node).exists()
+            states.append({'Service': node['id'], 'State': 'running' if running else 'exited',
+                           'Health': 'healthy' if running else '', 'ExitCode': 0 if running else 143})
         print(json.dumps(states))
     elif verb == 'up':
         with (root / 'events').open('a') as output:
             output.write('up\n')
         marker.touch()
         network_marker.touch()
+        for node in nodes:
+            if not node.get('stopped', False):
+                node_marker(node).touch()
         if os.environ.get('LOCALNET_TEST_BLOCK_START'):
             time.sleep(60)
     elif verb in ['stop', 'down']:
@@ -66,6 +87,8 @@ if 'compose' in args:
             raise SystemExit('Docker could not stop the fixture network')
         network_marker.unlink(missing_ok=True)
         marker.unlink(missing_ok=True)
+        for node in nodes:
+            node_marker(node).unlink(missing_ok=True)
     elif verb == 'run':
         action = command[command.index('snapshot') + 1]
         snapshot = {'formatVersion': 1, 'id': 'snapshot-1', 'name': 'checkpoint',

@@ -26,11 +26,14 @@ pub(super) fn router() -> Router<ApiState> {
                 .post(start_admin)
                 .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024)),
         )
+        .route("/v1/network/config", post(update_config))
         .route("/v1/network/start", post(start))
         .route("/v1/network/stop", post(stop))
         .route("/v1/network/logs", get(logs))
         .route("/v1/network/nodes", post(add_node))
         .route("/v1/network/nodes/{node}", delete(remove_node))
+        .route("/v1/network/nodes/{node}/start", post(start_node))
+        .route("/v1/network/nodes/{node}/stop", post(stop_node))
         .route(
             "/v1/network/nodes/{node}/enter-validation",
             post(enter_validation),
@@ -53,6 +56,13 @@ pub(super) fn router() -> Router<ApiState> {
 
 async fn network(State(state): State<ApiState>) -> Json<crate::Network> {
     Json(state.runtime.get().await)
+}
+
+async fn update_config(
+    State(state): State<ApiState>,
+    Json(request): Json<crate::UpdateNetworkConfig>,
+) -> Result<(StatusCode, Json<Operation>), Error> {
+    accepted(state, Action::UpdateConfig(request)).await
 }
 
 async fn network_health(
@@ -131,6 +141,20 @@ async fn remove_node(
         },
     )
     .await
+}
+
+async fn start_node(
+    State(state): State<ApiState>,
+    Path(id): Path<String>,
+) -> Result<(StatusCode, Json<Operation>), Error> {
+    accepted(state, Action::NodeRunning { id, running: true }).await
+}
+
+async fn stop_node(
+    State(state): State<ApiState>,
+    Path(id): Path<String>,
+) -> Result<(StatusCode, Json<Operation>), Error> {
+    accepted(state, Action::NodeRunning { id, running: false }).await
 }
 
 async fn enter_validation(

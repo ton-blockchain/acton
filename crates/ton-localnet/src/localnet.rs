@@ -607,6 +607,12 @@ pub(crate) enum Request {
         config: BocBytes,
         resp: oneshot::Sender<anyhow::Result<LocalnetSetConfigResult>>,
     },
+    SetConfigParam {
+        index: i32,
+        boc: BocBytes,
+        expected_hash: Option<String>,
+        resp: oneshot::Sender<anyhow::Result<LocalnetSetConfigResult>>,
+    },
     GetShards {
         seqno: u32,
         resp: oneshot::Sender<anyhow::Result<Vec<LocalnetBlockId>>>,
@@ -1076,6 +1082,37 @@ impl Localnet {
         let config = BocBytes::from_base64(&config).context("Invalid config base64")?;
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::SetConfig { config, resp }).await?;
+        rx.await?
+    }
+
+    /// Commits a single parameter without overwriting concurrent edits to other keys.
+    /// The node actor checks the expected hash and persists the new block atomically.
+    /// This explicitly mines a block even when automatic mining is disabled.
+    pub async fn set_config_param(
+        &self,
+        index: i32,
+        boc: String,
+        expected_hash: Option<String>,
+    ) -> anyhow::Result<LocalnetSetConfigResult> {
+        if boc.len() > 1_000_000 {
+            return Err(
+                LocalnetError::invalid_request("Parameter BoC exceeds the size limit").into(),
+            );
+        }
+        let boc = BocBytes::from_base64(&boc).map_err(|error| {
+            LocalnetError::invalid_request(format!("Invalid parameter base64: {error}"))
+        })?;
+
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::SetConfigParam {
+                index,
+                boc,
+                expected_hash,
+                resp,
+            })
+            .await?;
+
         rx.await?
     }
 
@@ -2318,6 +2355,20 @@ fn process_loop_request(
         Request::SetConfig { config, resp } => {
             let res = node
                 .set_config(config)
+                .map(|(config_hash, block)| LocalnetSetConfigResult {
+                    config_hash,
+                    block_seqno: block.seqno,
+                });
+            let _ = resp.send(res);
+        }
+        Request::SetConfigParam {
+            index,
+            boc,
+            expected_hash,
+            resp,
+        } => {
+            let res = node
+                .set_config_param(index, boc, expected_hash.as_deref())
                 .map(|(config_hash, block)| LocalnetSetConfigResult {
                     config_hash,
                     block_seqno: block.seqno,

@@ -47,6 +47,7 @@ pub fn error_status(error: &anyhow::Error) -> StatusCode {
     }
     if let Some(error) = error.downcast_ref::<LocalnetError>() {
         return match error {
+            LocalnetError::ConfigParameterConflict { .. } => StatusCode::CONFLICT,
             LocalnetError::ProtocolViolation { .. } | LocalnetError::InvalidRequest { .. } => {
                 StatusCode::UNPROCESSABLE_ENTITY
             }

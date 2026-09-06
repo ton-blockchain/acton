@@ -19,6 +19,9 @@ mod selection;
 #[path = "localnet_command/offline.rs"]
 mod offline;
 
+#[path = "localnet_command/network_config.rs"]
+mod network_config;
+
 #[path = "localnet_command/shutdown.rs"]
 mod shutdown;
 
@@ -315,7 +318,6 @@ async fn cli_and_http_share_lifecycle_snapshots_and_persisted_state() {
         stop
         snapshot-restore
         down
-        up
         up
         stop
     "]]

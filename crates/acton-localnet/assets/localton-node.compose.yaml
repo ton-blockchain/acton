@@ -1,4 +1,5 @@
   __LOCALTON_NODE_ID__:
+    profiles: __LOCALTON_NODE_PROFILES__
     image: "__LOCALTON_IMAGE__"
     command:
       - join
@@ -11,7 +12,7 @@
       - 127.0.0.1
       - --port-base
       - "__LOCALTON_NODE_PORT_BASE__"
-      __LOCALTON_VALIDATOR_ARGS__
+      - __LOCALTON_VALIDATOR_ARGS__
     network_mode: service:localton
     depends_on:
       localton:

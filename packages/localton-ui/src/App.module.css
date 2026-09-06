@@ -307,6 +307,149 @@
   color: var(--acton-color-accent);
 }
 
+.validatorEfficiency {
+  color: var(--acton-color-text-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.validatorEfficiency[data-tone="good"] {
+  color: var(--acton-color-success);
+}
+
+.validatorEfficiency[data-tone="warning"] {
+  color: var(--acton-color-warning);
+}
+
+.validatorEfficiency[data-tone="bad"] {
+  color: var(--acton-color-danger-text);
+}
+
+.validatorPerformanceTable.validatorPerformanceTable {
+  max-width: 72rem;
+}
+
+.validationRoundPanel {
+  box-sizing: border-box;
+  max-width: 72rem;
+  overflow: hidden;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-surface-raised);
+}
+
+.validationRoundGroup {
+  display: flex;
+  min-width: 0;
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.validationRoundGroup:last-child {
+  border-bottom: 0;
+}
+
+.validationRoundGroupLabel {
+  display: flex;
+  flex: 0 0 10rem;
+  align-items: center;
+  box-sizing: border-box;
+  padding: var(--acton-space-2) var(--acton-space-3);
+  border-right: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: var(--acton-font-weight-emphasis);
+}
+
+.validationRoundGrid {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  align-items: start;
+  gap: var(--acton-space-3) var(--acton-space-4);
+  box-sizing: border-box;
+  padding: var(--acton-space-2) var(--acton-space-3);
+}
+
+.validationRoundGrid[data-columns="4"] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.validationRoundGrid[data-columns="5"] {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.validationRoundMetric {
+  display: flex;
+  min-width: 0;
+  min-height: 2.125rem;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.125rem;
+}
+
+.validationRoundMetricLabel {
+  color: var(--acton-color-text-subtle);
+  font-size: 0.6875rem;
+  line-height: 1.25;
+}
+
+.validationRoundMetricValue {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--acton-color-text);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.validationRoundEmpty {
+  box-sizing: border-box;
+  max-width: 72rem;
+  padding: var(--acton-space-5);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text-muted);
+  text-align: center;
+}
+
+.validationRoundTime {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.validationRoundRelativeTime {
+  color: var(--acton-color-text-muted);
+}
+
+@media (max-width: 64rem) {
+  .validationRoundGrid[data-columns="4"],
+  .validationRoundGrid[data-columns="5"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 40rem) {
+  .validationRoundGroup {
+    flex-direction: column;
+  }
+
+  .validationRoundGroupLabel {
+    width: 100%;
+    flex-basis: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--acton-color-border);
+  }
+
+  .validationRoundGrid[data-columns="4"],
+  .validationRoundGrid[data-columns="5"] {
+    grid-template-columns: 1fr;
+  }
+}
+
 .topologyChange {
   color: var(--acton-color-warning);
   font-weight: var(--acton-font-weight-medium);

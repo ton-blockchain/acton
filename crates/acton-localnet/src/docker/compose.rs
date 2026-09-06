@@ -5,11 +5,11 @@ use crate::{NetworkConfig, Node};
 
 const NODE_TEMPLATE: &str = include_str!("../../assets/localton-node.compose.yaml");
 
-// The template supplies the first line's indentation. Continuation lines stay
-// at the command list's depth, while an empty replacement leaves a blank line.
-const VALIDATOR_ARGS: &str = r"- --validator
+// Replace one valid YAML list item with the optional validator arguments.
+const VALIDATOR_ARGS: &str = r"      - --validator
       - --faucet
-      - http://127.0.0.1:18000/faucet";
+      - http://127.0.0.1:18000/faucet
+";
 
 pub(super) fn render_compose(image: &str, config: &NetworkConfig, nodes: &[Node]) -> String {
     let ports = config.ports();
@@ -55,11 +55,17 @@ fn render_join_nodes(image: &str, nodes: &[Node]) -> String {
             let name = serde_json::to_string(&node.name).expect("a node name is valid JSON");
 
             NODE_TEMPLATE
+                // An explicitly stopped node must not return during a whole-network start.
+                // Selecting its service directly still lets the start-node operation resume it.
+                .replace(
+                    "__LOCALTON_NODE_PROFILES__",
+                    if node.stopped { "[\"stopped\"]" } else { "[]" },
+                )
                 .replace("__LOCALTON_IMAGE__", image)
                 .replace("__LOCALTON_NODE_ID__", &node.id)
                 .replace("__LOCALTON_NODE_PORT_BASE__", &node.port_base.to_string())
                 .replace(
-                    "__LOCALTON_VALIDATOR_ARGS__",
+                    "      - __LOCALTON_VALIDATOR_ARGS__\n",
                     if node.validator { VALIDATOR_ARGS } else { "" },
                 )
                 // Insert user-controlled names last so marker-like text in a

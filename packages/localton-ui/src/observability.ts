@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from "react"
 import {useToast} from "@acton/ui"
 
-import type {NetworkView, TpsView} from "./types"
+import type {NetworkView, SessionStatsView, TpsView} from "./types"
 
 const POLL_INTERVAL_MS = 1000
 
@@ -11,6 +11,12 @@ export interface ObservabilityClient {
   /** Reads the name of the node serving this observability endpoint */
   readonly localNodeName: (signal?: AbortSignal) => Promise<string>
   readonly network: (signal?: AbortSignal) => Promise<NetworkView>
+  readonly sessionStats: (
+    start: number,
+    end: number,
+    windowSize: number,
+    signal?: AbortSignal,
+  ) => Promise<SessionStatsView>
   readonly tps: (signal?: AbortSignal) => Promise<TpsView | undefined>
 }
 
@@ -55,6 +61,14 @@ export function createObservabilityClient(baseUrl = ""): ObservabilityClient {
         observation => observation.payload.name,
       ),
     network: signal => request<NetworkView>("/api/v1/network", signal),
+    sessionStats: (start, end, windowSize, signal) => {
+      const query = new URLSearchParams({
+        start: String(start),
+        end: String(end),
+        window_size: String(windowSize),
+      })
+      return request<SessionStatsView>(`/api/v1/stats/session?${query}`, signal)
+    },
     tps: signal =>
       request<TpsView>("/api/v1/stats/tps", signal).catch(error => {
         if (error instanceof DOMException && error.name === "AbortError") throw error

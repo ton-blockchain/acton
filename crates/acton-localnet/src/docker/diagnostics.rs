@@ -4,7 +4,7 @@ use super::{
     DOCKER_DIAGNOSTICS_TIMEOUT, DOCKER_METADATA_TIMEOUT, DockerNetwork, FAILED_CONTAINER_LOG_LINES,
     STARTUP_ERROR_LINES,
 };
-use crate::{Error, Node, ServiceHealth, ServiceHealthStatus};
+use crate::{DockerContainer, Error, Node, ServiceHealth, ServiceHealthStatus};
 use serde::Deserialize;
 use std::{
     process::{ExitStatus, Stdio},
@@ -29,8 +29,12 @@ const ONE_SHOT_SERVICES: [&str; 2] = ["v3-basechain-bootstrap", "v3-migrations"]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct ComposeContainerState {
+    #[serde(default, rename = "ID")]
+    id: String,
     #[serde(default)]
     name: String,
+    #[serde(default)]
+    image: String,
     #[serde(default)]
     service: String,
     #[serde(default)]
@@ -116,6 +120,11 @@ impl ComposeContainerState {
             state: (!self.state.is_empty()).then(|| self.state.clone()),
             health: (!self.health.is_empty()).then(|| self.health.clone()),
             exit_code: Some(self.exit_code),
+            container: Some(DockerContainer {
+                id: self.id.clone(),
+                name: self.name.clone(),
+                image: self.image.clone(),
+            }),
         }
     }
 }
@@ -146,7 +155,8 @@ impl DockerNetwork {
             .chain(nodes.iter().map(|node| node.id.as_str()))
         {
             let state = states.iter().find(|state| state.service == service);
-            let ready = if stopping {
+            let explicitly_stopped = nodes.iter().any(|node| node.id == service && node.stopped);
+            let ready = if stopping || explicitly_stopped {
                 state.is_none_or(|state| matches!(state.state.as_str(), "exited" | "dead"))
             } else {
                 state.is_some_and(|state| {
@@ -206,7 +216,7 @@ impl DockerNetwork {
     /// Missing services remain visible as stopped so clients can explain an incomplete deployment.
     pub(crate) async fn service_health(&self, nodes: &[Node]) -> Result<Vec<ServiceHealth>, Error> {
         let mut command = self.compose_command();
-        command.args(["ps", "--all", "--format", "json"]);
+        command.args(["ps", "--all", "--no-trunc", "--format", "json"]);
         let output = self
             .command_output(
                 command,
@@ -238,15 +248,24 @@ impl DockerNetwork {
                             state: None,
                             health: None,
                             exit_code: None,
+                            container: None,
                         },
-                        |state| state.health(ONE_SHOT_SERVICES.contains(&service)),
+                        |state| {
+                            let mut health = state.health(ONE_SHOT_SERVICES.contains(&service));
+                            if nodes.iter().any(|node| node.id == service && node.stopped)
+                                && matches!(state.state.as_str(), "exited" | "dead" | "created")
+                            {
+                                health.status = ServiceHealthStatus::Stopped;
+                            }
+                            health
+                        },
                     )
             })
             .collect())
     }
 
     /// Classifies the Compose deployment while ignoring successful one-shot jobs.
-    pub(crate) async fn status(&self) -> Result<crate::Status, Error> {
+    pub(crate) async fn status(&self, nodes: &[Node]) -> Result<crate::Status, Error> {
         let mut command = self.compose_command();
         command.args(["ps", "--all", "--format", "json"]);
         let output = self
@@ -270,13 +289,18 @@ impl DockerNetwork {
             "v3-api",
             "v3-classifier",
         ];
-        if states.iter().any(ComposeContainerState::failed)
-            || required.iter().any(|name| {
-                !states
-                    .iter()
-                    .any(|s| s.service == *name && s.state == "running")
-            })
-        {
+        if states.iter().any(|state| {
+            state.failed()
+                && !nodes.iter().any(|node| {
+                    node.id == state.service
+                        && node.stopped
+                        && matches!(state.state.as_str(), "exited" | "dead" | "created")
+                })
+        }) || required.iter().any(|name| {
+            !states
+                .iter()
+                .any(|s| s.service == *name && s.state == "running")
+        }) {
             return Ok(crate::Status::Failed);
         }
 
@@ -396,4 +420,56 @@ fn parse_compose_container_states(output: &str) -> Vec<ComposeContainerState> {
             .filter_map(|line| serde_json::from_str(line).ok())
             .collect()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_compose_container_states;
+    use expect_test::expect;
+
+    #[test]
+    fn compose_health_preserves_container_identity_in_both_json_formats() {
+        // Compose versions return either a JSON array or one JSON object per line.
+        // Keep Docker's uppercase ID intact while projecting its public metadata.
+        let container = r#"{"ID":"0123456789abcdef","Name":"acton-test-localton-1","Image":"localton:dev","Service":"localton","State":"running","Health":"healthy","ExitCode":0}"#;
+        let snapshot = [format!("[{container}]"), format!("{container}\n")].map(|output| {
+            parse_compose_container_states(&output)
+                .into_iter()
+                .map(|state| state.health(false))
+                .collect::<Vec<_>>()
+        });
+
+        expect![[r#"
+            [
+              [
+                {
+                  "name": "localton",
+                  "status": "ready",
+                  "state": "running",
+                  "health": "healthy",
+                  "exitCode": 0,
+                  "container": {
+                    "id": "0123456789abcdef",
+                    "name": "acton-test-localton-1",
+                    "image": "localton:dev"
+                  }
+                }
+              ],
+              [
+                {
+                  "name": "localton",
+                  "status": "ready",
+                  "state": "running",
+                  "health": "healthy",
+                  "exitCode": 0,
+                  "container": {
+                    "id": "0123456789abcdef",
+                    "name": "acton-test-localton-1",
+                    "image": "localton:dev"
+                  }
+                }
+              ]
+            ]"#]]
+        .assert_eq(&serde_json::to_string_pretty(&snapshot).expect("container health snapshot"));
+    }
 }

@@ -55,6 +55,21 @@ pub enum StoredWalletVersion {
     HighloadV2,
 }
 
+impl StoredWalletVersion {
+    /// Returns the stable product label used in telemetry and CLI-facing output.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::V1 => "v1",
+            Self::V2 => "v2",
+            Self::V3 => "v3",
+            Self::V4r2 => "v4r2",
+            Self::V5r1 => "v5r1",
+            Self::HighloadV2 => "Highload v2",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WalletRecord {
     pub name: String,

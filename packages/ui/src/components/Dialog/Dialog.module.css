@@ -128,13 +128,9 @@
   padding: 0;
 }
 
-.scrollArea {
-  min-height: 0;
-  overflow: auto;
-}
-
-.scrollArea > .content {
-  overflow: visible;
+.footer {
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .actions {

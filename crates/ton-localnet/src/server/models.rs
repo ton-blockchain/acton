@@ -35,6 +35,16 @@ pub struct SetConfigRequest {
     pub config: String,
 }
 
+/// The expected representation hash protects edits made from an older config view.
+/// An absent hash adds a parameter only while that dictionary key is still absent.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SetConfigParamRequest {
+    pub index: i32,
+    pub boc: String,
+    pub expected_hash: Option<String>,
+}
+
 #[derive(Deserialize)]
 pub struct ChangeAccountStateRequest {
     pub address: String,

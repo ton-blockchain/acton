@@ -44,6 +44,11 @@ pub(crate) enum LocalnetError {
     #[error("{message}")]
     InvalidRequest { message: String },
 
+    #[error(
+        "Parameter {index} changed since it was loaded; reload the configuration before applying"
+    )]
+    ConfigParameterConflict { index: i32 },
+
     #[error("Timed out waiting for masterchain seqno {seqno}")]
     MasterchainWaitTimeout { seqno: u32 },
 
@@ -71,9 +76,9 @@ impl LocalnetError {
             | Self::BlockLookupNotFound { .. }
             | Self::BlockDataNotFound { .. }
             | Self::TransactionNotFound => LiteServerErrorCode::NotReady,
-            Self::ProtocolViolation { .. } | Self::InvalidRequest { .. } => {
-                LiteServerErrorCode::ProtoViolation
-            }
+            Self::ProtocolViolation { .. }
+            | Self::InvalidRequest { .. }
+            | Self::ConfigParameterConflict { .. } => LiteServerErrorCode::ProtoViolation,
             Self::MasterchainWaitTimeout { .. } => LiteServerErrorCode::Timeout,
         }
     }

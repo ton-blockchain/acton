@@ -52,6 +52,19 @@ impl Client {
         .await
     }
 
+    /// Changes one joined node's run intent while preserving its identity and state volume.
+    /// Repeating a request reconciles the same desired state without adding another node.
+    pub async fn node_running(&self, id: &str, running: bool) -> Result<Operation, Error> {
+        crate::storage::validate_id(id)?;
+        let action = if running { "start" } else { "stop" };
+        self.request(
+            Method::POST,
+            &format!("/v1/network/nodes/{id}/{action}"),
+            None,
+        )
+        .await
+    }
+
     /// Changes future election participation; current validator sets remain immutable.
     pub async fn validation(&self, id: &str, enabled: bool) -> Result<Operation, Error> {
         crate::storage::validate_id(id)?;

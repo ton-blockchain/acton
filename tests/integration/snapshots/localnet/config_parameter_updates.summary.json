@@ -1,0 +1,43 @@
+{
+  "added_block": 3,
+  "applied_block": 2,
+  "duplicate": {
+    "@extra": "[EXTRA]",
+    "code": 409,
+    "error": "Parameter -2147483648 changed since it was loaded; reload the configuration before applying",
+    "ok": false
+  },
+  "historical_config_preserved": true,
+  "immutable": {
+    "@extra": "[EXTRA]",
+    "code": 422,
+    "error": "Parameter 0 identifies the configuration contract and cannot be changed in place",
+    "ok": false
+  },
+  "invalid": {
+    "@extra": "[EXTRA]",
+    "code": 422,
+    "error": "Invalid parameter BoC: unexpected EOF",
+    "ok": false
+  },
+  "negative_parameter_added": true,
+  "neighbors_preserved": true,
+  "rejected_changes_did_not_mine": true,
+  "restart": {
+    "config_preserved": true,
+    "head_seqno": 3
+  },
+  "stale": {
+    "@extra": "[EXTRA]",
+    "code": 409,
+    "error": "Parameter 2 changed since it was loaded; reload the configuration before applying",
+    "ok": false
+  },
+  "unchanged": {
+    "@extra": "[EXTRA]",
+    "code": 422,
+    "error": "The parameter has not changed",
+    "ok": false
+  },
+  "updated_value": true
+}

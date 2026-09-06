@@ -3,7 +3,7 @@ TEST_FEATURE_ARGS := if env_var_or_default("CI", "") != "" { "--features only_ci
 SOURCE_TRACE_WASM_OUT := env_var_or_default("ACTON_SOURCE_TRACE_WASM_OUT", "/tmp/acton-source-trace-wasm")
 FAUCET_POW_WASM_OUT := env_var_or_default("ACTON_FAUCET_POW_WASM_OUT", justfile_directory() + "/packages/explorer-ui/src/faucet/wasm")
 LOCALTON_DEV_IMAGE := env_var_or_default("ACTON_STUDIO_LOCALTON_IMAGE", "localton:dev")
-LOCALTON_BASE_IMAGE := env_var_or_default("LOCALTON_BASE_IMAGE", "ghcr.io/ton-blockchain/localton:sha-fb807b4286149081379b337cc1f50165972384d7")
+LOCALTON_BASE_IMAGE := env_var_or_default("LOCALTON_BASE_IMAGE", "ghcr.io/ton-blockchain/localton:sha-45d6df7fd86283c655105b56cb7cdd04602f09f5")
 
 all: precommit
 
@@ -27,10 +27,10 @@ sync-artifacts:
     cargo xtask sync-artifacts
 
 install-tools:
-    cargo install cargo-shear --version 1.13.1 --locked
-    cargo install cargo-deny --version 0.19.8 --locked
-    cargo install cargo-audit --version 0.22.1 --locked
-    cargo install typos-cli --version 1.47.2 --locked
+    cargo install cargo-shear --version 1.13.4 --locked
+    cargo install cargo-deny --version 0.20.2 --locked
+    cargo install cargo-audit --version 0.22.2 --locked
+    cargo install typos-cli --version 1.49.0 --locked
     cargo install cargo-llvm-cov --locked
     rustup component add llvm-tools-preview
     cargo install wasm-pack --version 0.15.0 --locked

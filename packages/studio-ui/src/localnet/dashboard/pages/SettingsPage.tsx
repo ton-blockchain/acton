@@ -7,6 +7,7 @@ import {
   formatNumberValue,
   Input,
   NumberValue,
+  Skeleton,
   Tooltip,
   useToast,
 } from "@acton/ui"
@@ -15,8 +16,12 @@ import {useCallback, useEffect, useState} from "react"
 import type {FC, ReactNode} from "react"
 
 import {supports} from "../../../environmentCapabilities"
-import {deleteStudioEnvironment, updateStudioEnvironment} from "../../../studioApi"
-import type {StudioEnvironment} from "../../../studioApi"
+import {
+  deleteStudioEnvironment,
+  fetchStudioEnvironmentHealth,
+  updateStudioEnvironment,
+} from "../../../studioApi"
+import type {NetworkHealth, StudioEnvironment} from "../../../studioApi"
 import {useLocalnetRuntime} from "../../LocalnetRuntimeProvider"
 import type {TonClient} from "@acton/explorer-core/api/client"
 import type {LocalnetMiningMode} from "@acton/explorer-core/api/types"
@@ -39,8 +44,10 @@ export const SettingsPage: FC<SettingsPageProps> = ({
   const {environment} = useLocalnetRuntime()
   const localnetConfig =
     environment?.config.kind === "actonSimulatedLocalnet" ? environment.config : undefined
+  const fullLocalnet = environment?.config.kind === "fullTonNetwork"
   const runtimeAvailable = environment?.status === "running"
-  const hasControlApi = runtimeAvailable && supports(environment, "controlApi")
+  const hasControlApi =
+    Boolean(localnetConfig) && runtimeAvailable && supports(environment, "controlApi")
   const hasMining = runtimeAvailable && supports(environment, "mining")
   const [miningMode, setMiningMode] = useState<LocalnetMiningMode>()
   const [autoMining, setAutoMining] = useState<boolean>()
@@ -53,6 +60,43 @@ export const SettingsPage: FC<SettingsPageProps> = ({
   const [loadError, setLoadError] = useState<string>()
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [containerHealth, setContainerHealth] = useState<NetworkHealth>()
+  const [isContainerLoading, setIsContainerLoading] = useState(true)
+
+  useEffect(() => {
+    // Deletion tears down the process that serves Docker diagnostics
+    if (!fullLocalnet || !environment?.id || isDeleting || environment.status === "stopping") {
+      return
+    }
+
+    const controller = new AbortController()
+    setContainerHealth(undefined)
+    setIsContainerLoading(true)
+
+    const loadContainer = async () => {
+      try {
+        const health = await fetchStudioEnvironmentHealth(environment.id, controller.signal)
+        if (controller.signal.aborted) return
+
+        setContainerHealth(health)
+        if (health.infrastructureError) throw new Error(health.infrastructureError)
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          showToast({
+            variant: "error",
+            title: "Docker container information unavailable",
+            description: errorMessage(error, "Failed to inspect the Docker container"),
+          })
+        }
+      } finally {
+        if (!controller.signal.aborted) setIsContainerLoading(false)
+      }
+    }
+
+    void loadContainer()
+
+    return () => controller.abort()
+  }, [environment?.id, environment?.status, fullLocalnet, isDeleting, showToast])
 
   const loadRuntimeSettings = useCallback(async () => {
     if (!hasControlApi) {
@@ -197,6 +241,12 @@ export const SettingsPage: FC<SettingsPageProps> = ({
   }, [environment, onEnvironmentDelete, showToast])
 
   const parsedResponseDelay = parseResponseDelay(responseDelay)
+  const containerService = containerHealth?.services.find(service => service.name === "localton")
+  const container = containerService?.container
+  const containerPlaceholder =
+    !containerHealth || containerHealth.infrastructureError || containerService?.state
+      ? "Unavailable"
+      : "Not created"
   const endpointRows = environment
     ? [
         environment.endpoints.apiV2
@@ -475,6 +525,45 @@ export const SettingsPage: FC<SettingsPageProps> = ({
                 {loadError}
               </div>
             ) : undefined}
+          </div>
+        </section>
+      ) : undefined}
+
+      {fullLocalnet ? (
+        <section className={styles.settingsSection} aria-labelledby="docker-settings-title">
+          <SettingsSectionHeader
+            id="docker-settings-title"
+            title="Docker"
+            description="The container running the primary full localnet node"
+          />
+          <div className={styles.settingsRows}>
+            <SettingsValueRow
+              label="Container name"
+              description="Find this container in Docker Desktop or the Docker CLI"
+              value={
+                isContainerLoading ? (
+                  <Skeleton width="12rem" />
+                ) : (
+                  container?.name || containerPlaceholder
+                )
+              }
+              copyValue={container?.name}
+              technical={Boolean(container?.name)}
+            />
+            <SettingsValueRow
+              label="Container ID"
+              description="The full identifier of this container instance"
+              value={isContainerLoading ? <Skeleton width="16rem" /> : container?.id || "—"}
+              copyValue={container?.id}
+              technical={Boolean(container?.id)}
+            />
+            <SettingsValueRow
+              label="Image"
+              description="The Docker image used to create this container"
+              value={isContainerLoading ? <Skeleton width="12rem" /> : container?.image || "—"}
+              copyValue={container?.image}
+              technical={Boolean(container?.image)}
+            />
           </div>
         </section>
       ) : undefined}

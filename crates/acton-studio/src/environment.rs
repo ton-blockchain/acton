@@ -484,6 +484,24 @@ pub enum EnvironmentRuntimeError {
     Internal { code: &'static str, message: String },
 }
 
+/// A simulator commits during the request; full localnet confirmation runs independently.
+/// Only pending changes need durable operation polling, never a repeated submission.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(
+    tag = "status",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum NetworkConfigUpdate {
+    Pending {
+        operation: Box<acton_localnet::Operation>,
+    },
+    Applied {
+        index: i32,
+        masterchain_seqno: u32,
+    },
+}
+
 pub type EnvironmentRuntimeFuture<'a, T> =
     Pin<Box<dyn Future<Output = Result<T, EnvironmentRuntimeError>> + Send + 'a>>;
 
@@ -519,6 +537,35 @@ pub trait EnvironmentRuntime: Send + Sync {
             Err(EnvironmentRuntimeError::Conflict {
                 code: "environment_health_unavailable",
                 message: "Health diagnostics are not available for this environment".to_owned(),
+            })
+        })
+    }
+
+    /// Delegates a parameter mutation to its network owner and reports completion or progress.
+    /// Studio never signs full localnet changes or edits the simulator's database directly.
+    fn update_network_config(
+        &self,
+        _environment_id: &str,
+        _request: acton_localnet::UpdateNetworkConfig,
+    ) -> EnvironmentRuntimeFuture<'_, NetworkConfigUpdate> {
+        Box::pin(async {
+            Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_config_unavailable",
+                message: "Configuration editing is unavailable for this environment".to_owned(),
+            })
+        })
+    }
+
+    /// Reads durable mutation progress without resubmitting an accepted request.
+    fn localnet_operation(
+        &self,
+        _environment_id: &str,
+        _operation_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, acton_localnet::Operation> {
+        Box::pin(async {
+            Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_config_unavailable",
+                message: "Localnet operations are unavailable for this environment".to_owned(),
             })
         })
     }
@@ -571,6 +618,23 @@ pub trait EnvironmentRuntime: Send + Sync {
                 message:
                     "Validator participation can only be changed in a managed full TON network"
                         .to_owned(),
+            })
+        })
+    }
+
+    /// Starts or stops one joined node without removing its identity or persistent state.
+    /// The network owner stays online; explicit stop intent survives environment restarts.
+    fn set_full_ton_node_running(
+        &self,
+        _environment_id: &str,
+        _node_id: &str,
+        _running: bool,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        Box::pin(async {
+            Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_nodes_unavailable",
+                message: "Nodes can only be started or stopped in a managed full TON network"
+                    .to_owned(),
             })
         })
     }

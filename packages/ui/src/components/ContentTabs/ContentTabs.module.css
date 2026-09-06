@@ -94,6 +94,33 @@
   outline-offset: 2px;
 }
 
+.standalone {
+  gap: var(--acton-space-4);
+}
+
+.standalone .tabList {
+  margin-bottom: 0;
+}
+
+.standalone .tab:first-child {
+  border-end-start-radius: var(--acton-radius-control-sm);
+}
+
+.standalone .tab:last-child {
+  border-end-end-radius: var(--acton-radius-control-sm);
+}
+
+.standalone .tabActive {
+  border-bottom-color: var(--acton-color-border);
+}
+
+.standalone .panel {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 .loadingStatus {
   position: absolute;
   width: 1px;

@@ -12,16 +12,18 @@ mod error;
 pub mod http;
 pub mod inspection;
 mod model;
+mod network_config;
 pub mod process;
 mod runtime;
 mod storage;
 
 pub use error::Error;
 pub use model::{
-    ApiHealth, ApiHealthStatus, CreateNetwork, Endpoints, Network, NetworkConfig, NetworkHealth,
-    NetworkHealthSample, NetworkHealthStatus, NetworkPorts, NetworkState, Node, Operation,
-    OperationProgress, OperationStatus, OperationStep, PortOptions, ServiceHealth,
+    ApiHealth, ApiHealthStatus, CreateNetwork, DockerContainer, Endpoints, Network, NetworkConfig,
+    NetworkHealth, NetworkHealthSample, NetworkHealthStatus, NetworkPorts, NetworkState, Node,
+    Operation, OperationProgress, OperationStatus, OperationStep, PortOptions, ServiceHealth,
     ServiceHealthStatus, Snapshot, StartupTimings, Status,
 };
+pub use network_config::UpdateNetworkConfig;
 pub use runtime::Runtime;
 pub use storage::{ServiceDescriptor, service_descriptor_path};

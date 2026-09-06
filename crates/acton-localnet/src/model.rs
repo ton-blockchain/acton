@@ -117,6 +117,9 @@ pub struct Node {
     pub name: String,
     pub validator: bool,
     pub port_base: u16,
+    /// Explicit stop intent survives network restarts without removing the node's state.
+    #[serde(default)]
+    pub stopped: bool,
 }
 
 /// Observed lifecycle state. `Unknown` means Docker state has not been confirmed.
@@ -194,6 +197,20 @@ pub struct ServiceHealth {
     pub state: Option<String>,
     pub health: Option<String>,
     pub exit_code: Option<i32>,
+    /// The observed container, absent when Compose has not created this service.
+    pub container: Option<DockerContainer>,
+}
+
+/// Container identity sampled by the localnet owner from Docker Compose.
+///
+/// This describes the deployed container, not the configured image for a future
+/// start. Recreating a service changes its ID, so clients must refresh the sample.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DockerContainer {
+    pub id: String,
+    pub name: String,
+    pub image: String,
 }
 
 /// Normalized service state used by clients instead of Docker-specific strings.
@@ -252,7 +269,7 @@ pub struct NetworkState {
 
 /// Operation progress survives client disconnects. A service restart marks active
 /// operations interrupted and reconciles Docker instead of replaying mutations.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Operation {
     pub id: String,
@@ -283,7 +300,7 @@ pub struct Operation {
 
 /// Completed phases remain visible even when they finish between client polls.
 /// Durations are measured by the owning service, independently of client latency.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationStep {
     pub phase: String,
@@ -294,7 +311,7 @@ pub struct OperationStep {
 ///
 /// `total` is absent when Docker has not announced the complete workload. Clients
 /// must then display the observed count without inventing a completion percentage.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationProgress {
     pub completed: u64,
@@ -304,7 +321,7 @@ pub struct OperationProgress {
 }
 
 /// Terminal states are durable; closing a polling client never cancels `Running`.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum OperationStatus {
     Running,

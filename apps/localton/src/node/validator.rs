@@ -256,6 +256,7 @@ pub(super) async fn start_persistent(
             database,
             logs: ValidatorLogPaths {
                 engine: node_layout.logs.join("validator-engine"),
+                session: node_layout.logs.join("validator-session.jsonl"),
                 stdout: node_layout.logs.join("validator.stdout.log"),
                 stderr: node_layout.logs.join("validator.stderr.log"),
             },
@@ -435,6 +436,7 @@ async fn start_bootstrap(
             database: ValidatorDatabase::at(node_layout.db.clone()),
             logs: ValidatorLogPaths {
                 engine: node_layout.logs.join("validator-init"),
+                session: node_layout.logs.join("validator-bootstrap-session.jsonl"),
                 stdout: node_layout.logs.join("validator-bootstrap.stdout.log"),
                 stderr: node_layout.logs.join("validator-bootstrap.stderr.log"),
             },

@@ -74,7 +74,9 @@ post-change production checks.
 
 - Only masterchain and a single unsplit workchain-0 shard are supported. Split or
   merged histories are rejected. Every configured node must be available and
-  caught up; nodes managed outside the localnet service must not continue validating.
+  caught up. Start any individually stopped nodes before submitting an edit; the
+  service rejects edits while a managed node is stopped. Nodes managed outside the
+  localnet service must not continue validating.
 - Several coordinated stops and starts are required. Cost includes copying node
   databases. This is intended for local development, and can take minutes.
 - Stock TON's `getState` refuses seqnos above 1000. Localton reconstructs later

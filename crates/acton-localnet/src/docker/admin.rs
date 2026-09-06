@@ -105,11 +105,11 @@ impl DockerNetwork {
         Ok(Some(op))
     }
 
-    pub(crate) async fn admin_is_running(&self) -> bool {
+    pub(crate) async fn admin_is_running(&self, nodes: &[Node]) -> bool {
         if self.has_admin_recovery() {
             return false;
         }
-        self.status()
+        self.status(nodes)
             .await
             .is_ok_and(|status| status == crate::Status::Running)
     }
@@ -637,6 +637,7 @@ mod tests {
             name: "replica".into(),
             validator: false,
             port_base: 19000,
+            stopped: false,
         }];
         let mut location = crate::catalog::create(
             dir.path(),
@@ -688,7 +689,7 @@ mod tests {
             eprintln!("Expected rejected operation: {error}");
             if !error.to_string().contains("Only an active account") { return Err(error); }
             if driver.has_admin_recovery() { return Err(failure("Recovery journal remains")); }
-            if !driver.admin_is_running().await { return Err(failure("Environment did not recover")); }
+            if !driver.admin_is_running(&nodes).await { return Err(failure("Environment did not recover")); }
             let account = driver.live_admin("localton", &["lite", "account", &address], None).await?;
             if account["balance_nano"] != "43000000000" { return Err(failure(format!("Incorrect native account: {account}"))); }
             Ok(())

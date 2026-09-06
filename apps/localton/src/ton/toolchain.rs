@@ -149,6 +149,29 @@ impl Toolchain {
         Ok(join_output(output))
     }
 
+    /// Measures validator block production for one validation interval.
+    ///
+    /// `checkloadall` is the official lite-client command consumed by MyTonCtrl.
+    /// The default verbosity is required because this command otherwise exits before
+    /// producing its validator summary on the pinned TON release.
+    pub(crate) async fn validator_load(&self, start: u32, end: u32) -> Result<String> {
+        ensure!(start < end, "validator load interval must be non-empty");
+        let command_text = format!("checkloadall {start} {end}");
+        let mut command = Command::new(self.binaries.command("lite-client"));
+        command
+            .args(["-t", "15", "-C"])
+            .arg(&self.lite_config)
+            .args(["-c", &command_text, "-c", "quit"]);
+        let output = run_checked(
+            &format!("lite-client {command_text}"),
+            command,
+            Duration::from_secs(30),
+        )
+        .await?;
+
+        Ok(join_output(output))
+    }
+
     /// Returns the authenticated host-local control endpoint for a managed node
     ///
     /// Administrative traffic stays on loopback even when the node advertises a

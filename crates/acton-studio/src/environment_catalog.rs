@@ -6,7 +6,8 @@ use crate::environment::{
     CreateEnvironmentRequest, CreateEnvironmentSnapshotRequest, CreateFullTonNodeRequest,
     EnvironmentConfig, EnvironmentEndpoints, EnvironmentRuntime, EnvironmentRuntimeError,
     EnvironmentRuntimeFuture, EnvironmentSnapshot, EnvironmentSnapshotOperation, EnvironmentStatus,
-    PublicTonNetwork, RemoveFullTonNodeRequest, StudioEnvironment, UpdateEnvironmentRequest,
+    NetworkConfigUpdate, PublicTonNetwork, RemoveFullTonNodeRequest, StudioEnvironment,
+    UpdateEnvironmentRequest,
 };
 
 pub const TESTNET_ENVIRONMENT_ID: &str = "testnet";
@@ -140,6 +141,31 @@ impl EnvironmentRuntime for EnvironmentCatalogRuntime {
         self.managed.health(environment_id)
     }
 
+    fn update_network_config(
+        &self,
+        environment_id: &str,
+        request: acton_localnet::UpdateNetworkConfig,
+    ) -> EnvironmentRuntimeFuture<'_, NetworkConfigUpdate> {
+        if let Some(error) = lifecycle_unavailable(environment_id, "configured") {
+            return error;
+        }
+
+        self.managed.update_network_config(environment_id, request)
+    }
+
+    fn localnet_operation(
+        &self,
+        environment_id: &str,
+        operation_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, acton_localnet::Operation> {
+        if let Some(error) = lifecycle_unavailable(environment_id, "configured") {
+            return error;
+        }
+
+        self.managed
+            .localnet_operation(environment_id, operation_id)
+    }
+
     fn add_full_ton_node(
         &self,
         environment_id: &str,
@@ -149,6 +175,19 @@ impl EnvironmentRuntime for EnvironmentCatalogRuntime {
             return error;
         }
         self.managed.add_full_ton_node(environment_id, request)
+    }
+
+    fn set_full_ton_node_running(
+        &self,
+        environment_id: &str,
+        node_id: &str,
+        running: bool,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        if let Some(error) = lifecycle_unavailable(environment_id, "changed") {
+            return error;
+        }
+        self.managed
+            .set_full_ton_node_running(environment_id, node_id, running)
     }
 
     fn remove_full_ton_node(

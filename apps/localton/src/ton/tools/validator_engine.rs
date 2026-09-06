@@ -36,9 +36,15 @@ const TOOL_NAME: &str = "validator-engine";
 /// useful diagnostics through both channels and because log routing is a runtime
 /// concern, not something the bootstrap workflow should reconstruct implicitly.
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// Files owned by one validator-engine process for diagnostic and session output.
 pub struct ValidatorLogPaths {
+    /// Prefix used by validator-engine for its regular rotating log.
     pub engine: PathBuf,
+    /// JSONL session stream consumed by Localton observability.
+    pub session: PathBuf,
+    /// Captured process standard output.
     pub stdout: PathBuf,
+    /// Captured process standard error.
     pub stderr: PathBuf,
 }
 
@@ -267,6 +273,7 @@ impl OfficialValidatorEngine {
         global_config: &Path,
         database: &Path,
         engine_log: &Path,
+        session_log: &Path,
         threads: u16,
         verbosity: u8,
     ) -> Command {
@@ -284,7 +291,8 @@ impl OfficialValidatorEngine {
             .arg(database)
             .arg("--logname")
             .arg(engine_log)
-            .args(["--session-logs", ""]);
+            .arg("--session-logs")
+            .arg(session_log);
         command
     }
 
@@ -333,6 +341,7 @@ impl OfficialValidatorEngine {
             &request.global_config,
             &request.database.path,
             &request.logs.engine,
+            &request.logs.session,
             request.threads,
             request.verbosity,
         );
@@ -387,6 +396,7 @@ impl ValidatorEngine for OfficialValidatorEngine {
                 &request.global_config,
                 &request.database,
                 &request.log_path,
+                Path::new(""),
                 request.threads,
                 request.verbosity,
             );
@@ -447,6 +457,7 @@ impl ValidatorEngine for OfficialValidatorEngine {
                 &request.global_config,
                 &request.database.path,
                 &request.logs.engine,
+                &request.logs.session,
                 request.threads,
                 request.verbosity,
             );
@@ -590,6 +601,7 @@ mod tests {
             database: ValidatorDatabase::at("/state/db"),
             logs: ValidatorLogPaths {
                 engine: PathBuf::from("/state/logs/validator-engine"),
+                session: PathBuf::from("/state/logs/validator-session.jsonl"),
                 stdout: PathBuf::from("/state/logs/validator.stdout.log"),
                 stderr: PathBuf::from("/state/logs/validator.stderr.log"),
             },
@@ -615,6 +627,7 @@ mod tests {
             Path::new("/state/global.config.json"),
             Path::new("/state/db"),
             Path::new("/state/logs/validator-init"),
+            Path::new("/state/logs/validator-bootstrap-session.jsonl"),
             4,
             2,
         );
@@ -635,7 +648,7 @@ mod tests {
                 "--logname",
                 "/state/logs/validator-init",
                 "--session-logs",
-                "",
+                "/state/logs/validator-bootstrap-session.jsonl",
                 "--celldb-preload-all",
                 "false",
                 "--ip",
@@ -663,7 +676,7 @@ mod tests {
                 "--logname",
                 "/state/logs/validator-engine",
                 "--session-logs",
-                "",
+                "/state/logs/validator-session.jsonl",
                 "--celldb-preload-all",
                 "--initial-sync-delay",
                 "0.0",

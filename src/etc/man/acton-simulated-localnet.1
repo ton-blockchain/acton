@@ -505,6 +505,15 @@ config\-only block
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setConfigParam\fR with
+\fB{"index":2,"boc":"<BASE64_BOC>","expectedHash":"<CURRENT_CELL_HASH>"}\fR
+replaces one config parameter and commits a config\-only block, even when
+automatic mining is disabled. \fBexpectedHash\fR is the current parameter\[cq]s
+lowercase hexadecimal representation hash; use \fBnull\fR to add a missing
+parameter. A stale hash returns HTTP 409. Parameter 0 cannot be changed
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'\fBPOST /acton_setShardAccount\fR with
 \fB{"address":"<ADDR>","shard_account":"<BASE64_BOC>"}\fR replaces the selected
 account state with a base64\-encoded \fBShardAccount\fR BOC
@@ -540,6 +549,10 @@ one\-shot timestamp for the next mined block
 simulated network latency; use \fB0\fR to disable response delay
 .RE
 .sp
+Acton Studio exposes the same parameter editor under \fBConfig\fR in the
+\fBNetwork\fR section for simulated localnet environments. Changes preserve all
+other parameters and historical configs.
+.sp
 TonCenter\-compatible message endpoints such as \fB/api/v2/sendBoc\fR and
 \fB/api/v3/message\fR accept external\-in messages only. Use
 \fB/acton_sendInternalMessage\fR when local tooling needs to inject a raw internal
@@ -566,8 +579,9 @@ with a database path from either CLI or \fBActon.toml\fR
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'blockchain configs replaced through \fB/acton_setConfig\fR are stored in block
-history and survive restarts when \fB\-\-db\-path\fR is configured
+\h'-04'\(bu\h'+03'blockchain configs changed through \fB/acton_setConfig\fR or
+\fB/acton_setConfigParam\fR are stored in block history and survive restarts when
+\fB\-\-db\-path\fR is configured
 .RE
 .sp
 .RS 4

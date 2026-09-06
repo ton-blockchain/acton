@@ -23,7 +23,7 @@ use utoipa::ToSchema;
 use crate::storage::InitialSyncProgress;
 
 /// Wire format accepted by the signed telemetry collector endpoint.
-pub const PROTOCOL_VERSION: u16 = 2;
+pub const PROTOCOL_VERSION: u16 = 3;
 /// Maximum live observer reports retained for one network view.
 pub const MAX_OBSERVERS: usize = 1_024;
 /// Maximum head difference that still counts as synchronized.
@@ -79,6 +79,22 @@ pub struct ValidatorObservation {
     pub adnl_address: Option<String>,
     /// Exact decimal representation of the validator weight.
     pub weight: String,
+    /// Block-production efficiency measured by the official lite-client for the active round.
+    pub efficiency: Option<ValidatorEfficiencyObservation>,
+}
+
+/// Block-production totals used to explain one validator's current-round efficiency.
+///
+/// Expected values remain decimal strings because lite-client reports fractional
+/// shard assignments and JSON numbers would lose the source precision.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct ValidatorEfficiencyObservation {
+    /// Percentage points computed with the same masterchain-first rule as MyTonCtrl.
+    pub percent: String,
+    pub masterchain_blocks_created: u64,
+    pub masterchain_blocks_expected: String,
+    pub shard_blocks_created: u64,
+    pub shard_blocks_expected: String,
 }
 
 /// Election timing and adjacent validator sets decoded from on-chain configuration.
@@ -92,6 +108,16 @@ pub struct ElectionObservation {
     pub elections_close_at: u32,
     pub validators_elected_for: u32,
     pub stake_held_for: u32,
+    /// Minimum validator stake from on-chain config parameter 17, in integer nanograms.
+    pub min_stake_nano: String,
+    /// Maximum validator stake from on-chain config parameter 17, in integer nanograms.
+    pub max_stake_nano: String,
+    /// Minimum validator count from on-chain config parameter 16.
+    pub min_validators: u16,
+    /// Maximum validator count from on-chain config parameter 16.
+    pub max_validators: u16,
+    /// Maximum masterchain validator count from on-chain config parameter 16.
+    pub max_main_validators: u16,
     pub previous: Option<ValidatorSetObservation>,
     pub current: ValidatorSetObservation,
     pub next: Option<ValidatorSetObservation>,
@@ -164,6 +190,8 @@ pub enum NodeCapability {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct NodeTelemetry {
     pub software: String,
+    /// Official TON release used by the validator-engine owned by this host.
+    pub ton_release: String,
     pub observability_endpoint: String,
     pub instance_started_at: Option<u64>,
     pub name: String,
@@ -191,6 +219,12 @@ pub struct NodeTelemetry {
     pub validator_public_key: Option<String>,
     pub validator_public_keys: Vec<String>,
     pub validator_adnl: Option<String>,
+    /// Stake this host configured for its validator, expressed in integer nanograms.
+    pub validator_stake_nano: Option<String>,
+    /// Public wallet address used by this host to submit validator elections.
+    pub validator_wallet_address: Option<String>,
+    /// Localton wallet implementation used by the validator election wallet.
+    pub validator_wallet_version: Option<String>,
 }
 
 /// Versioned observation authenticated by the state directory's stable Ed25519 key.
@@ -836,6 +870,7 @@ mod tests {
     fn telemetry(validator_key: Option<String>) -> NodeTelemetry {
         NodeTelemetry {
             software: "localton/test".to_owned(),
+            ton_release: "v-test".to_owned(),
             observability_endpoint: "http://127.0.0.1:18007".to_owned(),
             instance_started_at: Some(10),
             name: "node".to_owned(),
@@ -856,6 +891,9 @@ mod tests {
             validator_public_key: validator_key,
             validator_public_keys: Vec::new(),
             validator_adnl: None,
+            validator_stake_nano: Some("1000000000".to_owned()),
+            validator_wallet_address: None,
+            validator_wallet_version: Some("v4r2".to_owned()),
         }
     }
 
@@ -1092,6 +1130,11 @@ mod tests {
                 elections_close_at: 90,
                 validators_elected_for: 120,
                 stake_held_for: 30,
+                min_stake_nano: "1000000000".to_owned(),
+                max_stake_nano: "1000000000000".to_owned(),
+                min_validators: 1,
+                max_validators: 100,
+                max_main_validators: 10,
                 previous: None,
                 current: ValidatorSetObservation {
                     round_id: 0,
@@ -1104,6 +1147,7 @@ mod tests {
                         public_key: hex::encode([5; 32]),
                         adnl_address: None,
                         weight: "1".to_owned(),
+                        efficiency: None,
                     }],
                 },
                 next: None,

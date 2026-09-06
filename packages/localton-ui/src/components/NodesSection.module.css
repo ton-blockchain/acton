@@ -52,31 +52,27 @@
 }
 
 .nodesTable th:nth-child(1) {
-  width: 10%;
+  width: 12%;
 }
 
 .nodesTable th:nth-child(2) {
-  width: 15%;
+  width: 18%;
 }
 
 .nodesTable th:nth-child(3) {
-  width: 29%;
+  width: 36%;
 }
 
 .nodesTable th:nth-child(4) {
-  width: 8%;
-}
-
-.nodesTable th:nth-child(5) {
-  width: 9%;
-}
-
-.nodesTable th:nth-child(6) {
   width: 10%;
 }
 
-.nodesTable th:nth-child(7) {
-  width: 19%;
+.nodesTable th:nth-child(5) {
+  width: 11%;
+}
+
+.nodesTable th:nth-child(6) {
+  width: 13%;
 }
 
 .nodesTable tbody td {

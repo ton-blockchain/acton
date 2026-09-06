@@ -15,7 +15,6 @@ import {
   InlineActions,
   InlineLoader,
   Percentage,
-  TechnicalValue,
   Tooltip,
 } from "@acton/ui"
 
@@ -72,7 +71,9 @@ const NODE_ROLE_PRESENTATION: Record<
   },
 }
 
-/** Owns node synchronization, role, production, and observer columns for the network view */
+/**
+ * Owns node synchronization, roles, and block production for the network view
+ */
 export function NodesSection({
   footer,
   nodes,
@@ -304,7 +305,7 @@ function NodeRoleBadge({role}: {readonly role: NodeRole}) {
 
 function NodesTable({nodes, now, renderNodeActions}: NodesSectionProps) {
   return (
-    <DataTable className={styles.nodesTable} minWidth="60rem">
+    <DataTable className={styles.nodesTable} minWidth="50rem">
       <DataTableTable>
         <DataTableHead>
           <DataTableRow>
@@ -314,12 +315,11 @@ function NodesTable({nodes, now, renderNodeActions}: NodesSectionProps) {
             <DataTableHeaderCell>Roles</DataTableHeaderCell>
             <DataTableHeaderCell align="right">MC blocks</DataTableHeaderCell>
             <DataTableHeaderCell align="right">Shard blocks</DataTableHeaderCell>
-            <DataTableHeaderCell>Observer</DataTableHeaderCell>
           </DataTableRow>
         </DataTableHead>
         <DataTableBody>
           {nodes.length === 0 ? (
-            <DataTableEmpty colSpan={7}>No nodes match this filter</DataTableEmpty>
+            <DataTableEmpty colSpan={6}>No nodes match this filter</DataTableEmpty>
           ) : (
             nodes.map(node => (
               <DataTableRow key={`${node.observer_id}:${node.name}`}>
@@ -359,9 +359,6 @@ function NodesTable({nodes, now, renderNodeActions}: NodesSectionProps) {
                   <span className={styles.tabular}>
                     {node.produced_shard_blocks.toLocaleString()}
                   </span>
-                </DataTableCell>
-                <DataTableCell>
-                  <TechnicalValue value={node.observer_id} copyLabel="observer ID" />
                 </DataTableCell>
               </DataTableRow>
             ))

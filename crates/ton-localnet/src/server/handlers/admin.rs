@@ -4,9 +4,9 @@ use crate::localnet::{Localnet, LocalnetAccountStateChange, LocalnetMiningMode};
 use crate::server::models::{
     ChangeAccountStatePayload, ChangeAccountStateRequest, CheckpointRequest,
     CreateCheckpointRequest, FaucetRequest, GetVerifiedSourceRequest, ImportCheckpointQuery,
-    IncreaseTimeRequest, JettonFaucetRequest, MineBlocksRequest, SetConfigRequest,
-    SetMiningModeRequest, SetNetworkConditionsRequest, SetNextBlockTimestampRequest,
-    SetShardAccountRequest, SetTimeRequest,
+    IncreaseTimeRequest, JettonFaucetRequest, MineBlocksRequest, SetConfigParamRequest,
+    SetConfigRequest, SetMiningModeRequest, SetNetworkConditionsRequest,
+    SetNextBlockTimestampRequest, SetShardAccountRequest, SetTimeRequest,
 };
 use crate::server::{
     NetworkConditions, NetworkConditionsInfo, ServerState, StartupAccount, StateSourceInfo,
@@ -306,6 +306,38 @@ pub async fn set_config(
     Json(payload): Json<SetConfigRequest>,
 ) -> Response {
     handle_result(node.set_config(payload.config), |res| {
+        serde_json::to_value(res).unwrap_or(Value::Null)
+    })
+    .await
+}
+
+/// Applies an optimistic parameter edit through the node actor, without replacing other keys.
+pub async fn set_config_param(
+    State(node): State<Arc<Localnet>>,
+    Json(payload): Json<SetConfigParamRequest>,
+) -> Response {
+    let started = std::time::Instant::now();
+    tracing::info!(
+        operation = "update_config",
+        target = payload.index,
+        phase = "applying",
+        "simulated localnet config update started"
+    );
+
+    let result = node
+        .set_config_param(payload.index, payload.boc, payload.expected_hash)
+        .await;
+    tracing::info!(
+        operation = "update_config",
+        target = payload.index,
+        duration_ms = started.elapsed().as_millis(),
+        outcome = if result.is_ok() { "applied" } else { "failed" },
+        block_seqno = result.as_ref().ok().map(|result| result.block_seqno),
+        error = result.as_ref().err().map(|error| format!("{error:#}")),
+        "simulated localnet config update finished"
+    );
+
+    handle_result(async { result }, |res| {
         serde_json::to_value(res).unwrap_or(Value::Null)
     })
     .await

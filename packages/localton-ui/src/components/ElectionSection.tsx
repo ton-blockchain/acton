@@ -386,7 +386,8 @@ function ValidatorSetRow({
   )
 }
 
-function validatorWeightParts(weight: string, totalWeight: string) {
+/** Preserves large TON weights while scaling their ratio for Percentage */
+export function validatorWeightParts(weight: string, totalWeight: string) {
   const total = BigInt(totalWeight)
   if (total === 0n) return 0
 

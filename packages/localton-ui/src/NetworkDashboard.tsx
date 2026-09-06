@@ -1,7 +1,8 @@
 import {lazy, Suspense, useEffect, useState} from "react"
-import type {ReactNode} from "react"
+import type {MouseEvent, ReactNode} from "react"
 import {Activity} from "lucide-react"
 import {
+  AddressChip,
   DataTable,
   DataTableBody,
   DataTableCell,
@@ -11,20 +12,31 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  DateTime,
   Duration,
+  GramAmount,
+  Percentage,
   RelativeTime,
   Skeleton,
   TechnicalValue,
+  Tooltip,
 } from "@acton/ui"
 
-import {ElectionSection} from "./components/ElectionSection"
+import {ElectionSection, validatorWeightParts} from "./components/ElectionSection"
 import {Metric} from "./components/Metric"
 import {NodesSection} from "./components/NodesSection"
 import {StatusPill} from "./components/StatusPill"
 import type {ObservabilityClient} from "./observability"
 import {useObservability} from "./observability"
 import styles from "./App.module.css"
-import type {NetworkView, NodeView, ShardHead, TpsView} from "./types"
+import type {
+  NetworkView,
+  NodeView,
+  ShardHead,
+  TpsView,
+  ValidatorEfficiencyObservation,
+  ValidatorObservation,
+} from "./types"
 
 const TpsSection = lazy(() => import("./components/TpsSection"))
 
@@ -32,8 +44,12 @@ export type NetworkDashboardView = "all" | "overview" | "nodes" | "validators"
 
 export interface NetworkDashboardProps {
   readonly client: ObservabilityClient
+  /** Keeps host-managed offline nodes accessible before the collector has a report */
+  readonly fallbackNodes?: readonly NodeView[]
   /** Host-owned controls rendered after the node table without coupling them to Localton */
   readonly nodesFooter?: ReactNode
+  /** Opens validator wallet addresses in the host application's account view */
+  readonly onAddressClick?: (address: string, event?: MouseEvent<HTMLElement>) => void
   readonly onNetworkChange?: (network: NetworkView) => void
   /** Host-owned row controls; standalone Localton omits this callback */
   readonly renderNodeActions?: (node: NodeView) => ReactNode
@@ -43,7 +59,9 @@ export interface NetworkDashboardProps {
 /** Renders collector-backed network pages without owning product navigation or page chrome */
 export function NetworkDashboard({
   client,
+  fallbackNodes = [],
   nodesFooter,
+  onAddressClick,
   onNetworkChange,
   renderNodeActions,
   view = "all",
@@ -60,9 +78,21 @@ export function NetworkDashboard({
 
   return (
     <NetworkDashboardContent
-      network={network}
+      network={{
+        ...network,
+        nodes: [
+          ...network.nodes,
+          ...fallbackNodes.filter(
+            node =>
+              !network.nodes.some(
+                observed => observed.name.toLowerCase() === node.name.toLowerCase(),
+              ),
+          ),
+        ],
+      }}
       nodesFooter={nodesFooter}
       now={now}
+      onAddressClick={onAddressClick}
       renderNodeActions={renderNodeActions}
       tps={tps}
       view={view}
@@ -94,6 +124,16 @@ function NetworkDashboardSkeleton({
 
       {view === "all" || view === "validators" ? (
         <>
+          <LoadingTableSection
+            ariaLabel="Current validation round"
+            columns={[
+              {label: "Metric", width: "12rem"},
+              {label: "Value", width: "22rem"},
+            ]}
+            minWidth="36rem"
+            rows={3}
+            title="Current validation round"
+          />
           <ElectionSkeleton />
           <LoadingTableSection
             ariaLabel="Validator production"
@@ -110,6 +150,22 @@ function NetworkDashboardSkeleton({
             rows={1}
             title="Validator production"
           />
+          <LoadingTableSection
+            ariaLabel="Current round validator performance"
+            columns={[
+              {label: "#", width: "2rem"},
+              {label: "Validator", width: "7rem"},
+              {label: "Efficiency", align: "right", width: "6rem"},
+              {label: "Weight", align: "right", width: "5rem"},
+              {label: "Stake", align: "right", width: "8rem"},
+              {label: "Node version", width: "6rem"},
+              {label: "Wallet", width: "13rem"},
+              {label: "Type", width: "4rem"},
+            ]}
+            minWidth="56rem"
+            rows={1}
+            title="Current round validator performance"
+          />
         </>
       ) : null}
 
@@ -124,10 +180,9 @@ function NetworkDashboardSkeleton({
               {label: "Roles", width: "5rem"},
               {label: "MC blocks", align: "right", width: "4rem"},
               {label: "Shard blocks", align: "right", width: "4rem"},
-              {label: "Observer", width: "9rem"},
             ]}
             footer={nodesFooter}
-            minWidth="60rem"
+            minWidth="50rem"
             rows={1}
             rowSize="node"
             showTitle={view === "all"}
@@ -285,6 +340,7 @@ interface NetworkDashboardContentProps {
   readonly network: NetworkView
   readonly nodesFooter?: ReactNode
   readonly now: number
+  readonly onAddressClick?: (address: string, event?: MouseEvent<HTMLElement>) => void
   readonly renderNodeActions?: (node: NodeView) => ReactNode
   readonly tps: TpsView | undefined
   readonly view?: NetworkDashboardView
@@ -295,6 +351,7 @@ export function NetworkDashboardContent({
   network,
   nodesFooter,
   now,
+  onAddressClick,
   renderNodeActions,
   tps,
   view = "all",
@@ -310,8 +367,10 @@ export function NetworkDashboardContent({
 
       {view === "all" || view === "validators" ? (
         <>
+          <ValidationRoundSection network={network} now={now} />
           <ElectionSection election={network.election} now={now} />
           <ValidatorsSection nodes={network.nodes} />
+          <ValidatorPerformanceSection network={network} onAddressClick={onAddressClick} />
         </>
       ) : null}
 
@@ -546,6 +605,314 @@ function ValidatorsSection({nodes}: {readonly nodes: readonly NodeView[]}) {
         </DataTableTable>
       </DataTable>
     </section>
+  )
+}
+
+function ValidationRoundSection({
+  network,
+  now,
+}: {
+  readonly network: NetworkView
+  readonly now: number
+}) {
+  const election = network.election
+  const members = election?.current.members ?? []
+  const stakes = members.flatMap(validator => {
+    const stake = nodeForValidator(network.nodes, validator)?.validator_stake_nano
+
+    return stake ? [BigInt(stake)] : []
+  })
+  const completeStakeSet = members.length > 0 && stakes.length === members.length
+  const totalStake = completeStakeSet
+    ? stakes.reduce((total, stake) => total + stake, 0n).toString()
+    : undefined
+  const minimumStake = completeStakeSet
+    ? stakes.reduce((minimum, stake) => (stake < minimum ? stake : minimum)).toString()
+    : undefined
+  const maximumStake = completeStakeSet
+    ? stakes.reduce((maximum, stake) => (stake > maximum ? stake : maximum)).toString()
+    : undefined
+
+  return (
+    <section className={styles.sectionStack} aria-labelledby="validation-round-title">
+      <div className={styles.sectionHeading}>
+        <h2 id="validation-round-title">Current validation round</h2>
+      </div>
+      {election ? (
+        <div className={styles.validationRoundPanel} aria-label="Current validation round">
+          <ValidationRoundGroup label="Round" columns={4}>
+            <ValidationRoundMetric
+              label="Number"
+              value={election.current.round_id.toLocaleString()}
+            />
+            <ValidationRoundMetric
+              label="Start"
+              value={
+                <ValidationRoundTime now={now} timestamp={election.current.validation_started_at} />
+              }
+            />
+            <ValidationRoundMetric
+              label="End"
+              value={
+                <ValidationRoundTime now={now} timestamp={election.current.validation_ended_at} />
+              }
+            />
+            <ValidationRoundMetric
+              label="Unfreezing stakes"
+              value={
+                <ValidationRoundTime
+                  now={now}
+                  timestamp={election.current.validation_ended_at + election.stake_held_for}
+                />
+              }
+            />
+          </ValidationRoundGroup>
+          <ValidationRoundGroup label="Stake" columns={4}>
+            <ValidationRoundMetric
+              label="Validators"
+              value={`${election.current.validators.toLocaleString()} / ${election.max_validators.toLocaleString()}`}
+            />
+            <ValidationRoundMetric label="Total" value={<GramAmount value={totalStake} />} />
+            <ValidationRoundMetric label="Actual min" value={<GramAmount value={minimumStake} />} />
+            <ValidationRoundMetric label="Actual max" value={<GramAmount value={maximumStake} />} />
+          </ValidationRoundGroup>
+          <ValidationRoundGroup label="Network config" columns={4}>
+            <ValidationRoundMetric
+              label="Min stake"
+              value={<GramAmount value={election.min_stake_nano} />}
+            />
+            <ValidationRoundMetric
+              label="Max stake"
+              value={<GramAmount value={election.max_stake_nano} />}
+            />
+            <ValidationRoundMetric
+              label="Min validators"
+              value={election.min_validators.toLocaleString()}
+            />
+            <ValidationRoundMetric
+              label="Max validators"
+              value={election.max_validators.toLocaleString()}
+            />
+            <ValidationRoundMetric
+              label="Max masterchain validators"
+              value={election.max_main_validators.toLocaleString()}
+            />
+          </ValidationRoundGroup>
+        </div>
+      ) : (
+        <div className={styles.validationRoundEmpty}>Current validation round is not available</div>
+      )}
+    </section>
+  )
+}
+
+function ValidationRoundGroup({
+  children,
+  columns,
+  label,
+}: {
+  readonly children: ReactNode
+  readonly columns: number
+  readonly label: string
+}) {
+  return (
+    <div className={styles.validationRoundGroup}>
+      <div className={styles.validationRoundGroupLabel}>{label}</div>
+      <div className={styles.validationRoundGrid} data-columns={columns}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function ValidationRoundMetric({
+  label,
+  value,
+}: {
+  readonly label: string
+  readonly value: ReactNode
+}) {
+  return (
+    <div className={styles.validationRoundMetric}>
+      <span className={styles.validationRoundMetricLabel}>{label}</span>
+      <span className={styles.validationRoundMetricValue}>{value}</span>
+    </div>
+  )
+}
+
+function ValidationRoundTime({now, timestamp}: {readonly now: number; readonly timestamp: number}) {
+  return (
+    <span className={styles.validationRoundTime}>
+      <DateTime display="date-time-numeric-seconds" unit="seconds" value={timestamp} />
+      <span className={styles.validationRoundRelativeTime}>
+        (<RelativeTime mode="relative" now={now} unit="seconds" value={timestamp} />)
+      </span>
+    </span>
+  )
+}
+
+function ValidatorPerformanceSection({
+  network,
+  onAddressClick,
+}: {
+  readonly network: NetworkView
+  readonly onAddressClick?: (address: string, event?: MouseEvent<HTMLElement>) => void
+}) {
+  const currentSet = network.election?.current
+  const validators = currentSet?.members ?? []
+
+  return (
+    <section className={styles.sectionStack} aria-labelledby="validator-performance-title">
+      <div className={styles.sectionHeading}>
+        <h2 id="validator-performance-title">Current round validator performance</h2>
+      </div>
+      <DataTable className={styles.validatorPerformanceTable} minWidth="56rem">
+        <DataTableTable aria-label="Current round validator performance" layout="fixed">
+          <DataTableHead>
+            <DataTableRow>
+              <DataTableHeaderCell columnWidth="3rem">#</DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="9rem">Validator</DataTableHeaderCell>
+              <DataTableHeaderCell align="right" columnWidth="8rem">
+                Efficiency
+              </DataTableHeaderCell>
+              <DataTableHeaderCell align="right" columnWidth="7rem">
+                Weight
+              </DataTableHeaderCell>
+              <DataTableHeaderCell align="right" columnWidth="8rem">
+                Stake
+              </DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="8rem">Node version</DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="14rem">Wallet</DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="5rem">Type</DataTableHeaderCell>
+            </DataTableRow>
+          </DataTableHead>
+          <DataTableBody>
+            {currentSet ? (
+              currentSet.members === undefined ? (
+                <DataTableEmpty colSpan={8}>Validator identities are not available</DataTableEmpty>
+              ) : validators.length === 0 ? (
+                <DataTableEmpty colSpan={8}>No validators in the current round</DataTableEmpty>
+              ) : (
+                validators.map((validator, index) => {
+                  const node = nodeForValidator(network.nodes, validator)
+
+                  return (
+                    <ValidatorPerformanceRow
+                      index={index}
+                      key={`${validator.public_key}:${index}`}
+                      node={node}
+                      onAddressClick={onAddressClick}
+                      totalWeight={currentSet.total_weight ?? "0"}
+                      validator={validator}
+                    />
+                  )
+                })
+              )
+            ) : (
+              <DataTableEmpty colSpan={8}>Current validator set is not available</DataTableEmpty>
+            )}
+          </DataTableBody>
+        </DataTableTable>
+      </DataTable>
+    </section>
+  )
+}
+
+function ValidatorPerformanceRow({
+  index,
+  node,
+  onAddressClick,
+  totalWeight,
+  validator,
+}: {
+  readonly index: number
+  readonly node: NodeView | undefined
+  readonly onAddressClick?: (address: string, event?: MouseEvent<HTMLElement>) => void
+  readonly totalWeight: string
+  readonly validator: ValidatorObservation
+}) {
+  const weightParts = validatorWeightParts(validator.weight, totalWeight)
+
+  return (
+    <DataTableRow hover>
+      <DataTableCell tone="muted">{index + 1}</DataTableCell>
+      <DataTableCell>
+        <strong>{node?.name ?? `Validator ${index + 1}`}</strong>
+      </DataTableCell>
+      <DataTableCell align="right">
+        <ValidatorEfficiency efficiency={validator.efficiency} />
+      </DataTableCell>
+      <DataTableCell align="right">
+        <Tooltip
+          content={`${BigInt(validator.weight).toLocaleString()} of ${BigInt(totalWeight).toLocaleString()}`}
+        >
+          <span className={styles.tabular}>
+            <Percentage
+              maximumFractionDigits={3}
+              minimumFractionDigits={2}
+              total={1_000_000}
+              value={weightParts}
+            />
+          </span>
+        </Tooltip>
+      </DataTableCell>
+      <DataTableCell align="right">
+        <GramAmount value={node?.validator_stake_nano} />
+      </DataTableCell>
+      <DataTableCell>
+        <span className={styles.tabular}>{node?.ton_release || "—"}</span>
+      </DataTableCell>
+      <DataTableCell>
+        <AddressChip
+          address={node?.validator_wallet_address ?? undefined}
+          fallback="—"
+          onAddressClick={onAddressClick}
+        />
+      </DataTableCell>
+      <DataTableCell tone="muted">{node?.validator_wallet_version ?? "—"}</DataTableCell>
+    </DataTableRow>
+  )
+}
+
+function ValidatorEfficiency({
+  efficiency,
+}: {
+  readonly efficiency: ValidatorEfficiencyObservation | null
+}) {
+  if (!efficiency) return <span className={styles.muted}>Collecting</span>
+
+  const masterchainExpected = Number(efficiency.masterchain_blocks_expected)
+  const usesMasterchain = masterchainExpected > 0
+  const created = usesMasterchain
+    ? efficiency.masterchain_blocks_created
+    : efficiency.shard_blocks_created
+  const expected = usesMasterchain
+    ? efficiency.masterchain_blocks_expected
+    : efficiency.shard_blocks_expected
+  const chain = usesMasterchain ? "masterchain" : "shard"
+  const percent = Number(efficiency.percent)
+  const tone = percent >= 90 ? "good" : percent >= 60 ? "warning" : "bad"
+
+  return (
+    <Tooltip content={`${created.toLocaleString()} of ${expected} expected ${chain} blocks`}>
+      <span className={styles.validatorEfficiency} data-tone={tone}>
+        <Percentage maximumFractionDigits={2} minimumFractionDigits={2} value={percent} />
+      </span>
+    </Tooltip>
+  )
+}
+
+/** Finds the host report that owns a key from the on-chain validator set */
+function nodeForValidator(
+  nodes: readonly NodeView[],
+  validator: ValidatorObservation,
+): NodeView | undefined {
+  const publicKey = validator.public_key.toLowerCase()
+
+  return nodes.find(
+    node =>
+      node.validator_public_key?.toLowerCase() === publicKey ||
+      node.validator_public_keys.some(key => key.toLowerCase() === publicKey),
   )
 }
 

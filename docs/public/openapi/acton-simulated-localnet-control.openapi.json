@@ -599,6 +599,35 @@
         }
       }
     },
+    "/acton_setConfigParam": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setConfigParam",
+        "summary": "Update a blockchain config parameter",
+        "description": "Checks the parameter's expected representation hash and commits its replacement in a new block, even with automatic mining disabled. A null expectedHash adds a missing parameter. Other parameters and historical configs are preserved. Parameter 0 cannot be changed.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetConfigParamRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SetConfigResponse"
+          },
+          "409": {
+            "description": "The parameter changed since it was loaded"
+          },
+          "422": {
+            "description": "Invalid, unchanged or immutable parameter"
+          }
+        }
+      }
+    },
     "/acton_setShardAccount": {
       "post": {
         "tags": ["Localnet Control"],
@@ -1740,6 +1769,26 @@
         "properties": {
           "config": {
             "$ref": "#/components/schemas/Base64Boc"
+          }
+        }
+      },
+      "SetConfigParamRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["index", "boc"],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Signed configuration parameter ID, excluding 0"
+          },
+          "boc": {
+            "$ref": "#/components/schemas/Base64Boc"
+          },
+          "expectedHash": {
+            "type": "string",
+            "nullable": true,
+            "description": "Lowercase hexadecimal representation hash of the current parameter, or null to add a missing parameter"
           }
         }
       },

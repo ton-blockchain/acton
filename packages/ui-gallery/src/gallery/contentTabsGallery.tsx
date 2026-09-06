@@ -1,4 +1,4 @@
-import {ContentTabs, RawDataBlock, type ContentTab} from "@acton/ui"
+import {ContentTabs, Input, RawDataBlock, type ContentTab} from "@acton/ui"
 import {useRef, useState} from "react"
 
 import styles from "./contentTabsGallery.module.css"
@@ -75,6 +75,34 @@ function CodeViewerSample() {
       >
         {activeTab === "disasm" ? <DisasmPreview /> : undefined}
       </RawDataBlock>
+    </ContentTabs>
+  )
+}
+
+function StandaloneFormSample() {
+  const [activeTab, setActiveTab] = useState<"fields" | "json">("fields")
+  const [label, setLabel] = useState("Local network")
+
+  return (
+    <ContentTabs
+      ariaLabel="Form representation"
+      variant="standalone"
+      tabs={[
+        {value: "fields", label: "Fields"},
+        {value: "json", label: "JSON"},
+      ]}
+      value={activeTab}
+      onValueChange={setActiveTab}
+    >
+      {activeTab === "fields" ? (
+        <Input
+          label="Label"
+          value={label}
+          onChange={event => setLabel(event.currentTarget.value)}
+        />
+      ) : (
+        <RawDataBlock value={JSON.stringify({label}, null, 2)} />
+      )}
     </ContentTabs>
   )
 }
@@ -259,11 +287,12 @@ export const contentTabsGallery = {
     "Use controlled state so app code owns the selected tab and the rendered content.",
     "Return a Promise from onValueChange when switching tabs requires async loading.",
     "Pass panelClassName when the panel needs code scrolling, table layout, or custom padding.",
+    'Use variant="standalone" for rounded tabs above unframed content',
   ],
   avoid: [
     "Do not put domain decoding logic inside ContentTabs.",
     "Do not create one-off tab button styles in feature code when this connected panel pattern fits.",
-    "Do not use when tabs do not share the same framed content area.",
+    "Do not place tab content outside the component's accessible panel",
   ],
   sections: [
     {
@@ -271,6 +300,12 @@ export const contentTabsGallery = {
       title: "Code Viewer",
       description: "Connected tabs above a scrollable panel for disasm and encoded data formats.",
       content: <CodeViewerSample />,
+    },
+    {
+      id: "content-tabs-standalone",
+      title: "Standalone form views",
+      description: "Rounded tabs above alternate form representations without a panel divider",
+      content: <StandaloneFormSample />,
     },
     {
       id: "content-tabs-table-content",

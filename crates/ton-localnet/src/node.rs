@@ -518,6 +518,57 @@ impl Node {
         self.mine_block_with_limits(BASECHAIN_BLOCK_LIMITS)
     }
 
+    /// Checks and replaces one dictionary entry in the same actor turn as its block commit.
+    /// Reuses full-config persistence so historical queries and restart see the same change.
+    pub fn set_config_param(
+        &mut self,
+        index: i32,
+        boc: BocBytes,
+        expected_hash: Option<&str>,
+    ) -> anyhow::Result<(Hash256, BlockMeta)> {
+        if index == 0 {
+            return Err(LocalnetError::invalid_request(
+                "Parameter 0 identifies the configuration contract and cannot be changed in place",
+            )
+            .into());
+        }
+        let cell = Boc::decode(&boc).map_err(|error| {
+            LocalnetError::invalid_request(format!("Invalid parameter BoC: {error}"))
+        })?;
+        if cell.is_exotic() || cell.repr_depth() >= 120 {
+            return Err(LocalnetError::invalid_request(
+                "Parameter must be an ordinary cell with depth below 120",
+            )
+            .into());
+        }
+
+        let mut config = Dict::<u32, Cell>::from_raw(Some(self.config_cell.clone()));
+        // TON uses signed parameter IDs as the bit pattern of a 32-bit dictionary key.
+        let key = index.cast_unsigned();
+        let previous = config.get(key)?;
+        if previous
+            .as_ref()
+            .map(|value| value.repr_hash().to_string())
+            .as_deref()
+            != expected_hash
+        {
+            return Err(LocalnetError::ConfigParameterConflict { index }.into());
+        }
+        if previous
+            .as_ref()
+            .is_some_and(|value| value.repr_hash() == cell.repr_hash())
+        {
+            return Err(LocalnetError::invalid_request("The parameter has not changed").into());
+        }
+
+        config.set(key, cell)?;
+        let root = config
+            .root()
+            .as_ref()
+            .context("Configuration dictionary is empty")?;
+        self.set_config(BocBytes::from(Boc::encode(root)))
+    }
+
     pub fn set_config(&mut self, config_boc: BocBytes) -> anyhow::Result<(Hash256, BlockMeta)> {
         let config_cell =
             Boc::decode(&config_boc).context("Failed to decode blockchain config BOC")?;

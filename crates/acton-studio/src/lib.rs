@@ -35,6 +35,7 @@ mod local_artifacts;
 mod local_process;
 mod local_test_process;
 mod localnet;
+mod network_config;
 mod openapi;
 mod test_api;
 mod test_run;
@@ -56,7 +57,7 @@ pub use environment::{
     EnvironmentLifecycle, EnvironmentNetwork, EnvironmentRuntime, EnvironmentRuntimeError,
     EnvironmentRuntimeFuture, EnvironmentSnapshot, EnvironmentSnapshotOperation,
     EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings,
-    EnvironmentStatus, FullTonAccountImport, FullTonNode, PublicTonNetwork,
+    EnvironmentStatus, FullTonAccountImport, FullTonNode, NetworkConfigUpdate, PublicTonNetwork,
     RemoveFullTonNodeRequest, StudioEnvironment, UpdateEnvironmentRequest,
 };
 pub use environment_catalog::{
@@ -352,6 +353,14 @@ impl StudioServer {
                 axum::routing::delete(remove_full_ton_node),
             )
             .route(
+                "/environments/{environment_id}/nodes/{node_id}/start",
+                post(start_full_ton_node),
+            )
+            .route(
+                "/environments/{environment_id}/nodes/{node_id}/stop",
+                post(stop_full_ton_node),
+            )
+            .route(
                 "/environments/{environment_id}/nodes/{node_id}/leave-validation",
                 post(leave_full_ton_validation),
             )
@@ -366,6 +375,14 @@ impl StudioServer {
             .route(
                 "/environments/{environment_id}/restart",
                 post(restart_environment),
+            )
+            .route(
+                "/environments/{environment_id}/network/config",
+                post(network_config::update),
+            )
+            .route(
+                "/environments/{environment_id}/localnet-operations/{operation_id}",
+                get(network_config::operation),
             )
             .route(
                 "/environments/{environment_id}/health",
@@ -673,6 +690,52 @@ async fn enter_full_ton_validation(
         .enter_full_ton_validation(&environment_id, &node_id)
         .await
         .map(|environment| (StatusCode::ACCEPTED, Json(public_environment(environment))))
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/nodes/{node_id}/start",
+    params(("environment_id" = String, Path), ("node_id" = String, Path)),
+    responses(
+        (status = 200, description = "Node started with its existing state", body = StudioEnvironment),
+        (status = 409, description = "Network cannot start the node", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
+async fn start_full_ton_node(
+    State(state): State<StudioState>,
+    AxumPath((environment_id, node_id)): AxumPath<(String, String)>,
+) -> Result<Json<StudioEnvironment>, StudioApiError> {
+    state
+        .environment_runtime
+        .set_full_ton_node_running(&environment_id, &node_id, true)
+        .await
+        .map(public_environment)
+        .map(Json)
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/nodes/{node_id}/stop",
+    params(("environment_id" = String, Path), ("node_id" = String, Path)),
+    responses(
+        (status = 200, description = "Node stopped with its state preserved", body = StudioEnvironment),
+        (status = 409, description = "Network cannot stop the node", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
+async fn stop_full_ton_node(
+    State(state): State<StudioState>,
+    AxumPath((environment_id, node_id)): AxumPath<(String, String)>,
+) -> Result<Json<StudioEnvironment>, StudioApiError> {
+    state
+        .environment_runtime
+        .set_full_ton_node_running(&environment_id, &node_id, false)
+        .await
+        .map(public_environment)
+        .map(Json)
         .map_err(StudioApiError)
 }
 

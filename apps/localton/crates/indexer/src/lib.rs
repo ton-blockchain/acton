@@ -1,5 +1,7 @@
 //! Embedded, checkpointed metrics indexing for a Localton network.
 
+pub mod session_stats;
+
 use std::{
     path::{Path, PathBuf},
     sync::{

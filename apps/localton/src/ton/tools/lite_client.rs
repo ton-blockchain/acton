@@ -280,6 +280,12 @@ pub struct ElectionStatus {
     pub min_total_stake_nano: u64,
     /// Maximum effective-stake ratio encoded as a fixed-point Q16 value.
     pub max_stake_factor_q16: u32,
+    /// Minimum validator count accepted by on-chain configuration.
+    pub min_validators: u16,
+    /// Maximum validator count accepted by on-chain configuration.
+    pub max_validators: u16,
+    /// Maximum validators assigned to the masterchain subset.
+    pub max_main_validators: u16,
     /// Validator set currently securing the network.
     pub current: ValidatorSetInfo,
     /// Validator set from the preceding round, when retained by the network.
@@ -632,13 +638,18 @@ impl LiteClient for NativeLiteClient {
     ) -> Result<ElectionStatus> {
         observe_native(context, target, LiteOperation::ElectionStatus, async {
             let mut client = LocalLiteClient::connect(&target.global_config).await?;
-            let config = client.config_params(vec![1, 15, 17, 32, 34, 36]).await?;
+            let config = client
+                .config_params(vec![1, 15, 16, 17, 32, 34, 36])
+                .await?;
             let timing = config
                 .get_election_timings()
                 .context("config parameter 15 has invalid election timing")?;
             let stakes = config
                 .get_validator_stake_params()
                 .context("config parameter 17 has invalid validator stake limits")?;
+            let validator_counts = config
+                .get_validator_count_params()
+                .context("config parameter 16 has invalid validator count limits")?;
             let elector = config
                 .get_elector_address()
                 .context("config parameter 1 has no valid Elector address")?;
@@ -664,6 +675,9 @@ impl LiteClient for NativeLiteClient {
                 min_total_stake_nano: u64::try_from(stakes.min_total_stake.into_inner())
                     .context("config parameter 17 min_total_stake exceeds u64")?,
                 max_stake_factor_q16: stakes.max_stake_factor,
+                min_validators: validator_counts.min_validators,
+                max_validators: validator_counts.max_validators,
+                max_main_validators: validator_counts.max_main_validators,
                 current: validator_set_info(current),
                 previous: previous.map(validator_set_info),
                 next: next.map(validator_set_info),

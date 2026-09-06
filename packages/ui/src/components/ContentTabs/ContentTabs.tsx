@@ -24,6 +24,8 @@ export type ContentTabsProps<TValue extends string = string> = Readonly<
     readonly panelClassName?: string
     readonly tabs: readonly ContentTab<TValue>[]
     readonly value: TValue
+    /** Standalone tabs keep rounded lower corners and leave the content unframed */
+    readonly variant?: "connected" | "standalone"
   }
 >
 
@@ -48,6 +50,7 @@ export function ContentTabs<TValue extends string = string>({
   ref,
   tabs,
   value,
+  variant = "connected",
   ...props
 }: ContentTabsProps<TValue>) {
   const generatedId = useId()
@@ -116,7 +119,12 @@ export function ContentTabs<TValue extends string = string>({
   }
 
   return (
-    <div {...props} ref={ref} id={id} className={cx(styles.contentTabs, className)}>
+    <div
+      {...props}
+      ref={ref}
+      id={id}
+      className={cx(styles.contentTabs, variant === "standalone" && styles.standalone, className)}
+    >
       <div
         className={cx(styles.tabList, listClassName)}
         role="tablist"

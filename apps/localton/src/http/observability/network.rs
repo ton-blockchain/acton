@@ -2,10 +2,12 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet},
+    sync::LazyLock,
     time::Duration,
 };
 
 use anyhow::{Context, Result};
+use regex::Regex;
 use tokio::{sync::watch, time::MissedTickBehavior};
 use ton::{block_tlb::Block, ton_core::traits::tlb::TLB};
 use tracing::warn;
@@ -13,7 +15,8 @@ use tracing::warn;
 use crate::{
     observability::{
         ChainHead, ElectionObservation, ElectionStage, MasterchainBlock, ProductionView, ShardHead,
-        ValidatorObservation, ValidatorSetObservation, VerifiedNetworkState,
+        ValidatorEfficiencyObservation, ValidatorObservation, ValidatorSetObservation,
+        VerifiedNetworkState,
     },
     operations::validators,
     storage::{Layout, RuntimeState, Settings, unix_time},
@@ -28,6 +31,14 @@ const INITIAL_BACKFILL_BLOCKS: u32 = 64;
 const MAX_CATCHUP_BLOCKS_PER_TICK: u32 = 128;
 const MAX_RETAINED_BLOCKS: usize = 20_000;
 const ELECTION_POLL_INTERVAL_SECONDS: u64 = 15;
+const EFFICIENCY_POLL_INTERVAL_SECONDS: u64 = 30;
+
+static VALIDATOR_LOAD_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?m)^val #\d+: pubkey ([0-9A-Fa-f]{64}), blocks created \((\d+),(\d+)\), expected \(([0-9.]+),([0-9.]+)\)",
+    )
+    .expect("validator load regex is valid")
+});
 
 /// Host-local liteserver position with the times needed for progress and lag checks.
 #[derive(Clone, Copy)]
@@ -178,6 +189,9 @@ struct NetworkReader {
     last_election_update: Option<u64>,
     blocks: BTreeMap<String, BlockObservation>,
     election: Option<ElectionObservation>,
+    validator_efficiency: BTreeMap<String, ValidatorEfficiencyObservation>,
+    validator_efficiency_round: Option<u32>,
+    last_efficiency_update: Option<u64>,
     current_validator_keys: Option<BTreeSet<String>>,
     next_validator_keys: Option<BTreeSet<String>>,
     network: Option<VerifiedNetworkState>,
@@ -201,6 +215,26 @@ impl NetworkReader {
             self.last_election_update = Some(now);
             match validators::election_status(toolchain).await {
                 Ok(info) => {
+                    if let Some(observed_head_time) = self
+                        .network
+                        .as_ref()
+                        .map(|network| u64::from(network.head.gen_utime))
+                        && let Err(error) = self
+                            .refresh_validator_efficiency(
+                                toolchain,
+                                now,
+                                observed_head_time,
+                                &info.current,
+                            )
+                            .await
+                    {
+                        warn!(
+                            round_id = info.current.since,
+                            error = %format_args!("{error:#}"),
+                            "validator efficiency update failed"
+                        );
+                    }
+
                     self.current_validator_keys = Some(
                         info.current
                             .validators
@@ -235,9 +269,23 @@ impl NetworkReader {
                         elections_close_at,
                         validators_elected_for: info.validators_elected_for,
                         stake_held_for: info.stake_held_for,
-                        previous: info.previous.as_ref().map(validator_set_observation),
-                        current: validator_set_observation(&info.current),
-                        next: info.next.as_ref().map(validator_set_observation),
+                        min_stake_nano: info.min_stake_nano.to_string(),
+                        max_stake_nano: info.max_stake_nano.to_string(),
+                        min_validators: info.min_validators,
+                        max_validators: info.max_validators,
+                        max_main_validators: info.max_main_validators,
+                        previous: info
+                            .previous
+                            .as_ref()
+                            .map(|set| validator_set_observation(set, None)),
+                        current: validator_set_observation(
+                            &info.current,
+                            Some(&self.validator_efficiency),
+                        ),
+                        next: info
+                            .next
+                            .as_ref()
+                            .map(|set| validator_set_observation(set, None)),
                     });
                 }
                 Err(error) => warn!(
@@ -431,9 +479,47 @@ impl NetworkReader {
 
         Ok(())
     }
+
+    /// Refreshes current-round efficiency without rescanning the whole round on every tick.
+    async fn refresh_validator_efficiency(
+        &mut self,
+        toolchain: &Toolchain,
+        now: u64,
+        observed_head_time: u64,
+        set: &ValidatorSetInfo,
+    ) -> Result<()> {
+        let round_changed = self.validator_efficiency_round != Some(set.since);
+        if round_changed {
+            self.validator_efficiency.clear();
+            self.validator_efficiency_round = Some(set.since);
+            self.last_efficiency_update = None;
+        }
+
+        if !round_changed
+            && self.last_efficiency_update.is_some_and(|updated| {
+                now.saturating_sub(updated) < EFFICIENCY_POLL_INTERVAL_SECONDS
+            })
+        {
+            return Ok(());
+        }
+
+        let end = u32::try_from(observed_head_time.min(u64::from(set.until))).unwrap_or(set.until);
+        if end <= set.since.saturating_add(1) {
+            return Ok(());
+        }
+
+        let output = toolchain.validator_load(set.since, end).await?;
+        self.validator_efficiency = parse_validator_efficiency(&output)?;
+        self.last_efficiency_update = Some(now);
+
+        Ok(())
+    }
 }
 
-fn validator_set_observation(set: &ValidatorSetInfo) -> ValidatorSetObservation {
+fn validator_set_observation(
+    set: &ValidatorSetInfo,
+    efficiency: Option<&BTreeMap<String, ValidatorEfficiencyObservation>>,
+) -> ValidatorSetObservation {
     ValidatorSetObservation {
         round_id: set.since,
         validation_started_at: set.since,
@@ -448,9 +534,59 @@ fn validator_set_observation(set: &ValidatorSetInfo) -> ValidatorSetObservation 
                 public_key: validator.public_key.clone(),
                 adnl_address: validator.adnl_address.clone(),
                 weight: validator.weight.to_string(),
+                efficiency: efficiency
+                    .and_then(|values| values.get(&validator.public_key.to_ascii_lowercase()))
+                    .cloned(),
             })
             .collect(),
     }
+}
+
+/// Parses the stable summary emitted by lite-client `checkloadall`.
+///
+/// MyTonCtrl measures masterchain production when the validator has a masterchain
+/// assignment and falls back to shard production for validators outside that subset.
+fn parse_validator_efficiency(
+    output: &str,
+) -> Result<BTreeMap<String, ValidatorEfficiencyObservation>> {
+    VALIDATOR_LOAD_PATTERN
+        .captures_iter(output)
+        .map(|captures| {
+            let public_key = captures[1].to_ascii_lowercase();
+            let masterchain_blocks_created = captures[2]
+                .parse::<u64>()
+                .context("invalid masterchain created-block count")?;
+            let shard_blocks_created = captures[3]
+                .parse::<u64>()
+                .context("invalid shard created-block count")?;
+            let masterchain_blocks_expected = captures[4].to_owned();
+            let shard_blocks_expected = captures[5].to_owned();
+            let masterchain_expected = masterchain_blocks_expected
+                .parse::<f64>()
+                .context("invalid masterchain expected-block count")?;
+            let shard_expected = shard_blocks_expected
+                .parse::<f64>()
+                .context("invalid shard expected-block count")?;
+            let percent = if masterchain_expected > 0.0 {
+                masterchain_blocks_created as f64 / masterchain_expected * 100.0
+            } else if shard_expected > 0.0 {
+                shard_blocks_created as f64 / shard_expected * 100.0
+            } else {
+                0.0
+            };
+
+            Ok((
+                public_key,
+                ValidatorEfficiencyObservation {
+                    percent: format!("{percent:.2}"),
+                    masterchain_blocks_created,
+                    masterchain_blocks_expected,
+                    shard_blocks_created,
+                    shard_blocks_expected,
+                },
+            ))
+        })
+        .collect()
 }
 
 fn election_stage(
@@ -558,15 +694,49 @@ mod tests {
                 {
                   "public_key": "0101010101010101010101010101010101010101010101010101010101010101",
                   "adnl_address": "0202020202020202020202020202020202020202020202020202020202020202",
-                  "weight": "10"
+                  "weight": "10",
+                  "efficiency": null
                 },
                 {
                   "public_key": "0303030303030303030303030303030303030303030303030303030303030303",
                   "adnl_address": null,
-                  "weight": "20"
+                  "weight": "20",
+                  "efficiency": null
                 }
               ]
             }"#]]
-        .assert_eq(&serde_json::to_string_pretty(&validator_set_observation(&set)).unwrap());
+        .assert_eq(
+            &serde_json::to_string_pretty(&validator_set_observation(&set, None)).unwrap(),
+        );
+    }
+
+    #[test]
+    fn validator_efficiency_matches_lite_client_checkloadall_summary() {
+        let output = r#"
+total: (68,66)
+val #0: pubkey FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, blocks created (68,66), expected (68.000000,9.428571), probabilities 0.500000 and 0.500000
+val #1: pubkey 1111111111111111111111111111111111111111111111111111111111111111, blocks created (0,7), expected (0.000000,7.500000), probabilities 0.000000 and 0.500000
+"#;
+
+        expect_test::expect![[r#"
+            {
+              "1111111111111111111111111111111111111111111111111111111111111111": {
+                "percent": "93.33",
+                "masterchain_blocks_created": 0,
+                "masterchain_blocks_expected": "0.000000",
+                "shard_blocks_created": 7,
+                "shard_blocks_expected": "7.500000"
+              },
+              "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff": {
+                "percent": "100.00",
+                "masterchain_blocks_created": 68,
+                "masterchain_blocks_expected": "68.000000",
+                "shard_blocks_created": 66,
+                "shard_blocks_expected": "9.428571"
+              }
+            }"#]]
+        .assert_eq(
+            &serde_json::to_string_pretty(&parse_validator_efficiency(output).unwrap()).unwrap(),
+        );
     }
 }

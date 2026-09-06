@@ -57,6 +57,7 @@ impl Context {
             name: name.to_owned(),
             validator,
             port_base,
+            stopped: false,
         };
 
         self.phase("joiningNode").await?;
@@ -100,6 +101,78 @@ impl Context {
         Ok(())
     }
 
+    /// Changes one joined node's persisted run intent under the network mutation lock.
+    /// The same request can be retried to reconcile Docker after an interrupted operation.
+    pub(super) async fn node_running(
+        &mut self,
+        driver: &DockerNetwork,
+        id: &str,
+        running: bool,
+    ) -> Result<(), Error> {
+        self.require_running().await?;
+        let previous = self.entry.record.read().await.nodes.clone();
+        let mut nodes = previous.clone();
+        let node = nodes
+            .iter_mut()
+            .find(|node| node.id == id)
+            .ok_or_else(|| Error::invalid("Node is not managed by this network"))?;
+        node.stopped = !running;
+
+        self.phase(if running {
+            "startingNode"
+        } else {
+            "stoppingNode"
+        })
+        .await?;
+        tracing::info!(
+            operation = %self.operation.kind,
+            node = %id,
+            outcome = "running",
+            "Changing node running state"
+        );
+
+        self.entry.record.write().await.nodes = nodes.clone();
+        if let Err(error) = Runtime::save(&self.entry).await {
+            self.entry.record.write().await.nodes = previous;
+            return Err(error);
+        }
+
+        let result = match driver.node_running(&nodes, id, running).await {
+            Ok(()) => {
+                self.entry.record.write().await.error = None;
+                Ok(())
+            }
+            Err(error) => {
+                self.entry.record.write().await.nodes = previous.clone();
+                let rollback = async {
+                    Runtime::save(&self.entry).await?;
+                    driver.write_compose(&previous).await
+                }
+                .await;
+
+                match rollback {
+                    Ok(()) => Err(error),
+                    Err(rollback) => Err(Error::Internal {
+                        code: "node_state_rollback_failed",
+                        message: format!(
+                            "{error}; restoring the node definition also failed: {rollback}"
+                        ),
+                    }),
+                }
+            }
+        };
+
+        tracing::info!(
+            operation = %self.operation.kind,
+            node = %id,
+            duration_ms = self.started.elapsed().as_millis() as u64,
+            outcome = if result.is_ok() { "success" } else { "failed" },
+            "Node running state operation finished"
+        );
+
+        result
+    }
+
     pub(super) async fn validation(
         &mut self,
         driver: &DockerNetwork,
@@ -117,6 +190,12 @@ impl Context {
             .find(|n| n.id == id)
             .cloned()
             .ok_or_else(|| Error::invalid("Node is not managed by this network"))?;
+        if node.stopped {
+            return Err(Error::Conflict {
+                code: "node_stopped",
+                message: "Start the node before changing election participation".to_owned(),
+            });
+        }
         self.phase(if enabled {
             "enteringElections"
         } else {

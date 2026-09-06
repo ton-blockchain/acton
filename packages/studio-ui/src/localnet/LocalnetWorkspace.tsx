@@ -31,6 +31,7 @@ import {AddressBookProvider} from "@acton/explorer-core/hooks/useAddressBook"
 import {MetadataRegistryProvider} from "@acton/explorer-core/metadata/MetadataRegistryProvider"
 import {FaucetPage} from "./dashboard/pages/FaucetPage"
 import {HomePage} from "./dashboard/pages/HomePage"
+import {NetworkConfigPage} from "./dashboard/pages/NetworkConfigPage"
 import {HealthPage} from "./dashboard/pages/HealthPage"
 import {AbiCatalogPage, AbiDetailsPage} from "./dashboard/pages/AbiCatalogPage"
 import {ApiCallsPage} from "./dashboard/pages/ApiCallsPage"
@@ -39,6 +40,7 @@ import {ContractPage} from "./dashboard/pages/ContractPage"
 import {ContractsPage} from "./dashboard/pages/ContractsPage"
 import {NftsPage} from "./dashboard/pages/NftsPage"
 import {NetworkPage} from "./dashboard/pages/NetworkPage"
+import {StatsPage} from "./dashboard/pages/StatsPage"
 import {SettingsPage} from "./dashboard/pages/SettingsPage"
 import {AdminPage} from "./dashboard/pages/AdminPage"
 import {SnapshotsPage} from "./dashboard/pages/SnapshotsPage"
@@ -59,9 +61,11 @@ const ApiReferencePage = lazy(async () => {
 const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/dashboard": "Dashboard",
   "/network/health": "Health",
+  "/network/config": "Config",
   "/network": "Network overview",
   "/network/nodes": "Nodes and synchronization",
   "/network/validators": "Validators",
+  "/network/stats": "Stats",
   "/faucet": "Faucet",
   "/wallets": "Wallets",
   "/simulator": "Simulator",
@@ -88,9 +92,11 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
 const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/dashboard": "Network status and recent activity",
   "/network/health": "API readiness, indexer lag and service health",
+  "/network/config": "Update on-chain configuration parameters",
   "/network": "Throughput, topology and consensus health",
   "/network/nodes": "Node availability, synchronization and diagnostics",
   "/network/validators": "Elections, validator sets and block production",
+  "/network/stats": "Validator session timing, block limits and message queues",
   "/faucet": "Fund accounts in this environment",
   "/wallets": "Project wallets available on this network, ready for TON Connect",
   "/simulator": "Build and replay messages against this network",
@@ -122,6 +128,7 @@ interface LocalnetWorkspaceProps {
 }
 
 export interface LocalnetWorkspaceShellState {
+  readonly headerActions?: ReactNode
   readonly pageDescription: string
   readonly pageTitle: string
   readonly primaryAction?: LocalnetWorkspaceShellAction
@@ -211,8 +218,12 @@ const AppContent: FC<AppContentProps> = ({
   const {pathname} = useLocation()
   const [isAddContractOpen, setIsAddContractOpen] = useState(false)
   const [isCreateSnapshotOpen, setIsCreateSnapshotOpen] = useState(false)
+  const [configActions, setConfigActions] = useState<ReactNode>()
   const localPathname = pathname.slice(basePath.length) || "/"
-  const allowsOverflow = localPathname === "/faucet" || localPathname.startsWith("/explorer/config")
+  const allowsOverflow =
+    localPathname === "/faucet" ||
+    localPathname === "/network/config" ||
+    localPathname.startsWith("/explorer/config")
   const isExplorerPage = localPathname === "/explorer" || localPathname.startsWith("/explorer/")
   const isAbiDetailsPage = /^\/contracts\/abi\/[^/]+$/.test(localPathname)
   const configSeqno = /^\/explorer\/config\/(\d+)$/.exec(localPathname)?.[1]
@@ -251,15 +262,17 @@ const AppContent: FC<AppContentProps> = ({
     runtime.environment?.endpoints.apiV3 ??
     runtime.environment?.endpoints.apiV2 ??
     runtime.environment?.endpoints.control
+  const headerActions = localPathname === "/network/config" ? configActions : undefined
 
   useLayoutEffect(() => {
     onShellChange({
+      headerActions,
       pageDescription,
       pageTitle,
       primaryAction,
       rpcUrl: primaryEndpoint ? absoluteUrl(primaryEndpoint) : undefined,
     })
-  }, [onShellChange, pageDescription, pageTitle, primaryAction, primaryEndpoint])
+  }, [onShellChange, pageDescription, pageTitle, primaryAction, primaryEndpoint, headerActions])
 
   useEffect(() => {
     if (localPathname !== "/contracts") setIsAddContractOpen(false)
@@ -286,6 +299,20 @@ const AppContent: FC<AppContentProps> = ({
                 </DashboardPage>
               }
             />
+            {runtime.environment && supports(runtime.environment, "controlApi") && (
+              <Route
+                path={path("/network/config")}
+                element={
+                  <DashboardPage>
+                    <NetworkConfigPage
+                      environment={runtime.environment}
+                      client={client}
+                      onActionsChange={setConfigActions}
+                    />
+                  </DashboardPage>
+                }
+              />
+            )}
             <Route
               path={path("/network/health")}
               element={withCapability(
@@ -314,6 +341,15 @@ const AppContent: FC<AppContentProps> = ({
                 )}
               />
             ))}
+            <Route
+              path={path("/network/stats")}
+              element={withCapability(
+                "observability",
+                <DashboardPage>
+                  <StatsPage />
+                </DashboardPage>,
+              )}
+            />
             <Route
               path={path("/faucet")}
               element={
@@ -392,7 +428,7 @@ const AppContent: FC<AppContentProps> = ({
                 element={withCapability(
                   "explorer",
                   <DashboardPage embedded>
-                    <ConfigPage client={client} />
+                    <ConfigPage client={client} navigationPosition="right" />
                   </DashboardPage>,
                 )}
               />

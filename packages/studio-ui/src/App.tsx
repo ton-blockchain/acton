@@ -211,6 +211,7 @@ function StudioWorkspace({
           current?.environmentId === route.environmentId &&
           current.pageDescription === state.pageDescription &&
           current.pageTitle === state.pageTitle &&
+          current.headerActions === state.headerActions &&
           current.primaryAction === state.primaryAction &&
           current.rpcUrl === state.rpcUrl
         ) {
@@ -280,7 +281,9 @@ function StudioWorkspace({
         headerMode={hasSelectedTestRun ? "hidden" : "visible"}
         headerActions={
           environmentRoute ? (
-            activeEnvironmentShell?.primaryAction ? (
+            activeEnvironmentShell?.headerActions ? (
+              activeEnvironmentShell.headerActions
+            ) : activeEnvironmentShell?.primaryAction ? (
               <Button
                 variant="primary"
                 size="sm"

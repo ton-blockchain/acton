@@ -1,6 +1,17 @@
 import {useCallback, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
-import {EyeOff, LogIn, LogOut, Plus, Server, ShieldCheck, Trash2, TriangleAlert} from "lucide-react"
+import {
+  EyeOff,
+  LogIn,
+  LogOut,
+  Play,
+  Plus,
+  Server,
+  ShieldCheck,
+  Square,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react"
 import {Button, Checkbox, Dialog, DialogActions, InlineAction, Input, useToast} from "@acton/ui"
 import {
   createObservabilityClient,
@@ -9,6 +20,8 @@ import {
   type NetworkView,
   type NodeView,
 } from "@acton/localton-ui"
+import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
+import {useOpenExplorerPath} from "@acton/explorer-core/hooks/useOpenExplorerPath"
 
 import type {FullTonNode, StudioEnvironment} from "../../../studioApi"
 import {
@@ -16,6 +29,7 @@ import {
   enterStudioFullTonValidation,
   leaveStudioFullTonValidation,
   removeStudioFullTonNode,
+  setStudioFullTonNodeRunning,
 } from "../../../studioApi"
 import {useLocalnetRuntime} from "../../LocalnetRuntimeProvider"
 import styles from "./NetworkPage.module.css"
@@ -28,7 +42,9 @@ interface NetworkPageProps {
 /** Connects reusable Localton observability views to the selected Studio environment */
 export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) => {
   const {environment} = useLocalnetRuntime()
-  const {showToast} = useToast()
+  const explorerRoutes = useExplorerRoutePaths()
+  const openExplorerPath = useOpenExplorerPath()
+  const {showToast, updateToast} = useToast()
   const [network, setNetwork] = useState<NetworkView>()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [nodeName, setNodeName] = useState("")
@@ -39,6 +55,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
   const [leavingNodeId, setLeavingNodeId] = useState<string>()
   const [enteringNodeId, setEnteringNodeId] = useState<string>()
   const [forgettingObserverId, setForgettingObserverId] = useState<string>()
+  const [changingNodeId, setChangingNodeId] = useState<string>()
   const endpoint = environment?.endpoints.observability
   const config = environment?.config.kind === "fullTonNetwork" ? environment.config : undefined
   const client = useMemo(
@@ -87,6 +104,40 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
       setIsAdding(false)
     }
   }, [config, environment, nodeIsValidator, nodeName, onEnvironmentChange, showToast])
+
+  const setNodeRunning = useCallback(
+    async (node: FullTonNode, running: boolean) => {
+      if (!environment) return
+
+      setChangingNodeId(node.id)
+      const toastId = showToast({
+        variant: "loading",
+        title: running ? "Starting node" : "Stopping node",
+        description: node.name,
+        durationMs: 0,
+      })
+      try {
+        const updated = await setStudioFullTonNodeRunning(environment.id, node.id, running)
+        onEnvironmentChange(updated)
+        updateToast(toastId, {
+          variant: "success",
+          title: running ? "Node started" : "Node stopped",
+          description: node.name,
+          durationMs: 4000,
+        })
+      } catch (error) {
+        updateToast(toastId, {
+          variant: "error",
+          title: running ? "Node not started" : "Node not stopped",
+          description: message(error, "Failed to change the node running state"),
+          durationMs: 8000,
+        })
+      } finally {
+        setChangingNodeId(undefined)
+      }
+    },
+    [environment, onEnvironmentChange, showToast, updateToast],
+  )
 
   const removeNode = useCallback(async () => {
     if (!environment || !removingNode) return
@@ -201,6 +252,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
     removingNode?.validator === true && !validatorCanLeaveSafely(removalObservation)
   const participationEnabled = removalObservation?.participate_in_elections !== false
   const nodesView = view === "nodes" && config !== undefined
+  const fallbackNodes = useMemo(() => config?.nodes.map(unobservedNode) ?? [], [config?.nodes])
   const nextNodeNumber = (config?.nodes.length ?? 0) + 1
   const suggestedNodeName = `${nodeIsValidator ? "validator" : "node"}-${nextNodeNumber}`
 
@@ -211,6 +263,17 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
       const actions: ReactNode[] = []
 
       if (managed) {
+        const start = managed.stopped || !node.online
+        actions.push(
+          <InlineAction
+            key="running"
+            label={`${start ? "Start" : "Stop"} ${node.name}`}
+            title={start ? "Start node" : "Stop node"}
+            icon={start ? <Play /> : <Square />}
+            disabled={changingNodeId !== undefined || environment?.status !== "running"}
+            onClick={() => void setNodeRunning(managed, start)}
+          />,
+        )
         actions.push(
           node.participate_in_elections ? (
             <InlineAction
@@ -218,7 +281,12 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
               label={`Leave validator set for ${node.name}`}
               title="Leave validator set"
               icon={<LogOut />}
-              disabled={!node.online || leavingNodeId === managed.id}
+              disabled={
+                managed.stopped ||
+                !node.online ||
+                changingNodeId !== undefined ||
+                leavingNodeId === managed.id
+              }
               onClick={() => void leaveValidation(managed)}
             />
           ) : (
@@ -227,14 +295,19 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
               label={`Enter elections for ${node.name}`}
               title="Enter elections"
               icon={<LogIn />}
-              disabled={!node.online || enteringNodeId === managed.id}
+              disabled={
+                managed.stopped ||
+                !node.online ||
+                changingNodeId !== undefined ||
+                enteringNodeId === managed.id
+              }
               onClick={() => void enterValidation(managed)}
             />
           ),
         )
       }
 
-      if (!node.online && !genesis) {
+      if (!node.online && !genesis && !managed) {
         actions.push(
           <InlineAction
             key="forget"
@@ -248,6 +321,15 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
       }
 
       if (genesis) {
+        actions.push(
+          <InlineAction
+            key="running"
+            label="Stop the environment to stop genesis"
+            title="Stop the environment to stop the network owner"
+            icon={<Square />}
+            disabled
+          />,
+        )
         actions.push(
           <InlineAction
             key="remove"
@@ -266,6 +348,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
             title="Remove node"
             icon={<Trash2 />}
             variant="danger"
+            disabled={changingNodeId !== undefined}
             onClick={() => setRemovingNode(managed)}
           />,
         )
@@ -281,6 +364,9 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
       leaveValidation,
       leavingNodeId,
       managedNode,
+      changingNodeId,
+      environment?.status,
+      setNodeRunning,
     ],
   )
 
@@ -288,6 +374,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
     <>
       <NetworkDashboard
         client={client}
+        fallbackNodes={fallbackNodes}
         nodesFooter={
           nodesView ? (
             <Button
@@ -303,6 +390,9 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
             </Button>
           ) : undefined
         }
+        onAddressClick={(address, event) => {
+          openExplorerPath(explorerRoutes.addressPath(address), event)
+        }}
         onNetworkChange={setNetwork}
         renderNodeActions={nodesView ? renderNodeActions : undefined}
         view={view}
@@ -426,6 +516,54 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
       </Dialog>
     </>
   )
+}
+
+/**
+ * Keeps a managed node reachable when its collector report is absent after a restart
+ * Unknown elected-set membership must still prevent unsafe removal
+ */
+function unobservedNode(node: FullTonNode): NodeView {
+  return {
+    observer_id: `managed:${node.id}`,
+    name: node.name,
+    generated_at: 0,
+    expires_at: 0,
+    online: false,
+    running: false,
+    sync_status: "offline",
+    active_validator: false,
+    validator_status: node.validator ? "unknown" : "not_configured",
+    produced_masterchain_blocks: 0,
+    produced_shard_blocks: 0,
+    software: "",
+    ton_release: "",
+    observability_endpoint: "",
+    instance_started_at: null,
+    public_ip: "—",
+    roles: ["full_node"],
+    process_id: null,
+    status: node.stopped ? "Stopped" : "Awaiting observation",
+    last_error: null,
+    head_seqno: null,
+    head_observed_at: null,
+    network_head_seqno: null,
+    sync_initial_masterchain_block_time: null,
+    sync_masterchain_block_time: null,
+    sync_target_time: null,
+    initial_sync_progress: null,
+    sync_progressed_at: null,
+    sync_lag_blocks: null,
+    participate_in_elections: node.validator,
+    current_validator: null,
+    next_validator: null,
+    location: {kind: "unavailable"},
+    validator_public_key: null,
+    validator_public_keys: [],
+    validator_adnl: null,
+    validator_stake_nano: null,
+    validator_wallet_address: null,
+    validator_wallet_version: null,
+  }
 }
 
 function validatorCanLeaveSafely(node: NodeView | undefined) {

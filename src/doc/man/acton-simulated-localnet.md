@@ -441,6 +441,12 @@ tooling:
 - `POST /acton_setConfig` with `{"config":"<BASE64_BOC>"}` validates and
   replaces the full blockchain config dictionary, then commits it in a
   config-only block
+- `POST /acton_setConfigParam` with
+  `{"index":2,"boc":"<BASE64_BOC>","expectedHash":"<CURRENT_CELL_HASH>"}`
+  replaces one config parameter and commits a config-only block, even when
+  automatic mining is disabled. `expectedHash` is the current parameter's
+  lowercase hexadecimal representation hash; use `null` to add a missing
+  parameter. A stale hash returns HTTP 409. Parameter 0 cannot be changed
 - `POST /acton_setShardAccount` with
   `{"address":"<ADDR>","shard_account":"<BASE64_BOC>"}` replaces the selected
   account state with a base64-encoded `ShardAccount` BOC
@@ -456,6 +462,10 @@ tooling:
   one-shot timestamp for the next mined block
 - `POST /acton_setNetworkConditions` with `{"response_delay_ms":300}` updates
   simulated network latency; use `0` to disable response delay
+
+Acton Studio exposes the same parameter editor under **Config** in the
+**Network** section for simulated localnet environments. Changes preserve all
+other parameters and historical configs.
 
 TonCenter-compatible message endpoints such as `/api/v2/sendBoc` and
 `/api/v3/message` accept external-in messages only. Use
@@ -474,8 +484,9 @@ expose the localnet server publicly.
 - `--load-state` initializes state from a JSON state file and cannot be combined
   with a database path from either CLI or `Acton.toml`
 - `--dump-state` exports a JSON state file on shutdown
-- blockchain configs replaced through `/acton_setConfig` are stored in block
-  history and survive restarts when `--db-path` is configured
+- blockchain configs changed through `/acton_setConfig` or
+  `/acton_setConfigParam` are stored in block history and survive restarts when
+  `--db-path` is configured
 - when no database path is configured, node state is ephemeral unless loaded
   or dumped
 

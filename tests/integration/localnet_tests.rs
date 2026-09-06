@@ -3653,6 +3653,106 @@ fn localnet_admin_set_config_replaces_and_persists_full_config() {
 }
 
 #[test]
+fn localnet_config_parameter_updates_preserve_neighbors_history_and_restart() {
+    let project = ProjectBuilder::new("localnet-config-parameter").build();
+    let db_path = project.path().join("localnet.sqlite").display().to_string();
+    let start = || {
+        project
+            .localnet()
+            .args(["--no-mining", "--mine-empty-blocks", "--db-path", &db_path])
+            .start()
+    };
+    let node = start();
+    node.post_json("/acton_mine", &json!({}));
+
+    let original = node.get_json("/api/v2/getConfigAll");
+    let original_boc = original["result"]["config"]["bytes"].as_str().unwrap();
+    let original_params =
+        BlockchainConfigParams::from_raw(Boc::decode_base64(original_boc).unwrap());
+    let old_hash = original_params
+        .as_dict()
+        .get(2)
+        .unwrap()
+        .unwrap()
+        .repr_hash()
+        .to_string();
+    let cell = CellBuilder::from_raw_data(&[0x42; 32], 256)
+        .unwrap()
+        .build()
+        .unwrap();
+    let boc = Boc::encode_base64(&cell);
+    let new_hash = cell.repr_hash().to_string();
+    let update = json!({"index": 2, "boc": boc, "expectedHash": old_hash});
+    let applied = node.post_json("/acton_setConfigParam", &update);
+
+    // Negative IDs use the same signed key representation as TON's config dictionary.
+    let addition = json!({"index": i32::MIN, "boc": boc, "expectedHash": null});
+    let added = node.post_json("/acton_setConfigParam", &addition);
+    let stale = node.post_json_error("/acton_setConfigParam", &update);
+    let duplicate = node.post_json_error("/acton_setConfigParam", &addition);
+    let unchanged = node.post_json_error(
+        "/acton_setConfigParam",
+        &json!({"index": 2, "boc": boc, "expectedHash": new_hash}),
+    );
+    let invalid = node.post_json_error(
+        "/acton_setConfigParam",
+        &json!({"index": 999, "boc": "", "expectedHash": null}),
+    );
+    let immutable = node.post_json_error(
+        "/acton_setConfigParam",
+        &json!({"index": 0, "boc": boc, "expectedHash": null}),
+    );
+
+    let latest = node.get_json("/api/v2/getConfigAll");
+    let latest_boc = latest["result"]["config"]["bytes"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let latest_params = BlockchainConfigParams::from_raw(Boc::decode_base64(&latest_boc).unwrap());
+    let historical = node.get_json("/api/v2/getConfigAll?seqno=1");
+    let neighbors_preserved = original_params.as_dict().iter().all(|entry| {
+        let (id, value) = entry.unwrap();
+        id == 2
+            || latest_params
+                .as_dict()
+                .get(id)
+                .unwrap()
+                .unwrap()
+                .repr_hash()
+                == value.repr_hash()
+    });
+
+    let mut snapshot = json!({
+        "applied_block": applied["result"]["block_seqno"],
+        "added_block": added["result"]["block_seqno"],
+        "updated_value": latest_params.as_dict().get(2).unwrap().unwrap().repr_hash() == cell.repr_hash(),
+        "negative_parameter_added": latest_params.as_dict().get(i32::MIN.cast_unsigned()).unwrap().unwrap().repr_hash() == cell.repr_hash(),
+        "neighbors_preserved": neighbors_preserved,
+        "historical_config_preserved": historical["result"]["config"]["bytes"].as_str() == Some(original_boc),
+        "rejected_changes_did_not_mine": latest_masterchain_seqno(&node) == 3,
+        "stale": summarize_admin_response(&stale),
+        "duplicate": summarize_admin_response(&duplicate),
+        "unchanged": summarize_admin_response(&unchanged),
+        "invalid": summarize_admin_response(&invalid),
+        "immutable": summarize_admin_response(&immutable),
+    });
+
+    node.stop();
+    let reopened = start();
+    let restored = reopened.get_json("/api/v2/getConfigAll");
+    snapshot["restart"] = json!({
+        "head_seqno": latest_masterchain_seqno(&reopened),
+        "config_preserved": restored["result"]["config"]["bytes"].as_str() == Some(latest_boc.as_str()),
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/config_parameter_updates.summary.json"),
+    );
+    reopened.stop();
+}
+
+#[test]
 fn localnet_supports_v3_message_endpoint() {
     let project = ProjectBuilder::new("localnet-v3-message-endpoint").build();
     fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)

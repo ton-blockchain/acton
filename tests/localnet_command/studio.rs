@@ -181,6 +181,173 @@ async fn studio_uses_cli_for_lifecycle_and_http_for_nodes_and_snapshots() {
         )
         .await
         .expect("join node");
+
+    let stopped = runtime
+        .set_full_ton_node_running(&created.id, "node-1", false)
+        .await
+        .expect("stop node without deleting it");
+    runtime
+        .set_full_ton_node_running(&created.id, "node-1", false)
+        .await
+        .expect("repeated stop is idempotent");
+    let stopped_node =
+        serde_json::to_value(&stopped).expect("stopped environment")["config"]["nodes"][0].clone();
+    let stopped_compose =
+        std::fs::read_to_string(location.path.join("compose.yaml")).expect("stopped compose");
+    let stopped_container = !location.path.join("fixture-running-node-1").exists();
+
+    std::fs::write(service.root.path().join("fail-node-operation"), "")
+        .expect("failed start fixture");
+    let failed_start = runtime
+        .set_full_ton_node_running(&created.id, "node-1", true)
+        .await;
+    std::fs::remove_file(service.root.path().join("fail-node-operation")).expect("clear failure");
+    let failed_record: Value = serde_json::from_slice(
+        &std::fs::read(location.path.join("network.json")).expect("node record"),
+    )
+    .expect("record JSON");
+    let failed_compose =
+        std::fs::read_to_string(location.path.join("compose.yaml")).expect("rolled back compose");
+
+    runtime.stop(&created.id).await.expect("stop full network");
+    runtime
+        .restart(&created.id)
+        .await
+        .expect("restart full network");
+    let resumed = running(&runtime, &created.id).await;
+    let still_stopped = !location.path.join("fixture-running-node-1").exists();
+    let resumed_node =
+        serde_json::to_value(resumed).expect("resumed environment")["config"]["nodes"][0].clone();
+    let started = runtime
+        .set_full_ton_node_running(&created.id, "node-1", true)
+        .await
+        .expect("start the same node");
+    runtime
+        .set_full_ton_node_running(&created.id, "node-1", true)
+        .await
+        .expect("repeated start is idempotent");
+    let started_node =
+        serde_json::to_value(started).expect("started environment")["config"]["nodes"][0].clone();
+    let genesis_stop = runtime
+        .set_full_ton_node_running(&created.id, "genesis", false)
+        .await;
+    let node_commands =
+        std::fs::read_to_string(service.root.path().join("node-events")).expect("node commands");
+    let node_commands: Vec<Value> = node_commands
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("command JSON"))
+        .collect();
+    let summary = serde_json::json!({
+        "stoppedNode": stopped_node,
+        "stoppedContainer": stopped_container,
+        "disabledComposeProfile": stopped_compose.contains("profiles: [\"stopped\"]"),
+        "failedStartRejected": failed_start.is_err(),
+        "failedStartPreservedIntent": failed_record["nodes"][0]["stopped"],
+        "failedStartRestoredCompose": failed_compose == stopped_compose,
+        "restartPreservedNode": resumed_node == stopped_node,
+        "restartKeptNodeStopped": still_stopped,
+        "startedNode": started_node,
+        "startedContainer": location.path.join("fixture-running-node-1").exists(),
+        "genesisStopRejected": genesis_stop.is_err(),
+        "networkOwnerStillRunning": location.path.join("fixture-running").exists(),
+        "nodeCommands": node_commands,
+    });
+    expect![[r#"
+        {
+          "disabledComposeProfile": true,
+          "failedStartPreservedIntent": true,
+          "failedStartRejected": true,
+          "failedStartRestoredCompose": true,
+          "genesisStopRejected": true,
+          "networkOwnerStillRunning": true,
+          "nodeCommands": [
+            {
+              "command": [
+                "up",
+                "-d",
+                "--wait",
+                "--wait-timeout",
+                "600",
+                "node-1"
+              ],
+              "node": "node-1"
+            },
+            {
+              "command": [
+                "stop",
+                "--timeout",
+                "30",
+                "node-1"
+              ],
+              "node": "node-1"
+            },
+            {
+              "command": [
+                "stop",
+                "--timeout",
+                "30",
+                "node-1"
+              ],
+              "node": "node-1"
+            },
+            {
+              "command": [
+                "up",
+                "-d",
+                "--no-deps",
+                "--wait",
+                "--wait-timeout",
+                "600",
+                "node-1"
+              ],
+              "node": "node-1"
+            },
+            {
+              "command": [
+                "up",
+                "-d",
+                "--no-deps",
+                "--wait",
+                "--wait-timeout",
+                "600",
+                "node-1"
+              ],
+              "node": "node-1"
+            },
+            {
+              "command": [
+                "up",
+                "-d",
+                "--no-deps",
+                "--wait",
+                "--wait-timeout",
+                "600",
+                "node-1"
+              ],
+              "node": "node-1"
+            }
+          ],
+          "restartKeptNodeStopped": true,
+          "restartPreservedNode": true,
+          "startedContainer": true,
+          "startedNode": {
+            "id": "node-1",
+            "name": "peer",
+            "portBase": 20010,
+            "stopped": false,
+            "validator": false
+          },
+          "stoppedContainer": true,
+          "stoppedNode": {
+            "id": "node-1",
+            "name": "peer",
+            "portBase": 20010,
+            "stopped": true,
+            "validator": false
+          }
+        }"#]]
+    .assert_eq(&serde_json::to_string_pretty(&summary).expect("node lifecycle snapshot"));
+
     runtime
         .enter_full_ton_validation(&created.id, "node-1")
         .await
@@ -299,7 +466,7 @@ async fn studio_uses_cli_for_lifecycle_and_http_for_nodes_and_snapshots() {
                 .any(|arg| arg == "start")
         })
         .count();
-    expect![["2"]].assert_eq(&starts.to_string());
+    expect!["3"].assert_eq(&starts.to_string());
     service.stop(&independent).await;
     first_v2.abort();
     first_v3.abort();
@@ -340,6 +507,97 @@ async fn studio_shutdown_interrupts_an_actual_cli_start_gracefully() {
     service.stop(&independent).await;
     drop(runtime);
     drop(service);
+}
+
+#[tokio::test]
+async fn studio_does_not_restart_diagnostics_while_deleting_an_environment() {
+    let mut service = Service::start(false).await;
+    let independent = service.client().await;
+    let executable = executable(service.root.path(), false);
+    let runtime = studio(service.root.path(), &executable).await;
+    let created = runtime
+        .create(request("Delete with pending diagnostics"))
+        .await
+        .expect("create network");
+    let EnvironmentConfig::FullTonNetwork {
+        api_v2_port,
+        api_v3_port,
+        ..
+    } = created.config
+    else {
+        panic!("full network")
+    };
+    let v2 = api_listener(api_v2_port).await;
+    let v3 = api_listener(api_v3_port).await;
+    running(&runtime, &created.id).await;
+
+    let location = catalog::list(&service.state())
+        .await
+        .expect("catalog")
+        .into_iter()
+        .find(|entry| entry.network.name == created.name)
+        .expect("created network");
+
+    // Keep deletion inside Docker shutdown while a late Settings request arrives.
+    std::fs::write(service.root.path().join("hold-stop"), "").expect("hold deletion");
+    let deletion = runtime.delete(&created.id);
+    tokio::pin!(deletion);
+    tokio::select! {
+        result = &mut deletion => panic!("Deletion finished before shutdown was released: {result:?}"),
+        () = async {
+            tokio::time::timeout(Duration::from_secs(10), async {
+                while !service.root.path().join("stop-entered").exists() {
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                }
+            })
+            .await
+            .expect("Docker shutdown entered");
+        } => {}
+    }
+
+    let health = runtime.health(&created.id);
+    tokio::pin!(health);
+    let health_waited = tokio::time::timeout(Duration::from_millis(100), &mut health)
+        .await
+        .is_err();
+    std::fs::remove_file(service.root.path().join("hold-stop")).expect("release deletion");
+    deletion.await.expect("delete network");
+    let health_result = health.await;
+    let record: Value = serde_json::from_slice(
+        &std::fs::read(location.path.join("network.json")).expect("retained network diagnostics"),
+    )
+    .expect("deleted network record");
+
+    let summary = json!({
+        "healthWaitedForDeletion": health_waited,
+        "healthReturnedNotFound": matches!(
+            health_result,
+            Err(acton_studio::EnvironmentRuntimeError::NotFound { .. })
+        ),
+        "networkStatus": record["status"],
+        "serviceDescriptorExists": location.path.join("service.json").exists(),
+        "studioStorageExists": service.root.path().join(".studio/environments").join(&created.id).exists(),
+    });
+    expect![[r#"
+        {
+          "healthReturnedNotFound": true,
+          "healthWaitedForDeletion": true,
+          "networkStatus": "deleted",
+          "serviceDescriptorExists": false,
+          "studioStorageExists": false
+        }
+    "#]]
+    .assert_eq(&format!(
+        "{}\n",
+        serde_json::to_string_pretty(&summary).expect("deletion summary")
+    ));
+
+    runtime.shutdown().await.expect("Studio shutdown");
+    service.stop(&independent).await;
+    drop(service);
+    v2.abort();
+    v3.abort();
+    let _ = tokio::join!(v2, v3);
 }
 
 #[tokio::test]

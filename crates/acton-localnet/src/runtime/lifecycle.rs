@@ -175,8 +175,9 @@ impl Runtime {
             return;
         }
 
+        let nodes = entry.record.read().await.nodes.clone();
         let result = match self.driver(entry).await {
-            Ok(driver) => driver.status().await,
+            Ok(driver) => driver.status(&nodes).await,
             Err(error) => Err(error),
         };
         {
