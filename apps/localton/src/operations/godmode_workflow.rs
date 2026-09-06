@@ -1,10 +1,16 @@
 //! Validation and recoverable installation of offline administrator plans.
 
 use super::*;
-use crate::{storage, ton::lite::{BlockRef as ObservedBlock, LocalLiteClient}};
+use crate::{
+    storage,
+    ton::lite::{BlockRef as ObservedBlock, LocalLiteClient},
+};
 use std::time::Duration;
 use tokio::time::sleep;
-use ton_hardfork::{HardforkBlock, request::{AccountEdit, account_batch}};
+use ton_hardfork::{
+    HardforkBlock, build_hardfork,
+    request::{AccountEdit, account_batch},
+};
 use tycho_types::{
     boc::Boc,
     merkle::MerkleProof,
@@ -58,7 +64,7 @@ pub(super) async fn live_command(layout: &Layout, command: &GodmodeCommand) -> R
             let now = storage::unix_time()
                 .try_into()
                 .context("Timestamp overflow")?;
-            let built = ton_hardfork::build_hardfork(&sources, now, &batch)?;
+            let built = build_hardfork(&sources, now, &batch)?;
             let planned = |b: &HardforkBlock| PlannedBlock {
                 workchain: b.shard.workchain(),
                 shard: b.shard.prefix(),
@@ -324,9 +330,8 @@ pub(super) fn install(
             .is_none_or(|n| *n < info.seqno),
         "Hardfork sequence number is already registered"
     );
-    let read_json = |p: &Path| -> Result<serde_json::Value> {
-        Ok(serde_json::from_slice(&fs::read(p)?)?)
-    };
+    let read_json =
+        |p: &Path| -> Result<serde_json::Value> { Ok(serde_json::from_slice(&fs::read(p)?)?) };
     let saved = InstallJournal {
         global: read_json(&layout.global_config)?,
         node_global: read_json(&layout.node.global_config)?,
@@ -349,7 +354,9 @@ pub(super) fn install(
     })();
     if let Err(error) = &result {
         // Preserve both causes: a failed rollback must not hide why installation failed.
-        recover_install(layout).with_context(|| format!("Installation failed: {error:#}; rollback could not restore the original files"))?;
+        recover_install(layout).with_context(|| {
+            format!("Installation failed: {error:#}; rollback could not restore the original files")
+        })?;
     }
     result
 }
@@ -382,10 +389,24 @@ mod tests {
         .save_atomic(&layout.global_config)
         .unwrap();
         fs::copy(&layout.global_config, &layout.node.global_config).unwrap();
-        write_json_atomic(&engine_config_path(&layout.node), &serde_json::json!({
-            "@type": "engine.validator.config", "out_port": 3272, "addrs": [], "adnl": [], "dht": [], "validators": [],
-            "fullnode": STANDARD.encode([1; 32]), "fullnodeslaves": [], "fullnodemasters": [], "liteservers": [], "control": [], "gc": {"@type": "engine.gc", "ids": []}
-        })).unwrap();
+        write_json_atomic(
+            &engine_config_path(&layout.node),
+            &serde_json::json!({
+                "@type": "engine.validator.config",
+                "out_port": 3272,
+                "addrs": [],
+                "adnl": [],
+                "dht": [],
+                "validators": [],
+                "fullnode": STANDARD.encode([1; 32]),
+                "fullnodeslaves": [],
+                "fullnodemasters": [],
+                "liteservers": [],
+                "control": [],
+                "gc": {"@type": "engine.gc", "ids": []}
+            }),
+        )
+        .unwrap();
         write_json_atomic(
             &layout.node.root.join("godmode-head.json"),
             &Observation {
@@ -487,5 +508,36 @@ mod tests {
         assert!(suspended_keys_path(&layout.node).exists());
         assert!(resume_validation(&layout.node).unwrap());
         assert!(!suspended_keys_path(&layout.node).exists());
+    }
+
+    #[test]
+    fn unreadable_staged_plan_is_not_treated_as_an_empty_source() {
+        let (_dir, layout, _) = fixture();
+        fs::create_dir_all(staging_dir(&layout.node).join("plan.json")).unwrap();
+
+        let result = staged_blocks(&layout.node);
+        expect_test::expect![["staged plan read failed"]].assert_eq(match result {
+            Err(_) => "staged plan read failed",
+            Ok(_) => "missing source was silently accepted",
+        });
+    }
+
+    #[test]
+    fn finish_preserves_staging_when_original_routing_is_missing() {
+        let (_dir, layout, plan) = fixture();
+        install(&layout, &plan, endpoint()).unwrap();
+        let staging = staging_dir(&layout.node);
+        write_json_atomic(&staging.join("verified.json"), &true).unwrap();
+        fs::remove_file(staging.join("original-engine.json")).unwrap();
+
+        let error = finish(&layout.node).unwrap_err();
+        let actual = format!(
+            "error: {error}\nstaging retained: {}",
+            staging.join("plan.json").exists()
+        );
+        expect_test::expect![[r#"
+            error: Cannot restore networking without the original engine configuration
+            staging retained: true"#]]
+        .assert_eq(&actual);
     }
 }

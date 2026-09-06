@@ -134,11 +134,6 @@ impl ValidatorEngineConfig {
         self.fullnodeslaves = original.fullnodeslaves.clone();
     }
 
-    /// Removes the full-node master link and returns the node to overlay mode.
-    pub(crate) fn clear_full_node_master(&mut self) {
-        self.fullnodeslaves.clear();
-    }
-
     /// Returns keys already registered for an election round, if present.
     pub(crate) fn election_keys(&self, election_id: u32) -> Result<Option<ValidatorElectionKeys>> {
         self.validators

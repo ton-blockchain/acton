@@ -406,6 +406,7 @@ their original text.
 - `value` and `onValueChange` control the input text
 - `label`, `description`, `rows`, `disabled`, `readOnly` and `invalid` control presentation
 - `onError` reports file-read failures; show them through Toast
+- `onReadingChange` lets a form disable submission while a file replaces the current value
 - `maxFileBytes` limits local files before reading them; the default is 12 MiB
 - The caller owns decoding, accepted cell types, root count and API size limits
 - Explorer consumers can use `decodeCellInput` from `@acton/explorer-core/cell-inspector/inputNormalization`

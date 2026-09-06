@@ -2,6 +2,7 @@
 //! owns workers and drains cancellation before Docker stops or a snapshot begins.
 
 use super::Runtime;
+use crate::AdminOperation;
 use crate::{
     Error, Status,
     activity::{
@@ -91,7 +92,7 @@ impl Runtime {
             .read()
             .await
             .as_ref()
-            .is_some_and(crate::AdminOperation::is_active)
+            .is_some_and(AdminOperation::is_active)
         {
             return Err(Error::busy());
         }

@@ -435,8 +435,9 @@ fn include_basechain_balance_in_master_state(
         "generated zerostate is not a masterchain state"
     );
 
-    // `McStateExtra.global_balance` represents supply allocated outside the
-    // masterchain. Add exactly the balances inserted into basechain zerostate.
+    // create-state initializes global_balance with the masterchain's allocated
+    // supply. The separate basechain pass is not included in that process, so
+    // add exactly its imported balances to obtain the supply across both chains.
     let expected_global_balance = {
         let custom = state
             .custom

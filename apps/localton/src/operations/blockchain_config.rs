@@ -14,11 +14,17 @@
 //! production permanently. Values are therefore checked against the release's
 //! own TL-B schema before the request is signed.
 
-use std::{fs, path::Path, time::Duration};
+use std::{
+    fs,
+    io::{self, Read},
+    path::Path,
+    time::Duration,
+};
 
 use anyhow::{Context, Result, ensure};
 use ed25519_dalek::{Signer, SigningKey};
 use tempfile::TempDir;
+use tokio::time;
 use tracing::info;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder};
@@ -27,6 +33,7 @@ use tycho_types::num::Tokens;
 use tycho_types::prelude::HashBytes;
 
 use crate::{
+    bootstrap,
     cli::BlockchainConfigCommand,
     storage::Layout,
     ton::{
@@ -89,32 +96,35 @@ pub(crate) async fn set_param(
 ) -> Result<SetParamOutcome> {
     // Serialize config-master seqno allocation across independent CLI callers.
     let lock_path = state_dir.join("blockchain-config.lock");
-    let _lock = crate::bootstrap::acquire_lock(&lock_path)
+    let _lock = bootstrap::acquire_lock(&lock_path)
         .context("Another blockchain configuration change is in progress")?;
     let toolchain = Toolchain::resolve(state_dir, None).await?;
     let master = ConfigMaster::load(&toolchain.layout)?;
 
-    let stdin_dir = TempDir::new()?;
-    let stdin_value = stdin_dir.path().join("config.boc");
-    let value = if value == Path::new("-") {
-        use std::io::Read;
-        let mut bytes = Vec::new();
-        std::io::stdin()
+    let mut value_boc = Vec::new();
+    if value == Path::new("-") {
+        io::stdin()
             .take(16 * 1024 * 1024 + 1)
-            .read_to_end(&mut bytes)?;
-        ensure!(
-            bytes.len() <= 16 * 1024 * 1024,
-            "Parameter BoC is too large"
-        );
-        fs::write(&stdin_value, bytes)?;
-        stdin_value.as_path()
+            .read_to_end(&mut value_boc)?;
     } else {
-        value
-    };
-    let value_boc = fs::read(value)
-        .with_context(|| format!("failed to read parameter value {}", value.display()))?;
+        fs::File::open(value)
+            .with_context(|| format!("failed to read parameter value {}", value.display()))?
+            .take(16 * 1024 * 1024 + 1)
+            .read_to_end(&mut value_boc)?;
+    }
+    ensure!(
+        value_boc.len() <= 16 * 1024 * 1024,
+        "Parameter BoC is too large"
+    );
+
     let value_cell = Boc::decode(&value_boc)
         .with_context(|| format!("{} is not a valid BoC", value.display()))?;
+
+    // Validate the exact bytes used for signing. The original file can change
+    // while create-state runs, so it must not be read a second time by the validator.
+    let value_dir = TempDir::new()?;
+    let validated_value = value_dir.path().join("config.boc");
+    fs::write(&validated_value, &value_boc)?;
 
     if force {
         info!(
@@ -122,7 +132,7 @@ pub(crate) async fn set_param(
             index, "skipping schema validation of the parameter value"
         );
     } else {
-        validate_value(&toolchain, index, value).await?;
+        validate_value(&toolchain, index, &validated_value).await?;
     }
 
     let target = lite_target(&toolchain)?;
@@ -152,19 +162,33 @@ pub(crate) async fn set_param(
         .context("failed to submit the configuration change")?;
 
     let mut client = LocalLiteClient::connect(toolchain.lite_config()).await?;
-    tokio::time::timeout(OPERATION_TIMEOUT, async {
+    time::timeout(OPERATION_TIMEOUT, async {
         loop {
             let current = client.config_params(vec![index]).await?;
-            let accepted = toolchain.lite_client_tool.run_method(
-                &context, &target,
-                RunMethodRequest::new(&master.address.to_string(), "seqno", Vec::new())?,
-            ).await?.first_u64()?;
-            if accepted > u64::from(seqno) && current.get_raw_cell(index as u32)?.is_some_and(|cell| cell.repr_hash() == value_cell.repr_hash()) {
+            let accepted = toolchain
+                .lite_client_tool
+                .run_method(
+                    &context,
+                    &target,
+                    RunMethodRequest::new(&master.address.to_string(), "seqno", Vec::new())?,
+                )
+                .await?
+                .first_u64()?;
+            let matches = current
+                .get_raw_cell(index as u32)?
+                .is_some_and(|cell| cell.repr_hash() == value_cell.repr_hash());
+
+            // The value alone can already match before our request executes.
+            // Require the config-master seqno to advance as well.
+            if accepted > u64::from(seqno) && matches {
                 return Ok::<(), anyhow::Error>(());
             }
-            tokio::time::sleep(Duration::from_millis(500)).await;
+
+            time::sleep(Duration::from_millis(500)).await;
         }
-    }).await.context("Configuration change was submitted but confirmation timed out; read the active value before retrying")??;
+    })
+    .await
+    .context("Configuration change was submitted but confirmation timed out; read the active value before retrying")??;
 
     info!(
         operation = "set_config_param",

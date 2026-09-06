@@ -112,7 +112,7 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/explorer/config": "Protocol parameters active in this network",
   "/explorer/suspended": "Addresses restricted by the network configuration",
   "/settings": "Manage environment identity, network behavior and mining",
-  "/admin": "Edit accounts and blockchain configuration",
+  "/admin": "Edit account balances, code and state",
   "/snapshots": "Create and restore persistent network snapshots",
   "/integrate": "Connect Acton projects, applications and TON-compatible tools to this network",
   "/api-reference/v2": "Explore the v2 API",

@@ -1,3 +1,4 @@
+use crate::{AdminOperation, AdminRequest};
 use std::future::Future;
 use std::pin::Pin;
 
@@ -669,11 +670,13 @@ pub trait EnvironmentRuntime: Send + Sync {
         })
     }
 
+    /// Admits an edit in the owning localnet service. The request ID makes retries
+    /// safe after a lost response; the service continues work after callers disconnect.
     fn start_admin(
         &self,
         _environment_id: &str,
-        _request: crate::AdminRequest,
-    ) -> EnvironmentRuntimeFuture<'_, crate::AdminOperation> {
+        _request: AdminRequest,
+    ) -> EnvironmentRuntimeFuture<'_, AdminOperation> {
         Box::pin(async {
             Err(EnvironmentRuntimeError::Conflict {
                 code: "admin_unavailable",
@@ -682,10 +685,11 @@ pub trait EnvironmentRuntime: Send + Sync {
         })
     }
 
+    /// Reads the latest durable result without blocking on an in-progress edit.
     fn admin_operation(
         &self,
         _environment_id: &str,
-    ) -> EnvironmentRuntimeFuture<'_, Option<crate::AdminOperation>> {
+    ) -> EnvironmentRuntimeFuture<'_, Option<AdminOperation>> {
         Box::pin(async { Ok(None) })
     }
 

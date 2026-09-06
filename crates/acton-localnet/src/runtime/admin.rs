@@ -62,7 +62,7 @@ impl Runtime {
         }
 
         let driver = self.driver(&entry).await?;
-        let operation = AdminOperation {
+        let mut operation = AdminOperation {
             id: request.id().into(),
             phase: "preparing".into(),
             started_at: chrono::Utc::now().to_rfc3339(),
@@ -72,10 +72,30 @@ impl Runtime {
         };
 
         driver.save_admin_operation(&request, &operation).await?;
-        *entry.admin_operation.write().await = Some(operation.clone());
         entry.record.write().await.status = Status::Starting;
-        Self::save(&entry).await?;
         *entry.admin_request.write().await = Some(request.clone());
+
+        if let Err(error) = Self::save(&entry).await {
+            // No worker owns the operation yet. A persistence failure must not
+            // leave an active record that blocks every later network action.
+            entry.record.write().await.status = network.status;
+            operation.phase = "failed".into();
+            operation.finished_at = Some(chrono::Utc::now().to_rfc3339());
+            operation.error = Some(error.to_string());
+            *entry.admin_operation.write().await = Some(operation.clone());
+
+            if let Err(save_error) = driver.save_admin_operation(&request, &operation).await {
+                log::error!(
+                    "operation=admin id={} target={} outcome=failed error={save_error}",
+                    request.id(),
+                    entry.data_dir.display()
+                );
+            }
+
+            return Err(error);
+        }
+
+        *entry.admin_operation.write().await = Some(operation.clone());
 
         let runtime = self.clone();
         tokio::spawn(async move {
@@ -169,14 +189,17 @@ impl Runtime {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::activity::ActivityConfig;
+    use crate::{CreateNetwork, Node, activity::ActivityConfig, catalog, storage};
+    use std::time::Duration;
+    use tokio::time::timeout;
+    use uuid::Uuid;
 
     #[tokio::test]
     async fn retries_observe_the_owned_operation_while_mutations_are_locked() {
         let temp = tempfile::tempdir().unwrap();
-        let location = crate::catalog::create(
+        let location = catalog::create(
             temp.path(),
-            crate::CreateNetwork {
+            CreateNetwork {
                 name: "admin-retry".into(),
                 ..Default::default()
             },
@@ -186,8 +209,13 @@ mod tests {
         let runtime = Runtime::open(&location.path).await.unwrap();
         let entry = &runtime.inner.entry;
         let request: AdminRequest = serde_json::from_value(serde_json::json!({
-            "kind":"accounts", "id":uuid::Uuid::new_v4().to_string(),
-            "edits":[{"address":format!("0:{}", "11".repeat(32)), "type":"balance", "balance":"1"}]
+            "kind": "accounts",
+            "id": Uuid::new_v4().to_string(),
+            "edits": [{
+                "address": format!("0:{}", "11".repeat(32)),
+                "type": "balance",
+                "balance": "1"
+            }]
         }))
         .unwrap();
         let mut operation = AdminOperation {
@@ -210,8 +238,8 @@ mod tests {
             *entry.admin_operation.write().await = Some(operation.clone());
             if !completed {
                 for start in [false, true] {
-                    let result = tokio::time::timeout(
-                        std::time::Duration::from_secs(1),
+                    let result = timeout(
+                        Duration::from_secs(1),
                         runtime.configure_activity(ActivityConfig::default(), start),
                     )
                     .await
@@ -241,7 +269,7 @@ mod tests {
                     ..
                 })
             ));
-            changed["id"] = uuid::Uuid::new_v4().to_string().into();
+            changed["id"] = Uuid::new_v4().to_string().into();
             assert!(matches!(
                 runtime
                     .start_admin(serde_json::from_value(changed).unwrap())
@@ -258,18 +286,26 @@ mod tests {
     #[tokio::test]
     async fn historical_retries_do_not_wait_for_or_replace_a_newer_operation() {
         let temp = tempfile::tempdir().unwrap();
-        let location = crate::catalog::create(
+        let location = catalog::create(
             temp.path(),
-            crate::CreateNetwork {
+            CreateNetwork {
                 name: "historical-retry".into(),
                 ..Default::default()
             },
         )
         .await
         .unwrap();
-        crate::storage::write_json(&location.path.join("runtime.json"), &serde_json::json!({
-            "version":2,"image":"unused","dockerTarget":{"kind":"context","value":"unused"},"projectName":"unused"
-        })).await.unwrap();
+        storage::write_json(
+            &location.path.join("runtime.json"),
+            &serde_json::json!({
+                "version": 2,
+                "image": "unused",
+                "dockerTarget": {"kind": "context", "value": "unused"},
+                "projectName": "unused"
+            }),
+        )
+        .await
+        .unwrap();
         let runtime = Runtime::open(&location.path).await.unwrap();
         let driver = DockerNetwork::load(&location.path, &runtime.get().await)
             .await
@@ -277,9 +313,15 @@ mod tests {
             .unwrap();
         let request = || {
             serde_json::from_value::<AdminRequest>(serde_json::json!({
-            "kind":"accounts", "id":uuid::Uuid::new_v4().to_string(),
-            "edits":[{"address":format!("0:{}", "11".repeat(32)), "type":"balance", "balance":"1"}]
-        })).unwrap()
+                "kind": "accounts",
+                "id": Uuid::new_v4().to_string(),
+                "edits": [{
+                    "address": format!("0:{}", "11".repeat(32)),
+                    "type": "balance",
+                    "balance": "1"
+                }]
+            }))
+            .unwrap()
         };
         let old = request();
         let current = request();
@@ -325,7 +367,7 @@ mod tests {
                 })
             ));
             let latest: String =
-                crate::storage::read_json(&location.path.join("admin-operations/latest.json"))
+                storage::read_json(&location.path.join("admin-operations/latest.json"))
                     .await
                     .unwrap();
             assert_eq!(latest, current.id());
@@ -342,9 +384,9 @@ mod tests {
     #[tokio::test]
     async fn admin_rejects_stopped_nodes_before_creating_an_operation() {
         let temp = tempfile::tempdir().unwrap();
-        let location = crate::catalog::create(
+        let location = catalog::create(
             temp.path(),
-            crate::CreateNetwork {
+            CreateNetwork {
                 name: "admin-stopped-node".into(),
                 ..Default::default()
             },
@@ -355,7 +397,7 @@ mod tests {
         {
             let mut network = runtime.inner.entry.record.write().await;
             network.status = Status::Running;
-            network.nodes.push(crate::Node {
+            network.nodes.push(Node {
                 id: "node-1".into(),
                 name: "replica".into(),
                 validator: false,
@@ -364,8 +406,13 @@ mod tests {
             });
         }
         let request = serde_json::from_value(serde_json::json!({
-            "kind":"accounts", "id":uuid::Uuid::new_v4().to_string(),
-            "edits":[{"address":format!("0:{}", "11".repeat(32)), "type":"balance", "balance":"1"}]
+            "kind": "accounts",
+            "id": Uuid::new_v4().to_string(),
+            "edits": [{
+                "address": format!("0:{}", "11".repeat(32)),
+                "type": "balance",
+                "balance": "1"
+            }]
         }))
         .unwrap();
         assert!(matches!(
@@ -381,11 +428,70 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn failed_admission_persistence_does_not_leave_an_active_operation() {
+        let temp = tempfile::tempdir_in("/tmp").unwrap();
+        let location = catalog::create(
+            temp.path(),
+            CreateNetwork {
+                name: "admin-persistence".into(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        storage::write_json(
+            &location.path.join("runtime.json"),
+            &serde_json::json!({
+                "version": 2,
+                "image": "unused",
+                "dockerTarget": {"kind": "context", "value": "unused"},
+                "projectName": "unused"
+            }),
+        )
+        .await
+        .unwrap();
+        let runtime = Runtime::open(&location.path).await.unwrap();
+        runtime.inner.entry.record.write().await.status = Status::Running;
+        let request: AdminRequest = serde_json::from_value(serde_json::json!({
+            "kind": "accounts",
+            "id": Uuid::new_v4().to_string(),
+            "edits": [{
+                "address": format!("0:{}", "11".repeat(32)),
+                "type": "balance",
+                "balance": "1"
+            }]
+        }))
+        .unwrap();
+
+        // A directory at the final filename makes the atomic rename fail on
+        // every platform, without relying on permissions or a Docker daemon.
+        let network_path = location.path.join("network.json");
+        tokio::fs::remove_file(&network_path).await.unwrap();
+        tokio::fs::create_dir(&network_path).await.unwrap();
+        let failed = runtime.start_admin(request.clone()).await.is_err();
+        let operation = runtime.admin_operation().await.unwrap().unwrap();
+        let retry = runtime.start_admin(request).await.unwrap();
+
+        let actual = format!(
+            "submission failed: {failed}\nnetwork running: {}\noperation phase: {}\nretry active: {}",
+            runtime.get().await.status == Status::Running,
+            operation.phase,
+            retry.is_active()
+        );
+        expect_test::expect![[r"
+            submission failed: true
+            network running: true
+            operation phase: failed
+            retry active: false"]]
+        .assert_eq(&actual);
+    }
+
+    #[tokio::test]
     async fn admin_respects_service_admission_and_the_shared_mutation_lock() {
         let temp = tempfile::tempdir().unwrap();
-        let location = crate::catalog::create(
+        let location = catalog::create(
             temp.path(),
-            crate::CreateNetwork {
+            CreateNetwork {
                 name: "admin-locks".into(),
                 ..Default::default()
             },
@@ -394,8 +500,13 @@ mod tests {
         .unwrap();
         let runtime = Runtime::open(&location.path).await.unwrap();
         let request: AdminRequest = serde_json::from_value(serde_json::json!({
-            "kind":"accounts", "id":uuid::Uuid::new_v4().to_string(),
-            "edits":[{"address":format!("0:{}", "11".repeat(32)), "type":"balance", "balance":"1"}]
+            "kind": "accounts",
+            "id": Uuid::new_v4().to_string(),
+            "edits": [{
+                "address": format!("0:{}", "11".repeat(32)),
+                "type": "balance",
+                "balance": "1"
+            }]
         }))
         .unwrap();
         assert!(matches!(

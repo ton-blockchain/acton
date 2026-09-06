@@ -21,8 +21,8 @@ has no transaction for this change.
 - Allow enough disk space for recovery snapshots of every node. The operation
   copies node databases and can take several minutes
 - For a restore point that you can use later, create a snapshot on **Snapshots**
-- Stop external scripts that send messages if your test requires a stable account
-  state after the edit
+- If your test requires a stable account state after the edit, stop external
+  scripts that send messages
 
 Existing environments keep the image that you selected at creation. A new default
 image does not update them. If Studio reports an unsupported image, create an

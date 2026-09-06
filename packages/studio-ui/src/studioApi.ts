@@ -723,13 +723,18 @@ async function request(input: string, init?: RequestInit): Promise<Response> {
   if (response.ok) return response
 
   const fallbackMessage = `Studio server returned ${response.status}`
-  let body: {readonly error?: {readonly message?: string}}
+  let body: {readonly error?: {readonly message?: unknown}} | null
   try {
     body = (await response.json()) as typeof body
   } catch {
     throw new StudioRequestError(fallbackMessage, response.status)
   }
-  throw new StudioRequestError(body.error?.message || fallbackMessage, response.status)
+
+  const message = body?.error?.message
+  throw new StudioRequestError(
+    typeof message === "string" && message ? message : fallbackMessage,
+    response.status,
+  )
 }
 
 export type AdminAccountChange =

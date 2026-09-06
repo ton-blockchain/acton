@@ -10,6 +10,7 @@ mod operations;
 mod progress;
 mod readiness;
 
+use crate::{AdminOperation, AdminRequest};
 use crate::{Error, Network, Operation, OperationStatus, Status};
 use crate::{docker::DockerNetwork, storage};
 pub(crate) use operations::Action;
@@ -43,8 +44,8 @@ struct Entry {
     data_dir: PathBuf,
     record: RwLock<Network>,
     mutation: Arc<Mutex<()>>,
-    admin_operation: RwLock<Option<crate::AdminOperation>>,
-    admin_request: RwLock<Option<crate::AdminRequest>>,
+    admin_operation: RwLock<Option<AdminOperation>>,
+    admin_request: RwLock<Option<AdminRequest>>,
 }
 
 impl Runtime {

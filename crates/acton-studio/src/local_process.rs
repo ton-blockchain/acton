@@ -1,3 +1,4 @@
+use crate::{AdminOperation, AdminRequest};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener as StdTcpListener};
 use std::path::{Path, PathBuf};
@@ -709,8 +710,8 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
     fn start_admin(
         &self,
         environment_id: &str,
-        request: crate::AdminRequest,
-    ) -> EnvironmentRuntimeFuture<'_, crate::AdminOperation> {
+        request: AdminRequest,
+    ) -> EnvironmentRuntimeFuture<'_, AdminOperation> {
         let id = environment_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &id).await?;
@@ -726,7 +727,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
     fn admin_operation(
         &self,
         environment_id: &str,
-    ) -> EnvironmentRuntimeFuture<'_, Option<crate::AdminOperation>> {
+    ) -> EnvironmentRuntimeFuture<'_, Option<AdminOperation>> {
         let id = environment_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &id).await?;

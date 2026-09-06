@@ -35,6 +35,7 @@ use anyhow::{Context, bail, ensure};
 use rustc_hash::FxHashSet;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, Lazy, LazyExotic};
+use tycho_types::dict::Dict;
 use tycho_types::merkle::{FilterAction, MerkleFilter, MerkleUpdate};
 use tycho_types::models::account::ShardAccount;
 use tycho_types::models::block::{
@@ -45,9 +46,8 @@ use tycho_types::models::currency::CurrencyCollection;
 use tycho_types::models::shard::{
     DepthBalanceInfo, KeyBlockRef, KeyMaxLt, McStateExtra, ShardAccounts, ShardStateUnsplit,
 };
+use tycho_types::models::{AccountState, IntAddr, LibDescr};
 use tycho_types::prelude::HashBytes;
-
-use crate::account_blocks::{ExecutedTransaction, build_account_blocks_from};
 
 /// Logical time granularity every TON block start time is aligned to.
 ///
@@ -87,9 +87,8 @@ pub struct AccountWrite {
     /// Transaction to record for this account, when the change is the result of
     /// executing a message rather than a plain state overwrite.
     ///
-    /// A fork block is never re-executed, so the transaction is taken at face
-    /// value; recording it is what makes the change visible to indexers and to
-    /// `getTransactions` instead of appearing as an unexplained state jump.
+    /// Currently rejected by the builder: transaction records require matching
+    /// message descriptors and outgoing queues, which administrative edits do not create.
     pub transaction: Option<RecordedTransaction>,
 }
 
@@ -186,10 +185,9 @@ pub struct ShardSource {
 
 /// One built hardfork block and the state it produces.
 ///
-/// `block_boc` has to be written to `<db>/static/<FILE_HASH>` on every node.
-/// Only the masterchain block is additionally registered in the `hardforks`
-/// section of the global config; the shard block is reached through the
-/// masterchain state and read from the static directory on demand.
+/// The masterchain block is installed in `<db>/static/<FILE_HASH>` and registered
+/// in the global config. A shard block must be downloaded from the local block
+/// source with its proof link; TON refuses shard hardforks loaded from `db/static`.
 #[derive(Debug, Clone)]
 pub struct HardforkBlock {
     /// Shard this block belongs to.
@@ -246,17 +244,13 @@ pub struct HardforkPlan {
 }
 
 impl HardforkPlan {
-    /// Returns every block that has to be present in `db/static`.
+    /// Returns all serialized artifacts for installation or serving by the coordinator.
     pub fn static_blocks(&self) -> impl Iterator<Item = &HardforkBlock> {
         std::iter::once(&self.masterchain).chain(self.basechain.iter())
     }
 }
 
-/// Returns the first logical time the blocks of this hardfork will use.
-///
-/// Transactions recorded through [`RecordedTransaction`] must use logical times
-/// at or after this value, because a block may only contain transactions inside
-/// its own `start_lt..end_lt` range.
+/// Returns the aligned start of a hardfork's logical time window for the supplied states.
 pub fn logical_time_window(sources: &HardforkSources) -> anyhow::Result<u64> {
     let mc_state = sources
         .masterchain_state
@@ -282,6 +276,17 @@ pub fn build_hardfork(
     if batch.is_empty() {
         bail!("hardfork batch is empty");
     }
+
+    // Reject unsupported execution metadata before deriving the LT window.
+    // In particular, a caller-supplied u64::MAX LT must never overflow here.
+    ensure!(
+        batch
+            .masterchain
+            .iter()
+            .chain(&batch.basechain)
+            .all(|write| write.transaction.is_none()),
+        "Recorded transactions are not supported: hardfork message descriptors and outgoing queues must be built together"
+    );
 
     let old_mc_state = sources
         .masterchain_state
@@ -355,20 +360,7 @@ pub fn build_hardfork(
         base_lt = base_lt.max(shard_state.gen_lt);
     }
     let start_lt = align_lt(base_lt)?;
-    let end_lt = batch
-        .masterchain
-        .iter()
-        .chain(&batch.basechain)
-        .filter_map(|write| write.transaction.as_ref())
-        .try_fold(start_lt + 1, |end, tx| {
-            if tx.lt < start_lt {
-                bail!(
-                    "recorded transaction has logical time {} before the block window start {start_lt}",
-                    tx.lt
-                );
-            }
-            Ok(end.max(tx.lt + 1))
-        })?;
+    let end_lt = start_lt.checked_add(1).context("Logical time overflow")?;
 
     let mc_prev_ref = BlockRef {
         end_lt: old_mc_state.gen_lt,
@@ -518,7 +510,6 @@ fn build_shard_block(
         value_flow(&old_state, &new_state),
         block_extra(
             rand_seed(new_state.seqno, gen_utime, &source.prev.root_hash),
-            writes,
             None,
         )?,
         source.shard,
@@ -563,7 +554,9 @@ fn build_masterchain_block(
 
     let mut extra = old_extra.clone();
     // Administrative balance changes mint or remove supply without ordinary
-    // transactions. Account for both chains, including extra currencies; retain
+    // transactions. TON initializes global_balance with masterchain supply
+    // (create-state.cpp::store_custom), then adds workchain supply and emission.
+    // Account for both chains, including extra currencies; retain
     // supply held in queues, validator fees and every untouched shard.
     let mut global_balance = extra
         .global_balance
@@ -643,7 +636,6 @@ fn build_masterchain_block(
 
     let extra_cell = block_extra(
         rand_seed(seqno, gen_utime, &prev_ref.root_hash),
-        writes,
         Some(McBlockExtra {
             shards: extra.shards.clone(),
             fees: Default::default(),
@@ -712,26 +704,9 @@ fn published_shards(
         .context("Failed to rebuild shard configuration")
 }
 
-/// Builds `BlockExtra` with the transactions the caller wants recorded.
-fn block_extra(
-    rand_seed: HashBytes,
-    writes: &[AccountWrite],
-    custom: Option<McBlockExtra>,
-) -> anyhow::Result<BlockExtra> {
-    let account_blocks = build_account_blocks_from(writes.iter().filter_map(|write| {
-        write.transaction.as_ref().map(|tx| ExecutedTransaction {
-            account: write.address,
-            lt: tx.lt,
-            fees: tx.total_fees.clone(),
-            transaction: tx.cell.clone(),
-            old_state_hash: tx.old_state_hash,
-            new_state_hash: tx.new_state_hash,
-        })
-    }))
-    .context("Failed to build hardfork account blocks")?;
-
+/// Leaves transaction and message dictionaries empty for direct state edits.
+fn block_extra(rand_seed: HashBytes, custom: Option<McBlockExtra>) -> anyhow::Result<BlockExtra> {
     Ok(BlockExtra {
-        account_blocks: Lazy::new(&account_blocks).context("Failed to wrap account blocks")?,
         rand_seed,
         custom: match custom {
             Some(custom) => {
@@ -756,16 +731,12 @@ fn apply_writes(
             "Duplicate account write: {}",
             write.address
         );
-        ensure!(
-            write.transaction.is_none(),
-            "Recorded transactions are not supported: hardfork message descriptors and outgoing queues must be built together"
-        );
         match &write.account {
             Some(account) => {
                 let state = account
                     .load_account()?
                     .context("Use AccountWrite::remove for a nonexistent account")?;
-                let tycho_types::models::IntAddr::Std(address) = &state.address else {
+                let IntAddr::Std(address) = &state.address else {
                     bail!("Variable addresses are not supported");
                 };
                 ensure!(
@@ -774,23 +745,22 @@ fn apply_writes(
                         && address.anycast.is_none(),
                     "Replacement account address does not match its dictionary key"
                 );
-                let split_depth =
-                    if let tycho_types::models::AccountState::Active(init) = &state.state {
+                let split_depth = if let AccountState::Active(init) = &state.state {
+                    ensure!(
+                        shard.is_masterchain() || init.special.is_none(),
+                        "Tick/tock is only supported in masterchain"
+                    );
+                    for entry in init.libraries.iter() {
+                        let (hash, library) = entry?;
                         ensure!(
-                            shard.is_masterchain() || init.special.is_none(),
-                            "Tick/tock is only supported in masterchain"
+                            *library.root.repr_hash() == hash,
+                            "Library key does not match its code hash"
                         );
-                        for entry in init.libraries.iter() {
-                            let (hash, library) = entry?;
-                            ensure!(
-                                *library.root.repr_hash() == hash,
-                                "Library key does not match its code hash"
-                            );
-                        }
-                        init.split_depth.map_or(0, |d| d.into_bit_len() as u8)
-                    } else {
-                        0
-                    };
+                    }
+                    init.split_depth.map_or(0, |d| d.into_bit_len() as u8)
+                } else {
+                    0
+                };
                 let balance = state.balance;
                 accounts
                     .set(
@@ -817,8 +787,7 @@ fn apply_writes(
 fn updated_libraries(
     state: &ShardStateUnsplit,
     writes: &[AccountWrite],
-) -> anyhow::Result<tycho_types::dict::Dict<HashBytes, tycho_types::models::LibDescr>> {
-    use tycho_types::models::{AccountState, LibDescr};
+) -> anyhow::Result<Dict<HashBytes, LibDescr>> {
     let accounts = state.accounts.load()?;
     let mut libraries = state.libraries.clone();
     for write in writes {
@@ -903,7 +872,7 @@ fn finish_block(
         root_hash: *block_cell.repr_hash(),
         file_hash: Boc::file_hash(&block_boc),
     };
-    let proof_link = crate::proof::build_block_proof_link(&block_id, &block_cell)?;
+    let proof_link = proof::build_block_proof_link(&block_id, &block_cell)?;
 
     Ok(HardforkBlock {
         shard,
@@ -1281,6 +1250,77 @@ mod tests {
         assert!(info.master_ref.is_none());
         assert!(block.extra.load().unwrap().custom.is_some());
         assert!(plan.basechain.is_none());
+    }
+
+    #[test]
+    fn masterchain_only_balance_changes_adjust_global_supply() {
+        let mut sources = sources();
+        let address = HashBytes([0x11; 32]);
+
+        for balance in [777, 100, 0] {
+            let write = if balance == 0 {
+                AccountWrite::remove(address)
+            } else {
+                AccountWrite::set(address, account(address, balance))
+            };
+            let plan = build_hardfork(
+                &sources,
+                200,
+                &AdminBatch {
+                    masterchain: vec![write],
+                    basechain: Vec::new(),
+                },
+            )
+            .unwrap();
+            let state_cell = Boc::decode(&plan.masterchain.state_boc).unwrap();
+            let state = state_cell.parse::<ShardStateUnsplit>().unwrap();
+
+            // The fixture's 1000 existing units are outside the edited account.
+            // Changes to masterchain supply must preserve those units too.
+            assert_eq!(
+                state
+                    .custom
+                    .as_ref()
+                    .unwrap()
+                    .load()
+                    .unwrap()
+                    .global_balance
+                    .tokens,
+                Tokens::new(1000 + balance)
+            );
+            sources.masterchain_prev = HardforkPrevBlock {
+                seqno: plan.masterchain.seqno,
+                root_hash: plan.masterchain.root_hash,
+                file_hash: plan.masterchain.file_hash,
+            };
+            sources.masterchain_state = state_cell;
+        }
+    }
+
+    #[test]
+    fn unsupported_transactions_fail_before_logical_time_arithmetic() {
+        let address = HashBytes([0x11; 32]);
+        let batch = AdminBatch {
+            masterchain: vec![
+                AccountWrite::set(address, account(address, 1)).with_transaction(
+                    RecordedTransaction {
+                        cell: Cell::default(),
+                        lt: u64::MAX,
+                        total_fees: CurrencyCollection::ZERO,
+                        old_state_hash: HashBytes::ZERO,
+                        new_state_hash: HashBytes::ZERO,
+                    },
+                ),
+            ],
+            basechain: Vec::new(),
+        };
+
+        let error = build_hardfork(&sources(), 200, &batch).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .starts_with("Recorded transactions are not supported")
+        );
     }
 
     #[test]

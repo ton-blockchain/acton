@@ -6,6 +6,9 @@
 //!   `hardfork_spike` accounts --state <boc>
 //!       lists the accounts of one shard state
 //!
+//!   `hardfork_spike` config --mc-state <boc>
+//!       checks typed decoding of configuration parameters
+//!
 //!   `hardfork_spike` build --mc-state <boc> --mc-prev <seqno>:<root>:<file>
 //!                        [--shard-state <boc> --shard-prev <seqno>:<root>:<file>]
 //!                        --account <workchain>:<hex> [--add-balance <nanotons>]
@@ -20,20 +23,22 @@
 use anyhow::{Context, bail};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
-use std::path::PathBuf;
+use std::{
+    fs,
+    io::Read,
+    path::PathBuf,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use ton_fullnode_master::{BlockSource, ServedBlock};
 use ton_liteapi::adnl::crypto::{KeyPair, SecretKey};
 use ton_localnet::block::hardfork::{
-    AccountWrite, AdminBatch, HardforkPrevBlock, HardforkSources, ShardSource, build_hardfork,
+    HardforkBlock, HardforkPrevBlock, HardforkSources, ShardSource, build_hardfork,
+    request::{AccountChange, AccountEdit, account_batch},
 };
 use tycho_types::boc::Boc;
-use tycho_types::cell::Lazy;
-use tycho_types::models::account::{
-    Account, AccountState, OptionalAccount, ShardAccount, StorageExtra, StorageInfo, StorageUsed,
-};
+use tycho_types::cell::Cell;
+use tycho_types::models::account::AccountState;
 use tycho_types::models::block::{BlockId, ShardIdent};
-use tycho_types::models::currency::CurrencyCollection;
-use tycho_types::models::message::{IntAddr, StdAddr};
 use tycho_types::models::shard::ShardStateUnsplit;
 use tycho_types::num::Tokens;
 use tycho_types::prelude::HashBytes;
@@ -42,7 +47,7 @@ fn main() -> anyhow::Result<()> {
     let mut args = std::env::args().skip(1);
     let command = args
         .next()
-        .context("expected: shards | accounts | build | keygen | serve")?;
+        .context("expected: config | shards | accounts | build | keygen | serve")?;
     let mut flags = Flags::default();
     while let Some(flag) = args.next() {
         let mut value = || args.next().with_context(|| format!("{flag} needs a value"));
@@ -72,11 +77,11 @@ fn main() -> anyhow::Result<()> {
 
 /// Writes the block source identity used by the `fullnodeslaves` config entry.
 fn keygen(flags: &Flags) -> anyhow::Result<()> {
-    std::fs::create_dir_all(&flags.out)?;
+    fs::create_dir_all(&flags.out)?;
     let mut secret = [0u8; 32];
     getrandom(&mut secret)?;
     let keypair = KeyPair::from(&SecretKey::from_bytes(secret));
-    std::fs::write(flags.out.join("source.key"), hex::encode(secret))?;
+    fs::write(flags.out.join("source.key"), hex::encode(secret))?;
     println!(
         "{}",
         serde_json::json!({
@@ -88,12 +93,11 @@ fn keygen(flags: &Flags) -> anyhow::Result<()> {
 
 /// Serves every block built into the output directory over ADNL-over-TCP.
 fn serve(flags: &Flags) -> anyhow::Result<()> {
-    let secret: [u8; 32] =
-        hex::decode(std::fs::read_to_string(flags.out.join("source.key"))?.trim())?
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("block source key must be 32 bytes"))?;
+    let secret: [u8; 32] = hex::decode(fs::read_to_string(flags.out.join("source.key"))?.trim())?
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("block source key must be 32 bytes"))?;
     let manifest: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(flags.out.join("fork.json"))?)?;
+        serde_json::from_slice(&fs::read(flags.out.join("fork.json"))?)?;
 
     let source = BlockSource::new();
     let runtime = tokio::runtime::Runtime::new()?;
@@ -102,11 +106,14 @@ fn serve(flags: &Flags) -> anyhow::Result<()> {
             let path = PathBuf::from(entry["path"].as_str().context("no path")?);
             let block_id = BlockId {
                 shard: ShardIdent::new(
-                    entry["workchain"].as_i64().context("no workchain")? as i32,
+                    entry["workchain"]
+                        .as_i64()
+                        .context("no workchain")?
+                        .try_into()?,
                     u64::from_str_radix(entry["shard"].as_str().context("no shard")?, 16)?,
                 )
                 .context("invalid shard")?,
-                seqno: entry["seqno"].as_u64().context("no seqno")? as u32,
+                seqno: entry["seqno"].as_u64().context("no seqno")?.try_into()?,
                 root_hash: parse_hash(entry["root_hash"].as_str().context("no root hash")?)?,
                 file_hash: parse_hash(entry["file_hash"].as_str().context("no file hash")?)?,
             };
@@ -115,8 +122,8 @@ fn serve(flags: &Flags) -> anyhow::Result<()> {
                 .insert(
                     &block_id,
                     ServedBlock {
-                        data: std::fs::read(&path)?,
-                        proof_link: std::fs::read(path.with_extension("proof"))?,
+                        data: fs::read(&path)?,
+                        proof_link: fs::read(path.with_extension("proof"))?,
                     },
                 )
                 .await;
@@ -155,9 +162,9 @@ impl Default for Flags {
 }
 
 impl Flags {
-    fn state(&self) -> anyhow::Result<(tycho_types::cell::Cell, ShardStateUnsplit)> {
+    fn state(&self) -> anyhow::Result<(Cell, ShardStateUnsplit)> {
         let path = self.mc_state.as_ref().context("--state is required")?;
-        let cell = Boc::decode(std::fs::read(path)?)?;
+        let cell = Boc::decode(fs::read(path)?)?;
         let state = cell.parse::<ShardStateUnsplit>()?;
         Ok((cell, state))
     }
@@ -261,7 +268,7 @@ fn build(flags: &Flags) -> anyhow::Result<()> {
 
     let basechain = match (&flags.shard_state, &flags.shard_prev) {
         (Some(path), Some(prev)) => {
-            let cell = Boc::decode(std::fs::read(path)?)?;
+            let cell = Boc::decode(fs::read(path)?)?;
             let shard = cell.parse::<ShardStateUnsplit>()?.shard_ident;
             Some(ShardSource {
                 shard,
@@ -276,12 +283,17 @@ fn build(flags: &Flags) -> anyhow::Result<()> {
     if flags.accounts.is_empty() {
         bail!("--account is required");
     }
-    let mut batch = AdminBatch::default();
+    let mut edits = Vec::new();
+
     for account in &flags.accounts {
         let (workchain, address) = account
             .split_once(':')
             .context("--account must be <workchain>:<hex>")?;
         let workchain: i32 = workchain.parse()?;
+        if !matches!(workchain, -1 | 0) {
+            bail!("Only masterchain and basechain accounts are supported");
+        }
+
         let address = parse_hash(address)?;
 
         let shard_state;
@@ -296,71 +308,40 @@ fn build(flags: &Flags) -> anyhow::Result<()> {
             &shard_state
         };
 
-        // An absent account is created as an uninitialized one, which is what
-        // "fund this address out of nowhere" means for a chain with no faucet.
+        // Use the same edit validation and storage accounting as Localton.
+        // This example adds a delta; the shared request sets the resulting balance.
         let existing = source_state.accounts.load()?.get(address)?;
-        let (mut inner, last_trans_hash, last_trans_lt) = match &existing {
-            Some((_, shard_account)) => (
-                shard_account
-                    .load_account()?
-                    .context("target account record is empty")?,
-                shard_account.last_trans_hash,
-                shard_account.last_trans_lt,
-            ),
-            None => (
-                Account {
-                    address: IntAddr::Std(StdAddr::new(workchain as i8, address)),
-                    storage_stat: StorageInfo {
-                        used: StorageUsed::ZERO,
-                        storage_extra: StorageExtra::None,
-                        last_paid: 0,
-                        due_payment: None,
-                    },
-                    last_trans_lt: 0,
-                    balance: CurrencyCollection::ZERO,
-                    state: AccountState::Uninit,
-                },
-                HashBytes::ZERO,
-                0,
-            ),
-        };
-        inner.balance.tokens = inner
-            .balance
-            .tokens
+        let balance = existing
+            .map(|(_, account)| account.load_account())
+            .transpose()?
+            .flatten()
+            .map_or(Tokens::ZERO, |account| account.balance.tokens)
             .checked_add(Tokens::new(flags.add_balance))
             .context("balance overflow")?;
 
-        let write = AccountWrite::set(
-            address,
-            ShardAccount {
-                account: Lazy::new(&OptionalAccount(Some(inner)))?,
-                last_trans_hash,
-                last_trans_lt,
+        edits.push(AccountEdit {
+            address: account.clone(),
+            change: AccountChange::Balance {
+                balance: balance.to_string(),
             },
-        );
-        if workchain == ShardIdent::MASTERCHAIN.workchain() {
-            batch.masterchain.push(write);
-        } else {
-            batch.basechain.push(write);
-        }
+        });
     }
 
-    let gen_utime = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)?
-        .as_secs() as u32;
-    let plan = build_hardfork(
-        &HardforkSources {
-            masterchain_state: mc_state_cell,
-            masterchain_prev,
-            basechain,
-        },
-        gen_utime,
-        &batch,
-    )?;
+    let sources = HardforkSources {
+        masterchain_state: mc_state_cell,
+        masterchain_prev,
+        basechain,
+    };
+    let batch = account_batch(&sources, &edits)?;
+    let gen_utime = SystemTime::now()
+        .duration_since(UNIX_EPOCH)?
+        .as_secs()
+        .try_into()?;
+    let plan = build_hardfork(&sources, gen_utime, &batch)?;
 
-    std::fs::create_dir_all(&flags.out)?;
+    fs::create_dir_all(&flags.out)?;
     // The installer on the node side consumes this shape.
-    let planned = |block: &ton_localnet::block::hardfork::HardforkBlock| {
+    let planned = |block: &HardforkBlock| {
         serde_json::json!({
             "workchain": block.shard.workchain(),
             "shard": block.shard.prefix(),
@@ -371,7 +352,7 @@ fn build(flags: &Flags) -> anyhow::Result<()> {
             "proof": STANDARD.encode(&block.proof_link),
         })
     };
-    std::fs::write(
+    fs::write(
         flags.out.join("plan.json"),
         serde_json::to_vec_pretty(&serde_json::json!({
             "masterchain": planned(&plan.masterchain),
@@ -381,8 +362,8 @@ fn build(flags: &Flags) -> anyhow::Result<()> {
     let mut files = Vec::new();
     for block in plan.static_blocks() {
         let path = flags.out.join(block.static_file_name());
-        std::fs::write(&path, &block.block_boc)?;
-        std::fs::write(path.with_extension("proof"), &block.proof_link)?;
+        fs::write(&path, &block.block_boc)?;
+        fs::write(path.with_extension("proof"), &block.proof_link)?;
         files.push(serde_json::json!({
             "workchain": block.shard.workchain(),
             "shard": format!("{:016x}", block.shard.prefix()),
@@ -394,17 +375,21 @@ fn build(flags: &Flags) -> anyhow::Result<()> {
             "proof_bytes": block.proof_link.len(),
         }));
     }
-    println!(
-        "{}",
-        serde_json::json!({
-            "vert_seqno": plan.vert_seqno,
-            "seqno": plan.masterchain.seqno,
-            "root_hash": hex::encode(plan.masterchain.root_hash.0),
-            "file_hash": hex::encode(plan.masterchain.file_hash.0),
-            "state_root_hash": hex::encode(plan.masterchain.state_root_hash.0),
-            "static_files": files,
-        })
-    );
+    let manifest = serde_json::json!({
+        "vert_seqno": plan.vert_seqno,
+        "seqno": plan.masterchain.seqno,
+        "root_hash": hex::encode(plan.masterchain.root_hash.0),
+        "file_hash": hex::encode(plan.masterchain.file_hash.0),
+        "state_root_hash": hex::encode(plan.masterchain.state_root_hash.0),
+        "static_files": files,
+    });
+
+    // `serve` reads this manifest directly; stdout alone is insufficient.
+    fs::write(
+        flags.out.join("fork.json"),
+        serde_json::to_vec_pretty(&manifest)?,
+    )?;
+    println!("{manifest}");
     Ok(())
 }
 
@@ -422,8 +407,7 @@ fn parse_prev(value: &str) -> anyhow::Result<HardforkPrevBlock> {
 
 /// Fills a buffer with operating-system randomness.
 fn getrandom(buffer: &mut [u8; 32]) -> anyhow::Result<()> {
-    use std::io::Read;
-    std::fs::File::open("/dev/urandom")?.read_exact(buffer)?;
+    fs::File::open("/dev/urandom")?.read_exact(buffer)?;
     Ok(())
 }
 

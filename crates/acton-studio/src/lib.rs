@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex as StdMutex};
 
 use axum::Router;
 use axum::body::Body;
-use axum::extract::{Path as AxumPath, Query, Request, State};
+use axum::extract::{DefaultBodyLimit, Path as AxumPath, Query, Request, State};
 #[cfg(not(debug_assertions))]
 use axum::http::Uri;
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
@@ -421,7 +421,7 @@ impl StudioServer {
                 "/environments/{environment_id}/admin",
                 get(get_admin_operation)
                     .post(start_admin_operation)
-                    .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024)),
+                    .layer(DefaultBodyLimit::max(16 * 1024 * 1024)),
             )
             .route("/environments/{environment_id}/wallets", get(list_wallets))
             .route(
@@ -1360,10 +1360,17 @@ fn public_environment(mut environment: StudioEnvironment) -> StudioEnvironment {
 /// Account edits contain a raw address and a type: balance (decimal nanotons),
 /// code/data/replace (base64 `BoC`), freeze, uninit or delete. Reuse the UUID only
 /// when retrying the same request. Poll GET for completion after this response.
-#[utoipa::path(post, path = "/api/v1/environments/{environment_id}/admin", tag = "Environments",
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/admin",
+    tag = "Environments",
     params(("environment_id" = String, Path, description = "Environment id")),
     request_body = AdminRequest,
-    responses((status = 200, body = AdminOperation), (status = 409, body = StudioApiErrorBody)))]
+    responses(
+        (status = 200, body = AdminOperation),
+        (status = 409, body = StudioApiErrorBody)
+    )
+)]
 async fn start_admin_operation(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
@@ -1379,9 +1386,16 @@ async fn start_admin_operation(
 }
 
 /// Read the current or most recent administrative operation.
-#[utoipa::path(get, path = "/api/v1/environments/{environment_id}/admin", tag = "Environments",
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}/admin",
+    tag = "Environments",
     params(("environment_id" = String, Path, description = "Environment id")),
-    responses((status = 200, body = Option<AdminOperation>), (status = 404, body = StudioApiErrorBody)))]
+    responses(
+        (status = 200, body = Option<AdminOperation>),
+        (status = 404, body = StudioApiErrorBody)
+    )
+)]
 async fn get_admin_operation(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,

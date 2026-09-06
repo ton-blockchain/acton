@@ -204,8 +204,13 @@ impl BlockSource {
                     Answer::NotFound
                 }
             }
-            Query::PrepareBlockProof { block, .. } => {
-                if self.blocks.read().await.contains_key(&block) {
+            Query::PrepareBlockProof {
+                block,
+                allow_partial,
+            } => {
+                // This source has proof links only. A caller requiring a signed
+                // proof must not be promised a link it explicitly disallowed.
+                if allow_partial && self.blocks.read().await.contains_key(&block) {
                     Answer::PreparedProofLink
                 } else {
                     Answer::PreparedProofEmpty
@@ -345,5 +350,39 @@ mod tests {
                 .await
                 .is_none()
         );
+    }
+
+    #[tokio::test]
+    async fn proof_links_require_the_callers_permission() {
+        let source = BlockSource::new();
+        let id = block_id(7);
+        source
+            .insert(
+                &id,
+                ServedBlock {
+                    data: b"block".to_vec(),
+                    proof_link: b"proof".to_vec(),
+                },
+            )
+            .await;
+
+        for allow_partial in [false, true] {
+            let answer = source
+                .answer(&query(&tl_proto::serialize(Query::PrepareBlockProof {
+                    block: block_id_to_tl(&id),
+                    allow_partial,
+                })))
+                .await
+                .unwrap();
+
+            assert_eq!(
+                tl_proto::deserialize::<Answer>(&answer).unwrap(),
+                if allow_partial {
+                    Answer::PreparedProofLink
+                } else {
+                    Answer::PreparedProofEmpty
+                }
+            );
+        }
     }
 }

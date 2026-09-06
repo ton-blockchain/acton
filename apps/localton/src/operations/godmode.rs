@@ -77,33 +77,36 @@ pub(crate) async fn execute(command: GodmodeCommand) -> Result<()> {
         GodmodeCommand::Observe(_) | GodmodeCommand::Prepare(_) | GodmodeCommand::Verify(_) => {
             unreachable!()
         }
-        GodmodeCommand::Suspend(state) => {
-            let layout = Layout::new(state.state_dir);
+        GodmodeCommand::Suspend(_) => {
             let suspended = suspend_validation(&layout.node)?;
             println!("{}", json!({ "suspended": suspended }));
         }
-        GodmodeCommand::Resume(state) => {
-            let layout = Layout::new(state.state_dir);
+        GodmodeCommand::Resume(_) => {
             let resumed = resume_validation(&layout.node)?;
             println!("{}", json!({ "resumed": resumed }));
         }
-        GodmodeCommand::Install { state, plan } => {
-            let layout = Layout::new(state.state_dir);
+        GodmodeCommand::Install { plan, .. } => {
+            let mut bytes = Vec::new();
+            if plan == Path::new("-") {
+                io::stdin()
+                    .take(64 * 1024 * 1024 + 1)
+                    .read_to_end(&mut bytes)
+                    .context("failed to read the hardfork plan from stdin")?;
+            } else {
+                fs::File::open(&plan)
+                    .with_context(|| format!("failed to open {}", plan.display()))?
+                    .take(64 * 1024 * 1024 + 1)
+                    .read_to_end(&mut bytes)
+                    .with_context(|| format!("failed to read {}", plan.display()))?;
+            }
+
+            ensure!(
+                bytes.len() <= 64 * 1024 * 1024,
+                "Hardfork plan is too large"
+            );
+
             let plan: HardforkPlan =
-                serde_json::from_slice(&if plan == Path::new("-") {
-                    let mut bytes = Vec::new();
-                    io::stdin()
-                        .take(64 * 1024 * 1024 + 1)
-                        .read_to_end(&mut bytes)?;
-                    ensure!(
-                        bytes.len() <= 64 * 1024 * 1024,
-                        "Hardfork plan is too large"
-                    );
-                    bytes
-                } else {
-                    fs::read(&plan).with_context(|| format!("failed to read {}", plan.display()))?
-                })
-                .context("invalid hardfork plan")?;
+                serde_json::from_slice(&bytes).context("invalid hardfork plan")?;
 
             let (_, key) = source_identity(&layout.node)?;
             install(
@@ -123,8 +126,7 @@ pub(crate) async fn execute(command: GodmodeCommand) -> Result<()> {
                 })
             );
         }
-        GodmodeCommand::Finish(state) => {
-            let layout = Layout::new(state.state_dir);
+        GodmodeCommand::Finish(_) => {
             let detached = finish(&layout.node)?;
             println!("{}", json!({ "detached": detached }));
         }

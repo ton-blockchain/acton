@@ -1,6 +1,7 @@
 //! Typed network operations keep wire paths and completion semantics out of applications.
 
 use super::Client;
+use crate::{AdminOperation, AdminRequest};
 use crate::{Error, Network, NetworkHealth, Operation, OperationStatus, Snapshot};
 use reqwest::Method;
 use serde_json::json;
@@ -185,10 +186,7 @@ impl Client {
 
 impl Client {
     /// Submits an edit once; reuse its ID after an ambiguous response.
-    pub async fn start_admin(
-        &self,
-        request: &crate::AdminRequest,
-    ) -> Result<crate::AdminOperation, Error> {
+    pub async fn start_admin(&self, request: &AdminRequest) -> Result<AdminOperation, Error> {
         self.request(
             Method::POST,
             "/v1/network/admin",
@@ -198,7 +196,7 @@ impl Client {
     }
 
     /// Reads the active or latest durable administrative operation.
-    pub async fn admin_operation(&self) -> Result<Option<crate::AdminOperation>, Error> {
+    pub async fn admin_operation(&self) -> Result<Option<AdminOperation>, Error> {
         self.request(Method::GET, "/v1/network/admin", None).await
     }
 }

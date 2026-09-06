@@ -8,9 +8,8 @@ use tycho_types::prelude::HashBytes;
 
 /// One transaction as it has to appear in `BlockExtra.account_blocks`.
 ///
-/// The localnet executor and the hardfork builder produce transactions in very
-/// different ways, but a block records them identically, so both funnel through
-/// this description.
+/// The localnet executor supplies completed transaction cells here. Direct
+/// administrative edits leave this dictionary empty because they execute no transactions.
 pub struct ExecutedTransaction {
     /// Account the transaction belongs to.
     pub account: HashBytes,
@@ -27,6 +26,8 @@ pub struct ExecutedTransaction {
 }
 
 /// Groups transactions by account and builds the block transaction dictionary.
+/// Callers supply transactions in execution order so the state update spans the
+/// first and last account state, even when several accounts are interleaved.
 pub fn build_account_blocks_from(
     transactions: impl Iterator<Item = ExecutedTransaction>,
 ) -> anyhow::Result<AccountBlocks> {

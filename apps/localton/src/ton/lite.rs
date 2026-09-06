@@ -1,11 +1,17 @@
-use std::{net::Ipv4Addr, path::Path, time::Duration};
+use std::{
+    fs,
+    net::Ipv4Addr,
+    path::Path,
+    time::{Duration, Instant},
+};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, ensure};
 use crc::{CRC_16_XMODEM, Crc};
 use fastnum::I512;
 use num_bigint::BigInt;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ton::{block_tlb::TVMStack, ton_core::traits::tlb::TLB};
+use ton_hardfork::{HardforkPrevBlock, HardforkSources, ShardSource};
 use tonutils::{
     liteclient::{
         boc::{SimpleAccount, SimpleAccountState},
@@ -13,17 +19,20 @@ use tonutils::{
     },
     network_config::{ConfigGlobal, ConfigLiteServer, ConfigPublicKey},
     tl::{
+        Int256,
         common::{BlockId, BlockIdExt},
         response::TransactionId,
     },
     tlb::Account,
     tvm::Address,
 };
+use tracing::info;
 use tycho_types::{
     boc::Boc,
     cell::{Cell, CellFamily, LoadCell},
     merkle::MerkleProof,
-    models::{ShardStateUnsplit, config::BlockchainConfigParams},
+    models::{Block, ShardIdent, ShardStateUnsplit, config::BlockchainConfigParams},
+    prelude::HashBytes,
 };
 
 use crate::ton::{global_config::GlobalConfig, tools::types::TonPublicKey};
@@ -47,7 +56,7 @@ fn ton_method_id(name: &str) -> u64 {
     u64::from(CRC16.checksum(name.as_bytes())) | 0x1_0000
 }
 
-#[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BlockRef {
     pub workchain: i32,
     pub shard: String,
@@ -128,14 +137,9 @@ impl LocalLiteClient {
         ))
     }
 
-    /// Downloads a complete state and authenticates its root against the block update.
-    pub async fn hardfork_sources(
-        &mut self,
-        cache_dir: &Path,
-    ) -> Result<ton_hardfork::HardforkSources> {
-        use ton_hardfork::{HardforkPrevBlock, HardforkSources, ShardSource};
-        use tycho_types::models::ShardIdent;
-        use tycho_types::prelude::HashBytes;
+    /// Downloads both chain states at one paused head and authenticates their roots.
+    /// The caller owns suspending block production; a changed head rejects the snapshot.
+    pub async fn hardfork_sources(&mut self, cache_dir: &Path) -> Result<HardforkSources> {
         let head = self.inner.get_masterchain_info().await?.last;
         let mc = self.complete_state(head.clone(), cache_dir).await?;
         let state = mc.parse::<ShardStateUnsplit>()?;
@@ -148,7 +152,7 @@ impl LocalLiteClient {
         let mut basechain = None;
         for entry in shards.iter() {
             let (shard, descr) = entry?;
-            anyhow::ensure!(
+            ensure!(
                 shard == ShardIdent::BASECHAIN,
                 "Administrative edits currently require one unsplit basechain shard"
             );
@@ -156,8 +160,8 @@ impl LocalLiteClient {
                 workchain: 0,
                 shard: shard.prefix() as i64,
                 seqno: descr.seqno as i32,
-                root_hash: tonutils::tl::Int256(descr.root_hash.0),
-                file_hash: tonutils::tl::Int256(descr.file_hash.0),
+                root_hash: Int256(descr.root_hash.0),
+                file_hash: Int256(descr.file_hash.0),
             };
             let cell = self.complete_state(id, cache_dir).await?;
             basechain = Some(ShardSource {
@@ -170,7 +174,7 @@ impl LocalLiteClient {
                 },
             });
         }
-        anyhow::ensure!(
+        ensure!(
             self.inner.get_masterchain_info().await?.last == head,
             "Chain advanced while reading hardfork sources"
         );
@@ -185,10 +189,10 @@ impl LocalLiteClient {
         })
     }
 
-    async fn checked_block(&mut self, id: BlockIdExt) -> Result<tycho_types::models::Block> {
+    async fn checked_block(&mut self, id: BlockIdExt) -> Result<Block> {
         let bytes = self.inner.get_block(id.clone()).await?;
         let root = Boc::decode(&bytes)?;
-        anyhow::ensure!(
+        ensure!(
             root.repr_hash().0 == id.root_hash.0 && Boc::file_hash(&bytes).0 == id.file_hash.0,
             "Block hash mismatch"
         );
@@ -199,10 +203,11 @@ impl LocalLiteClient {
     /// state, then authenticate and apply block updates. The reusable cache is
     /// verified against the current chain, including after a snapshot restore.
     async fn complete_state(&mut self, id: BlockIdExt, cache_dir: &Path) -> Result<Cell> {
+        let started = Instant::now();
         let shard = format!("{:016x}", id.shard as u64);
         let path = cache_dir.join(format!("{}-{shard}.boc", id.workchain));
         let mut cached = None;
-        if let Ok(bytes) = std::fs::read(&path)
+        if let Ok(bytes) = fs::read(&path)
             && let Ok(cell) = Boc::decode(bytes)
             && let Ok(state) = cell.parse::<ShardStateUnsplit>()
             && state.seqno <= id.seqno as u32
@@ -232,7 +237,7 @@ impl LocalLiteClient {
                     self.lookup(id.workchain, &shard, seqno).await?
                 };
                 let expected = if seqno == 0 {
-                    tycho_types::prelude::HashBytes(seed.root_hash.0)
+                    HashBytes(seed.root_hash.0)
                 } else {
                     self.checked_block(seed.clone())
                         .await?
@@ -241,14 +246,17 @@ impl LocalLiteClient {
                         .new_hash
                 };
                 let cell = Boc::decode(self.inner.get_state(seed).await?.data)?;
-                anyhow::ensure!(
+                ensure!(
                     *cell.repr_hash() == expected,
                     "Initial state does not match its block"
                 );
                 (seqno, cell)
             }
         };
-        std::fs::create_dir_all(cache_dir)?;
+        info!(operation = "reconstruct_state", workchain = id.workchain, %shard,
+            target = id.seqno, from = seqno, "Reconstructing paused chain state");
+
+        fs::create_dir_all(cache_dir)?;
         while seqno < id.seqno as u32 {
             seqno += 1;
             let next = if seqno == id.seqno as u32 {
@@ -258,7 +266,7 @@ impl LocalLiteClient {
             };
             let block = self.checked_block(next).await?;
             let info = block.info.load()?;
-            anyhow::ensure!(
+            ensure!(
                 !info.after_merge && !info.after_split,
                 "Split and merged shard histories are not supported"
             );
@@ -269,9 +277,17 @@ impl LocalLiteClient {
                 .context("State update does not extend the previous state")?;
             if seqno % 128 == 0 {
                 save_state_cache(&path, &cell)?;
+                info!(operation = "reconstruct_state", workchain = id.workchain, %shard,
+                    target = id.seqno, current = seqno, duration_ms = started.elapsed().as_millis(),
+                    "Saved state reconstruction checkpoint");
             }
         }
+
         save_state_cache(&path, &cell)?;
+        info!(operation = "reconstruct_state", workchain = id.workchain, %shard,
+            target = id.seqno, duration_ms = started.elapsed().as_millis(), outcome = "completed",
+            "Paused chain state reconstructed");
+
         Ok(cell)
     }
 
@@ -567,8 +583,8 @@ pub fn require_existing_config(path: &Path) -> Result<()> {
 
 fn save_state_cache(path: &Path, cell: &Cell) -> Result<()> {
     let temp = path.with_extension("boc.tmp");
-    std::fs::write(&temp, Boc::encode(cell))?;
-    std::fs::rename(temp, path)?;
+    fs::write(&temp, Boc::encode(cell))?;
+    fs::rename(temp, path)?;
     Ok(())
 }
 
