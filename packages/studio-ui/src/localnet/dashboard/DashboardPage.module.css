@@ -1221,6 +1221,49 @@
   overflow: visible;
 }
 
+.settingsNotice {
+  min-height: 68px;
+  padding: 13px 16px;
+  border: 1px solid color-mix(in srgb, var(--acton-color-primary) 18%, var(--acton-color-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--acton-color-primary) 6%, var(--acton-color-surface));
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+.settingsNotice > svg {
+  margin-top: 2px;
+  color: var(--acton-color-primary);
+  flex: 0 0 auto;
+}
+
+.settingsNotice > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.settingsNotice strong {
+  color: var(--acton-color-text);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.settingsNotice span {
+  color: var(--acton-color-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 700px) {
+  .settingsNotice {
+    padding-inline: 14px;
+  }
+}
+
 .settingsSectionHeader {
   min-height: 0;
   margin-bottom: 10px;

@@ -218,7 +218,7 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({
 
   return (
     <section className={`${pageStyles.settingsSection} ${styles.page}`}>
-      <div className={styles.notice}>
+      <div className={`${pageStyles.settingsNotice} ${styles.notice}`}>
         <Archive size={17} aria-hidden="true" />
         <div>
           <strong>Snapshots can be large</strong>

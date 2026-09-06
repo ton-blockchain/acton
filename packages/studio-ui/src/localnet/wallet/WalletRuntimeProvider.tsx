@@ -37,6 +37,8 @@ type WalletBalanceResult =
   | {readonly id: string; readonly error: string}
 
 interface WalletRuntimeProviderProps {
+  /** Pause network activity without remounting workspace pages or losing form drafts */
+  readonly enabled: boolean
   readonly apiBaseUrl: string
   readonly environmentId: string
   readonly environmentKind: EnvironmentConfig["kind"]
@@ -51,6 +53,7 @@ interface SignRequestPreviewProps {
 }
 
 export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
+  enabled,
   apiBaseUrl,
   environmentId,
   environmentKind,
@@ -164,6 +167,8 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
 
   const refreshWalletBalances = useCallback(
     async (wallets: readonly RuntimeWallet[] = runtimeWallets) => {
+      if (!enabled) return
+
       if (wallets.length === 0) {
         setWalletBalances({})
         return
@@ -234,7 +239,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
 
       setIsRefreshingBalances(false)
     },
-    [runtimeWallets, showToast],
+    [enabled, runtimeWallets, showToast],
   )
 
   useEffect(() => {
@@ -269,7 +274,19 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
   }, [environmentId, showErrorToast])
 
   useEffect(() => {
+    if (!enabled) {
+      setWalletKit(undefined)
+      setRuntimeWallets([])
+      setSessions([])
+      setPendingConnectRequest(undefined)
+      setPendingTransactionRequest(undefined)
+      setPendingSignDataRequest(undefined)
+      setIsInitializing(false)
+      return
+    }
+
     let cancelled = false
+    setIsInitializing(true)
     const nextWalletKit = createWalletKit(apiBaseUrl, environmentId, chainId, localnetApiToken)
 
     const handleRequestError = (event: RequestErrorEvent) => {
@@ -321,10 +338,10 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
       cancelled = true
       void nextWalletKit.close()
     }
-  }, [apiBaseUrl, chainId, environmentId, localnetApiToken, showErrorToast, showToast])
+  }, [enabled, apiBaseUrl, chainId, environmentId, localnetApiToken, showErrorToast, showToast])
 
   useEffect(() => {
-    if (!walletKit) {
+    if (!enabled || !walletKit) {
       return
     }
 
@@ -375,6 +392,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
       cancelled = true
     }
   }, [
+    enabled,
     chainId,
     environmentId,
     environmentKind,

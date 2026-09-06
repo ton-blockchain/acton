@@ -1,5 +1,6 @@
 // biome-ignore lint/correctness/noUndeclaredDependencies: Playwright is shared from the workspace root.
 import {expect, test} from "@playwright/test"
+import {Address, beginCell} from "@ton/core"
 import type {AdminOperation, AdminRequest, StudioEnvironment} from "../src/studioApi"
 
 const environment: StudioEnvironment = {
@@ -18,12 +19,16 @@ const environment: StudioEnvironment = {
     nodes: [],
     importedAccounts: [],
   },
-  capabilities: ["explorer", "snapshots"],
+  capabilities: ["explorer", "snapshots", "wallets"],
   endpoints: {},
   network: {id: "local", label: "Local", chainId: -3, testOnly: true, supportsActions: false},
 }
 
-test("admin form submits nanotons and tracks a detached operation across reload", async ({
+test.beforeEach(async ({page}) => {
+  await page.route("**/rpc/acton_listContracts", route => route.fulfill({json: []}))
+})
+
+test("admin form submits nanograms and tracks a detached operation across reload", async ({
   page,
 }) => {
   let operation: AdminOperation | null = null
@@ -56,10 +61,12 @@ test("admin form submits nanotons and tracks a detached operation across reload"
     await route.fulfill({json: body})
   })
   await page.goto("/virtual-environments/environment-1/dashboard")
+  const notifications = page.getByRole("region", {name: "Notifications"})
+  const friendlyAddress = Address.parse(`0:${"11".repeat(32)}`).toString({testOnly: true})
   await page.getByLabel("State actions").getByRole("button", {name: "Admin actions"}).click()
   await expect(page).toHaveURL(/\/environment-1\/admin$/)
   await page.getByLabel("Account address").fill(`0:${"11".repeat(32)}`)
-  await page.getByLabel("New balance (TON)").fill("12.5")
+  await page.getByLabel("New balance").fill("12.5")
   await page.getByRole("button", {name: "Apply changes", exact: true}).click()
   expect(submitted?.kind).toBe("accounts")
   if (submitted?.kind === "accounts")
@@ -68,12 +75,13 @@ test("admin form submits nanotons and tracks a detached operation across reload"
       type: "balance",
       balance: "12500000000",
     })
-  await expect(page.getByText("Installing hardfork", {exact: true})).toBeVisible()
+  await expect(notifications.getByText("Installing hardfork", {exact: true})).toBeVisible()
   await expect(page.getByLabel("Account address")).toBeDisabled()
   await expect.poll(() => startingPolls).toBeGreaterThanOrEqual(2)
-  await expect(page.getByLabel("Account address")).toHaveValue(`0:${"11".repeat(32)}`)
-  await page.reload()
-  await expect(page.getByText("Installing hardfork", {exact: true})).toBeVisible()
+  await expect(page.getByLabel("Account address")).toHaveValue(friendlyAddress)
+  await expect(page.getByLabel("New balance")).toHaveValue("12.5")
+  await expect(page.getByLabel("Action", {exact: true})).toHaveValue("balance")
+  await expect(page.locator("form")).not.toContainText("Installing hardfork")
   status = "running"
   operation = {
     id: submitted?.id ?? "",
@@ -83,7 +91,15 @@ test("admin form submits nanotons and tracks a detached operation across reload"
     finishedAt: new Date().toISOString(),
     blockSeqno: 1234,
   }
-  await expect(page.getByText("Changes applied", {exact: true})).toBeVisible()
+  await expect(notifications.getByText("Changes applied", {exact: true})).toBeVisible()
+  await expect(page.getByRole("button", {name: "Apply changes", exact: true})).toBeEnabled()
+  await expect(page.getByLabel("Account address")).toHaveValue(friendlyAddress)
+  await expect(page.getByLabel("New balance")).toHaveValue("12.5")
+  await expect(page.getByLabel("Action", {exact: true})).toHaveValue("balance")
+
+  operation = {...operation, phase: "indexing", finishedAt: null}
+  await page.reload()
+  await expect(notifications.getByText("Waiting for the indexer", {exact: true})).toBeVisible()
   await page.screenshot({path: "/tmp/acton-hardfork-review/admin-ui.png", fullPage: true})
 })
 
@@ -121,14 +137,16 @@ test("ambiguous HTTP failure retries the exact same request", async ({page}) => 
   })
   await page.goto("/virtual-environments/environment-1/admin")
   await page.getByLabel("Account address").fill(`0:${"11".repeat(32)}`)
-  await page.getByLabel("New balance (TON)").fill("7")
+  await page.getByLabel("New balance").fill("7")
   await page.getByRole("button", {name: "Apply changes", exact: true}).click()
   await page.getByRole("button", {name: "Retry same operation"}).click()
   expect(requests).toHaveLength(2)
   expect(requests[0]).toEqual(requests[1])
 })
 
-test("failed environment keeps administrative error visible across reload", async ({page}) => {
+test("historical administrative errors are not shown again on page open or reload", async ({
+  page,
+}) => {
   await page.route("**/api/v1/**", async route => {
     const path = new URL(route.request().url()).pathname
     await route.fulfill({
@@ -149,8 +167,179 @@ test("failed environment keeps administrative error visible across reload", asyn
     })
   })
   await page.goto("/virtual-environments/environment-1/admin")
-  await expect(page.getByText("Cold backup could not be restored", {exact: true})).toBeVisible()
   await expect(page.getByRole("button", {name: "Apply changes", exact: true})).toBeDisabled()
+  await expect(page.getByText("Cold backup could not be restored", {exact: true})).toHaveCount(0)
+  await expect(page.locator("form")).not.toContainText("Start the environment")
+  await expect(page.getByText("Operation failed", {exact: true})).toHaveCount(0)
   await page.reload()
-  await expect(page.getByText("Cold backup could not be restored", {exact: true})).toBeVisible()
+  await expect(page.getByLabel("Account address")).toBeVisible()
+  await expect(page.getByText("Cold backup could not be restored", {exact: true})).toHaveCount(0)
+})
+
+test("validation and operation failures use toasts without repeating after dismissal", async ({
+  page,
+}) => {
+  let operation: AdminOperation | null = null
+  let submissions = 0
+  let submittedId = ""
+  let polls = 0
+  await page.route("**/api/v1/**", async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith("/admin")) {
+      if (route.request().method() === "POST") {
+        submissions += 1
+        submittedId = route.request().postDataJSON().id
+        operation = {
+          id: submittedId,
+          phase: "preparing",
+          startedAt: new Date().toISOString(),
+          finishedAt: null,
+          error: null,
+          blockSeqno: null,
+        }
+      } else polls += 1
+      await route.fulfill({json: operation})
+      return
+    }
+    await route.fulfill({
+      json: path.endsWith("/info")
+        ? {protocolVersion: 1, serverVersion: "test"}
+        : path.endsWith("/environments")
+          ? [environment]
+          : [],
+    })
+  })
+
+  await page.goto("/virtual-environments/environment-1/admin")
+  const notifications = page.getByRole("region", {name: "Notifications"})
+  await page.getByLabel("Account address").fill("123")
+  await page.getByLabel("New balance").fill("123")
+  await page.getByRole("button", {name: "Apply changes", exact: true}).click()
+  await expect(
+    notifications.getByText("Enter a valid raw or friendly account address"),
+  ).toBeVisible()
+  expect(submissions).toBe(0)
+  await expect(page.locator("form [role=alert]")).toHaveCount(0)
+  await notifications
+    .getByRole("button", {name: "Dismiss notification", includeHidden: true})
+    .click()
+
+  await page.getByLabel("Account address").fill(`0:${"11".repeat(32)}`)
+  await page.getByLabel("New balance").fill("-1")
+  await page.getByRole("button", {name: "Apply changes", exact: true}).click()
+  await expect(
+    notifications.getByText("Enter a nonnegative GRAM amount with at most 9 decimal places"),
+  ).toBeVisible()
+  expect(submissions).toBe(0)
+  await notifications
+    .getByRole("button", {name: "Dismiss notification", includeHidden: true})
+    .click()
+
+  await page.getByLabel("New balance").fill("1")
+  await page.getByRole("button", {name: "Apply changes", exact: true}).click()
+  await expect(notifications.getByText("Preparing operation", {exact: true})).toBeVisible()
+  operation = {
+    id: submittedId,
+    startedAt: new Date().toISOString(),
+    blockSeqno: null,
+    phase: "failed",
+    finishedAt: new Date().toISOString(),
+    error: "Indexer did not catch up",
+  }
+  await expect(notifications.getByText("Indexer did not catch up", {exact: true})).toBeVisible()
+  await notifications
+    .getByRole("button", {name: "Dismiss notification", includeHidden: true})
+    .click()
+  const previousPolls = polls
+  await expect.poll(() => polls, {timeout: 10_000}).toBeGreaterThan(previousPolls + 2)
+  await expect(page.getByText("Indexer did not catch up", {exact: true})).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByRole("button", {name: "Apply changes", exact: true})).toBeEnabled()
+  await expect(page.getByText("Indexer did not catch up", {exact: true})).toHaveCount(0)
+})
+
+test("admin cell edits accept common BoC encodings and binary files", async ({page}) => {
+  const requests: Extract<AdminRequest, {kind: "accounts"}>[] = []
+  await page.route("**/api/v1/**", async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith("/admin")) {
+      if (route.request().method() === "POST") {
+        const request = route.request().postDataJSON()
+        requests.push(request)
+        await route.fulfill({
+          json: {
+            id: request.id,
+            phase: "completed",
+            startedAt: new Date().toISOString(),
+            finishedAt: new Date().toISOString(),
+            error: null,
+            blockSeqno: 1234,
+          },
+        })
+      } else await route.fulfill({json: null})
+      return
+    }
+    await route.fulfill({
+      json: path.endsWith("/info")
+        ? {protocolVersion: 1, serverVersion: "test"}
+        : path.endsWith("/environments")
+          ? [environment]
+          : [],
+    })
+  })
+
+  await page.goto("/virtual-environments/environment-1/admin")
+  await page.getByLabel("Account address").fill(`0:${"11".repeat(32)}`)
+  await page.getByLabel("Action", {exact: true}).selectOption("data")
+  const cell = beginCell().storeUint(65_535, 16).storeRef(beginCell().storeUint(42, 8)).endCell()
+  const bytes = cell.toBoc()
+  const base64 = bytes.toString("base64")
+  const hex = bytes.toString("hex")
+  const variants = [
+    base64,
+    bytes.toString("base64url"),
+    hex,
+    `0x${hex.replace(/(.{8})/g, "$1\n")}`,
+    cell.toBoc({idx: true, crc32: false}).toString("base64"),
+    `ton://cell/${base64}`,
+    `https://example.com/inspect?boc=${encodeURIComponent(base64)}`,
+  ]
+
+  for (const value of variants) {
+    await page.getByLabel("Cell", {exact: true}).fill(value)
+    await page.getByRole("button", {name: "Apply changes", exact: true}).click()
+    await expect(page.getByRole("button", {name: "Apply changes", exact: true})).toBeEnabled()
+    expect(requests.at(-1)?.edits[0]).toEqual({
+      address: `0:${"11".repeat(32)}`,
+      type: "data",
+      boc: base64,
+    })
+    await expect(page.getByLabel("Cell", {exact: true})).toHaveValue(value)
+    await page
+      .getByRole("region", {name: "Notifications"})
+      .getByRole("button", {name: "Dismiss notification", includeHidden: true})
+      .click()
+    await expect(page.getByRole("region", {name: "Notifications"})
+      .getByText("Changes applied", {exact: true})).toHaveCount(0)
+  }
+  expect(requests).toHaveLength(variants.length)
+
+  await page
+    .getByLabel("Load BoC file")
+    .setInputFiles({name: "state.boc", mimeType: "application/octet-stream", buffer: bytes})
+  await expect(page.getByLabel("Cell", {exact: true})).toHaveValue(base64)
+  await page.getByRole("button", {name: "Apply changes", exact: true}).click()
+  await expect.poll(() => requests.length).toBe(variants.length + 1)
+  expect(requests.at(-1)?.edits[0]).toEqual({
+    address: `0:${"11".repeat(32)}`,
+    type: "data",
+    boc: base64,
+  })
+
+  await page.getByLabel("Cell", {exact: true}).fill("not a BoC")
+  await page.getByRole("button", {name: "Apply changes", exact: true}).click()
+  await expect(
+    page.getByRole("region", {name: "Notifications"}).getByText("Changes not submitted"),
+  ).toBeVisible()
+  expect(requests).toHaveLength(variants.length + 1)
 })

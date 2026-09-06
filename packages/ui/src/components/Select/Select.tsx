@@ -12,6 +12,7 @@ export type SelectProps = Readonly<
     readonly size?: ActonSelectSize
     readonly invalid?: boolean
     readonly label?: ReactNode
+    readonly labelAction?: ReactNode
     readonly description?: ReactNode
     readonly fieldClassName?: string
   }
@@ -34,13 +35,14 @@ export function Select({
   id,
   invalid = false,
   label,
+  labelAction,
   ref,
   required,
   size = "md",
   ...props
 }: SelectProps) {
   const generatedId = useId()
-  const hasField = label !== undefined || description !== undefined
+  const hasField = label !== undefined || labelAction !== undefined || description !== undefined
   const selectId = id ?? (hasField ? generatedId : undefined)
   const descriptionId = description === undefined ? undefined : `${selectId}-description`
   const describedBy = [ariaDescribedBy, descriptionId].filter(Boolean).join(" ") || undefined
@@ -75,15 +77,20 @@ export function Select({
 
   return (
     <div className={cx(styles.field, fieldClassName)}>
-      {label === undefined ? undefined : (
-        <label className={styles.label} htmlFor={selectId}>
-          {label}
-          {required ? (
-            <span className={styles.required} aria-hidden="true">
-              *
-            </span>
-          ) : undefined}
-        </label>
+      {label === undefined && labelAction === undefined ? undefined : (
+        <div className={styles.labelRow}>
+          {label === undefined ? undefined : (
+            <label className={styles.label} htmlFor={selectId}>
+              {label}
+              {required ? (
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
+              ) : undefined}
+            </label>
+          )}
+          {labelAction}
+        </div>
       )}
       {control}
       {description === undefined ? undefined : (

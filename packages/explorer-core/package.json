@@ -6,6 +6,7 @@
   "author": "TON Core",
   "type": "module",
   "exports": {
+    "./cell-inspector/inputNormalization": "./src/cell-inspector/inputNormalization.ts",
     "./config/ParameterEditor": "./src/config/editor/ParameterEditor.tsx",
     "./api/client": "./src/api/client.ts",
     "./api/config": "./src/api/config.ts",

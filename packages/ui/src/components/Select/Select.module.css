@@ -116,6 +116,13 @@
   line-height: 1.25;
 }
 
+.labelRow {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+  min-width: 0;
+}
+
 .required {
   margin-inline-start: var(--acton-space-1);
   color: var(--acton-color-danger-text);

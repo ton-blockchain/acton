@@ -164,9 +164,10 @@ export const LocalnetWorkspace: FC<LocalnetWorkspaceProps> = ({
   return (
     <MetadataRegistryProvider registry={runtime.metadataRegistry}>
       <AddressBookProvider>
-        {environment?.status === "running" && supports(environment, "wallets") ? (
+        {environment && supports(environment, "wallets") ? (
           <WalletRuntimeProvider
             key={environment.id}
+            enabled={environment.status === "running"}
             apiBaseUrl={runtime.rpcBaseUrl}
             environmentId={environment.id}
             environmentKind={environment.config.kind}

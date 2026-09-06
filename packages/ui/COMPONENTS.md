@@ -392,6 +392,26 @@ and forwards native attributes and refs.
   actions belong in a dedicated InputGroup.
 - Do not add an inline error-message API to Input.
 
+## BocInput
+
+Status: ready
+
+Import: `import {BocInput} from "@acton/ui"`
+
+Use BocInput for serialized cells supplied as text or a local file. It provides
+the standard field label, monospace textarea and a Load file action. Binary BoC
+files become base64; text files and pasted base64, base64url, hex and links retain
+their original text.
+
+- `value` and `onValueChange` control the input text
+- `label`, `description`, `rows`, `disabled`, `readOnly` and `invalid` control presentation
+- `onError` reports file-read failures; show them through Toast
+- `maxFileBytes` limits local files before reading them; the default is 12 MiB
+- The caller owns decoding, accepted cell types, root count and API size limits
+- Explorer consumers can use `decodeCellInput` from `@acton/explorer-core/cell-inspector/inputNormalization`
+- Review text paste, binary and text files, invalid content, keyboard focus,
+  disabled state, long inputs and narrow screens
+
 ## MultiValueInput
 
 Status: ready
@@ -462,6 +482,9 @@ import { Select } from "@acton/ui";
 Use Select for choosing one value from a concise, known option set. It renders
 a native `select`, forwards native attributes and refs, and preserves native
 keyboard, focus, option, and form behavior.
+
+Use `labelAction` for a help popover beside the label. Its trigger stays outside
+the native label so opening help does not activate the select.
 
 ### Composition
 

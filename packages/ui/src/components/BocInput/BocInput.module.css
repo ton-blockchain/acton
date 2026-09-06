@@ -1,0 +1,8 @@
+.textarea {
+  min-height: 8rem;
+  padding: var(--acton-space-3);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.5;
+  resize: vertical;
+  overflow-wrap: anywhere;
+}

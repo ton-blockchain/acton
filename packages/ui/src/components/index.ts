@@ -1,5 +1,6 @@
 export * from "./AddressChip"
 export * from "./BlockChip"
+export * from "./BocInput"
 export * from "./BooleanValue"
 export * from "./ByteSize"
 export * from "./Button"
