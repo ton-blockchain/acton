@@ -55,7 +55,9 @@ test("admin form submits nanotons and tracks a detached operation across reload"
     }
     await route.fulfill({json: body})
   })
-  await page.goto("/virtual-environments/environment-1/admin")
+  await page.goto("/virtual-environments/environment-1/dashboard")
+  await page.getByLabel("State actions").getByRole("button", {name: "Admin actions"}).click()
+  await expect(page).toHaveURL(/\/environment-1\/admin$/)
   await page.getByLabel("Account address").fill(`0:${"11".repeat(32)}`)
   await page.getByLabel("New balance (TON)").fill("12.5")
   await page.getByRole("button", {name: "Apply changes", exact: true}).click()

@@ -440,6 +440,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
           onFund={() => void navigate(localnetRoutes.path("/faucet"))}
           onSend={() => void navigate(localnetRoutes.path("/simulator"))}
           onSnapshots={() => void navigate(localnetRoutes.path("/snapshots"))}
+          onAdminActions={() => void navigate(localnetRoutes.path("/admin"))}
           onStateChanged={() => setNodeInfo(undefined)}
         />
       </header>
