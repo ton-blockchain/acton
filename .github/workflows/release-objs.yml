@@ -74,7 +74,7 @@ jobs:
     steps:
       - name: Restore TON objects archive cache
         id: archive-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: &linux-ton-objs-archive-cache-paths |
             dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
@@ -102,7 +102,7 @@ jobs:
 
       - name: Clone TON repository
         if: steps.archive-cache.outputs.cache-hit != 'true'
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           repository: ${{ env.TON_REPOSITORY }}
@@ -173,7 +173,7 @@ jobs:
 
       - name: Save TON objects archive cache
         if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: *linux-ton-objs-archive-cache-paths
           key: ton-objs-${{ env.TARGET_NAME }}-${{ needs.prepare.outputs.ton_commit }}
@@ -212,7 +212,7 @@ jobs:
     steps:
       - name: Restore TON objects archive cache
         id: archive-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: &macos-ton-objs-archive-cache-paths |
             dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
@@ -221,7 +221,7 @@ jobs:
 
       - name: Clone TON repository
         if: steps.archive-cache.outputs.cache-hit != 'true'
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           repository: ${{ env.TON_REPOSITORY }}
@@ -283,7 +283,7 @@ jobs:
 
       - name: Save TON objects archive cache
         if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: *macos-ton-objs-archive-cache-paths
           key: ton-objs-${{ env.TARGET_NAME }}-${{ needs.prepare.outputs.ton_commit }}
@@ -319,7 +319,7 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -424,7 +424,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 1
@@ -477,7 +477,7 @@ jobs:
 
     steps:
       - name: Clone TON repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           repository: ${{ env.TON_REPOSITORY }}

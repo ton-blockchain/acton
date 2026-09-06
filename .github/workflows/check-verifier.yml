@@ -36,12 +36,12 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: apps-verifier-${{ runner.os }}-${{ runner.arch }}
           save-if: ${{ github.ref == 'refs/heads/master' }}
@@ -51,7 +51,7 @@ jobs:
         run: rustup toolchain install
 
       - name: Install just
-        uses: taiki-e/install-action@fcf5432d9f50d67e37ee6e29bdb7a224ff67b4a7 # v2.86.8
+        uses: taiki-e/install-action@84f5ac3124727fb3d284d4d22ee9ab3654fd09a6 # v2.87.7
         with:
           tool: just@1.58.0
           fallback: none
@@ -76,12 +76,12 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: apps-verifier-${{ runner.os }}-${{ runner.arch }}
           save-if: ${{ github.ref == 'refs/heads/master' }}
@@ -91,13 +91,13 @@ jobs:
         run: rustup toolchain install
 
       - name: Install check tools
-        uses: taiki-e/install-action@fcf5432d9f50d67e37ee6e29bdb7a224ff67b4a7 # v2.86.8
+        uses: taiki-e/install-action@84f5ac3124727fb3d284d4d22ee9ab3654fd09a6 # v2.87.7
         with:
           tool: just@1.58.0,cargo-shear@1.13.4,cargo-deny@0.20.2
           fallback: none
 
       - name: Set up Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           cache: npm
           cache-dependency-path: apps/verifier/compiler-worker/package-lock.json

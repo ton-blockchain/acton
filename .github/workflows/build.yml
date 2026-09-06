@@ -47,7 +47,7 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -73,7 +73,7 @@ jobs:
           echo "packages_only=${packages_only}" >> "${GITHUB_OUTPUT}"
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: ${{ runner.os }}-${{ runner.arch }}
           save-if: ${{ github.ref == 'refs/heads/master' }}
@@ -82,7 +82,7 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@fcf5432d9f50d67e37ee6e29bdb7a224ff67b4a7 # v2.86.8
+        uses: taiki-e/install-action@84f5ac3124727fb3d284d4d22ee9ab3654fd09a6 # v2.87.7
         with:
           tool: just@1.58.0,nextest@0.9.143
           fallback: none
@@ -114,7 +114,7 @@ jobs:
 
       - name: Restore Bun cache
         id: bun-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: &linux-build-ui-bun-cache-path |
             ~/.bun/install/cache
@@ -124,7 +124,7 @@ jobs:
 
       - name: Restore Playwright cache
         id: ui-e2e-playwright-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: &linux-ui-e2e-playwright-cache-path |
             ~/.cache/ms-playwright
@@ -196,14 +196,14 @@ jobs:
 
       - name: Save Bun cache
         if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: *linux-build-ui-bun-cache-path
           key: ${{ steps.bun-cache.outputs.cache-primary-key }}
 
       - name: Save Playwright cache
         if: github.ref == 'refs/heads/master' && steps.ui-e2e-playwright-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: *linux-ui-e2e-playwright-cache-path
           key: ${{ steps.ui-e2e-playwright-cache.outputs.cache-primary-key }}
@@ -245,12 +245,12 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: ${{ runner.os }}-${{ runner.arch }}
           save-if: ${{ github.ref == 'refs/heads/master' }}
@@ -259,7 +259,7 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@fcf5432d9f50d67e37ee6e29bdb7a224ff67b4a7 # v2.86.8
+        uses: taiki-e/install-action@84f5ac3124727fb3d284d4d22ee9ab3654fd09a6 # v2.87.7
         with:
           tool: just@1.58.0,cargo-shear@1.13.4,typos@1.49.0
           fallback: none
@@ -300,7 +300,7 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -326,7 +326,7 @@ jobs:
           echo "packages_only=${packages_only}" >> "${GITHUB_OUTPUT}"
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: ${{ runner.os }}-${{ runner.arch }}
           save-if: ${{ github.ref == 'refs/heads/master' }}
@@ -335,7 +335,7 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@fcf5432d9f50d67e37ee6e29bdb7a224ff67b4a7 # v2.86.8
+        uses: taiki-e/install-action@84f5ac3124727fb3d284d4d22ee9ab3654fd09a6 # v2.87.7
         with:
           tool: just@1.58.0,nextest@0.9.143
           fallback: none
@@ -358,7 +358,7 @@ jobs:
 
       - name: Restore Bun cache
         id: bun-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: &macos-build-ui-bun-cache-path |
             ~/.bun/install/cache
@@ -395,7 +395,7 @@ jobs:
 
       - name: Save Bun cache
         if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: *macos-build-ui-bun-cache-path
           key: ${{ steps.bun-cache.outputs.cache-primary-key }}
