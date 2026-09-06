@@ -14,8 +14,9 @@
 
 use std::{
     fs,
+    io::{self, Read},
     net::{Ipv4Addr, SocketAddrV4},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result, bail, ensure};
@@ -30,6 +31,7 @@ use tycho_types::models::block::{BlockId, ShardIdent};
 use tycho_types::prelude::HashBytes;
 
 use crate::{
+    bootstrap,
     cli::GodmodeCommand,
     storage::{BLOCK_SOURCE_PORT, Layout, NodeLayout, write_json_atomic},
     ton::{
@@ -59,15 +61,18 @@ pub(crate) async fn execute(command: GodmodeCommand) -> Result<()> {
         }
         _ => {}
     }
+
     let state = match &command {
         GodmodeCommand::Suspend(s) | GodmodeCommand::Resume(s) | GodmodeCommand::Finish(s) => s,
         GodmodeCommand::Install { state, .. } => state,
         _ => unreachable!(),
     };
+
     let layout = Layout::new(state.state_dir.clone());
-    let _lock = crate::bootstrap::acquire_lock(&layout.lock)
+    let _lock = bootstrap::acquire_lock(&layout.lock)
         .context("Stop this Localton instance before changing its engine configuration")?;
     recover_install(&layout)?;
+
     match command {
         GodmodeCommand::Observe(_) | GodmodeCommand::Prepare(_) | GodmodeCommand::Verify(_) => {
             unreachable!()
@@ -85,10 +90,9 @@ pub(crate) async fn execute(command: GodmodeCommand) -> Result<()> {
         GodmodeCommand::Install { state, plan } => {
             let layout = Layout::new(state.state_dir);
             let plan: HardforkPlan =
-                serde_json::from_slice(&if plan == std::path::Path::new("-") {
-                    use std::io::Read;
+                serde_json::from_slice(&if plan == Path::new("-") {
                     let mut bytes = Vec::new();
-                    std::io::stdin()
+                    io::stdin()
                         .take(64 * 1024 * 1024 + 1)
                         .read_to_end(&mut bytes)?;
                     ensure!(
@@ -100,6 +104,7 @@ pub(crate) async fn execute(command: GodmodeCommand) -> Result<()> {
                     fs::read(&plan).with_context(|| format!("failed to read {}", plan.display()))?
                 })
                 .context("invalid hardfork plan")?;
+
             let (_, key) = source_identity(&layout.node)?;
             install(
                 &layout,
@@ -124,6 +129,7 @@ pub(crate) async fn execute(command: GodmodeCommand) -> Result<()> {
             println!("{}", json!({ "detached": detached }));
         }
     }
+
     Ok(())
 }
 
@@ -169,12 +175,13 @@ pub(crate) fn suspend_validation(node: &NodeLayout) -> Result<bool> {
     let config_path = engine_config_path(node);
     let mut config = ValidatorEngineConfig::load(&config_path)?;
     if suspended_keys_path(node).exists() {
-        anyhow::ensure!(
+        ensure!(
             !config.validates(),
             "Suspended keys already exist but validation is enabled"
         );
         return Ok(false);
     }
+
     let suspended = config.suspend_validation();
     write_json_atomic(&suspended_keys_path(node), &suspended)
         .context("failed to store suspended validator keys")?;
@@ -299,14 +306,13 @@ pub(crate) fn finish(node: &NodeLayout) -> Result<bool> {
     );
     let config_path = engine_config_path(node);
     let mut config = ValidatorEngineConfig::load(&config_path)?;
-    if let Ok(original) = fs::read(staging.join("original-engine.json")) {
-        let original: ValidatorEngineConfig = serde_json::from_slice(&original)?;
-        config.restore_full_node_master(&original);
-    } else {
-        config.clear_full_node_master();
-    }
+    // Installation always saves the original routing. Missing or unreadable
+    // recovery data must not silently discard a user's full-node master link.
+    let original = ValidatorEngineConfig::load(&staging.join("original-engine.json"))
+        .context("Cannot restore networking without the original engine configuration")?;
+    config.restore_full_node_master(&original);
     config.save(&config_path)?;
-    let staging = staging_dir(node);
+
     if staging.exists() {
         fs::remove_dir_all(&staging)?;
     }
@@ -324,8 +330,13 @@ pub(crate) struct StagedBlock {
 /// Returns the blocks staged for the local block source, if any.
 pub(crate) fn staged_blocks(node: &NodeLayout) -> Result<Vec<StagedBlock>> {
     let staging = staging_dir(node);
-    let Ok(bytes) = fs::read(staging.join("plan.json")) else {
-        return Ok(Vec::new());
+    let plan_path = staging.join("plan.json");
+    let bytes = match fs::read(&plan_path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => {
+            return Err(error).with_context(|| format!("Failed to read {}", plan_path.display()));
+        }
     };
     let plan: HardforkPlan =
         serde_json::from_slice(&bytes).context("invalid staged hardfork plan")?;
@@ -418,7 +429,7 @@ pub(crate) async fn serve_staged(
     if staged.is_empty() {
         return Ok(None);
     }
-    let (secret, _) = source_identity(node)?;
+    let (secret, key) = source_identity(node)?;
 
     let source = BlockSource::new();
     for staged in staged {
@@ -448,7 +459,6 @@ pub(crate) async fn serve_staged(
         .await
         .context("Failed to bind the hardfork block source")?;
     let address = listener.local_addr()?;
-    let (_, key) = source_identity(node)?;
     let config_path = engine_config_path(node);
     let mut engine = ValidatorEngineConfig::load(&config_path)?;
     engine.set_full_node_master(SocketAddrV4::new(Ipv4Addr::LOCALHOST, address.port()), key);
@@ -462,8 +472,7 @@ pub(crate) async fn serve_staged(
 }
 
 /// Fills a buffer with operating-system randomness.
-fn getrandom(buffer: &mut [u8; 32]) -> std::io::Result<()> {
-    use std::io::Read;
+fn getrandom(buffer: &mut [u8; 32]) -> io::Result<()> {
     fs::File::open("/dev/urandom")?.read_exact(buffer)
 }
 

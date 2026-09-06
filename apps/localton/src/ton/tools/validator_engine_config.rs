@@ -129,6 +129,7 @@ impl ValidatorEngineConfig {
         }];
     }
 
+    /// Restores the pre-install download routing, including any existing master link.
     pub(crate) fn restore_full_node_master(&mut self, original: &Self) {
         self.fullnodeslaves = original.fullnodeslaves.clone();
     }

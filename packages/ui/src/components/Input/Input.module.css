@@ -126,7 +126,7 @@
   opacity: 0.52;
 }
 
-.input:read-only {
+.input:read-only:not(:disabled) {
   background: var(--acton-color-surface-raised);
   color: var(--acton-color-text-muted);
 }

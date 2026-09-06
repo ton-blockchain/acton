@@ -43,7 +43,7 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
     // Keep exclusive ownership until every child and in-process service stops.
     let _state_lock = acquire_lock(&layout.lock)?;
     godmode::recover_install(&layout)?;
-    crate::operations::godmode::invalidate_observation(&layout.node)?;
+    godmode::invalidate_observation(&layout.node)?;
 
     let state_exists = layout.manifest.is_file();
     let settings = prepare_settings(&layout, &args)?;

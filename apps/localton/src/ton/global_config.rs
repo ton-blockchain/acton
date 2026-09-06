@@ -163,10 +163,6 @@ impl GlobalConfig {
         Ok(())
     }
 
-    /// Routes this host's chain operations through its own liteserver identity.
-    ///
-    /// DHT and validator sections remain untouched, so the node still joins the
-    /// exact network described by the downloaded config.
     /// Registers one masterchain block as the network's newest hardfork.
     ///
     /// On its next start the node truncates to the block before this one and
@@ -197,6 +193,8 @@ impl GlobalConfig {
             .collect()
     }
 
+    /// Routes this host's chain operations through its own liteserver identity.
+    /// DHT and validator sections retain the downloaded network identity.
     pub(crate) fn with_local_liteserver(mut self, port: u16, public_key: TonPublicKey) -> Self {
         self.liteservers = vec![LiteserverConfig::new(Ipv4Addr::LOCALHOST, port, public_key)];
         self

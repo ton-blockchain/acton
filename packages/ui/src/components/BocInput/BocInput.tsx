@@ -16,6 +16,8 @@ export interface BocInputProps
   readonly value: string
   readonly onValueChange: (value: string) => void
   readonly onError: (error: Error) => void
+  /** Lets a form suspend submission until the selected file replaces the current value */
+  readonly onReadingChange?: (reading: boolean) => void
   readonly label?: ReactNode
   readonly description?: ReactNode
   readonly invalid?: boolean
@@ -28,6 +30,7 @@ export function BocInput({
   value,
   onValueChange,
   onError,
+  onReadingChange,
   label = "Cell",
   description = "Base64, base64url, hex or a link containing a BoC",
   invalid = false,
@@ -49,6 +52,16 @@ export function BocInput({
   const readRevision = useRef(0)
   const [reading, setReading] = useState(false)
 
+  useEffect(() => {
+    onReadingChange?.(reading)
+
+    return () => {
+      // Switching actions can unmount this input before a file read completes.
+      // Release the parent form while readRevision discards that stale result.
+      if (reading) onReadingChange?.(false)
+    }
+  }, [onReadingChange, reading])
+
   useEffect(
     () => () => {
       readRevision.current += 1
@@ -69,24 +82,30 @@ export function BocInput({
       const bytes = new Uint8Array(await file.arrayBuffer())
       const magic = bytes.length >= 4 ? new DataView(bytes.buffer).getUint32(0) : 0
       let text: string
+
       if ([0xb5_ee_9c_72, 0x68_ff_65_f3, 0xac_c3_a7_28].includes(magic)) {
         // Chunk conversion keeps large binary files below JavaScript's argument limit.
         let binary = ""
         for (let offset = 0; offset < bytes.length; offset += 8192) {
           binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192))
         }
+
         text = btoa(binary)
       } else {
         text = new TextDecoder("utf-8", {fatal: true}).decode(bytes)
       }
 
-      if (revision === readRevision.current) onValueChange(text)
+      if (revision === readRevision.current) {
+        onValueChange(text)
+      }
     } catch (cause) {
       if (revision === readRevision.current) {
         onError(cause instanceof Error ? cause : new Error(String(cause)))
       }
     } finally {
-      if (revision === readRevision.current) setReading(false)
+      if (revision === readRevision.current) {
+        setReading(false)
+      }
     }
   }
 

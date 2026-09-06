@@ -1,7 +1,7 @@
 import {KeyRound, Shield} from "lucide-react"
 import {TlbCellViewer} from "@acton/transaction-ui"
 import {AddressChip, GramAmount, RawDataBlock, useToast} from "@acton/ui"
-import {useCallback, useEffect, useMemo, useState} from "react"
+import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 import type {
   ConnectionRequestEvent,
@@ -73,6 +73,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
   const [isSyncingWallets, setIsSyncingWallets] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isRefreshingBalances, setIsRefreshingBalances] = useState(false)
+  const balanceRequestVersion = useRef(0)
   const [walletBalances, setWalletBalances] = useState<Record<string, WalletBalanceState>>({})
   const [copiedAddress, setCopiedAddress] = useState<string>()
   const [tonConnectUrl, setTonConnectUrl] = useState("")
@@ -167,10 +168,15 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
 
   const refreshWalletBalances = useCallback(
     async (wallets: readonly RuntimeWallet[] = runtimeWallets) => {
-      if (!enabled) return
+      const requestVersion = ++balanceRequestVersion.current
+      if (!enabled) {
+        setIsRefreshingBalances(false)
+        return
+      }
 
       if (wallets.length === 0) {
         setWalletBalances({})
+        setIsRefreshingBalances(false)
         return
       }
 
@@ -203,6 +209,10 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
           }
         }),
       )
+
+      // Stopping the network or starting another refresh invalidates this
+      // response, including expected failures from the closed wallet runtime.
+      if (requestVersion !== balanceRequestVersion.current) return
 
       setWalletBalances(current => {
         const nextBalances: Record<string, WalletBalanceState> = {}
@@ -244,9 +254,17 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
 
   useEffect(() => {
     void refreshWalletBalances(runtimeWallets)
+    return () => {
+      balanceRequestVersion.current += 1
+    }
   }, [refreshWalletBalances, runtimeWallets])
 
   useEffect(() => {
+    if (!enabled) {
+      setIsLoadingWallets(false)
+      return
+    }
+
     const controller = new AbortController()
 
     void (async () => {
@@ -271,7 +289,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
     return () => {
       controller.abort()
     }
-  }, [environmentId, showErrorToast])
+  }, [enabled, environmentId, showErrorToast])
 
   useEffect(() => {
     if (!enabled) {
@@ -290,6 +308,8 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
     const nextWalletKit = createWalletKit(apiBaseUrl, environmentId, chainId, localnetApiToken)
 
     const handleRequestError = (event: RequestErrorEvent) => {
+      if (cancelled) return
+
       const fallback = "WalletKit request failed."
       showToast({
         variant: "error",
@@ -307,20 +327,43 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
           return
         }
 
-        nextWalletKit.onConnectRequest(event => setPendingConnectRequest(event))
-        nextWalletKit.onTransactionRequest(event => setPendingTransactionRequest(event))
-        nextWalletKit.onSignDataRequest(event => setPendingSignDataRequest(event))
+        // Closing the old runtime can still deliver queued events. They must
+        // not repopulate dialogs or report outages while the network restarts.
+        nextWalletKit.onConnectRequest(event => {
+          if (!cancelled) setPendingConnectRequest(event)
+        })
+        nextWalletKit.onTransactionRequest(event => {
+          if (!cancelled) setPendingTransactionRequest(event)
+        })
+        nextWalletKit.onSignDataRequest(event => {
+          if (!cancelled) setPendingSignDataRequest(event)
+        })
         nextWalletKit.onDisconnect(() => {
+          if (cancelled) return
+
           showToast({
             variant: "info",
             title: "Session disconnected",
           })
-          void nextWalletKit.listSessions().then(setSessions)
+          void nextWalletKit
+            .listSessions()
+            .then(sessions => {
+              if (!cancelled) setSessions(sessions)
+            })
+            .catch(error => {
+              if (!cancelled) {
+                showErrorToast("Session refresh failed", error, "Failed to load wallet sessions")
+              }
+            })
         })
         nextWalletKit.onRequestError(handleRequestError)
 
-        setWalletKit(nextWalletKit)
-        setSessions(await nextWalletKit.listSessions())
+        const sessions = await nextWalletKit.listSessions()
+
+        if (!cancelled) {
+          setWalletKit(nextWalletKit)
+          setSessions(sessions)
+        }
       } catch (error) {
         if (!cancelled) {
           showErrorToast("Wallet runtime failed", error, "Failed to initialize wallet runtime.")
@@ -342,6 +385,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
 
   useEffect(() => {
     if (!enabled || !walletKit) {
+      setIsSyncingWallets(false)
       return
     }
 
@@ -358,6 +402,9 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
             chainId,
             useLocalnetAdapters: environmentKind === "actonSimulatedLocalnet",
           })
+
+          if (cancelled) return
+
           if (wallet) {
             nextRuntimeWallets.push({
               id: wallet.getWalletId(),
@@ -367,10 +414,11 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
           }
         }
 
-        if (!cancelled) {
-          setRuntimeWallets(nextRuntimeWallets)
-          await refreshSessions(walletKit)
-        }
+        const sessions = await walletKit.listSessions()
+        if (cancelled) return
+
+        setRuntimeWallets(nextRuntimeWallets)
+        setSessions(sessions)
       } catch (error) {
         if (!cancelled) {
           showErrorToast(
@@ -396,7 +444,6 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
     chainId,
     environmentId,
     environmentKind,
-    refreshSessions,
     showErrorToast,
     supportedWallets,
     walletKit,

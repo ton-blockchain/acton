@@ -1,12 +1,14 @@
 //! Administrative edits share the same admission and mutation locks as lifecycle commands.
+
 use super::Runtime;
-use crate::{AdminOperation, AdminRequest, Error, Status};
-use std::sync::Arc;
+use crate::{AdminOperation, AdminRequest, Error, Status, docker::DockerNetwork};
+use std::{sync::Arc, time::Instant};
 
 impl Runtime {
     /// Starts a durable edit owned by this service, independent of the HTTP caller.
     pub async fn start_admin(&self, request: AdminRequest) -> Result<AdminOperation, Error> {
         request.validate()?;
+
         let admission = self.inner.admission.lock().await;
         if !*admission {
             return Err(Error::Conflict {
@@ -14,7 +16,9 @@ impl Runtime {
                 message: "The localnet service is stopping".into(),
             });
         }
+
         let entry = self.entry().await?;
+
         // Admission serializes submissions; the mutation lock belongs to the
         // running task. A retry observes that task without treating it as crashed.
         let previous = entry.admin_request.read().await.clone();
@@ -27,21 +31,25 @@ impl Runtime {
                 return Ok(operation);
             }
         }
+
         let network = entry.record.read().await.clone();
-        if let Some(driver) = crate::docker::DockerNetwork::load(&entry.data_dir, &network).await?
+        if let Some(driver) = DockerNetwork::load(&entry.data_dir, &network).await?
             && let Some(previous) = driver.saved_admin_operation(Some(&request)).await?
         {
             return Ok(previous);
         }
+
         let guard = Arc::clone(&entry.mutation)
             .try_lock_owned()
             .map_err(|_| Error::busy())?;
+
         if network.status != Status::Running {
             return Err(Error::Conflict {
                 code: "admin_unavailable",
                 message: "Start the full TON network before editing its state".into(),
             });
         }
+
         // Every managed node must share the observed head and receive the fork.
         // A stopped node can be behind and must not be restarted implicitly.
         if network.nodes.iter().any(|node| node.stopped) {
@@ -52,6 +60,7 @@ impl Runtime {
                         .into(),
             });
         }
+
         let driver = self.driver(&entry).await?;
         let operation = AdminOperation {
             id: request.id().into(),
@@ -61,15 +70,26 @@ impl Runtime {
             error: None,
             block_seqno: None,
         };
+
         driver.save_admin_operation(&request, &operation).await?;
         *entry.admin_operation.write().await = Some(operation.clone());
         entry.record.write().await.status = Status::Starting;
         Self::save(&entry).await?;
         *entry.admin_request.write().await = Some(request.clone());
+
         let runtime = self.clone();
         tokio::spawn(async move {
             let _guard = guard;
+            let started = Instant::now();
             let nodes = entry.record.read().await.nodes.clone();
+            let target = entry.data_dir.display();
+
+            log::info!(
+                "operation=admin id={} target={target} phase=started nodes={}",
+                request.id(),
+                nodes.len() + 1
+            );
+
             let result = async {
                 runtime.stop_activity().await?;
                 driver
@@ -77,7 +97,9 @@ impl Runtime {
                     .await
             }
             .await;
+
             let running = result.is_ok() || driver.admin_is_running(&nodes).await;
+
             {
                 let mut record = entry.record.write().await;
                 record.status = if running {
@@ -87,6 +109,18 @@ impl Runtime {
                 };
                 record.error = result.as_ref().err().map(ToString::to_string);
             }
+
+            log::info!(
+                "operation=admin id={} target={target} duration_ms={} outcome={} running={running}",
+                request.id(),
+                started.elapsed().as_millis(),
+                if result.is_ok() {
+                    "completed"
+                } else {
+                    "failed"
+                }
+            );
+
             if let Some(op) = entry.admin_operation.write().await.as_mut() {
                 op.phase = if result.is_ok() {
                     "completed"
@@ -103,10 +137,12 @@ impl Runtime {
                     log::error!("Failed to persist administrative operation: {error}");
                 }
             }
+
             if let Err(error) = Self::save(&entry).await {
                 log::error!("Failed to persist network after administrative operation: {error}");
             }
         });
+
         drop(admission);
         Ok(operation)
     }
@@ -122,8 +158,7 @@ impl Runtime {
             return Ok(None);
         };
         let network = entry.record.read().await.clone();
-        let Some(driver) = crate::docker::DockerNetwork::load(&entry.data_dir, &network).await?
-        else {
+        let Some(driver) = DockerNetwork::load(&entry.data_dir, &network).await? else {
             return Ok(None);
         };
         driver.saved_admin_operation(None).await
@@ -134,6 +169,7 @@ impl Runtime {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use crate::activity::ActivityConfig;
 
     #[tokio::test]
     async fn retries_observe_the_owned_operation_while_mutations_are_locked() {
@@ -176,8 +212,7 @@ mod tests {
                 for start in [false, true] {
                     let result = tokio::time::timeout(
                         std::time::Duration::from_secs(1),
-                        runtime
-                            .configure_activity(crate::activity::ActivityConfig::default(), start),
+                        runtime.configure_activity(ActivityConfig::default(), start),
                     )
                     .await
                     .expect("activity must reject an admin operation without waiting for its lock");
@@ -236,7 +271,7 @@ mod tests {
             "version":2,"image":"unused","dockerTarget":{"kind":"context","value":"unused"},"projectName":"unused"
         })).await.unwrap();
         let runtime = Runtime::open(&location.path).await.unwrap();
-        let driver = crate::docker::DockerNetwork::load(&location.path, &runtime.get().await)
+        let driver = DockerNetwork::load(&location.path, &runtime.get().await)
             .await
             .unwrap()
             .unwrap();

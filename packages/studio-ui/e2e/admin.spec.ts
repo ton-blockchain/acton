@@ -92,6 +92,9 @@ test("admin form submits nanograms and tracks a detached operation across reload
     blockSeqno: 1234,
   }
   await expect(notifications.getByText("Changes applied", {exact: true})).toBeVisible()
+  await expect(
+    notifications.getByRole("link", {name: "#1234", includeHidden: true}),
+  ).toHaveAttribute("href", "/virtual-environments/environment-1/block/-1/8000000000000000/1234")
   await expect(page.getByRole("button", {name: "Apply changes", exact: true})).toBeEnabled()
   await expect(page.getByLabel("Account address")).toHaveValue(friendlyAddress)
   await expect(page.getByLabel("New balance")).toHaveValue("12.5")
@@ -142,6 +145,244 @@ test("ambiguous HTTP failure retries the exact same request", async ({page}) => 
   await page.getByRole("button", {name: "Retry same operation"}).click()
   expect(requests).toHaveLength(2)
   expect(requests[0]).toEqual(requests[1])
+})
+
+test("a stale poll cannot replace an acknowledged submission", async ({page}) => {
+  let operation: AdminOperation | null = null
+  let polls = 0
+  let releasePoll: (() => void) | undefined
+  const heldPoll = new Promise<void>(resolve => {
+    releasePoll = resolve
+  })
+
+  await page.route("**/api/v1/**", async route => {
+    const path = new URL(route.request().url()).pathname
+    let body: unknown = []
+
+    if (path.endsWith("/info")) {
+      body = {protocolVersion: 1, serverVersion: "test"}
+    } else if (path.endsWith("/environments")) {
+      body = [environment]
+    } else if (path.endsWith("/admin")) {
+      if (route.request().method() === "POST") {
+        operation = {
+          id: route.request().postDataJSON().id,
+          phase: "installing",
+          startedAt: new Date().toISOString(),
+          finishedAt: null,
+          error: null,
+          blockSeqno: null,
+        }
+      } else {
+        polls += 1
+
+        if (polls === 2) {
+          // This response observed the previous state before POST was accepted.
+          await heldPoll
+          await route.fulfill({json: null})
+          return
+        }
+      }
+
+      body = operation
+    }
+
+    await route.fulfill({json: body})
+  })
+
+  await page.goto("/virtual-environments/environment-1/admin")
+  await page.getByLabel("Account address").fill(`0:${"11".repeat(32)}`)
+  await page.getByLabel("New balance").fill("7")
+  await expect.poll(() => polls).toBe(2)
+  await page.getByRole("button", {name: "Apply changes", exact: true}).click()
+  await expect(page.getByText("Installing hardfork", {exact: true})).toBeVisible()
+
+  // Record transient re-enabling too, even if the next poll repairs the state.
+  await page.getByLabel("New balance").evaluate(input => {
+    const observer = new MutationObserver(() => {
+      if (!(input as HTMLInputElement).disabled) input.setAttribute("data-unlocked", "true")
+    })
+    observer.observe(input, {attributes: true, attributeFilter: ["disabled"]})
+  })
+  releasePoll?.()
+  await expect.poll(() => polls).toBeGreaterThanOrEqual(3)
+
+  await expect(page.getByLabel("New balance")).toBeDisabled()
+  await expect(page.getByLabel("New balance")).not.toHaveAttribute("data-unlocked", "true")
+})
+
+for (const response of ["lost", "stale"] as const) {
+  test(`polling completion wins over a ${response} POST response`, async ({page}) => {
+    let operation: AdminOperation | null = null
+    let releasePost: (() => void) | undefined
+    const heldPost = new Promise<void>(resolve => {
+      releasePost = resolve
+    })
+
+    await page.route("**/api/v1/**", async route => {
+      const path = new URL(route.request().url()).pathname
+
+      if (path.endsWith("/admin") && route.request().method() === "POST") {
+        operation = {
+          id: route.request().postDataJSON().id,
+          phase: "completed",
+          startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(),
+          error: null,
+          blockSeqno: 1234,
+        }
+
+        await heldPost
+
+        if (response === "lost") {
+          await route.abort()
+        } else {
+          await route.fulfill({json: {...operation, phase: "preparing", finishedAt: null}})
+        }
+
+        return
+      }
+
+      await route.fulfill({
+        json: path.endsWith("/info")
+          ? {protocolVersion: 1, serverVersion: "test"}
+          : path.endsWith("/environments")
+            ? [environment]
+            : path.endsWith("/admin")
+              ? operation
+              : [],
+      })
+    })
+
+    await page.goto("/virtual-environments/environment-1/admin")
+    await page.getByLabel("Account address").fill(`0:${"11".repeat(32)}`)
+    await page.getByLabel("New balance").fill("7")
+    const apply = page.getByRole("button", {name: "Apply changes", exact: true})
+    await apply.click()
+    await expect(page.getByText("Changes applied", {exact: true})).toBeVisible()
+
+    releasePost?.()
+    await expect(apply).toBeEnabled()
+    await expect(page.getByText("Changes applied", {exact: true})).toBeVisible()
+    await expect(page.getByText("Changes not submitted", {exact: true})).toHaveCount(0)
+    await expect(page.getByText("Preparing operation", {exact: true})).toHaveCount(0)
+  })
+}
+
+test("file loading blocks submission and switching actions discards its result", async ({page}) => {
+  await page.route("**/api/v1/**", async route => {
+    const path = new URL(route.request().url()).pathname
+    await route.fulfill({
+      json: path.endsWith("/info")
+        ? {protocolVersion: 1, serverVersion: "test"}
+        : path.endsWith("/environments")
+          ? [environment]
+          : path.endsWith("/admin")
+            ? null
+            : [],
+    })
+  })
+
+  await page.goto("/virtual-environments/environment-1/admin")
+  await page.getByLabel("Action", {exact: true}).selectOption("code")
+  await page.getByLabel("Cell", {exact: true}).fill("previous value")
+  await page.evaluate(() => {
+    const arrayBuffer = File.prototype.arrayBuffer
+
+    File.prototype.arrayBuffer = async function () {
+      await new Promise<void>(resolve =>
+        globalThis.addEventListener("release-boc", () => resolve(), {once: true}),
+      )
+      return arrayBuffer.call(this)
+    }
+  })
+  await page.getByLabel("Load BoC file").setInputFiles({
+    name: "cell.boc",
+    mimeType: "application/octet-stream",
+    buffer: beginCell().endCell().toBoc(),
+  })
+
+  const apply = page.getByRole("button", {name: "Apply changes", exact: true})
+  await expect(page.getByText("Reading file…", {exact: true})).toBeVisible()
+  await expect(apply).toBeDisabled()
+
+  await page.getByLabel("Action", {exact: true}).selectOption("balance")
+  await page.getByLabel("New balance").fill("42")
+  await page.evaluate(() => globalThis.dispatchEvent(new Event("release-boc")))
+  await expect(apply).toBeEnabled()
+  await expect(page.getByLabel("New balance")).toHaveValue("42")
+})
+
+test("active admin operations pause suggestions and keep disabled fields consistent", async ({
+  page,
+}) => {
+  let running = false
+  let walletRequests = 0
+  let contractRequests = 0
+  const operation: AdminOperation = {
+    id: "active-edit",
+    phase: "preparing",
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    error: null,
+    blockSeqno: null,
+  }
+
+  await page.route("**/rpc/acton_listContracts", async route => {
+    contractRequests += 1
+    await route.fulfill({status: running ? 200 : 503, json: []})
+  })
+  await page.route("**/api/v1/**", async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith("/wallets")) {
+      walletRequests += 1
+      await route.fulfill({status: running ? 200 : 409, json: []})
+      return
+    }
+    await route.fulfill({
+      json: path.endsWith("/info")
+        ? {protocolVersion: 1, serverVersion: "test"}
+        : path.endsWith("/environments")
+          ? [{...environment, status: running ? "running" : "starting"}]
+          : path.endsWith("/admin")
+            ? operation
+            : [],
+    })
+  })
+
+  await page.goto("/virtual-environments/environment-1/admin")
+  const notifications = page.getByRole("region", {name: "Notifications"})
+  await expect(notifications.getByText("Preparing operation", {exact: true})).toBeVisible()
+  await expect(page.getByRole("button", {name: "Apply changes", exact: true})).toHaveAttribute(
+    "aria-busy",
+    "true",
+  )
+  await page.evaluate(() => globalThis.dispatchEvent(new Event("focus")))
+  await page.reload()
+  await expect(notifications.getByText("Preparing operation", {exact: true})).toBeVisible()
+
+  const backgrounds = await page
+    .locator("#admin-action, input[aria-label='Account address'], #admin-value")
+    .evaluateAll(elements => elements.map(element => getComputedStyle(element).backgroundColor))
+  expect(new Set(backgrounds).size).toBe(1)
+  expect({walletRequests, contractRequests}).toMatchInlineSnapshot(`
+    {
+      "contractRequests": 0,
+      "walletRequests": 0,
+    }
+  `)
+  await expect(notifications).not.toContainText("unavailable")
+  await expect(notifications).not.toContainText("Failed to load wallets")
+
+  running = true
+  Object.assign(operation, {
+    phase: "completed",
+    finishedAt: new Date().toISOString(),
+    blockSeqno: 12,
+  })
+  await expect(notifications.getByText("Changes applied", {exact: true})).toBeVisible()
+  await expect.poll(() => walletRequests).toBe(1)
+  await expect.poll(() => contractRequests).toBe(1)
 })
 
 test("historical administrative errors are not shown again on page open or reload", async ({
@@ -319,8 +560,9 @@ test("admin cell edits accept common BoC encodings and binary files", async ({pa
       .getByRole("region", {name: "Notifications"})
       .getByRole("button", {name: "Dismiss notification", includeHidden: true})
       .click()
-    await expect(page.getByRole("region", {name: "Notifications"})
-      .getByText("Changes applied", {exact: true})).toHaveCount(0)
+    await expect(
+      page.getByRole("region", {name: "Notifications"}).getByText("Changes applied", {exact: true}),
+    ).toHaveCount(0)
   }
   expect(requests).toHaveLength(variants.length)
 

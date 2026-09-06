@@ -30,7 +30,7 @@ use crate::{
     cli::BlockchainConfigCommand,
     storage::Layout,
     ton::{
-        lite::require_existing_config,
+        lite::{LocalLiteClient, require_existing_config},
         toolchain::Toolchain,
         tools::{
             fift::{Fift, FiftScriptRequest, OfficialFift},
@@ -151,7 +151,7 @@ pub(crate) async fn set_param(
         .await
         .context("failed to submit the configuration change")?;
 
-    let mut client = crate::ton::lite::LocalLiteClient::connect(toolchain.lite_config()).await?;
+    let mut client = LocalLiteClient::connect(toolchain.lite_config()).await?;
     tokio::time::timeout(OPERATION_TIMEOUT, async {
         loop {
             let current = client.config_params(vec![index]).await?;

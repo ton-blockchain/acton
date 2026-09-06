@@ -1,4 +1,5 @@
 //! Coordinates a cold, recoverable administrative operation across the cluster.
+
 use super::{
     DOCKER_METADATA_TIMEOUT, Deserialize, DockerNetwork, Duration, LOCALTON_SNAPSHOT_DIR,
     LOCALTON_STATE_DIR, SNAPSHOT_TIMEOUT, Serialize, Uuid,
@@ -14,6 +15,7 @@ use tokio::{
     time::{Instant, sleep},
 };
 use tokio::{process::Command, time::timeout};
+
 const ADMIN_TIMEOUT: Duration = Duration::from_secs(180);
 const JOURNAL: &str = "admin-recovery.json";
 
@@ -22,11 +24,13 @@ struct Recovery {
     ready: bool,
     backups: BTreeMap<String, Backup>,
 }
+
 #[derive(Serialize, Deserialize)]
 struct Backup {
     id: String,
     directory: String,
 }
+
 fn failure(error: impl std::fmt::Display) -> Error {
     Error::Internal {
         code: "environment_admin_failed",
@@ -47,6 +51,7 @@ impl DockerNetwork {
         operation: &AdminOperation,
     ) -> Result<(), Error> {
         self.save_admin_record(request, operation).await?;
+
         let latest = self
             .compose_file
             .with_file_name("admin-operations")
@@ -65,12 +70,14 @@ impl DockerNetwork {
     ) -> Result<(), Error> {
         let dir = self.compose_file.with_file_name("admin-operations");
         tokio::fs::create_dir_all(&dir).await.map_err(failure)?;
+
         let path = dir.join(format!("{}.json", operation.id));
         let temp = path.with_extension("json.tmp");
         let record = SavedOperation {
             request: request.clone(),
             operation: operation.clone(),
         };
+
         tokio::fs::write(&temp, serde_json::to_vec(&record).map_err(failure)?)
             .await
             .map_err(failure)?;
@@ -90,16 +97,19 @@ impl DockerNetwork {
                 Err(e) => return Err(failure(e)),
             },
         };
+
         Uuid::parse_str(&id).map_err(failure)?;
         let bytes = match tokio::fs::read(dir.join(format!("{id}.json"))).await {
             Ok(bytes) => bytes,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(e) => return Err(failure(e)),
         };
+
         let saved: SavedOperation = serde_json::from_slice(&bytes).map_err(failure)?;
         if let Some(request) = request {
             request.check_retry(&saved.request)?;
         }
+
         let mut op = saved.operation;
         if op.is_active() {
             op.phase = "failed".into();
@@ -109,6 +119,7 @@ impl DockerNetwork {
             // Finalizing its record must not replace that operation's latest ID.
             self.save_admin_record(&saved.request, &op).await?;
         }
+
         Ok(Some(op))
     }
 
@@ -140,10 +151,12 @@ impl DockerNetwork {
         if !path.exists() {
             return Ok(());
         }
+
         let journal: Recovery =
             serde_json::from_slice(&tokio::fs::read(&path).await.map_err(failure)?)
                 .map_err(failure)?;
         self.stop().await?;
+
         if journal.ready {
             for (service, backup) in &journal.backups {
                 self.offline_admin(
@@ -161,10 +174,12 @@ impl DockerNetwork {
             }
             self.reset_indexer().await?;
         }
+
         // Opening the owner only reconciles Docker; it does not start services.
         // Retain the journal until the entire deployment is back, even when the
         // crash happened before backups were ready and no state was changed.
         self.start_all().await?;
+
         // Keep recovery archives in their own namespace; a joined-node archive must
         // never appear as a restorable genesis snapshot in the Studio snapshot list.
         tokio::fs::remove_file(path).await.map_err(failure)
@@ -205,9 +220,17 @@ impl DockerNetwork {
         }
         let mut services = vec!["localton".to_owned()];
         services.extend(nodes.iter().map(|node| node.id.clone()));
+
         phase(operation, "stopping").await;
-        self.stop().await?;
-        let result = self.admin_work(&services, request, operation).await;
+
+        // A failed stop can leave only part of the cluster running. Include it
+        // in recovery even though no account state has been changed yet.
+        let result = async {
+            self.stop().await?;
+            self.admin_work(&services, request, operation).await
+        }
+        .await;
+
         if let Err(error) = result {
             phase(operation, "restoring").await;
             let recovery = if self.has_admin_recovery() {
@@ -215,13 +238,16 @@ impl DockerNetwork {
             } else {
                 self.start_all().await
             };
+
             if let Err(restore) = recovery {
                 return Err(failure(format!(
                     "{error}. Recovery also failed: {restore}. Cold backups and the recovery journal have been retained."
                 )));
             }
+
             return Err(error);
         }
+
         result
     }
 
@@ -553,7 +579,11 @@ impl DockerNetwork {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::{NetworkConfig, Runtime, docker::DockerTarget};
+    use crate::{
+        NetworkConfig, Runtime,
+        activity::{ActivityConfig, ActivityStatus},
+        docker::DockerTarget,
+    };
 
     async fn run_edit(runtime: &Runtime, request: AdminRequest) -> Result<u32, Error> {
         let accepted = runtime.start_admin(request.clone()).await?;
@@ -681,49 +711,144 @@ mod tests {
         let result: Result<(), Error> = async {
             driver.start_all().await?;
             eprintln!("Complete environment started");
+
             let address = format!("0:{}", "22".repeat(32));
-            let request: AdminRequest = serde_json::from_value(serde_json::json!({"kind": "accounts", "id": Uuid::new_v4().to_string(), "edits": [{"address": address, "type": "balance", "balance": "42000000000"}]})).unwrap();
+            let request: AdminRequest = serde_json::from_value(serde_json::json!({
+                "kind": "accounts",
+                "id": Uuid::new_v4().to_string(),
+                "edits": [{
+                    "address": address,
+                    "type": "balance",
+                    "balance": "42000000000"
+                }]
+            }))
+            .unwrap();
+
             let runtime = Runtime::open(&location.path).await?;
             runtime.reconcile().await;
-            runtime.configure_activity(crate::activity::ActivityConfig::default(), true).await?;
+            runtime
+                .configure_activity(ActivityConfig::default(), true)
+                .await?;
+
             let seqno = run_edit(&runtime, request).await?;
-            if runtime.activity().await?.status != crate::activity::ActivityStatus::Stopped {
-                return Err(failure("Activity generator was not stopped before the hardfork"));
+            if runtime.activity().await?.status != ActivityStatus::Stopped {
+                return Err(failure(
+                    "Activity generator was not stopped before the hardfork",
+                ));
             }
+
             eprintln!("Hardfork completed at {seqno}");
-            let account = driver.live_admin("localton", &["lite", "account", &address], None).await?;
-            if account["balance_nano"] != "42000000000" { return Err(failure(format!("Incorrect native account: {account}"))); }
-            let replica = driver.live_admin("node-1", &["lite", "account", &address], None).await?;
-            if replica["balance_nano"] != "42000000000" { return Err(failure(format!("Incorrect replica account: {replica}"))); }
-            let response: serde_json::Value = reqwest::get(format!("http://127.0.0.1:28303/api/v3/accountStates?address={address}")).await.map_err(failure)?.json().await.map_err(failure)?;
+            let account = driver
+                .live_admin("localton", &["lite", "account", &address], None)
+                .await?;
+            if account["balance_nano"] != "42000000000" {
+                return Err(failure(format!("Incorrect native account: {account}")));
+            }
+
+            let replica = driver
+                .live_admin("node-1", &["lite", "account", &address], None)
+                .await?;
+            if replica["balance_nano"] != "42000000000" {
+                return Err(failure(format!("Incorrect replica account: {replica}")));
+            }
+
+            let account_url =
+                format!("http://127.0.0.1:28303/api/v3/accountStates?address={address}");
+            let response: serde_json::Value = reqwest::get(&account_url)
+                .await
+                .map_err(failure)?
+                .json()
+                .await
+                .map_err(failure)?;
             eprintln!("Indexed account: {response}");
-            if response["accounts"][0]["balance"] != "42000000000" { return Err(failure(format!("Incorrect indexed account: {response}"))); }
-            let changed: AdminRequest = serde_json::from_value(serde_json::json!({"kind": "accounts", "id": Uuid::new_v4().to_string(), "edits": [{"address": address, "type": "balance", "balance": "43000000000"}]})).unwrap();
+            if response["accounts"][0]["balance"] != "42000000000" {
+                return Err(failure(format!("Incorrect indexed account: {response}")));
+            }
+
+            // Both edits preserve transaction LT. Indexing must still replace
+            // the first hardfork's account state with the second one.
+            let changed: AdminRequest = serde_json::from_value(serde_json::json!({
+                "kind": "accounts",
+                "id": Uuid::new_v4().to_string(),
+                "edits": [{
+                    "address": address,
+                    "type": "balance",
+                    "balance": "43000000000"
+                }]
+            }))
+            .unwrap();
             run_edit(&runtime, changed).await?;
-            let updated: serde_json::Value = reqwest::get(format!("http://127.0.0.1:28303/api/v3/accountStates?address={address}")).await.map_err(failure)?.json().await.map_err(failure)?;
-            if updated["accounts"][0]["balance"] != "43000000000" { return Err(failure(format!("A second hardfork was not indexed: {updated}"))); }
+            let updated: serde_json::Value = reqwest::get(&account_url)
+                .await
+                .map_err(failure)?
+                .json()
+                .await
+                .map_err(failure)?;
+            if updated["accounts"][0]["balance"] != "43000000000" {
+                return Err(failure(format!(
+                    "A second hardfork was not indexed: {updated}"
+                )));
+            }
+
             eprintln!("Repeated account overwrite was indexed");
-            let invalid: AdminRequest = serde_json::from_value(serde_json::json!({"kind": "accounts", "id": Uuid::new_v4().to_string(), "edits": [{"address": address, "type": "freeze"}]})).unwrap();
-            let error = run_edit(&runtime, invalid).await.err().ok_or_else(|| failure("Invalid edit was accepted"))?;
+
+            // Freezing an uninitialized account fails after snapshots exist,
+            // exercising rollback rather than transport-level validation.
+            let invalid: AdminRequest = serde_json::from_value(serde_json::json!({
+                "kind": "accounts",
+                "id": Uuid::new_v4().to_string(),
+                "edits": [{"address": address, "type": "freeze"}]
+            }))
+            .unwrap();
+            let error = run_edit(&runtime, invalid)
+                .await
+                .err()
+                .ok_or_else(|| failure("Invalid edit was accepted"))?;
             eprintln!("Expected rejected operation: {error}");
-            if !error.to_string().contains("Only an active account") { return Err(error); }
-            if driver.has_admin_recovery() { return Err(failure("Recovery journal remains")); }
-            if !driver.admin_is_running(&nodes).await { return Err(failure("Environment did not recover")); }
-            let account = driver.live_admin("localton", &["lite", "account", &address], None).await?;
-            if account["balance_nano"] != "43000000000" { return Err(failure(format!("Incorrect native account: {account}"))); }
+
+            if !error.to_string().contains("Only an active account") {
+                return Err(error);
+            }
+            if driver.has_admin_recovery() {
+                return Err(failure("Recovery journal remains"));
+            }
+            if !driver.admin_is_running(&nodes).await {
+                return Err(failure("Environment did not recover"));
+            }
+
+            let account = driver
+                .live_admin("localton", &["lite", "account", &address], None)
+                .await?;
+            if account["balance_nano"] != "43000000000" {
+                return Err(failure(format!("Incorrect native account: {account}")));
+            }
+
             drop(runtime);
+
             for ready in [false, true] {
                 driver.stop().await?;
                 let mut journal = Recovery::default();
                 if ready {
                     for service in ["localton", "node-1"] {
-                        let directory = format!("{LOCALTON_SNAPSHOT_DIR}/admin/recovery-test/{service}");
-                        let snapshot = driver.offline_admin(service,
-                            &["snapshot", "create", "--snapshot-dir", &directory], None).await?;
-                        journal.backups.insert(service.into(), Backup {
-                            id: snapshot["id"].as_str().ok_or_else(|| failure("Missing snapshot id"))?.into(),
-                            directory,
-                        });
+                        let directory =
+                            format!("{LOCALTON_SNAPSHOT_DIR}/admin/recovery-test/{service}");
+                        let snapshot = driver
+                            .offline_admin(
+                                service,
+                                &["snapshot", "create", "--snapshot-dir", &directory],
+                                None,
+                            )
+                            .await?;
+                        journal.backups.insert(
+                            service.into(),
+                            Backup {
+                                id: snapshot["id"]
+                                    .as_str()
+                                    .ok_or_else(|| failure("Missing snapshot id"))?
+                                    .into(),
+                                directory,
+                            },
+                        );
                     }
                     journal.ready = true;
                 }
@@ -732,25 +857,38 @@ mod tests {
                     // Simulate the crash after validator suspension; restoring the
                     // cold archives must recover election keys as well as accounts.
                     for service in ["localton", "node-1"] {
-                        driver.offline_admin(service, &["godmode", "suspend"], None).await?;
+                        driver
+                            .offline_admin(service, &["godmode", "suspend"], None)
+                            .await?;
                     }
                 }
                 // No explicit start: opening the new owner must finish recovery.
                 let reopened = Runtime::open(&location.path).await?;
                 reopened.reconcile().await;
-                if reopened.get().await.status != crate::Status::Running || driver.has_admin_recovery() {
-                    return Err(failure(format!("Startup recovery did not complete (ready={ready})")));
+                if reopened.get().await.status != crate::Status::Running
+                    || driver.has_admin_recovery()
+                {
+                    return Err(failure(format!(
+                        "Startup recovery did not complete (ready={ready})"
+                    )));
                 }
                 for service in ["localton", "node-1"] {
-                    let account = driver.live_admin(service, &["lite", "account", &address], None).await?;
+                    let account = driver
+                        .live_admin(service, &["lite", "account", &address], None)
+                        .await?;
                     if account["balance_nano"] != "43000000000" {
-                        return Err(failure(format!("Recovery lost account state on {service}: {account}")));
+                        return Err(failure(format!(
+                            "Recovery lost account state on {service}: {account}"
+                        )));
                     }
                 }
                 eprintln!("Startup recovery restarted both nodes (ready={ready})");
             }
+
             Ok(())
-        }.await;
+        }
+        .await;
+
         if result.is_err() {
             let mut command = driver.compose_command();
             command.args(["logs", "--tail", "35", "v3-worker", "localton", "node-1"]);

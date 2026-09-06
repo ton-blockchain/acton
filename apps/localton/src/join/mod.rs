@@ -26,6 +26,7 @@ use crate::{
     bootstrap::{acquire_lock, shutdown_signal, supervise},
     cli::JoinArgs,
     http, node,
+    operations::godmode,
     runtime::ProcessRegistry,
     storage::{Layout, RuntimeState, ServiceRuntime},
     ton::{global_config::GlobalConfig, toolchain::Toolchain},
@@ -72,8 +73,9 @@ pub async fn run(args: JoinArgs) -> Result<()> {
     layout.create_dirs()?;
 
     let _state_lock = acquire_lock(&layout.lock)?;
-    crate::operations::godmode::recover_install(&layout)?;
-    crate::operations::godmode::invalidate_observation(&layout.node)?;
+    godmode::recover_install(&layout)?;
+    godmode::invalidate_observation(&layout.node)?;
+
     let processes = ProcessRegistry::default();
 
     // Install signal handling before any TON process starts. Otherwise Ctrl+C
@@ -129,7 +131,7 @@ pub async fn run(args: JoinArgs) -> Result<()> {
             if let Some(key) = manifest.liteserver_public_key() {
                 GlobalConfig::load(&layout.global_config)?.with_local_liteserver(node_settings.liteserver_port, key).save_atomic(&node_layout.global_config)?;
             }
-            let _block_source = crate::operations::godmode::serve_staged(&node_layout, 0).await?;
+            let _block_source = godmode::serve_staged(&node_layout, 0).await?;
             let mut runtime = node::start(
                 &layout,
                 &node_layout,

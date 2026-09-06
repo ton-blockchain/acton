@@ -5,12 +5,14 @@
   display: grid;
   gap: 16px;
 }
+
 .form {
   padding: 22px;
   border: 1px solid var(--acton-color-border);
   border-radius: 12px;
   background: var(--acton-color-surface-raised);
 }
+
 .form fieldset {
   border: 0;
   padding: 0;
@@ -19,6 +21,7 @@
   gap: 20px;
   min-width: 0;
 }
+
 .form fieldset:disabled {
   opacity: 0.6;
 }

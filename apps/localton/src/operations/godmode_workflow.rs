@@ -1,7 +1,10 @@
 //! Validation and recoverable installation of offline administrator plans.
+
 use super::*;
-use crate::ton::lite::{BlockRef as ObservedBlock, LocalLiteClient};
-use std::io::Read;
+use crate::{storage, ton::lite::{BlockRef as ObservedBlock, LocalLiteClient}};
+use std::time::Duration;
+use tokio::time::sleep;
+use ton_hardfork::{HardforkBlock, request::{AccountEdit, account_batch}};
 use tycho_types::{
     boc::Boc,
     merkle::MerkleProof,
@@ -14,8 +17,9 @@ struct Observation {
     state_hash: String,
 }
 
+/// Captures and checks one stable suspended run before recording an observation or plan.
 pub(super) async fn live_command(layout: &Layout, command: &GodmodeCommand) -> Result<()> {
-    let _lock = crate::bootstrap::acquire_lock(&layout.node.root.join("godmode-read.lock"))
+    let _lock = bootstrap::acquire_lock(&layout.node.root.join("godmode-read.lock"))
         .context("Another administrative state query is in progress")?;
     ensure!(
         !ValidatorEngineConfig::load(&engine_config_path(&layout.node))?.validates(),
@@ -26,7 +30,7 @@ pub(super) async fn live_command(layout: &Layout, command: &GodmodeCommand) -> R
         .hardfork_sources(&layout.node.root.join("godmode-state-cache"))
         .await?;
     let head = client.last().await?;
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    sleep(Duration::from_secs(1)).await;
     ensure!(
         client.last().await? == head && head.seqno == sources.masterchain_prev.seqno,
         "Block production is still active"
@@ -42,20 +46,20 @@ pub(super) async fn live_command(layout: &Layout, command: &GodmodeCommand) -> R
         }
         GodmodeCommand::Prepare(_) => {
             let mut input = Vec::new();
-            std::io::stdin()
+            io::stdin()
                 .take(16 * 1024 * 1024 + 1)
                 .read_to_end(&mut input)?;
             ensure!(
                 input.len() <= 16 * 1024 * 1024,
                 "Administrative request is too large"
             );
-            let edits: Vec<ton_hardfork::request::AccountEdit> = serde_json::from_slice(&input)?;
-            let batch = ton_hardfork::request::account_batch(&sources, &edits)?;
-            let now = crate::storage::unix_time()
+            let edits: Vec<AccountEdit> = serde_json::from_slice(&input)?;
+            let batch = account_batch(&sources, &edits)?;
+            let now = storage::unix_time()
                 .try_into()
                 .context("Timestamp overflow")?;
             let built = ton_hardfork::build_hardfork(&sources, now, &batch)?;
-            let planned = |b: &ton_hardfork::HardforkBlock| PlannedBlock {
+            let planned = |b: &HardforkBlock| PlannedBlock {
                 workchain: b.shard.workchain(),
                 shard: b.shard.prefix(),
                 seqno: b.seqno,
@@ -192,6 +196,7 @@ struct InstallJournal {
     engine: serde_json::Value,
 }
 
+/// Restores all configuration files before startup can expose a partially installed plan.
 pub(crate) fn recover_install(layout: &Layout) -> Result<()> {
     let path = layout.node.root.join("godmode-install.json");
     if !path.exists() {
@@ -209,6 +214,8 @@ pub(crate) fn recover_install(layout: &Layout) -> Result<()> {
     Ok(())
 }
 
+/// Validates the observed predecessor and commits configuration with an undo journal.
+/// The caller holds the state-directory lock and keeps validator-engine stopped.
 pub(super) fn install(
     layout: &Layout,
     plan: &HardforkPlan,
@@ -317,7 +324,7 @@ pub(super) fn install(
             .is_none_or(|n| *n < info.seqno),
         "Hardfork sequence number is already registered"
     );
-    let read_json = |p: &std::path::Path| -> Result<serde_json::Value> {
+    let read_json = |p: &Path| -> Result<serde_json::Value> {
         Ok(serde_json::from_slice(&fs::read(p)?)?)
     };
     let saved = InstallJournal {
@@ -340,9 +347,9 @@ pub(super) fn install(
         fs::remove_file(&journal)?;
         Ok(())
     })();
-    if result.is_err() {
-        recover_install(layout)
-            .context("Installation failed and rollback could not restore the original files")?;
+    if let Err(error) = &result {
+        // Preserve both causes: a failed rollback must not hide why installation failed.
+        recover_install(layout).with_context(|| format!("Installation failed: {error:#}; rollback could not restore the original files"))?;
     }
     result
 }
@@ -395,6 +402,7 @@ mod tests {
         .unwrap();
         (dir, layout, plan)
     }
+
     fn endpoint() -> BlockSourceEndpoint {
         BlockSourceEndpoint {
             port: 4443,
@@ -446,7 +454,7 @@ mod tests {
     #[test]
     fn interrupted_install_restores_configuration_before_startup() {
         let (_dir, layout, plan) = fixture();
-        let read = |p: &std::path::Path| serde_json::from_slice(&fs::read(p).unwrap()).unwrap();
+        let read = |p: &Path| serde_json::from_slice(&fs::read(p).unwrap()).unwrap();
         let saved = InstallJournal {
             global: read(&layout.global_config),
             node_global: read(&layout.node.global_config),

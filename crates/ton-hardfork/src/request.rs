@@ -1,4 +1,5 @@
 //! Validated account edits. Balances are decimal nanotons; cells are base64 BoCs.
+
 use crate::{AccountWrite, AdminBatch, HardforkSources};
 use anyhow::{Context, Result, bail, ensure};
 use base64::{Engine, engine::general_purpose::STANDARD};
@@ -15,6 +16,8 @@ use tycho_types::{
     prelude::HashBytes,
 };
 
+/// One account replacement within a hardfork batch, addressed in raw workchain form.
+/// Deserialization rejects unknown fields so misspelled edits cannot silently do less work.
 #[derive(Clone, Debug, Serialize)]
 pub struct AccountEdit {
     pub address: String,
@@ -25,26 +28,32 @@ pub struct AccountEdit {
 impl<'de> Deserialize<'de> for AccountEdit {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         use serde::de::Error;
+
         let mut fields = serde_json::Map::<String, serde_json::Value>::deserialize(deserializer)?;
         let address = fields
             .remove("address")
             .and_then(|v| v.as_str().map(str::to_owned))
             .ok_or_else(|| D::Error::custom("Expected account address"))?;
+
         let allowed: &[&str] = match fields.get("type").and_then(serde_json::Value::as_str) {
             Some("balance" | "uninit") => &["type", "balance"],
             Some("code" | "data" | "replace") => &["type", "boc"],
             Some("freeze" | "delete") => &["type"],
             _ => return Err(D::Error::custom("Unknown account action")),
         };
+
         if fields.keys().any(|key| !allowed.contains(&key.as_str())) {
             return Err(D::Error::custom("Unknown account edit field"));
         }
+
         let change =
             serde_json::from_value(serde_json::Value::Object(fields)).map_err(D::Error::custom)?;
         Ok(Self { address, change })
     }
 }
 
+/// Direct state mutations that do not execute contracts or synthesize transactions.
+/// State-dependent restrictions are enforced against the common paused chain head.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 pub enum AccountChange {
@@ -57,6 +66,7 @@ pub enum AccountChange {
     Replace { boc: String },
 }
 
+/// Bounds and decodes the API's base64 transport before account-specific TL-B validation.
 pub fn decode_cell(value: &str) -> Result<Cell> {
     ensure!(value.len() <= 16 * 1024 * 1024, "BoC exceeds 16 MiB");
     Boc::decode(
@@ -68,6 +78,7 @@ pub fn decode_cell(value: &str) -> Result<Cell> {
 }
 
 impl AccountEdit {
+    /// Validates the target and payload without requiring a live node or account state.
     pub fn validate(&self) -> Result<StdAddr> {
         let address: StdAddr = self
             .address
@@ -77,6 +88,7 @@ impl AccountEdit {
             matches!(address.workchain, -1 | 0),
             "Only masterchain and basechain accounts are supported"
         );
+
         match &self.change {
             AccountChange::Balance { balance }
             | AccountChange::Uninit {
@@ -102,15 +114,19 @@ impl AccountEdit {
             }
             _ => {}
         }
+
         Ok(address)
     }
 }
 
+/// Applies distinct edits to the supplied chain snapshot and groups writes by workchain.
+/// The caller owns pausing nodes and installing the resulting hardfork consistently.
 pub fn account_batch(sources: &HardforkSources, edits: &[AccountEdit]) -> Result<AdminBatch> {
     ensure!(
         !edits.is_empty() && edits.len() <= 100,
         "An operation must contain 1–100 account edits"
     );
+
     let mc = sources.masterchain_state.parse::<ShardStateUnsplit>()?;
     let shard = sources
         .basechain
@@ -119,12 +135,14 @@ pub fn account_batch(sources: &HardforkSources, edits: &[AccountEdit]) -> Result
         .transpose()?;
     let mut seen = BTreeSet::new();
     let mut batch = AdminBatch::default();
+
     for edit in edits {
         let address = edit.validate()?;
         ensure!(
             seen.insert(address.to_string()),
             "Duplicate account edit: {address}"
         );
+
         let state = if address.workchain == -1 {
             &mc
         } else {
@@ -132,12 +150,14 @@ pub fn account_batch(sources: &HardforkSources, edits: &[AccountEdit]) -> Result
         };
         let existing = state.accounts.load()?.get(address.address)?.map(|(_, a)| a);
         let write = apply_edit(&address, existing, &edit.change, mc.gen_utime)?;
+
         if address.workchain == -1 {
             batch.masterchain.push(write);
         } else {
             batch.basechain.push(write);
         }
     }
+
     Ok(batch)
 }
 
@@ -160,14 +180,17 @@ fn apply_edit(
     if matches!(change, AccountChange::Delete) {
         return Ok(AccountWrite::remove(address.address));
     }
+
     let mut record = existing.unwrap_or(ShardAccount {
         account: Lazy::new(&OptionalAccount(None))?,
         last_trans_hash: HashBytes::ZERO,
         last_trans_lt: 0,
     });
+
     if let AccountChange::Replace { boc } = change {
         record = decode_cell(boc)?.parse()?;
     }
+
     let mut account = record.load_account()?.unwrap_or(Account {
         address: IntAddr::Std(address.clone()),
         storage_stat: StorageInfo {
@@ -180,6 +203,7 @@ fn apply_edit(
         balance: CurrencyCollection::ZERO,
         state: AccountState::Uninit,
     });
+
     match change {
         AccountChange::Balance { balance } => account.balance.tokens = parse_balance(balance)?,
         AccountChange::Code { boc } => {
@@ -211,6 +235,7 @@ fn apply_edit(
         }
         _ => {}
     }
+
     // Compute AccountStorage, excluding Account's address and StorageInfo. The
     // upstream 0.3.5 StorageUsed::compute has an inverted validity predicate.
     let mut storage = CellBuilder::new();
@@ -225,6 +250,7 @@ fn apply_edit(
         .build()?
         .compute_unique_stats(1_000_000)
         .context("Account storage exceeds the cell limit")?;
+
     account.storage_stat.used = StorageUsed {
         cells: VarUint56::new(stats.cell_count),
         bits: VarUint56::new(stats.bit_count),

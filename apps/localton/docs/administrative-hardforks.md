@@ -1,133 +1,120 @@
-# Administrative actions in full Studio environments
+# Change account state with administrative hardforks
 
-Studio's **Admin actions** page edits account balances, code, data and lifecycle
-state, and replaces a complete `ShardAccount`. Configuration parameters are edited
-separately on **Network → Config**.
-It is available for managed full TON environments. Account edits use hardforks
-accepted by the pinned, unmodified TON validator-engine.
+Use **Admin actions** in Acton Studio to prepare account states for contract tests
+on a full localnet. You can set a balance, replace contract code or data, freeze
+an account, or delete it.
 
-Build an image containing **both** the updated Localton binary and the patched
-indexer. For development, reuse the pinned image's native TON and API layers:
+Each operation creates a **real hardfork** of your local blockchain. All managed
+nodes accept a new block with the edited account state, then continue normal
+block production. The change persists in node storage and appears in Explorer.
 
-```sh
-docker build -f apps/localton/Dockerfile --target localton-admin-dev \
-  -t acton-localton:admin .
-ACTON_LOCALNET_IMAGE=acton-localton:admin acton studio start
-```
+An administrative edit changes state directly. It does not execute the contract,
+send messages, or create a transaction. The account transaction history therefore
+has no transaction for this change.
 
-Create a full environment with this image. Existing environments retain their
-saved image in `runtime.json`; changing the environment variable does not upgrade
-them. The complete Dockerfile runtime target also contains the changes. The
-`localton-rust-only` target does not upgrade indexing and cannot be used for these
-operations. Studio checks compatibility before stopping the environment.
+## Before you apply an edit
 
-## Execution and recovery
+- Start your full localnet and all its nodes. Every node must be available and
+  synchronized before the operation starts
+- Use a Localton image with support for administrative hardforks and account
+  indexing after a hardfork. Studio checks image support before it pauses the network
+- Allow enough disk space for recovery snapshots of every node. The operation
+  copies node databases and can take several minutes
+- For a restore point that you can use later, create a snapshot on **Snapshots**
+- Stop external scripts that send messages if your test requires a stable account
+  state after the edit
 
-The acton-localnet service runs the operation independently of its HTTP request.
-Studio forwards edits to this service, sharing its mutation lock with CLI operations. It saves
-cold recovery archives for every node, suspends all validators, verifies a common
-masterchain head, builds and installs the same plan on every node, and checks that
-each node applied it. It then restores networking and validator keys and waits for
-ordinary blocks and the V3 indexer. The operation blocks conflicting lifecycle,
-topology and snapshot changes from Studio and the Acton CLI until it finishes.
+Existing environments keep the image that you selected at creation. A new default
+image does not update them. If Studio reports an unsupported image, create an
+environment with a compatible image.
 
-On failure, the localnet service restores all node archives and rebuilds the derived index.
-Recovery runs before startup after an interrupted localnet service process. A retained
-`admin-recovery.json` means recovery still needs to complete; it must not be
-removed to bypass a failed restore. Archives live in the environment's
-`localton-snapshots` Docker volume under `admin/<operation-id>/<service>/` and are
-retained for diagnosis. They are separate from ordinary Studio snapshots and
-consume disk space until removed. An interrupted operation is reported as failed
-rather than being silently resubmitted.
+## Apply an account change
 
-`POST /api/v1/environments/{id}/admin` returns an operation immediately. Poll the
-same URL with `GET` for progress and completion. A request contains a UUID `id`:
-reuse it when retrying the **same** request after a lost response. Operation
-records persist across localnet service restarts. Different content with a reused ID is
-rejected.
+- Open your full localnet in Studio, then open **Admin actions**
+- Select an **Action** from the table below
+- Enter the **Account address**, or select a wallet or known contract from the suggestions
+- Enter the balance or BoC required for the action
+- Select **Apply changes**
 
-```json
-{
-  "kind": "accounts",
-  "id": "312a389c-28fc-4d49-b71f-b843cff3b4fd",
-  "edits": [{
-    "address": "0:2222222222222222222222222222222222222222222222222222222222222222",
-    "type": "balance",
-    "balance": "42000000000"
-  }]
-}
-```
+| Action | Result | Input |
+| --- | --- | --- |
+| Set balance | Sets the native balance to an exact amount | A nonnegative GRAM amount, with up to 9 decimal places |
+| Replace code | Replaces code and preserves data and balance. An uninitialized account becomes active | The code cell |
+| Replace data | Replaces data and preserves code and balance. The account must be active | The data cell |
+| Freeze account | Replaces active state with its StateInit hash and preserves the balance | No additional value |
+| Make account uninitialized | Removes code and data and preserves the balance | No additional value |
+| Delete account | Removes the account, including its balance and state | No additional value |
+| Replace complete ShardAccount | Replaces the balance, state and transaction reference | A complete ShardAccount with the target address |
 
-The API accepts 1–100 distinct accounts per batch. Balances are decimal nanotons;
-the UI converts TON amounts. Requests are limited to 16 MiB of JSON and each
-base64 BoC string to 16 MiB. `code`, `data`, and `replace` take a base64 `boc`;
-`freeze`, `delete`, and `uninit` need no value. `uninit` can optionally set a new
-balance. `replace` requires a complete `ShardAccount` with the matching address.
-Public masterchain library registrations and account storage statistics are
-updated with the account state.
+For example, **Set balance** with `42` sets the account balance to **42 GRAM**.
+It does not add 42 GRAM to the current balance.
 
-A configuration request has `kind: "config"`, `id`, signed integer `index`, and
-base64 `boc`. It uses the configuration master contract and waits for the consumed
-seqno and the active parameter value. It also gets cold recovery archives and
-post-change production checks.
+The address field accepts raw and user-friendly addresses. The BoC field accepts
+base64, base64url, hex, and links that contain an encoded BoC. **Load file** accepts
+binary BoC files and text files. The input must contain one ordinary root cell.
 
-## Limits
+**Replace complete ShardAccount** requires the serialized account record.
+A code cell, data cell, or StateInit alone is not a complete ShardAccount.
 
-- Only masterchain and a single unsplit workchain-0 shard are supported. Split or
-  merged histories are rejected. Every configured node must be available and
-  caught up. Start any individually stopped nodes before submitting an edit; the
-  service rejects edits while a managed node is stopped. Nodes managed outside the
-  localnet service must not continue validating.
-- Several coordinated stops and starts are required. Cost includes copying node
-  databases. This is intended for local development, and can take minutes.
-- Stock TON's `getState` refuses seqnos above 1000. Localton reconstructs later
-  states by applying authenticated Merkle updates, caches the result, and
-  revalidates that cache after restarts or restores. The first edit on a long
-  chain needs retained block/state history and can be substantially slower.
-- Account edits create state discontinuities, without inventing transactions.
-  They do not send internal messages, execute code, create message descriptors,
-  or enqueue transaction outputs. `RecordedTransaction` is rejected until all of
-  those structures can be maintained together. Existing queued messages remain
-  queued and can subsequently change the edited account.
-- V3 account state indexing handles changes and deletion even when transaction
-  LT does not change. Transaction histories retain actual transactions only.
-  Derived token/NFT classifications and metadata have their own caches and
-  transaction-based update rules; arbitrary code/data replacement does not
-  guarantee immediate refresh of every derived view.
-- Hardforks use separate tonlib caches, and snapshot restoration clears the V2
-  trusted-head cache. API services need to warm up again after these restarts.
-- A valid BoC or configuration TL-B value does not prove contract semantics or
-  future validator-election correctness. The operation checks acceptance,
-  resumed production and indexing, not all future executions. In particular,
-  changing consensus/election parameters or system-contract state can have
-  delayed effects.
-- Direct Localton CLI mutations and manual Docker operations bypass the localnet
-  service mutation lock.
-  Avoid them while an administrative operation is active.
+## Progress and completion
 
-## Manual CLI steps
+Studio stops the activity generator and pauses the network. It saves recovery
+snapshots, applies the same hardfork on every node, and checks the resulting state.
+It then resumes block production and waits for Explorer indexing to reach the
+changed block. The activity generator remains stopped until you start it again.
 
-With every node stopped, `localton godmode suspend` saves validator keys and
-suppresses automatic election actions. Start the suspended nodes, run `godmode
-observe` on each, and feed an account-edit array to `godmode prepare` on genesis.
-Stop all nodes, install the resulting plan on each using `godmode install`, start
-them and run `godmode verify` on each. Stop them again, run `godmode finish` and
-`godmode resume` on each, then start normally. Take cold backups first.
+The progress notification shows the current step. **Changes applied** includes a
+link to the masterchain block where Studio verified the change. Your form values
+remain available after the operation.
 
-The offline commands reject a running Localton process. Installation validates
-BoC hashes, headers, predecessor references and shard proofs before changing
-files. An incomplete file commit is rolled back before the next node startup.
-A pending identical plan is idempotent; another plan cannot replace its block
-source. `finish` requires successful verification. Source listeners use available
-loopback ports, including on joined nodes.
+You can leave the page or close the browser. The localnet service continues the
+operation. The page shows progress again if you return before completion.
 
-## Regression checks
+Studio and the Acton CLI block conflicting network, node and snapshot changes
+until the operation finishes. Avoid manual Docker operations or direct Localton
+commands during this time.
 
-```sh
-cargo test -p ton-hardfork -p ton-fullnode-master -p ton-localnet -p acton-localnet -p acton-studio
-cargo test --manifest-path apps/localton/Cargo.toml
-bun run --cwd packages/studio-ui build
-bunx playwright test --config packages/studio-ui/playwright.config.ts
-ACTON_LOCALNET_IMAGE=acton-localton:admin cargo test -p acton-localnet \
-  administrative_hardfork_and_rollback_on_two_nodes -- --ignored --nocapture
-```
+## Failed or interrupted operations
+
+If an operation fails after the network pauses, Studio attempts to restore every
+node from its recovery snapshot. It rebuilds the index before the environment
+becomes available again. The error notification reports a failed restore separately.
+
+If the connection fails before Studio receives a response, **Retry same operation**
+sends the original request again. The service recognizes that request and does
+not create a second hardfork for it.
+
+After a localnet service restart, automatic recovery runs before normal startup.
+An interrupted operation appears as failed. Inspect the account in Explorer
+before you submit another edit.
+
+Recovery snapshots are separate from snapshots on the **Snapshots** page. They
+remain in the environment's `localton-snapshots` Docker volume under
+`admin/<operation-id>/<service>/` and use disk space after completion.
+
+If recovery fails, retain the environment data, recovery snapshots and
+`admin-recovery.json`. Do not delete the journal to force the environment to start.
+The error and environment logs provide details for diagnosis.
+
+## Scope and limits
+
+- Administrative hardforks support managed full localnets with masterchain
+  accounts and one unsplit workchain-0 shard. Split and merged histories are not supported
+- All validators must belong to the managed environment. External validators
+  cannot participate in the coordinated pause and state change
+- Existing queued messages remain queued. They can change the edited account
+  after block production resumes
+- Code or data replacement does not guarantee an immediate update of token and
+  NFT metadata. These derived views can depend on later transactions
+- The operation checks the new state, resumed block production and account
+  indexing. It does not prove that the edited contract will behave correctly
+- Changes to system contracts can affect later validator elections and network
+  behavior. Recovery snapshots cover operation failures, not every delayed consequence
+- The first edit on a long-running chain can take longer because Localton must
+  reconstruct its state. This requires retained block and state history
+
+## Change network configuration
+
+Use **Network / Config** to edit blockchain configuration parameters. This page
+submits changes through the configuration contract. Account actions use hardforks.
+Both workflows save recovery snapshots and check that block production resumes.
