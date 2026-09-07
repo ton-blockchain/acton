@@ -153,6 +153,8 @@ inspection panels.
   chevron, focus treatment, spacing, and open-state rotation.
 - Pass domain content as children and use `contentClassName` for its layout.
 - Use `description` only when the section consequence is not obvious.
+- Keep Disclosure borderless, with color-only hover feedback and a visible
+  keyboard focus outline. Align expanded content with the label.
 - Do not add a second chevron or style raw browser disclosure markers.
 - Use `DisclosureToggle` for compact inline Show/Hide actions.
 

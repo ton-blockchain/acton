@@ -991,6 +991,8 @@ open-state motion.
 - Use Disclosure instead of raw `details` and `summary` for full-width
   collapsible UI.
 - Let Disclosure own the chevron and marker removal.
+- Keep the trigger to a chevron and label, without separator lines or a hover
+  background. Hover changes the text color; keyboard focus keeps a visible outline.
 - Keep domain form and inspection content inside the component.
 - Use DisclosureToggle for compact inline Show/Hide controls rather than
   full-width sections.

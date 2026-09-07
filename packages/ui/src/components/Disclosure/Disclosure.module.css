@@ -1,29 +1,24 @@
-.disclosure {
-  border-top: 1px solid var(--acton-color-border);
-  border-bottom: 1px solid var(--acton-color-border);
-}
-
 .summary {
   display: flex;
   min-height: 44px;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--acton-space-2);
-  padding: var(--acton-space-2) var(--acton-space-1);
-  color: var(--acton-color-text);
+  padding: var(--acton-space-3) 0;
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   list-style: none;
   border-radius: var(--acton-radius-control);
-  transition:
-    background-color var(--acton-duration-fast) var(--acton-ease-standard),
-    color var(--acton-duration-fast) var(--acton-ease-standard);
+  transition: color var(--acton-duration-fast) var(--acton-ease-standard);
 }
 
 .summary::-webkit-details-marker {
   display: none;
 }
 
-.summary:hover {
-  background: var(--acton-color-surface-hover);
+.summary:hover,
+.summary:focus-visible,
+.disclosure[open] > .summary {
+  color: var(--acton-color-text);
 }
 
 .summary:focus-visible {
@@ -33,11 +28,11 @@
 
 .icon {
   flex: 0 0 auto;
-  color: var(--acton-color-text-muted);
+  margin-top: calc((var(--acton-font-size-sm) * 1.35 - 16px) / 2);
   transition: transform var(--acton-duration-fast) var(--acton-ease-standard);
 }
 
-.disclosure[open] .icon {
+.disclosure[open] > .summary > .icon {
   transform: rotate(90deg);
 }
 
@@ -48,7 +43,7 @@
 }
 
 .label {
-  color: var(--acton-color-text);
+  color: inherit;
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-medium);
   line-height: 1.35;
@@ -61,6 +56,5 @@
 }
 
 .content {
-  padding: var(--acton-space-2) var(--acton-space-1) var(--acton-space-5)
-    calc(var(--acton-space-1) + 24px);
+  padding: var(--acton-space-2) 0 var(--acton-space-4) calc(16px + var(--acton-space-2));
 }

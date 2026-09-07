@@ -1,4 +1,4 @@
-import {Disclosure} from "@acton/ui"
+import {Checkbox, Disclosure, Input} from "@acton/ui"
 
 import styles from "./disclosureGallery.module.css"
 import type {ComponentGallery} from "./types"
@@ -7,7 +7,20 @@ function DisclosureSamples() {
   return (
     <div className={styles.stack}>
       <Disclosure label="Network and mining">
-        <div className={styles.content}>Runtime options appear here</div>
+        <div className={styles.form}>
+          <div className={styles.fields}>
+            <Input label="Rate limit" suffix="RPS" type="number" min={1} placeholder="Unlimited" />
+            <Input label="Response delay" suffix="ms" type="number" min={1} placeholder="None" />
+            <Input
+              label="Block interval"
+              suffix="ms"
+              type="number"
+              min={1}
+              placeholder="Project default"
+            />
+          </div>
+          <Checkbox label="Manual mining" description="Create blocks only when requested" />
+        </div>
       </Disclosure>
       <Disclosure
         label="Fork settings"
@@ -53,6 +66,7 @@ export const disclosureGallery = {
     "Keep domain content inside the component and use contentClassName for its layout.",
   ],
   avoid: [
+    "Do not add separator lines or a hover background to the disclosure.",
     "Do not render a browser-native disclosure marker.",
     "Do not add a second chevron or custom open-state rotation.",
     "Do not use for compact inline Show/Hide controls; use DisclosureToggle.",
@@ -61,7 +75,7 @@ export const disclosureGallery = {
     {
       id: "disclosure-states",
       title: "Closed and open",
-      description: "Native closed and open states with the shared chevron and spacing.",
+      description: "Borderless sections with color-only hover feedback and keyboard focus.",
       content: <DisclosureSamples />,
     },
     {

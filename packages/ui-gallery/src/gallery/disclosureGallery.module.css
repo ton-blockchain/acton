@@ -10,6 +10,17 @@
   line-height: 1.55;
 }
 
+.form {
+  display: grid;
+  gap: var(--acton-space-4);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: var(--acton-space-4);
+}
+
 .values {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
