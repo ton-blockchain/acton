@@ -65,6 +65,8 @@ mod process;
 mod progress;
 mod snapshots;
 
+pub(crate) use snapshots::list_snapshots;
+
 use compose::render_compose;
 use descriptor::{
     compose_project_name, load_runtime_descriptor, resolve_docker_target, validate_image_reference,

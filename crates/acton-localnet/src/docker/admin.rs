@@ -500,32 +500,8 @@ impl DockerNetwork {
         args: &[&str],
         input: Option<Vec<u8>>,
     ) -> Result<serde_json::Value, Error> {
-        let mut command = self.docker_command();
-        let state_volume = format!(
-            "{}_{}-state:{LOCALTON_STATE_DIR}",
-            self.project_name, service
-        );
-        let backups_volume = format!(
-            "{}_localton-snapshots:{LOCALTON_SNAPSHOT_DIR}",
-            self.project_name
-        );
-        command
-            .args([
-                "run",
-                "--rm",
-                "-i",
-                "--network",
-                "none",
-                "--volume",
-                &state_volume,
-                "--volume",
-                &backups_volume,
-                "--entrypoint",
-                "/usr/local/bin/localton",
-                &self.image,
-            ])
-            .args(args)
-            .args(["--state-dir", LOCALTON_STATE_DIR]);
+        let mut command = self.offline_command(service);
+        command.args(args).args(["--state-dir", LOCALTON_STATE_DIR]);
         self.admin_json(command, service, args, input, SNAPSHOT_TIMEOUT)
             .await
     }

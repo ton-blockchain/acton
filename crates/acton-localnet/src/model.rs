@@ -329,8 +329,10 @@ pub enum OperationStatus {
     Failed,
 }
 
-/// Archive metadata returned by Localton's snapshot implementation. Restoring an
-/// archive requires a stopped network and rebuilding the derived indexer data.
+/// Published metadata for a cold snapshot of the entire network.
+///
+/// Sizes include every node archive; the masterchain height belongs to the genesis
+/// node. Restoration replaces the saved topology and rebuilds all derived index data.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {

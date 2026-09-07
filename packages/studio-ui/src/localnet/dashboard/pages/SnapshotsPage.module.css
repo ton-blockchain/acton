@@ -15,23 +15,20 @@
   margin-bottom: 12px;
 }
 
-.operationHeader > div,
-.operationError {
+.operationHeader > div {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
 
-.operationHeader strong,
-.operationError strong {
+.operationHeader strong {
   color: var(--acton-color-text);
   font-size: 0.88rem;
   font-weight: 600;
 }
 
-.operationHeader span,
-.operationError span {
+.operationHeader span {
   color: var(--acton-color-text-muted);
   font-size: 0.8rem;
   line-height: 1.4;
@@ -142,16 +139,6 @@
   text-align: center;
 }
 
-.operationError {
-  padding: 12px 18px;
-  background: var(--acton-color-status-failed-surface);
-}
-
-.operationError strong,
-.operationError span {
-  color: var(--acton-color-status-failed-text);
-}
-
 .tableWrap {
   overflow-x: auto;
 }
@@ -168,10 +155,6 @@
 .actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.actions {
   justify-content: flex-end;
   gap: 2px;
 }

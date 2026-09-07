@@ -658,7 +658,9 @@ impl ObservationStore {
             });
             let sync_lag_blocks = network_head
                 .zip(telemetry.head_seqno)
-                .map(|(network, node)| network.saturating_sub(node));
+                // A node ahead of the observed chain can belong to a pre-restore
+                // fork. Its lag is unknown, rather than zero (and thus Synced).
+                .and_then(|(network, node)| network.checked_sub(node));
             let sync_status = sync_status(online, sync_lag_blocks, &telemetry.status);
             let validator_status = validator_status(
                 telemetry.roles.contains(&NodeCapability::Validator),
@@ -952,6 +954,26 @@ mod tests {
             sync_status(true, None, "synchronizing"),
             SyncStatus::CatchingUp
         );
+    }
+
+    #[test]
+    fn a_node_ahead_of_the_restored_chain_is_not_synced() {
+        let identity = ObserverIdentity::from_secret([6; 32]);
+        let mut store = ObservationStore::new("network".to_owned(), identity, 600);
+        let mut report = telemetry(None);
+        report.status = "running".to_owned();
+        report.head_seqno = Some(387);
+        store.publish(report, 100, 20).unwrap();
+
+        let network = network_state(218, None);
+        let view = store.aggregate(101, Some(&network), false);
+        expect_test::expect![[r#"
+            (
+                None,
+                Unknown,
+            )
+        "#]]
+        .assert_debug_eq(&(view.nodes[0].sync_lag_blocks, view.nodes[0].sync_status));
     }
 
     #[test]

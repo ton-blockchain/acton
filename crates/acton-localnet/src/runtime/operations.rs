@@ -272,6 +272,7 @@ impl Context {
         }
 
         let driver = self.runtime.driver(&self.entry).await?;
+        self.recover_snapshot(&driver).await?;
         match action {
             Action::Start => {
                 self.start(&driver).await?;
@@ -295,11 +296,13 @@ impl Context {
             Action::Validation { id, enabled } => self.validation(&driver, &id, enabled).await?,
             Action::CreateSnapshot { name } => {
                 let restart = self.entry.record.read().await.status == Status::Running;
+                self.entry.record.write().await.status = Status::Stopping;
                 self.phase("stopping").await?;
                 self.observe(&driver, driver.stop()).await?;
                 self.entry.record.write().await.status = Status::Stopped;
                 self.phase("creatingArchive").await?;
-                let result = driver.create_snapshot(name.as_deref()).await;
+                let nodes = self.entry.record.read().await.nodes.clone();
+                let result = driver.create_snapshot(name.as_deref(), &nodes).await;
                 let restarted = if restart && !*self.runtime.inner.closing.borrow() {
                     self.start(&driver).await
                 } else {
@@ -310,24 +313,41 @@ impl Context {
             }
             Action::RestoreSnapshot { id } => {
                 storage::validate_id(&id)?;
+                let restart = self.entry.record.read().await.status == Status::Running;
+                self.entry.record.write().await.status = Status::Stopping;
                 self.phase("stopping").await?;
                 self.observe(&driver, driver.stop()).await?;
                 self.entry.record.write().await.status = Status::Stopped;
                 self.phase("restoringState").await?;
                 let result = async {
-                    let snapshot = driver.restore_snapshot(&id).await?;
+                    let nodes = self.entry.record.read().await.nodes.clone();
+                    let (snapshot, restored_nodes) = driver.restore_snapshot(&id, &nodes).await?;
                     self.phase("resettingIndexer").await?;
                     driver.reset_indexer().await?;
+                    driver.write_compose(&restored_nodes).await?;
+                    self.entry.record.write().await.nodes = restored_nodes.clone();
+                    self.publish().await?;
+                    driver.finish_snapshot_restore(&restored_nodes).await?;
                     Ok(snapshot)
                 }
                 .await;
-                // Restore failure must not strand a previously usable network.
-                // Cleanup during service shutdown still takes precedence over restart.
-                let restarted = if *self.runtime.inner.closing.borrow() {
-                    Ok(())
-                } else {
-                    self.start(&driver).await
-                };
+                // Never start a mixture of restored and newer node databases.
+                // Roll back first; if rollback fails the durable journal blocks startup.
+                if let Err(error) = &result
+                    && let Err(recovery) = self.recover_snapshot(&driver).await
+                {
+                    return Err(Error::Internal {
+                        code: "snapshot_recovery_failed",
+                        message: format!("{error}; rollback failed: {recovery}"),
+                    });
+                }
+                // Cleanup during service shutdown takes precedence over restart.
+                let restarted =
+                    if *self.runtime.inner.closing.borrow() || (result.is_err() && !restart) {
+                        Ok(())
+                    } else {
+                        self.start(&driver).await
+                    };
                 return snapshot_result(result, restarted);
             }
             Action::DeleteSnapshot { id } => {
@@ -341,6 +361,23 @@ impl Context {
         }
 
         Ok(Value::Null)
+    }
+
+    /// Commits recovered topology before removing the rollback journal. It is also
+    /// used on retries, so a previous failure cannot be bypassed by another action.
+    async fn recover_snapshot(
+        &mut self,
+        driver: &crate::docker::DockerNetwork,
+    ) -> Result<(), Error> {
+        if let Some(nodes) = driver.recover_snapshot().await? {
+            let mut record = self.entry.record.write().await;
+            record.nodes.clone_from(&nodes);
+            record.status = Status::Stopped;
+            drop(record);
+            self.publish().await?;
+            driver.finish_snapshot_restore(&nodes).await?;
+        }
+        Ok(())
     }
 }
 

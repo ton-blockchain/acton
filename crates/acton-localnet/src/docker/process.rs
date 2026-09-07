@@ -2,7 +2,7 @@
 
 use super::{
     COMPOSE_DELETE_TIMEOUT, COMPOSE_STOP_TIMEOUT, COMPOSE_WAIT_TIMEOUT_SECONDS, DockerNetwork,
-    DockerTarget, descriptor::docker_text,
+    DockerTarget, LOCALTON_SNAPSHOT_DIR, LOCALTON_STATE_DIR, descriptor::docker_text,
 };
 use crate::Error;
 use std::{ffi::OsStr, fs::OpenOptions, process::Stdio, time::Duration};
@@ -17,6 +17,25 @@ pub(crate) struct IsolatedPullTarget {
 }
 
 impl DockerNetwork {
+    /// Runs the same offline Localton tool for snapshot and administrative work.
+    /// Only the selected deployment's node and archive volumes are mounted.
+    pub(super) fn offline_command(&self, service: &str) -> Command {
+        let mut command = self.docker_command();
+        command
+            .args(["run", "--rm", "-i", "--network", "none", "--volume"])
+            .arg(format!(
+                "{}_{}-state:{LOCALTON_STATE_DIR}",
+                self.project_name, service
+            ))
+            .arg("--volume")
+            .arg(format!(
+                "{}_localton-snapshots:{LOCALTON_SNAPSHOT_DIR}",
+                self.project_name
+            ))
+            .args(["--entrypoint", "/usr/local/bin/localton", &self.image]);
+        command
+    }
+
     pub(crate) fn spawn_normal_pull(&self) -> Result<Child, Error> {
         let mut command = self.normal_pull_command();
         self.spawn_logged(
@@ -30,7 +49,7 @@ impl DockerNetwork {
         let mut command = self.image_inspect_command();
         self.spawn_logged(
             &mut command,
-            true,
+            false,
             "inspect the full TON network image with Docker",
         )
     }

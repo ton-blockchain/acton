@@ -106,7 +106,7 @@ impl Context {
 
         loop {
             let progress = readiness.borrow_and_update().clone();
-            let ready = progress.completed == 3;
+            let ready = progress.total == Some(progress.completed);
             self.progress(progress).await?;
             if ready {
                 return Ok(());
@@ -114,8 +114,9 @@ impl Context {
             if Instant::now() >= deadline {
                 return Err(Error::Internal {
                     code: "readiness_timeout",
-                    message: "TON APIs or the indexer did not become ready within 180 seconds"
-                        .to_owned(),
+                    message:
+                        "TON nodes, APIs or the indexer did not become ready within 180 seconds"
+                            .to_owned(),
                 });
             }
             tokio::select! {

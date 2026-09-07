@@ -10,6 +10,9 @@ mod operations;
 mod progress;
 mod readiness;
 
+#[cfg(test)]
+mod snapshot_tests;
+
 use crate::{AdminOperation, AdminRequest};
 use crate::{Error, Network, Operation, OperationStatus, Status};
 use crate::{docker::DockerNetwork, storage};
@@ -73,6 +76,18 @@ impl Runtime {
             driver.recover_admin().await?;
         }
 
+        if root.join("snapshot-recovery.json").exists() {
+            let driver = DockerNetwork::load(&root, &record).await?.ok_or_else(|| {
+                Error::invalid("Snapshot recovery requires its deployment descriptor")
+            })?;
+            if let Some(nodes) = driver.recover_snapshot().await? {
+                record.nodes = nodes;
+                record.status = Status::Stopped;
+                storage::write_json(&path, &record).await?;
+                driver.finish_snapshot_restore(&record.nodes).await?;
+            }
+        }
+
         if let Some(op) = &mut record.operation
             && op.status == OperationStatus::Running
         {
@@ -128,17 +143,10 @@ impl Runtime {
         crate::inspection::operation(&self.inner.root, id).await
     }
 
-    /// Lists archives while holding the deployment lock so a restore cannot
-    /// replace the snapshot volume midway through the Localton command.
+    /// Reads committed archive manifests without blocking operation discovery.
     pub async fn snapshots(&self) -> Result<Vec<crate::Snapshot>, Error> {
         let entry = self.entry().await?;
-        let _guard = entry.mutation.try_lock().map_err(|_| Error::busy())?;
-
-        if !entry.data_dir.join("runtime.json").exists() {
-            return Ok(Vec::new());
-        }
-
-        self.driver(&entry).await?.list_snapshots().await
+        crate::docker::list_snapshots(&entry.data_dir).await
     }
 
     /// Returns a bounded tail of the deployment log; the complete log stays on
