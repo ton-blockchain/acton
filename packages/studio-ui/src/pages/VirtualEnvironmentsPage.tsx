@@ -5,6 +5,7 @@ import {
   DataTableBody,
   DataTableCell,
   DataTableEmpty,
+  EmptyState,
   DataTableHead,
   DataTableHeaderCell,
   DataTableRow,
@@ -156,21 +157,21 @@ export function VirtualEnvironmentsPage({
                 />
               ) : environments.length === 0 ? (
                 <DataTableEmpty colSpan={6}>
-                  <div className={styles.emptyState}>
-                    <span className={styles.emptyIcon}>
-                      <Boxes size={21} aria-hidden="true" />
-                    </span>
-                    <strong>No virtual environments</strong>
-                    <span>Create an isolated TON network for this workspace</span>
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      leadingIcon={<Plus size={15} aria-hidden="true" />}
-                      onClick={() => onCreateOpenChange(true)}
-                    >
-                      Create environment
-                    </Button>
-                  </div>
+                  <EmptyState
+                    icon={<Boxes size={21} aria-hidden="true" />}
+                    title="No virtual environments"
+                    description="Create an isolated TON network for this workspace"
+                    action={
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        leadingIcon={<Plus size={15} aria-hidden="true" />}
+                        onClick={() => onCreateOpenChange(true)}
+                      >
+                        Create environment
+                      </Button>
+                    }
+                  />
                 </DataTableEmpty>
               ) : (
                 environments.map(environment => {

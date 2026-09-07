@@ -4,6 +4,7 @@ import {
   DataTableBody,
   DataTableCell,
   DataTableEmpty,
+  EmptyState,
   DataTableHead,
   DataTableHeaderCell,
   DataTableRow,
@@ -189,23 +190,21 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
                 />
               ) : contracts.length === 0 ? (
                 <DataTableEmpty colSpan={5}>
-                  <div className={styles.emptyState}>
-                    <span className={styles.emptyIcon}>
-                      <Box size={20} aria-hidden="true" />
-                    </span>
-                    <strong>No contracts found</strong>
-                    <span>
-                      Add a deployed address or interact with a contract in this environment
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      leadingIcon={<Plus size={15} aria-hidden="true" />}
-                      onClick={() => onAddOpenChange(true)}
-                    >
-                      Add contract
-                    </Button>
-                  </div>
+                  <EmptyState
+                    icon={<Box size={20} aria-hidden="true" />}
+                    title="No contracts yet"
+                    description="Add a deployed address or interact with a contract in this environment"
+                    action={
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        leadingIcon={<Plus size={15} aria-hidden="true" />}
+                        onClick={() => onAddOpenChange(true)}
+                      >
+                        Add contract
+                      </Button>
+                    }
+                  />
                 </DataTableEmpty>
               ) : (
                 contracts.map(contract => (

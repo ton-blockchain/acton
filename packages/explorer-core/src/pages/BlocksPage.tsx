@@ -1,4 +1,5 @@
 import {
+  ArrowLeftRight,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -6,6 +7,7 @@ import {
   Download,
   ExternalLink,
   FileJson,
+  PackageOpen,
   Star,
 } from "lucide-react"
 import {useNavigate, useParams} from "react-router"
@@ -19,6 +21,7 @@ import {
   DataTableBody,
   DataTableCell,
   DataTableEmpty,
+  EmptyState,
   DataTableFooter,
   DataTableHead,
   DataTableHeaderCell,
@@ -225,6 +228,13 @@ export const BlocksPage: FC<BlocksPageProps> = ({client, loadNetworkTps}) => {
             title="Last transactions"
             transactions={state.transactions}
             maxRows={LAST_TRANSACTION_MESSAGES_LIMIT}
+            emptyState={
+              <EmptyState
+                icon={<ArrowLeftRight size={20} aria-hidden="true" />}
+                title="No transactions yet"
+                description="Transactions appear here after the network processes its first message"
+              />
+            }
             messageNamesByAddress={messageNamesByAddress}
             onTransactionClick={(hashHex, _transaction, event) => {
               openPath(routes.transactionPath(hashHex), event)
@@ -240,7 +250,8 @@ export const BlocksPage: FC<BlocksPageProps> = ({client, loadNetworkTps}) => {
             title="Last masterchain blocks"
             blocks={state.masterchainBlocks}
             isLoading={state.isLoading}
-            emptyLabel="No masterchain blocks yet"
+            emptyTitle="No masterchain blocks yet"
+            emptyDescription="Blocks appear here after the masterchain produces and indexes them"
             onOpenBlock={(block, event) =>
               openPath(routes.blockPath(block.workchain, block.shard, block.seqno), event)
             }
@@ -249,7 +260,8 @@ export const BlocksPage: FC<BlocksPageProps> = ({client, loadNetworkTps}) => {
             title="Last workchain blocks"
             blocks={state.workchainBlocks}
             isLoading={state.isLoading}
-            emptyLabel="No workchain blocks yet"
+            emptyTitle="No workchain blocks yet"
+            emptyDescription="Blocks appear here after a workchain produces and indexes them"
             onOpenBlock={(block, event) =>
               openPath(routes.blockPath(block.workchain, block.shard, block.seqno), event)
             }
@@ -754,7 +766,8 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
                 blocks={state.shardchainBlocks}
                 blockDisplay="full"
                 isLoading={false}
-                emptyLabel="No shardchain blocks for this masterchain block"
+                emptyTitle="No shard blocks in this masterchain block"
+                emptyDescription="This masterchain block does not reference any shard blocks"
                 showShardFlags
                 onOpenBlock={(block, event) =>
                   openPath(routes.blockPath(block.workchain, block.shard, block.seqno), event)
@@ -915,7 +928,8 @@ const BlockTableSection: FC<{
   readonly blocks: readonly V3Block[]
   readonly blockDisplay?: "seqno" | "full"
   readonly isLoading: boolean
-  readonly emptyLabel: string
+  readonly emptyTitle: string
+  readonly emptyDescription: string
   readonly showShardFlags?: boolean
   readonly onOpenBlock: (block: V3Block, event?: ExplorerNavigationClickEvent) => void
 }> = ({
@@ -923,7 +937,8 @@ const BlockTableSection: FC<{
   blocks,
   blockDisplay = "seqno",
   isLoading,
-  emptyLabel,
+  emptyTitle,
+  emptyDescription,
   showShardFlags = false,
   onOpenBlock,
 }) => {
@@ -965,7 +980,13 @@ const BlockTableSection: FC<{
         </DataTableHead>
         <DataTableBody>
           {blocks.length === 0 ? (
-            <DataTableEmpty colSpan={showShardFlags ? 7 : 3}>{emptyLabel}</DataTableEmpty>
+            <DataTableEmpty colSpan={showShardFlags ? 7 : 3}>
+              <EmptyState
+                icon={<PackageOpen size={20} aria-hidden="true" />}
+                title={emptyTitle}
+                description={emptyDescription}
+              />
+            </DataTableEmpty>
           ) : (
             blocks.map(block => (
               <DataTableRow

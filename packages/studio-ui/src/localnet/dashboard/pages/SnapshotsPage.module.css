@@ -165,8 +165,7 @@
   overflow-wrap: anywhere;
 }
 
-.actions,
-.loadError {
+.actions {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -175,19 +174,6 @@
 .actions {
   justify-content: flex-end;
   gap: 2px;
-}
-
-.loadError {
-  min-height: 64px;
-  padding: 14px 18px;
-  color: var(--acton-color-text-muted);
-  font-size: 0.82rem;
-  box-sizing: border-box;
-}
-
-.loadError {
-  justify-content: space-between;
-  color: var(--acton-color-status-failed-text);
 }
 
 .dialogActions {

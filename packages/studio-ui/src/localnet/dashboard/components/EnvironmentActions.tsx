@@ -17,6 +17,7 @@ import {
   Button,
   Dialog,
   DialogActions,
+  EmptyState,
   formatByteSize,
   formatNumberValue,
   InlineButton,
@@ -488,9 +489,13 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
 
           <div className={styles.checkpointList}>
             {isLoadingCheckpoints ? (
-              <div className={styles.checkpointEmpty}>Loading checkpoints…</div>
+              <div className={styles.checkpointLoading}>Loading checkpoints…</div>
             ) : checkpoints.length === 0 ? (
-              <div className={styles.checkpointEmpty}>No checkpoints yet</div>
+              <EmptyState
+                icon={<Archive size={20} aria-hidden="true" />}
+                title="No checkpoints yet"
+                description="Create a checkpoint to return to this localnet state later"
+              />
             ) : (
               checkpoints.map(checkpoint => (
                 <div key={checkpoint.name} className={styles.checkpointRow}>

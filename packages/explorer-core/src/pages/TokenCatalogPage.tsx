@@ -3,6 +3,7 @@ import {
   DataTableBody,
   DataTableCell,
   DataTableEmpty,
+  EmptyState,
   DataTableHead,
   DataTableHeaderCell,
   DataTableRow,
@@ -12,6 +13,7 @@ import {
   Select,
   TokenAmount,
 } from "@acton/ui"
+import {Coins} from "lucide-react"
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 
@@ -198,7 +200,14 @@ export const TokenCatalogPage: FC<TokenCatalogPageProps> = ({client, embedded = 
             </DataTableHead>
             <DataTableBody>
               {state.error ? (
-                <DataTableEmpty colSpan={order === "recent" ? 5 : 4}>{state.error}</DataTableEmpty>
+                <DataTableEmpty colSpan={order === "recent" ? 5 : 4} role="alert">
+                  <EmptyState
+                    icon={<Coins size={20} aria-hidden="true" />}
+                    title="Unable to load tokens"
+                    description={state.error}
+                    variant="error"
+                  />
+                </DataTableEmpty>
               ) : state.isLoading ? (
                 <DataTableSkeletonRows
                   columns={order === "recent" ? 5 : 4}
@@ -217,7 +226,15 @@ export const TokenCatalogPage: FC<TokenCatalogPageProps> = ({client, embedded = 
                 />
               ) : state.items.length === 0 ? (
                 <DataTableEmpty colSpan={order === "recent" ? 5 : 4}>
-                  No tokens found
+                  <EmptyState
+                    icon={<Coins size={20} aria-hidden="true" />}
+                    title={order === "recent" ? "No recent token activity" : "No tokens yet"}
+                    description={
+                      order === "recent"
+                        ? "Tokens appear here after a transfer, mint, or burn is indexed"
+                        : "Jetton masters appear here after they are deployed and indexed"
+                    }
+                  />
                 </DataTableEmpty>
               ) : (
                 state.items.map(item => {

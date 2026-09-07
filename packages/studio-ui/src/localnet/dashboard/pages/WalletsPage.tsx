@@ -1,12 +1,13 @@
 import type {FC, FormEvent} from "react"
 import {useCallback, useEffect, useRef, useState} from "react"
-import {Link2, RefreshCw, Unplug} from "lucide-react"
+import {Link2, RefreshCw, Unplug, Wallet} from "lucide-react"
 import {
   Button,
   DataTable,
   DataTableBody,
   DataTableCell,
   DataTableEmpty,
+  EmptyState,
   DataTableFooter,
   DataTableHead,
   DataTableHeaderCell,
@@ -189,7 +190,11 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                   />
                 ) : runtimeWallets.length === 0 ? (
                   <DataTableEmpty colSpan={4}>
-                    No supported project wallets are configured in Acton.toml
+                    <EmptyState
+                      icon={<Wallet size={20} aria-hidden="true" />}
+                      title="No project wallets yet"
+                      description="Add a supported wallet to Acton.toml to use it with WalletKit"
+                    />
                   </DataTableEmpty>
                 ) : (
                   runtimeWallets.map(wallet => {
@@ -270,7 +275,13 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
               </DataTableHead>
               <DataTableBody>
                 {sessions.length === 0 ? (
-                  <DataTableEmpty colSpan={4}>No active TON Connect sessions</DataTableEmpty>
+                  <DataTableEmpty colSpan={4}>
+                    <EmptyState
+                      icon={<Link2 size={20} aria-hidden="true" />}
+                      title="No TON Connect sessions yet"
+                      description="Connect a dApp to this environment to create a session"
+                    />
+                  </DataTableEmpty>
                 ) : (
                   sessions.map(session => (
                     <DataTableRow key={session.sessionId} hover>

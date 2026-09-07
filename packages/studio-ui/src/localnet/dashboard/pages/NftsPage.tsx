@@ -3,12 +3,14 @@ import {
   DataTableBody,
   DataTableCell,
   DataTableEmpty,
+  EmptyState,
   DataTableHead,
   DataTableHeaderCell,
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
 } from "@acton/ui"
+import {Gem} from "lucide-react"
 import {useNavigate} from "react-router"
 import {useEffect, useState} from "react"
 import type {FC} from "react"
@@ -47,6 +49,7 @@ export const NftsPage: FC<NftsPageProps> = ({client}) => {
   })
   const showLoadingSkeleton = useDelayedLoadingVisibility(nftsState.isLoading, 500)
   const visibleItems = nftsState.items.filter(item => !hiddenAddresses.has(item.address))
+  const allItemsHidden = nftsState.items.length > 0 && visibleItems.length === 0
 
   useEffect(() => {
     let cancelled = false
@@ -107,7 +110,14 @@ export const NftsPage: FC<NftsPageProps> = ({client}) => {
             </DataTableHead>
             <DataTableBody>
               {nftsState.error ? (
-                <DataTableEmpty colSpan={5}>{nftsState.error}</DataTableEmpty>
+                <DataTableEmpty colSpan={5} role="alert">
+                  <EmptyState
+                    icon={<Gem size={20} aria-hidden="true" />}
+                    title="Unable to load NFTs"
+                    description={nftsState.error}
+                    variant="error"
+                  />
+                </DataTableEmpty>
               ) : nftsState.isLoading ? (
                 showLoadingSkeleton ? (
                   <DataTableSkeletonRows
@@ -118,7 +128,17 @@ export const NftsPage: FC<NftsPageProps> = ({client}) => {
                   />
                 ) : null
               ) : visibleItems.length === 0 ? (
-                <DataTableEmpty colSpan={5}>No NFTs yet</DataTableEmpty>
+                <DataTableEmpty colSpan={5}>
+                  <EmptyState
+                    icon={<Gem size={20} aria-hidden="true" />}
+                    title={allItemsHidden ? "No NFTs to show" : "No NFTs yet"}
+                    description={
+                      allItemsHidden
+                        ? "All indexed NFTs are hidden by safety filters"
+                        : "NFT items appear here after they are minted and indexed"
+                    }
+                  />
+                </DataTableEmpty>
               ) : (
                 visibleItems.map(item => {
                   const name = contentString(item.content, "name") || "NFT Item"

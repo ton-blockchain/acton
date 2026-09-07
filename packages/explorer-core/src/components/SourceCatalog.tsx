@@ -1,7 +1,9 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {ChangeEvent, DragEvent, FC, FormEvent, JSX} from "react"
 import {
+  Button,
   DateTime,
+  EmptyState,
   formatCompilerLabel,
   InlineAction,
   InlineActions,
@@ -9,7 +11,7 @@ import {
   TechnicalValue,
   useToast,
 } from "@acton/ui"
-import {CircleAlert, FolderUp, Plus, Trash2, Upload} from "lucide-react"
+import {CircleAlert, FileCode2, FolderUp, Plus, Trash2, Upload} from "lucide-react"
 
 import type {TonClient} from "../api/client"
 import type {VerificationSourceResponse} from "../api/types"
@@ -29,6 +31,7 @@ import type {RegisteredSource} from "../metadata/types"
 import styles from "./SourceCatalog.module.css"
 
 interface SourceCatalogState {
+  readonly error?: string
   readonly loading: boolean
   readonly sources: readonly RegisteredSource[]
 }
@@ -60,9 +63,18 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
   const directoryInputRef = useRef<HTMLInputElement>(null)
 
   const loadSources = useCallback(async () => {
-    setState(current => ({...current, loading: true}))
-    const sources = await metadataRegistry.listSources()
-    setState({loading: false, sources})
+    setState(current => ({...current, error: undefined, loading: true}))
+
+    try {
+      const sources = await metadataRegistry.listSources()
+      setState({loading: false, sources})
+    } catch (error) {
+      setState(current => ({
+        ...current,
+        error: error instanceof Error ? error.message : "Failed to load registered sources",
+        loading: false,
+      }))
+    }
   }, [metadataRegistry])
 
   useEffect(() => {
@@ -78,7 +90,11 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
       .catch(error => {
         if (isActive) {
           console.debug("Failed to load registered sources", error)
-          setState({loading: false, sources: []})
+          setState({
+            error: error instanceof Error ? error.message : "Failed to load registered sources",
+            loading: false,
+            sources: [],
+          })
         }
       })
 
@@ -312,10 +328,31 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
                     </td>
                   </tr>
                 )}
-                {tableEntries.length === 0 ? (
+                {state.error ? (
                   <tr>
                     <td colSpan={6}>
-                      <div className={styles.empty}>No sources registered</div>
+                      <EmptyState
+                        role="alert"
+                        icon={<CircleAlert size={20} aria-hidden="true" />}
+                        title="Sources are unavailable"
+                        description={state.error}
+                        variant="error"
+                        action={
+                          <Button size="sm" variant="outline" onClick={() => void loadSources()}>
+                            Retry
+                          </Button>
+                        }
+                      />
+                    </td>
+                  </tr>
+                ) : tableEntries.length === 0 ? (
+                  <tr>
+                    <td colSpan={6}>
+                      <EmptyState
+                        icon={<FileCode2 size={20} aria-hidden="true" />}
+                        title="No sources registered yet"
+                        description="Register an artifact or import a project folder to inspect verified contract source"
+                      />
                     </td>
                   </tr>
                 ) : (

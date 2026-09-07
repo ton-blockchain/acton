@@ -48,9 +48,6 @@
   display: flex;
   flex-direction: column;
   gap: 7px;
-}
-
-.textareaField {
   padding: 16px var(--cell-inspector-panel-padding) 0;
 }
 
@@ -70,6 +67,14 @@
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
   line-height: 1.4;
+}
+
+.cellFieldFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--acton-space-2);
 }
 
 .cellInput,

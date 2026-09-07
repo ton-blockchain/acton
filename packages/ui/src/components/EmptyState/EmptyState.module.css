@@ -1,0 +1,42 @@
+.emptyState {
+  display: grid;
+  justify-items: center;
+  gap: var(--acton-space-2);
+  padding: var(--acton-space-8) var(--acton-space-4);
+  text-align: center;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin-bottom: var(--acton-space-1);
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-group);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+}
+
+.title {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+  line-height: 1.35;
+}
+
+.description {
+  max-width: 30rem;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.45;
+}
+
+.action {
+  margin-top: var(--acton-space-2);
+}
+
+.emptyState[data-variant="error"] .icon {
+  color: var(--acton-color-status-failed-text);
+  border-color: color-mix(in srgb, var(--acton-color-status-failed-text) 45%, transparent);
+}

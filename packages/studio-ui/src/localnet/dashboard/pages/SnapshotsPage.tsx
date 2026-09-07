@@ -13,12 +13,13 @@ import {
   Dialog,
   DialogActions,
   Duration,
+  EmptyState,
   Input,
   InlineAction,
   NumberValue,
   useToast,
 } from "@acton/ui"
-import {Archive, RotateCcw, Trash2} from "lucide-react"
+import {Archive, CircleAlert, RotateCcw, Trash2} from "lucide-react"
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC} from "react"
 
@@ -300,15 +301,27 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({
                 />
               ) : loadError ? (
                 <DataTableEmpty colSpan={6}>
-                  <div className={styles.loadError} role="alert">
-                    <span>{loadError}</span>
-                    <Button size="sm" variant="outline" onClick={() => void load()}>
-                      Retry
-                    </Button>
-                  </div>
+                  <EmptyState
+                    role="alert"
+                    icon={<CircleAlert size={20} aria-hidden="true" />}
+                    title="Snapshots are unavailable"
+                    description={loadError}
+                    variant="error"
+                    action={
+                      <Button size="sm" variant="outline" onClick={() => void load()}>
+                        Retry
+                      </Button>
+                    }
+                  />
                 </DataTableEmpty>
               ) : snapshots.length === 0 ? (
-                <DataTableEmpty colSpan={6}>No snapshots yet</DataTableEmpty>
+                <DataTableEmpty colSpan={6}>
+                  <EmptyState
+                    icon={<Archive size={20} aria-hidden="true" />}
+                    title="No snapshots yet"
+                    description="Create a snapshot to restore this environment to a known state later"
+                  />
+                </DataTableEmpty>
               ) : (
                 snapshots.map(snapshot => (
                   <DataTableRow key={snapshot.id}>

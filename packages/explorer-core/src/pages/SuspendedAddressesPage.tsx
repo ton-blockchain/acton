@@ -5,6 +5,7 @@ import {
   DataTableBody,
   DataTableCell,
   DataTableEmpty,
+  EmptyState,
   DataTableFooter,
   DataTableHead,
   DataTableHeaderCell,
@@ -12,6 +13,7 @@ import {
   DataTableSkeletonRows,
   DataTableTable,
 } from "@acton/ui"
+import {ShieldCheck} from "lucide-react"
 import {useEffect, useMemo, useState, type FC} from "react"
 
 import type {TonClient} from "../api/client"
@@ -202,7 +204,13 @@ export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}
                   widths={["2rem", "30rem", "12rem"]}
                 />
               ) : rows.length === 0 ? (
-                <DataTableEmpty colSpan={3}>No suspended addresses</DataTableEmpty>
+                <DataTableEmpty colSpan={3}>
+                  <EmptyState
+                    icon={<ShieldCheck size={20} aria-hidden="true" />}
+                    title="No suspended addresses"
+                    description="The current network configuration does not restrict any addresses"
+                  />
+                </DataTableEmpty>
               ) : (
                 rows.map((row, index) => {
                   return (

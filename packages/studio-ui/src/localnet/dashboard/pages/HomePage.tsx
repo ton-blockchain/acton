@@ -1,4 +1,4 @@
-import {ArrowRight, FastForward, RadioTower} from "lucide-react"
+import {ArrowLeftRight, ArrowRight, CircleAlert, FastForward, RadioTower, Users} from "lucide-react"
 import {
   BlockChip,
   Button,
@@ -14,6 +14,7 @@ import {
   Dialog,
   DialogActions,
   Duration,
+  EmptyState,
   formatDuration,
   formatNumberValue,
   humanizeIdentifier,
@@ -593,7 +594,21 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                 title="Recent transactions"
                 transactions={homeState.transactions}
                 emptyState={
-                  homeState.error ? "Recent transactions are unavailable" : "No transactions yet"
+                  homeState.error ? (
+                    <EmptyState
+                      role="alert"
+                      icon={<CircleAlert size={20} aria-hidden="true" />}
+                      title="Recent transactions are unavailable"
+                      description={homeState.error}
+                      variant="error"
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={<ArrowLeftRight size={20} aria-hidden="true" />}
+                      title="No transactions yet"
+                      description="Transactions appear here after the environment processes its first message"
+                    />
+                  )
                 }
                 messageNamesByAddress={messageNamesByAddress}
                 onTransactionClick={(hashHex, _transaction, event) => {
@@ -613,7 +628,21 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                   title="Recent accounts"
                   accounts={recentAccountItems}
                   emptyState={
-                    homeState.error ? "Recent accounts are unavailable" : "No accounts yet"
+                    homeState.error ? (
+                      <EmptyState
+                        role="alert"
+                        icon={<CircleAlert size={20} aria-hidden="true" />}
+                        title="Recent accounts are unavailable"
+                        description={homeState.error}
+                        variant="error"
+                      />
+                    ) : (
+                      <EmptyState
+                        icon={<Users size={20} aria-hidden="true" />}
+                        title="No accounts yet"
+                        description="Accounts appear here after they receive balance, code, or data"
+                      />
+                    )
                   }
                   onAddressClick={(address, event) => {
                     openPath(routes.addressPath(address), event)

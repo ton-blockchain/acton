@@ -12,6 +12,7 @@ import {
   DataTableRow,
   DataTableTable,
   Disclosure,
+  EmptyState,
   Input,
   Skeleton,
   Slider,
@@ -246,7 +247,7 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
           <Button
             variant="outline"
             loading={pending === "save"}
-            disabled={!!pending}
+            disabled={Boolean(pending)}
             onClick={() => void control("save")}
           >
             Save settings
@@ -257,7 +258,9 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
           leadingIcon={running ? <Square size={15} /> : <Play size={15} />}
           loading={pending === "start" || pending === "stop"}
           disabled={
-            !draft || !!pending || (!running && (environment.status !== "running" || !available))
+            !draft ||
+            Boolean(pending) ||
+            (!running && (environment.status !== "running" || !available))
           }
           title={
             !running && environment.status !== "running"
@@ -481,7 +484,7 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
               description="0 to run until stopped"
               type="number"
               min={0}
-              max={86400}
+              max={86_400}
               value={draft.durationSeconds}
               disabled={!editable}
               onChange={event => setField("durationSeconds", event.target.value)}
@@ -499,7 +502,7 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
               : "Messages are counted after confirmation"}
           </span>
         </div>
-        {state.recent.length ? (
+        {state.recent.length > 0 ? (
           <DataTable>
             <DataTableTable>
               <DataTableHead>
@@ -555,10 +558,11 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
             </DataTableTable>
           </DataTable>
         ) : (
-          <div className={styles.empty}>
-            <ArrowRightLeft size={22} aria-hidden="true" />
-            <span>Your generated activity will appear here</span>
-          </div>
+          <EmptyState
+            icon={<ArrowRightLeft size={20} aria-hidden="true" />}
+            title="No recent scenarios yet"
+            description="Generated activity appears here after a scenario finishes"
+          />
         )}
       </section>
     </div>
@@ -670,12 +674,15 @@ function fromDraft(draft: Draft): ActivityConfig {
   ) as Record<ActivityScenario, number>
   if (!Object.values(weights).some(Boolean))
     throw new Error("Enable at least one activity scenario")
-  if (!draft.walletVersions.length) throw new Error("Select at least one wallet version")
+  if (draft.walletVersions.length === 0) {
+    throw new Error("Select at least one wallet version")
+  }
+
   return {
     intervalSeconds: integer(draft.intervalSeconds, "Scenario interval", 1, 3600),
     scenariosPerLaunch: integer(draft.scenariosPerLaunch, "Scenarios per launch", 1, 1000),
     concurrency: integer(draft.concurrency, "Concurrent scenarios", 1, 1024),
-    durationSeconds: integer(draft.durationSeconds, "Run duration", 0, 86400),
+    durationSeconds: integer(draft.durationSeconds, "Run duration", 0, 86_400),
     maxBatchSize: integer(draft.maxBatchSize, "Maximum batch size", 2, 128),
     randomizeBatchSize: draft.randomizeBatchSize,
     transferAmount,

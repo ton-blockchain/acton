@@ -4,6 +4,7 @@ import {
   DataTableBody,
   DataTableCell,
   DataTableEmpty,
+  EmptyState,
   DataTableHead,
   DataTableHeaderCell,
   DataTableRow,
@@ -52,21 +53,21 @@ export function TestRunsTable({isLoading, runs, onOpenRun, onRunTests}: TestRuns
             />
           ) : runs.length === 0 ? (
             <DataTableEmpty colSpan={6}>
-              <div className={styles.emptyState}>
-                <span className={styles.emptyIcon}>
-                  <FlaskConical size={21} aria-hidden="true" />
-                </span>
-                <strong>No test runs</strong>
-                <span>Run tests from Studio or use acton test in the terminal</span>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  leadingIcon={<FlaskConical size={15} aria-hidden="true" />}
-                  onClick={onRunTests}
-                >
-                  Run tests
-                </Button>
-              </div>
+              <EmptyState
+                icon={<FlaskConical size={21} aria-hidden="true" />}
+                title="No test runs"
+                description="Run tests from Studio or use acton test in the terminal"
+                action={
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    leadingIcon={<FlaskConical size={15} aria-hidden="true" />}
+                    onClick={onRunTests}
+                  >
+                    Run tests
+                  </Button>
+                }
+              />
             </DataTableEmpty>
           ) : (
             runs.map(run => (

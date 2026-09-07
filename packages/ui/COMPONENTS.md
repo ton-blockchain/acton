@@ -1876,6 +1876,19 @@ function RefreshButton() {
 - Do not use Toast for field validation, destructive confirmations, long logs,
   forms, tables, or permanent page content.
 
+## EmptyState
+
+Status: ready
+
+Use `EmptyState` for an empty primary resource view that benefits from a short explanation or a
+next action. Keep empty search results and small nested tables compact when their surrounding
+context already explains what is missing.
+
+Use `variant="error"` with `role="alert"` when a load failure replaces the resource view.
+
+Compose it inside `DataTableEmpty` to preserve table headers, or place it directly inside another
+framed surface such as a dialog list.
+
 ## DataTable
 
 Status: ready
@@ -1982,6 +1995,9 @@ loading rows.
   `Skeleton` inside cells for custom shapes.
 - Use `DataTableEmpty` when there are no rows but the table headers still give
   useful context.
+- Compose `EmptyState` inside `DataTableEmpty` when an empty primary
+  resource table benefits from an explanation or a creation/recovery action.
+  Keep contextual and nested tables compact.
 - Keep row click behavior in the caller. DataTable only provides visual row
   states and table semantics.
 

@@ -4,6 +4,7 @@ import {
   CopyInlineAction,
   HighlightedCode,
   Input,
+  InlineButton,
   ParsedValueView,
   Percentage,
   PillTab,
@@ -79,6 +80,8 @@ const OUTPUT_TABS: readonly {
 ]
 
 const CELL_INSPECTOR_DRAFT_KEY = "acton:cell-inspector:draft"
+// A minimal ordinary cell keeps the example stable while exercising the same BoC decoder as user input.
+const CELL_INSPECTOR_EXAMPLE_BOC = "te6ccgEBAQEAAgAAAA=="
 const MAX_CELL_QUERY_LENGTH = 4096
 const EMPTY_CELL_INSPECTOR_DRAFT: CellInspectorDraft = {
   input: "",
@@ -368,7 +371,7 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
   onCustomTlbEnabledChange,
 }) => (
   <section className={styles.inputPanel}>
-    <label className={`${styles.textareaField} ${styles.cellField}`} htmlFor="cell-inspector-input">
+    <div className={`${styles.textareaField} ${styles.cellField}`}>
       <textarea
         id="cell-inspector-input"
         aria-label="Cell input"
@@ -380,8 +383,15 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
         autoCapitalize="off"
         autoComplete="off"
       />
-      <span className={styles.fieldHint}>Paste Base64, hex, a ton:// URL, or an explorer link</span>
-    </label>
+      <div className={styles.cellFieldFooter}>
+        <span className={styles.fieldHint}>
+          Paste Base64, hex, a ton:// URL, or an explorer link
+        </span>
+        <InlineButton variant="utility" onClick={() => onInputChange(CELL_INSPECTOR_EXAMPLE_BOC)}>
+          Use example
+        </InlineButton>
+      </div>
+    </div>
 
     <div className={styles.optionsGrid}>
       <Input

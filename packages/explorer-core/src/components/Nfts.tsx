@@ -37,7 +37,7 @@ function getNftDisplayName(item: NftItem): string {
 
 export const Nfts: FC<NftsProps> = ({
   items,
-  emptyLabel = "No NFTs found",
+  emptyLabel = "No NFTs yet",
   searchLabel = "Search collectibles",
   onAddressClick,
 }) => {
@@ -127,7 +127,7 @@ export const Nfts: FC<NftsProps> = ({
           )
         })}
       </div>
-      {visibleItems.length === 0 && <div className={styles.empty}>No matching collectibles</div>}
+      {visibleItems.length === 0 && <div className={styles.empty}>No matching NFTs</div>}
     </div>
   )
 }

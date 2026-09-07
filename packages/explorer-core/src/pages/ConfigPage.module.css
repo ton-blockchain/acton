@@ -657,9 +657,16 @@
   margin: 0;
 }
 
+.empty {
+  padding: var(--acton-space-4);
+}
+
+.error {
+  padding: var(--acton-space-6);
+}
+
 .empty,
 .error {
-  padding: 24px;
   background: var(--acton-color-surface-raised);
   border: 1px solid var(--acton-color-border);
   border-radius: 10px;
@@ -775,6 +782,10 @@
   }
 
   .parameterHeader {
+    padding-inline: 14px;
+  }
+
+  .empty {
     padding-inline: 14px;
   }
 

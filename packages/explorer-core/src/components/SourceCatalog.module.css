@@ -330,19 +330,6 @@
   font-size: 0.78rem;
 }
 
-.empty {
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 3.875rem;
-  padding: var(--acton-space-4) var(--acton-space-5);
-  color: var(--acton-color-text-muted);
-  font-size: var(--acton-font-size-sm);
-  line-height: 1.4;
-  text-align: center;
-}
-
 .skeletonList {
   display: flex;
   flex-direction: column;

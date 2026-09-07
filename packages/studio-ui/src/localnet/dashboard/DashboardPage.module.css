@@ -2116,7 +2116,7 @@
   flex: 0 0 auto;
 }
 
-.checkpointEmpty {
+.checkpointLoading {
   min-height: 88px;
   padding: 20px;
   color: var(--acton-color-text-muted);

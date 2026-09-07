@@ -93,7 +93,7 @@ export const Tokens: FC<TokensProps> = ({wallets, client, onAddressClick}) => {
         </DataTableHead>
         <DataTableBody>
           {wallets.length === 0 ? (
-            <DataTableEmpty colSpan={3}>No tokens found</DataTableEmpty>
+            <DataTableEmpty colSpan={3}>No tokens yet</DataTableEmpty>
           ) : (
             wallets.map(wallet => {
               const master = wallet.master ?? mastersByAddress.get(toRawAddress(wallet.jetton))

@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from "react"
 import type {ChangeEvent, FC} from "react"
-import {Link} from "react-router"
+import {Link, useNavigate} from "react-router"
 import {
   BlockChip,
   Button,
@@ -8,6 +8,7 @@ import {
   DateTime,
   Dialog,
   DialogActions,
+  EmptyState,
   InlineAction,
   InlineActions,
   Pagination,
@@ -76,6 +77,7 @@ const EMPTY_BUNDLE_SELECTION: BundleSelection = {
 
 export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) => {
   const routes = useExplorerRoutePaths()
+  const navigate = useNavigate()
   const addressFormat = useAddressFormat()
   const {network} = useNetworkInfo()
   const openPath = useOpenExplorerPath()
@@ -343,6 +345,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
           />
           <Button
             size="sm"
+            variant="primary"
             leadingIcon={<Upload size={15} />}
             onClick={() => fileInputRef.current?.click()}
           >
@@ -350,7 +353,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
           </Button>
           <Button
             size="sm"
-            variant="secondary"
+            variant="outline"
             leadingIcon={<Download size={15} />}
             onClick={handleExport}
           >
@@ -365,16 +368,16 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
             <Star size={16} className={styles.titleIcon} />
             <span>Favorites</span>
           </header>
-          <div className={styles.emptyState}>
-            <Star size={26} className={styles.emptyIcon} />
-            <div className={styles.emptyText}>No favorites yet</div>
-            <div className={styles.emptyHint}>
-              Use the star on an account, block, or transaction page to save it here.
-            </div>
-            <Link className={styles.emptyLink} to={routes.rootPath}>
-              Explore TON
-            </Link>
-          </div>
+          <EmptyState
+            icon={<Star size={20} aria-hidden="true" />}
+            title="No favorites yet"
+            description="Use the star on an account, block, or transaction page to save it here"
+            action={
+              <Button size="sm" variant="primary" onClick={() => void navigate(routes.rootPath)}>
+                Explore TON
+              </Button>
+            }
+          />
         </section>
       )}
 

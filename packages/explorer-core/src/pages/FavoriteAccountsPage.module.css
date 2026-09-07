@@ -210,15 +210,8 @@
   white-space: nowrap;
 }
 
-.missingValue,
-.emptyHint {
+.missingValue {
   color: var(--acton-color-text-muted);
-}
-
-.emptyHint {
-  max-width: 30rem;
-  font-size: var(--acton-font-size-sm);
-  line-height: 1.45;
 }
 
 .balanceCell {
@@ -231,27 +224,10 @@
   background: var(--acton-color-surface-row);
 }
 
-.emptyLink:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
-}
-
 .savedAtCell {
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
   white-space: nowrap;
-}
-
-.emptyState {
-  min-height: 220px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 32px;
-  color: var(--acton-color-text-muted);
-  text-align: center;
 }
 
 .importDialogContent {
@@ -359,34 +335,6 @@
 
 .importActions {
   padding-top: 4px;
-}
-
-.emptyIcon {
-  color: color-mix(in srgb, var(--acton-color-text-muted) 76%, transparent);
-}
-
-.emptyText {
-  color: var(--acton-color-text);
-  font-size: var(--acton-font-size-sm);
-  font-weight: 650;
-}
-
-.emptyLink {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 32px;
-  padding: 0 12px;
-  color: var(--acton-color-accent);
-  border-radius: 8px;
-  font-size: var(--acton-font-size-sm);
-  font-weight: 650;
-  text-decoration: none;
-}
-
-.emptyLink:hover {
-  color: var(--acton-color-accent);
-  text-decoration: underline;
 }
 
 @media (max-width: 760px) {

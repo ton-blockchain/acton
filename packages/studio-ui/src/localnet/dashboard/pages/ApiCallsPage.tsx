@@ -1,4 +1,12 @@
-import {Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, RefreshCw} from "lucide-react"
+import {
+  Braces,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleAlert,
+  RefreshCw,
+} from "lucide-react"
 import {
   Button,
   Checkbox,
@@ -13,6 +21,7 @@ import {
   DataTableTable,
   DateTime,
   Duration,
+  EmptyState,
   HighlightedCode,
   InlineAction,
   RawDataBlock,
@@ -258,7 +267,13 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({environmentId}) => {
             <DataTableBody>
               {error ? (
                 <DataTableEmpty colSpan={7}>
-                  <span role="alert">{error}</span>
+                  <EmptyState
+                    role="alert"
+                    icon={<CircleAlert size={20} aria-hidden="true" />}
+                    title="API calls are unavailable"
+                    description={error}
+                    variant="error"
+                  />
                 </DataTableEmpty>
               ) : isLoading ? (
                 <DataTableSkeletonRows
@@ -270,7 +285,15 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({environmentId}) => {
                 />
               ) : filteredCalls.length === 0 ? (
                 <DataTableEmpty colSpan={7}>
-                  {calls.length === 0 ? "No API calls yet" : "No calls match the selected filters"}
+                  {calls.length === 0 ? (
+                    <EmptyState
+                      icon={<Braces size={20} aria-hidden="true" />}
+                      title="No API calls yet"
+                      description="Requests appear here after a client calls an environment endpoint"
+                    />
+                  ) : (
+                    "No calls match the selected filters"
+                  )}
                 </DataTableEmpty>
               ) : (
                 paginatedCalls.map(call => {
