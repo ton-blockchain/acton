@@ -626,13 +626,13 @@ mod tests {
         if retried.id != accepted.id || !retried.is_active() {
             return Err(failure("Retry did not return the active operation"));
         }
-        if !matches!(runtime.snapshots().await, Err(Error::Conflict { .. })) {
-            return Err(failure(
-                "Snapshots were not excluded during an administrative operation",
-            ));
-        }
+
         let mut phase = String::new();
         loop {
+            // Inventory reads committed manifests without taking the mutation lock,
+            // so Studio can keep polling while the edit and its recovery run.
+            runtime.snapshots().await?;
+
             let operation = runtime
                 .admin_operation()
                 .await?

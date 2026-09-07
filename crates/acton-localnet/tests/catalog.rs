@@ -48,7 +48,20 @@ async fn explicit_endpoint_ports_do_not_collide_with_automatic_defaults() {
     )
     .await
     .expect("first network");
-    let admin = first.network.config.port_base + 5;
+    // Use the next range the allocator would choose, rather than assuming the
+    // range after the first one is not occupied by another local development net.
+    let probe = catalog::create(
+        root.path(),
+        CreateNetwork {
+            name: "port probe".to_owned(),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("next available range");
+    let admin = probe.network.config.port_base;
+    std::fs::remove_dir_all(probe.path).expect("release probe reservation");
+
     let second = catalog::create(
         root.path(),
         CreateNetwork {

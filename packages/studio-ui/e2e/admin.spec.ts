@@ -93,7 +93,7 @@ test("admin form submits nanograms and tracks a detached operation across reload
   }
   await expect(notifications.getByText("Changes applied", {exact: true})).toBeVisible()
   await expect(
-    notifications.getByRole("link", {name: "#1234", includeHidden: true}),
+    notifications.getByRole("link", {name: "1234", includeHidden: true}),
   ).toHaveAttribute("href", "/virtual-environments/environment-1/block/-1/8000000000000000/1234")
   await expect(page.getByRole("button", {name: "Apply changes", exact: true})).toBeEnabled()
   await expect(page.getByLabel("Account address")).toHaveValue(friendlyAddress)
@@ -365,12 +365,9 @@ test("active admin operations pause suggestions and keep disabled fields consist
     .locator("#admin-action, input[aria-label='Account address'], #admin-value")
     .evaluateAll(elements => elements.map(element => getComputedStyle(element).backgroundColor))
   expect(new Set(backgrounds).size).toBe(1)
-  expect({walletRequests, contractRequests}).toMatchInlineSnapshot(`
-    {
-      "contractRequests": 0,
-      "walletRequests": 0,
-    }
-  `)
+  expect(`${JSON.stringify({walletRequests, contractRequests}, null, 2)}\n`).toMatchSnapshot(
+    "paused-suggestion-requests.txt",
+  )
   await expect(notifications).not.toContainText("unavailable")
   await expect(notifications).not.toContainText("Failed to load wallets")
 
@@ -464,6 +461,9 @@ test("validation and operation failures use toasts without repeating after dismi
   await notifications
     .getByRole("button", {name: "Dismiss notification", includeHidden: true})
     .click()
+  await expect(
+    notifications.getByRole("button", {name: "Dismiss notification", includeHidden: true}),
+  ).toHaveCount(0)
 
   await page.getByLabel("Account address").fill(`0:${"11".repeat(32)}`)
   await page.getByLabel("New balance").fill("-1")
@@ -475,6 +475,9 @@ test("validation and operation failures use toasts without repeating after dismi
   await notifications
     .getByRole("button", {name: "Dismiss notification", includeHidden: true})
     .click()
+  await expect(
+    notifications.getByRole("button", {name: "Dismiss notification", includeHidden: true}),
+  ).toHaveCount(0)
 
   await page.getByLabel("New balance").fill("1")
   await page.getByRole("button", {name: "Apply changes", exact: true}).click()
@@ -491,6 +494,9 @@ test("validation and operation failures use toasts without repeating after dismi
   await notifications
     .getByRole("button", {name: "Dismiss notification", includeHidden: true})
     .click()
+  await expect(
+    notifications.getByRole("button", {name: "Dismiss notification", includeHidden: true}),
+  ).toHaveCount(0)
   const previousPolls = polls
   await expect.poll(() => polls, {timeout: 10_000}).toBeGreaterThan(previousPolls + 2)
   await expect(page.getByText("Indexer did not catch up", {exact: true})).toHaveCount(0)

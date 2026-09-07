@@ -1,0 +1,4 @@
+{
+  "walletRequests": 0,
+  "contractRequests": 0
+}

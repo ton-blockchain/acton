@@ -161,7 +161,8 @@ test("an older poll cannot replace a newly accepted snapshot operation", async (
   finishPost?.()
   await expect(page.getByText("Creating snapshot", {exact: true})).toBeVisible()
   finishPoll?.()
-  await expect(dialog).not.toBeVisible()
+  // The closing dialog changes its title before its exit animation removes it.
+  await expect(page.getByRole("dialog")).toHaveCount(0)
   await expect(page.getByRole("button", {name: "Create snapshot", exact: true})).toBeDisabled()
   await expect(page.getByText("Creating snapshot", {exact: true})).toBeVisible()
 })
