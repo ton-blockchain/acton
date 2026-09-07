@@ -780,6 +780,11 @@ impl TonApiClient {
         self.get_v2_result("/getBlockHeader", request)
     }
 
+    /// Fetches the exact serialized block selected by a `TonCenter` v2 block request.
+    pub fn get_block_v2(&self, request: &v2::BlockDataRequest) -> anyhow::Result<v2::BlockData> {
+        self.get_v2_result("/getBlock", request)
+    }
+
     pub fn get_block_transactions_v2(
         &self,
         request: &v2::BlockTransactionsRequest,

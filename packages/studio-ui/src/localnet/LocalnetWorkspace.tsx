@@ -224,6 +224,7 @@ const AppContent: FC<AppContentProps> = ({
   const [snapshotActions, setSnapshotActions] = useState<ReactNode>()
   const [configActions, setConfigActions] = useState<ReactNode>()
   const [activityActions, setActivityActions] = useState<ReactNode>()
+  const [nodeActions, setNodeActions] = useState<ReactNode>()
   const localPathname = pathname.slice(basePath.length) || "/"
   const allowsOverflow =
     localPathname === "/faucet" ||
@@ -246,7 +247,7 @@ const AppContent: FC<AppContentProps> = ({
       ? (LOCALNET_PAGE_DESCRIPTIONS[localPathname] ??
         contractDetailsPageDescription(localPathname) ??
         "Inspect blocks, accounts, transactions and contract activity")
-      : `Protocol parameters at masterchain block #${configSeqno}`
+      : `Protocol parameters at masterchain block ${configSeqno}`
   const path = (value: string) => localnetPath(basePath, value)
   const fallback = <Navigate to={path("/dashboard")} replace />
   const withCapability = (capability: EnvironmentCapability, page: ReactNode) =>
@@ -270,7 +271,9 @@ const AppContent: FC<AppContentProps> = ({
         ? activityActions
         : localPathname === "/snapshots"
           ? snapshotActions
-          : undefined
+          : localPathname === "/network/nodes"
+            ? nodeActions
+            : undefined
 
   useLayoutEffect(() => {
     onShellChange({
@@ -359,6 +362,9 @@ const AppContent: FC<AppContentProps> = ({
                     <NetworkPage
                       view={networkDashboardView(networkPath)}
                       onEnvironmentChange={onEnvironmentChange}
+                      onActionsChange={
+                        networkPath === "/network/nodes" ? setNodeActions : undefined
+                      }
                     />
                   </DashboardPage>,
                 )}

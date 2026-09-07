@@ -380,41 +380,43 @@ function ValidationRoundDetails({
     (completeStakeSet
       ? stakes.reduce((maximum, stake) => (stake > maximum ? stake : maximum)).toString()
       : undefined)
-  const timingGroup =
-    election &&
-    ({
-      label: "Timing",
-      metrics: [
-        {
-          label: "Election",
-          value: (
-            <Duration
-              display="parts"
-              maxParts={3}
-              value={election.elections_close_at - election.elections_open_at}
-            />
-          ),
-        },
-        {
-          label: "Selection",
-          value: (
-            <Duration
-              display="parts"
-              maxParts={3}
-              value={election.current.validation_ended_at - election.elections_close_at}
-            />
-          ),
-        },
-        {
-          label: "Validation",
-          value: <Duration display="parts" maxParts={3} value={election.validators_elected_for} />,
-        },
-        {
-          label: "Stake hold",
-          value: <Duration display="parts" maxParts={3} value={election.stake_held_for} />,
-        },
-      ],
-    } as const)
+  const timingGroup = {
+    label: "Timing",
+    metrics: [
+      {
+        label: "Election",
+        value: election && (
+          <Duration
+            display="parts"
+            maxParts={3}
+            value={election.elections_close_at - election.elections_open_at}
+          />
+        ),
+      },
+      {
+        label: "Selection",
+        value: election && (
+          <Duration
+            display="parts"
+            maxParts={3}
+            value={election.current.validation_ended_at - election.elections_close_at}
+          />
+        ),
+      },
+      {
+        label: "Validation",
+        value: election && (
+          <Duration display="parts" maxParts={3} value={election.validators_elected_for} />
+        ),
+      },
+      {
+        label: "Stake hold",
+        value: election && (
+          <Duration display="parts" maxParts={3} value={election.stake_held_for} />
+        ),
+      },
+    ],
+  } as const
 
   const groups = [
     {
@@ -461,8 +463,15 @@ function ValidationRoundDetails({
     {
       label: "Network config",
       metrics: [
-        {label: "Min stake", value: <GramAmount value={election?.min_stake_nano} />},
-        {label: "Max stake", value: <GramAmount value={election?.max_stake_nano} />},
+        {
+          label: "Min / max stake",
+          value: election && (
+            <>
+              <GramAmount value={election.min_stake_nano} showUnit={false} /> /{" "}
+              <GramAmount value={election.max_stake_nano} />
+            </>
+          ),
+        },
         {label: "Min validators", value: election?.min_validators.toLocaleString()},
         {label: "Max validators", value: election?.max_validators.toLocaleString()},
         {
@@ -472,7 +481,7 @@ function ValidationRoundDetails({
       ],
     },
     timingGroup,
-  ].filter(group => group !== undefined)
+  ]
 
   return (
     <div className={styles.validationRoundPanel} aria-label="Current validation round">

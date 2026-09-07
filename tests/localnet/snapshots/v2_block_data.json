@@ -1,0 +1,12 @@
+{
+  "both_wrong_hashes": {
+    "code": 500,
+    "error": "root_hash mismatch",
+    "status": 500
+  },
+  "contains_valid_boc": true,
+  "matches_requested_block": true,
+  "rest_and_json_rpc_match": true,
+  "single_hash_is_lookup_hint": true,
+  "type": "blocks.blockData"
+}

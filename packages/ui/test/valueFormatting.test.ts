@@ -19,6 +19,7 @@ import {
   formatPercentageRatio,
   formatSourceLocation,
   formatSourcePath,
+  formatWalletVersion,
   humanizeIdentifier,
   shortenMiddle,
   truncateEnd,
@@ -69,6 +70,24 @@ describe("shared value formatting", () => {
         "fallback": "Unavailable",
         "label": "validator network",
         "sentence": "Pending message",
+      }
+    `)
+  })
+
+  test("formats wallet version identifiers without changing unknown versions", () => {
+    expect({
+      v3: formatWalletVersion("V3R2"),
+      v4: formatWalletVersion(" v4r2 "),
+      v5: formatWalletVersion("V5R1"),
+      unknown: formatWalletVersion("Highload v2"),
+      fallback: formatWalletVersion(""),
+    }).toMatchInlineSnapshot(`
+      {
+        "fallback": "Unknown",
+        "unknown": "Highload v2",
+        "v3": "v3r2",
+        "v4": "v4r2",
+        "v5": "v5r1",
       }
     `)
   })

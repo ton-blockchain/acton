@@ -10,7 +10,7 @@ import {
 } from "echarts/components"
 import {init, use, type EChartsCoreOption, type EChartsType} from "echarts/core"
 import {CanvasRenderer} from "echarts/renderers"
-import {useEffect, useRef} from "react"
+import {useEffect, useRef, useState} from "react"
 import styles from "./TpsSection.module.css"
 
 interface TpsSectionProps {
@@ -45,6 +45,8 @@ function TpsSection({series}: TpsSectionProps) {
   const points = series?.points ?? []
   const current = points.at(-1)
   const peak = points.reduce((maximum, point) => Math.max(maximum, point.tps), 0)
+  const [visibleRange, setVisibleRange] = useState<ZoomRange>()
+  const average = averageTps(points, series?.bucket_seconds, visibleRange)
   const queueSize = series?.queue_size
 
   return (
@@ -53,8 +55,12 @@ function TpsSection({series}: TpsSectionProps) {
         <h2 id="throughput-title">Transaction throughput</h2>
       </div>
       <div className={styles.panel}>
-        <div className={styles.summary}>
+        <div className={`${styles.summary} ${styles.summaryFour}`}>
           <SummaryMetric label="Current" value={current ? `${formatTps(current.tps)} TPS` : "—"} />
+          <SummaryMetric
+            label="Range average"
+            value={average === undefined ? "—" : `${formatTps(average)} TPS`}
+          />
           <SummaryMetric label="Peak" value={points.length > 0 ? `${formatTps(peak)} TPS` : "—"} />
           <SummaryMetric
             label="Queue"
@@ -67,7 +73,7 @@ function TpsSection({series}: TpsSectionProps) {
         ) : points.length === 0 ? (
           <ChartState>Indexing recent blocks</ChartState>
         ) : (
-          <MetricsChart metric="tps" points={points} />
+          <MetricsChart metric="tps" points={points} onRangeChange={setVisibleRange} />
         )}
       </div>
     </section>
@@ -152,11 +158,13 @@ function ChartState({children}: {readonly children: string}) {
 function MetricsChart({
   bucketDurationMs,
   metric,
+  onRangeChange,
   points,
   targetBlockTimeMs,
 }: {
   readonly bucketDurationMs?: number
   readonly metric: ChartMetric
+  readonly onRangeChange?: (range: ZoomRange) => void
   readonly points: readonly TpsPoint[]
   readonly targetBlockTimeMs?: number
 }) {
@@ -184,12 +192,14 @@ function MetricsChart({
       const extent = extentRef.current
       const duration = extent.to - extent.from
 
-      zoomRef.current = {
+      const range = {
         automatic: false,
         followsLatest: end >= 99.5,
         from: extent.from + (duration * start) / 100,
         to: extent.from + (duration * end) / 100,
       }
+      zoomRef.current = range
+      onRangeChange?.(range)
     })
 
     return () => {
@@ -197,7 +207,7 @@ function MetricsChart({
       chart.dispose()
       chartRef.current = undefined
     }
-  }, [])
+  }, [onRangeChange])
 
   useEffect(() => {
     const chart = chartRef.current
@@ -216,6 +226,7 @@ function MetricsChart({
     extentRef.current = {from, to}
     const zoom = resolveZoomRange(zoomRef.current, from, to)
     zoomRef.current = zoom
+    onRangeChange?.(zoom)
     const computed = getComputedStyle(element)
     const color = (name: string) => computed.getPropertyValue(name).trim()
     const isBlockTime = metric === "block_time"
@@ -369,7 +380,7 @@ function MetricsChart({
         type: "value",
       },
     } satisfies EChartsCoreOption)
-  }, [bucketDurationMs, metric, points, targetBlockTimeMs, theme])
+  }, [bucketDurationMs, metric, onRangeChange, points, targetBlockTimeMs, theme])
 
   return (
     <div className={`${styles.chart} ${metric === "block_time" ? styles.blockTimeChart : ""}`}>
@@ -418,6 +429,31 @@ function resolveZoomRange(previous: ZoomRange | undefined, from: number, to: num
   const nextFrom = Math.max(from, previous.from)
   const nextTo = Math.min(to, Math.max(nextFrom + 5000, previous.to))
   return {automatic: false, followsLatest: false, from: nextFrom, to: nextTo}
+}
+
+function averageTps(
+  points: readonly TpsPoint[],
+  bucketSeconds: number | undefined,
+  range: ZoomRange | undefined,
+): number | undefined {
+  if (points.length === 0 || bucketSeconds === undefined || bucketSeconds <= 0) return undefined
+
+  const latestTimestamp = points.at(-1)?.timestamp ?? 0
+  const selectedFrom = range?.from ?? (latestTimestamp - DEFAULT_VISIBLE_SECONDS) * 1000
+  const selectedTo = range?.to ?? latestTimestamp * 1000
+  const visiblePoints = points.filter(point => {
+    const timestamp = point.timestamp * 1000
+    return timestamp >= selectedFrom && timestamp <= selectedTo
+  })
+  const first = visiblePoints[0]
+  const last = visiblePoints.at(-1)
+  if (!first || !last) return undefined
+
+  // Include empty time between buckets so gaps cannot inflate the selected-range average
+  const coveredSeconds = Math.max(bucketSeconds, last.timestamp - first.timestamp + bucketSeconds)
+  const transactions = visiblePoints.reduce((total, point) => total + point.transactions, 0)
+
+  return transactions / coveredSeconds
 }
 
 function formatChartTooltip(params: unknown, metric: ChartMetric) {

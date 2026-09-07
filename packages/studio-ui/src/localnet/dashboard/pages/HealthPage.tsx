@@ -201,7 +201,9 @@ const ApiSummaryCard: FC<ApiSummaryCardProps> = ({api, detail, icon: Icon, label
       {apiStatusLabel(api.status)}
     </strong>
     <span className={styles.summaryDetail}>
-      {api.masterchainSeqno === null ? "No indexed head" : `Block #${api.masterchainSeqno}`}
+      {api.masterchainSeqno === null
+        ? "No indexed head"
+        : `Masterchain block ${api.masterchainSeqno}`}
       {api.latencyMs === null ? "" : ` · ${formatMilliseconds(api.latencyMs)}`}
       {detail ? ` · ${detail}` : ""}
     </span>
@@ -312,9 +314,7 @@ const ServicesTable: FC<{readonly services: readonly ServiceHealth[]}> = ({servi
         ) : (
           services.map(service => (
             <DataTableRow key={service.name}>
-              <DataTableCell>
-                <span className={styles.serviceName}>{serviceLabel(service.name)}</span>
-              </DataTableCell>
+              <DataTableCell>{serviceLabel(service.name)}</DataTableCell>
               <DataTableCell>{serviceRole(service.name)}</DataTableCell>
               <DataTableCell>
                 <span className={styles.serviceStatus} data-status={service.status}>
@@ -333,17 +333,45 @@ const ServicesTable: FC<{readonly services: readonly ServiceHealth[]}> = ({servi
   </DataTable>
 )
 
+const HealthChartSkeleton: FC<{readonly title: string}> = ({title}) => (
+  <article className={styles.chartPanel}>
+    <div className={styles.chartHeader}>
+      <div>
+        <strong>{title}</strong>
+        <span className={styles.skeletonDetail} />
+      </div>
+    </div>
+    <div className={styles.chartBody}>
+      <span className={styles.chartSkeleton} />
+    </div>
+  </article>
+)
+
 const HealthPageSkeleton: FC = () => (
   <div className={styles.page} aria-label="Loading health data">
     <section className={styles.summary}>
-      {Array.from({length: 4}, (_, index) => (
-        <div className={styles.summaryCard} key={index}>
-          <span className={styles.skeletonWide} />
+      {[
+        {icon: Gauge, label: "Full localnet"},
+        {icon: Server, label: "API v2"},
+        {icon: Database, label: "API v3"},
+        {icon: Clock3, label: "Latest block"},
+      ].map(({icon: Icon, label}) => (
+        <div className={styles.summaryCard} key={label}>
+          <span className={styles.summaryHeading}>
+            <Icon size={16} aria-hidden="true" />
+            {label}
+          </span>
           <span className={styles.skeletonValue} />
           <span className={styles.skeletonDetail} />
         </div>
       ))}
     </section>
+
+    <section className={styles.charts} aria-label="Loading health history">
+      <HealthChartSkeleton title="Probe latency" />
+      <HealthChartSkeleton title="Indexer lag" />
+    </section>
+
     <DataTable title="Services" minWidth="44rem">
       <DataTableTable aria-label="Loading Full localnet services">
         <DataTableHead>

@@ -1,4 +1,4 @@
-import {useCallback, useMemo, useState} from "react"
+import {useCallback, useLayoutEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
 import {
   EyeOff,
@@ -36,11 +36,12 @@ import styles from "./NetworkPage.module.css"
 
 interface NetworkPageProps {
   readonly onEnvironmentChange: (environment: StudioEnvironment) => void
+  readonly onActionsChange?: (actions: ReactNode) => void
   readonly view: NetworkDashboardView
 }
 
 /** Connects reusable Localton observability views to the selected Studio environment */
-export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) => {
+export const NetworkPage: FC<NetworkPageProps> = ({onActionsChange, onEnvironmentChange, view}) => {
   const {environment} = useLocalnetRuntime()
   const explorerRoutes = useExplorerRoutePaths()
   const openExplorerPath = useOpenExplorerPath()
@@ -48,6 +49,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
   const [network, setNetwork] = useState<NetworkView>()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [nodeName, setNodeName] = useState("")
+  const [nodeNameEdited, setNodeNameEdited] = useState(false)
   const [nodeIsValidator, setNodeIsValidator] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
   const [removingNode, setRemovingNode] = useState<FullTonNode>()
@@ -58,6 +60,9 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
   const [changingNodeId, setChangingNodeId] = useState<string>()
   const endpoint = environment?.endpoints.observability
   const config = environment?.config.kind === "fullTonNetwork" ? environment.config : undefined
+  const nodesView = view === "nodes" && config !== undefined
+  const nextNodeNumber = (config?.nodes.length ?? 0) + 1
+  const suggestedNodeName = `${nodeIsValidator ? "validator" : "node"}-${nextNodeNumber}`
   const client = useMemo(
     () => createObservabilityClient(endpoint ?? "/unavailable-observability"),
     [endpoint],
@@ -74,6 +79,28 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
       network?.nodes.find(candidate => candidate.name.toLowerCase() === node.name.toLowerCase()),
     [network?.nodes],
   )
+
+  const openAddNodeDialog = useCallback(() => {
+    setNodeName(suggestedNodeName)
+    setNodeNameEdited(false)
+    setAddDialogOpen(true)
+  }, [suggestedNodeName])
+
+  useLayoutEffect(() => {
+    if (!nodesView || !onActionsChange) return
+
+    onActionsChange(
+      <Button
+        variant="primary"
+        leadingIcon={<Plus size={15} aria-hidden="true" />}
+        onClick={openAddNodeDialog}
+      >
+        Add node
+      </Button>,
+    )
+
+    return () => onActionsChange(undefined)
+  }, [nodesView, onActionsChange, openAddNodeDialog])
 
   const addNode = useCallback(async () => {
     if (!environment || !config || isAdding) return
@@ -94,6 +121,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
       })
       onEnvironmentChange(updated)
       setNodeName("")
+      setNodeNameEdited(false)
       setAddDialogOpen(false)
       updateToast(toastId, {
         variant: "success",
@@ -284,10 +312,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
   const unsafeRemoval =
     removingNode?.validator === true && !validatorCanLeaveSafely(removalObservation)
   const participationEnabled = removalObservation?.participate_in_elections !== false
-  const nodesView = view === "nodes" && config !== undefined
   const fallbackNodes = useMemo(() => config?.nodes.map(unobservedNode) ?? [], [config?.nodes])
-  const nextNodeNumber = (config?.nodes.length ?? 0) + 1
-  const suggestedNodeName = `${nodeIsValidator ? "validator" : "node"}-${nextNodeNumber}`
 
   const renderNodeActions = useCallback(
     (node: NodeView) => {
@@ -408,21 +433,6 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
       <NetworkDashboard
         client={client}
         fallbackNodes={fallbackNodes}
-        nodesFooter={
-          nodesView ? (
-            <Button
-              size="sm"
-              variant="secondary"
-              leadingIcon={<Plus size={15} aria-hidden="true" />}
-              onClick={() => {
-                setNodeName(suggestedNodeName)
-                setAddDialogOpen(true)
-              }}
-            >
-              Add node
-            </Button>
-          ) : undefined
-        }
         onAddressClick={(address, event) => {
           openExplorerPath(explorerRoutes.addressPath(address), event)
         }}
@@ -448,7 +458,10 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
             maxLength={64}
             placeholder={suggestedNodeName}
             value={nodeName}
-            onChange={event => setNodeName(event.target.value)}
+            onChange={event => {
+              setNodeName(event.target.value)
+              setNodeNameEdited(true)
+            }}
             onKeyDown={event => {
               if (event.key === "Enter" && nodeName.trim()) void addNode()
             }}
@@ -460,11 +473,10 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
             onChange={event => {
               const validator = event.target.checked
               setNodeIsValidator(validator)
-              setNodeName(current =>
-                current === "" || /^(?:node|validator)-\d+$/.test(current)
-                  ? `${validator ? "validator" : "node"}-${nextNodeNumber}`
-                  : current,
-              )
+
+              if (!nodeNameEdited) {
+                setNodeName(`${validator ? "validator" : "node"}-${nextNodeNumber}`)
+              }
             }}
           />
           <DialogActions>

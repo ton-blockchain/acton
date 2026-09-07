@@ -1,10 +1,11 @@
 use super::toncenter_v2::{
-    parse_block_header_request, parse_block_transactions_request, parse_config_param,
-    parse_i32_seqno, parse_libraries_request, parse_lookup_block_request, parse_required_seqno,
-    parse_seqno, parse_transactions_request, parse_transactions_std_request,
-    parse_try_locate_tx_request, resolve_block_header, resolve_block_transactions,
-    resolve_block_transactions_ext, resolve_extended_address_information, resolve_lookup_block,
-    resolve_shards, resolve_token_data, resolve_wallet_information,
+    parse_block_data_request, parse_block_header_request, parse_block_transactions_request,
+    parse_config_param, parse_i32_seqno, parse_libraries_request, parse_lookup_block_request,
+    parse_required_seqno, parse_seqno, parse_transactions_request, parse_transactions_std_request,
+    parse_try_locate_tx_request, resolve_block_data, resolve_block_header,
+    resolve_block_transactions, resolve_block_transactions_ext,
+    resolve_extended_address_information, resolve_lookup_block, resolve_shards, resolve_token_data,
+    resolve_wallet_information,
 };
 use super::utils::{ToncenterHttpError, error_status, get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
@@ -18,10 +19,10 @@ use serde_json::Value;
 use std::sync::Arc;
 use ton_api::toncenter::v2 as wire;
 use ton_api::toncenter::v2::requests::{
-    AddressInformationRequest, AddressRequest, BlockHeaderRequest, BlockTransactionsRequest,
-    ConfigAllRequest, ConfigParamRequest, DetectHashRequest, JsonRpcIncomingRequest,
-    LibrariesRequest, LookupBlockRequest, RunGetMethodRequest, RunGetMethodStdRequest,
-    SendBocRequest, SeqnoRequest, TransactionsRequest, TryLocateTxRequest,
+    AddressInformationRequest, AddressRequest, BlockDataRequest, BlockHeaderRequest,
+    BlockTransactionsRequest, ConfigAllRequest, ConfigParamRequest, DetectHashRequest,
+    JsonRpcIncomingRequest, LibrariesRequest, LookupBlockRequest, RunGetMethodRequest,
+    RunGetMethodStdRequest, SendBocRequest, SeqnoRequest, TransactionsRequest, TryLocateTxRequest,
 };
 use tycho_types::models::{StdAddr, StdAddrFormat};
 
@@ -270,6 +271,11 @@ async fn json_rpc_router(
             let req: BlockHeaderRequest = parse_params(params, method)?;
             let request = validate!(parse_block_header_request(&req));
             wire::JsonRpcResult::BlockHeader(Box::new(resolve_block_header(&node, &request).await?))
+        }
+        "getBlock" => {
+            let req: BlockDataRequest = parse_params(params, method)?;
+            let request = validate!(parse_block_data_request(&req));
+            wire::JsonRpcResult::BlockData(Box::new(resolve_block_data(&node, &request).await?))
         }
         "getBlockTransactions" => {
             let req: BlockTransactionsRequest = parse_params(params, method)?;

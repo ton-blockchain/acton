@@ -130,6 +130,27 @@ pub struct ConfigAllRequest {
     pub seqno: Option<StringOrNumber>,
 }
 
+/// Selects a block whose complete serialized `BoC` should be returned by `getBlock`.
+///
+/// `TonCenter` resolves the block by workchain, shard, and seqno when either hash is absent. The
+/// optional archival flag selects an upstream liteserver and has no effect on locally stored blocks.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockDataRequest {
+    pub workchain: StringOrNumber,
+    pub shard: StringOrNumber,
+    pub seqno: StringOrNumber,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_hash: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_optional_bool_from_wire"
+    )]
+    pub archival: Option<bool>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockHeaderRequest {
     pub workchain: StringOrNumber,

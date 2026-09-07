@@ -101,7 +101,7 @@ export function NetworkConfigPage({
               className={styles.blockLink}
               to={blockPath(-1, "8000000000000000", result.masterchainSeqno)}
             >
-              #{result.masterchainSeqno}
+              {result.masterchainSeqno}
             </Link>
           </>
         ),

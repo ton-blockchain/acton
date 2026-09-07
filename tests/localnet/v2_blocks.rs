@@ -5,6 +5,7 @@ use crate::support::toncenter::{
 };
 use serde_json::{Value, json};
 use ton_api::toncenter::v2::{StringOrNumber, requests, responses};
+use tycho_types::boc::Boc;
 
 const SHARD: i64 = i64::MIN;
 const ZERO_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -131,6 +132,77 @@ fn block_transactions_match_upstream_pagination_contract() {
     assertion().eq(
         pretty_json_for_snapshot(&snapshot, project.path()),
         snapbox::file!("snapshots/v2_block_transactions.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn block_data_matches_upstream_rest_and_json_rpc_contract() {
+    let project = jetton_v1_action_project("localnet-v2-block-data");
+    let (node, _) = run_localnet_action_project(&project, "scripts/jetton.tolk");
+    let (seqno, transactions) = find_v2_transaction_block(&node, 1);
+    let query = block_query(0, seqno);
+
+    let get_response: responses::TonlibResponse<responses::BlockData> =
+        node.get_json_as(&format!("/api/v2/getBlock?{query}&archival=true"));
+    let post_response: responses::TonlibResponse<responses::BlockData> = node.post_json_as(
+        "/api/v2/getBlock",
+        &json!({
+            "workchain": 0,
+            "shard": SHARD.to_string(),
+            "seqno": seqno,
+            "root_hash": transactions.id.root_hash,
+            "file_hash": transactions.id.file_hash,
+            "archival": "false",
+        }),
+    );
+    let rpc_response: responses::JsonRpcResponse<responses::BlockData> = node.post_v2_json_rpc(
+        "/api/v2/jsonRPC",
+        StringOrNumber::String("block-data".to_owned()),
+        "getBlock",
+        json!({
+            "workchain": 0,
+            "shard": SHARD.to_string(),
+            "seqno": seqno,
+            "archival": 1,
+        }),
+    );
+    let root_only: responses::TonlibResponse<responses::BlockData> =
+        node.get_json_as(&format!("/api/v2/getBlock?{query}&root_hash={ZERO_HASH}"));
+    let (wrong_hashes_status, wrong_hashes_error): (u16, responses::TonlibErrorResponse) = node
+        .get_json_with_status_as(&format!(
+            "/api/v2/getBlock?{query}&root_hash={ZERO_HASH}&file_hash={ZERO_HASH}"
+        ));
+
+    let results = [
+        &get_response.result,
+        &post_response.result,
+        &rpc_response.response.result,
+    ];
+    let snapshot = json!({
+        "type": get_response.result.type_field,
+        "matches_requested_block": results.iter().all(|result| {
+            result.id.workchain == 0 && result.id.shard == SHARD.to_string()
+                && result.id.seqno == u64::from(seqno)
+        }),
+        "rest_and_json_rpc_match": results.iter().all(|result| {
+            result.id.root_hash == get_response.result.id.root_hash
+                && result.id.file_hash == get_response.result.id.file_hash
+                && result.data == get_response.result.data
+        }),
+        "contains_valid_boc": results.iter().all(|result| Boc::decode_base64(&result.data).is_ok()),
+        "single_hash_is_lookup_hint": root_only.result.id.root_hash
+            == get_response.result.id.root_hash,
+        "both_wrong_hashes": {
+            "status": wrong_hashes_status,
+            "code": wrong_hashes_error.code,
+            "error": wrong_hashes_error.error,
+        },
+    });
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!("snapshots/v2_block_data.json"),
     );
 
     node.stop();

@@ -307,6 +307,33 @@ fn block_header_request_covers_id_and_hashes() -> Result<()> {
 
 #[test]
 #[ignore = "optional live TonCenter contract test"]
+fn block_data_request_returns_the_selected_block_boc() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let block = masterchain_info(&live)?.last;
+    let request = v2::BlockDataRequest {
+        workchain: block.workchain.into(),
+        shard: v2::StringOrNumber::String(block.shard.clone()),
+        seqno: i32::try_from(block.seqno)?.into(),
+        root_hash: Some(block.root_hash.clone()),
+        file_hash: Some(block.file_hash.clone()),
+        archival: Some(true),
+    };
+
+    let get_response: v2::TonlibResponse<v2::BlockData> =
+        live.get(&live.v2_url, "/getBlock", &request)?;
+    let post_response: v2::TonlibResponse<v2::BlockData> =
+        live.post(&live.v2_url, "/getBlock", &request)?;
+
+    anyhow::ensure!(get_response.result.type_field == "blocks.blockData");
+    anyhow::ensure!(get_response.result.id.root_hash == block.root_hash);
+    anyhow::ensure!(get_response.result.id.file_hash == block.file_hash);
+    anyhow::ensure!(get_response.result.data == post_response.result.data);
+    Boc::decode_base64(&get_response.result.data).context("getBlock returned an invalid BoC")?;
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
 fn lookup_block_request_covers_seqno_lt_and_unixtime() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let block = &fixture(&live)?.block;

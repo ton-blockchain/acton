@@ -49,6 +49,7 @@ pub enum JsonRpcResult {
     RawTransactions(Box<RawTransactions>),
     ConfigInfo(Box<ConfigInfo>),
     Transaction(Box<Transaction>),
+    BlockData(Box<BlockData>),
     BlockHeader(Box<BlockHeader>),
     BlockTransactions(Box<BlockTransactions>),
     BlockTransactionsExt(Box<BlockTransactionsExt>),
@@ -105,6 +106,18 @@ pub struct DetectHash {
     pub b64: String,
     pub b64url: String,
     pub hex: String,
+}
+
+/// Complete raw block payload returned by the `TonCenter` v2 `getBlock` method.
+///
+/// `data` is the base64 representation of the block `BoC`; `id` identifies the exact bytes and is
+/// suitable for validating the requested root and file hashes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockData {
+    #[serde(rename = "@type")]
+    pub type_field: String,
+    pub id: TonBlockIdExt,
+    pub data: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

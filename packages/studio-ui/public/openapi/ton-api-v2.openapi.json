@@ -3,7 +3,7 @@
   "info": {
     "title": "Simulated localnet TON Center API v2",
     "description": "This API enables HTTP access to TON blockchain - getting accounts and wallets information, looking up blocks and transactions, sending messages to the blockchain, calling get methods of smart contracts, and more.\n\nIn addition to REST API, all methods are available through [JSON-RPC endpoint](#json%20rpc)  with `method` equal to method name and `params` passed as a dictionary.\n\nThe response contains a JSON object, which always has a boolean field `ok` and either `error` or `result`. If `ok` equals true, the request was successful and the result of the query can be found in the `result` field. In case of an unsuccessful request, `ok` equals false and the error is explained in the `error`.\n\nAPI Key should be sent either as `api_key` query parameter or `X-API-Key` header. When Simulated localnet is started with --require-auth, pass the printed localnet API token as `X-API-Key` or `Authorization: Bearer <token>`.\n\n\nThis bundled reference is derived from the official TON Center v2 OpenAPI document and filtered to endpoints implemented by Simulated localnet.",
-    "version": "v2.1.13"
+    "version": "v2.1.14"
   },
   "paths": {
     "/api/v2/jsonRPC": {
@@ -1182,6 +1182,96 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ShardsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getBlock": {
+      "get": {
+        "tags": ["blocks"],
+        "summary": "Get Block",
+        "description": "Get raw block data as a base64-encoded BOC",
+        "operationId": "getBlock_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workchain"
+          },
+          {
+            "$ref": "#/components/parameters/shard"
+          },
+          {
+            "$ref": "#/components/parameters/seqno"
+          },
+          {
+            "$ref": "#/components/parameters/rootHashOptional"
+          },
+          {
+            "$ref": "#/components/parameters/fileHashOptional"
+          },
+          {
+            "$ref": "#/components/parameters/archivalOptional"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Block",
+        "description": "Get raw block data as a base64-encoded BOC",
+        "operationId": "getBlock_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockDataRequest"
               }
             }
           },
@@ -2930,6 +3020,71 @@
       },
       "ShardsRequest": {
         "$ref": "#/components/schemas/SeqnoRequest"
+      },
+      "BlockDataRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["workchain", "shard", "seqno"],
+        "properties": {
+          "workchain": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          },
+          "shard": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int64",
+                "x-usrv-cpp-type": "std::int64_t"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "seqno": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          },
+          "root_hash": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "file_hash": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "archival": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              },
+              {
+                "type": "boolean"
+              }
+            ],
+            "x-usrv-cpp-type": "bool"
+          }
+        }
       },
       "BlockHeaderRequest": {
         "type": "object",
@@ -4714,6 +4869,9 @@
             "$ref": "#/components/schemas/Shards"
           },
           {
+            "$ref": "#/components/schemas/BlockData"
+          },
+          {
             "$ref": "#/components/schemas/BlockHeader"
           },
           {
@@ -4775,6 +4933,7 @@
             "ext.blocks.consensusBlock": "#/components/schemas/ConsensusBlock",
             "ton.blockIdExt": "#/components/schemas/TonBlockIdExt",
             "blocks.shards": "#/components/schemas/Shards",
+            "blocks.blockData": "#/components/schemas/BlockData",
             "blocks.header": "#/components/schemas/BlockHeader",
             "blocks.outMsgQueueSizes": "#/components/schemas/OutMsgQueueSizes",
             "blocks.transactions": "#/components/schemas/BlockTransactions",
@@ -5296,6 +5455,27 @@
           }
         },
         "required": ["@type", "shards"]
+      },
+      "BlockData": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Raw block data returned by a LiteServer.",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["blocks.blockData"],
+            "default": "blocks.blockData"
+          },
+          "id": {
+            "$ref": "#/components/schemas/TonBlockIdExt",
+            "description": "Extended identifier of the returned block."
+          },
+          "data": {
+            "$ref": "#/components/schemas/Bytes",
+            "description": "Full block BOC encoded as base64."
+          }
+        },
+        "required": ["@type", "id", "data"]
       },
       "BlockHeader": {
         "type": "object",

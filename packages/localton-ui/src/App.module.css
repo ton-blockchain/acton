@@ -264,6 +264,11 @@
   color: var(--acton-color-accent);
 }
 
+/* Reserve room for the 8…8 value and its copy action so CSS does not truncate it again */
+.validatorIdentifierColumn {
+  width: 12rem;
+}
+
 .validatorEfficiency {
   color: var(--acton-color-text-muted);
   font-variant-numeric: tabular-nums;

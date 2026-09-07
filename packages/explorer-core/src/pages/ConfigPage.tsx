@@ -184,7 +184,7 @@ export const ConfigPage: FC<ConfigPageProps> = ({
             items={
               seqno === undefined
                 ? [{label: "Config"}]
-                : [{label: "Config", path: routes.configPath()}, {label: `Block #${seqno}`}]
+                : [{label: "Config", path: routes.configPath()}, {label: `Block ${seqno}`}]
             }
           />
         )}

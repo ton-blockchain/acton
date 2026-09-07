@@ -83,7 +83,8 @@
   cursor: pointer;
 }
 
-.chartHeader[aria-expanded="true"] {
+.chartHeader[aria-expanded="true"],
+.chartHeader[data-expanded="true"] {
   border-bottom-color: var(--acton-color-border);
 }
 
@@ -110,7 +111,6 @@
   height: 400px;
 }
 
-.emptyState,
 .error {
   min-height: 180px;
   border: 1px solid var(--acton-color-border);
@@ -131,27 +131,8 @@
   color: var(--acton-color-status-failed-text);
 }
 
-.pulse {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--acton-color-accent);
-  animation: pulse 1.8s ease-in-out infinite;
-}
-
 .spinning {
   animation: spin 900ms linear infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-
-  50% {
-    opacity: 1;
-  }
 }
 
 @keyframes spin {
@@ -161,7 +142,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pulse,
   .spinning {
     animation: none;
   }

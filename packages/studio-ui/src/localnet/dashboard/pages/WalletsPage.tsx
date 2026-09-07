@@ -15,6 +15,7 @@ import {
   DataTableSkeletonRows,
   DataTableTable,
   DateTime,
+  formatWalletVersion,
   InlineButton,
   Input,
 } from "@acton/ui"
@@ -219,7 +220,7 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                           />
                         </DataTableCell>
                         <DataTableCell tone="strong" truncate>
-                          {wallet.record.version.toUpperCase()}
+                          {formatWalletVersion(wallet.record.version)}
                         </DataTableCell>
                         <DataTableCell align="right" className={styles.walletBalanceCell}>
                           <WalletAccountSummary
@@ -245,7 +246,7 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                 <div className={styles.unsupportedList}>
                   {unsupportedWallets.map(wallet => (
                     <span key={wallet.name} className={styles.unsupportedItem}>
-                      {wallet.name} · {wallet.version}
+                      {wallet.name} · {formatWalletVersion(wallet.version)}
                     </span>
                   ))}
                 </div>

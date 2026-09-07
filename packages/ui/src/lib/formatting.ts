@@ -64,6 +64,21 @@ export function formatCompilerLabel(
   return version ? `${language} ${version}` : language
 }
 
+/** Formats TON wallet version identifiers with their conventional lowercase prefixes */
+export function formatWalletVersion(
+  value: string | null | undefined,
+  fallback = "Unknown",
+): string {
+  const normalized = value?.trim() ?? ""
+  if (!normalized) return fallback
+
+  const version = /^v(\d+)(?:r(\d+))?$/i.exec(normalized)
+  if (!version) return normalized
+
+  const revision = version[2] ? `r${version[2]}` : ""
+  return `v${version[1]}${revision}`
+}
+
 function normalizeEdgeLength(value: number | undefined, fallback: number): number {
   return value === undefined || !Number.isFinite(value) ? fallback : Math.max(0, Math.trunc(value))
 }

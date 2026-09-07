@@ -24,6 +24,7 @@ import {
   Dialog,
   DialogActions,
   DateTime,
+  EmptyState,
   formatDateTime,
   formatGramAmount,
   InlineAction,
@@ -1836,18 +1837,21 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
               </div>
 
               {!hasValidTargetAddress && (
-                <div className={styles.messagePlaceholder}>
-                  <span>Enter a valid contract address in To to configure the message</span>
-                </div>
+                <EmptyState
+                  className={styles.messagePlaceholder}
+                  icon={<FileJson size={22} aria-hidden="true" />}
+                  title="Enter a contract address"
+                  description="Use a valid address in To to configure the message"
+                />
               )}
 
               {hasValidTargetAddress && abiSourceMode === "auto" && !hasValidAbiAddress && (
-                <div className={styles.messagePlaceholder}>
-                  <span>
-                    Enter a valid contract address in {abiEndpoint === "source" ? "From" : "To"} to
-                    load its ABI
-                  </span>
-                </div>
+                <EmptyState
+                  className={styles.messagePlaceholder}
+                  icon={<FileJson size={22} aria-hidden="true" />}
+                  title="Enter an ABI address"
+                  description={`Use a valid address in ${abiEndpoint === "source" ? "From" : "To"} to load its ABI`}
+                />
               )}
 
               {hasValidTargetAddress && abiSourceMode === "manual" && (

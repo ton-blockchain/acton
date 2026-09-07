@@ -5,8 +5,8 @@ use crate::node::{Node, NodeClockInfo, StateSource};
 use crate::node_snapshot::{NodeStateSnapshot, snapshot_from_json, snapshot_to_json};
 use crate::remote::{
     RemoteProvider, fetch_remote_block_header_v2, fetch_remote_block_transactions_ext_v2,
-    fetch_remote_block_transactions_v2, fetch_remote_blocks_v3, fetch_remote_lookup_block_v2,
-    fetch_remote_shards_v2, fetch_remote_transactions_v3,
+    fetch_remote_block_transactions_v2, fetch_remote_block_v2, fetch_remote_blocks_v3,
+    fetch_remote_lookup_block_v2, fetch_remote_shards_v2, fetch_remote_transactions_v3,
 };
 use crate::storage;
 use crate::storage::{AccountStatus, BlockMeta, MasterchainBlockMeta, MsgMeta, TransactionInfo};
@@ -1559,6 +1559,27 @@ impl Localnet {
         fetch_remote_block_header_v2(&provider, request)
             .await
             .map(Some)
+    }
+
+    /// Fetches a pre-fork block through the remote provider selected by this localnet's state source.
+    ///
+    /// Locally mined blocks return `None`, leaving the HTTP adapter responsible for reading local
+    /// storage. The upstream archival preference is preserved for historical provider selection.
+    pub async fn get_historical_block_v2(
+        &self,
+        workchain: i32,
+        shard: i64,
+        seqno: u32,
+        request: ton_api::toncenter::v2::BlockDataRequest,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v2::BlockData>> {
+        let Some(provider) = self
+            .historical_block_provider(workchain, shard, seqno)
+            .await?
+        else {
+            return Ok(None);
+        };
+
+        fetch_remote_block_v2(&provider, request).await.map(Some)
     }
 
     pub async fn get_historical_block_transactions_v2(

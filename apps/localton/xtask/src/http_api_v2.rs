@@ -12,8 +12,8 @@ use crate::build::{
 const UPSTREAM_REPOSITORY: &str = "https://github.com/toncenter/ton-http-api-cpp.git";
 const UPSTREAM_BINARY: &str = "ton-http-api-cpp";
 const UPSTREAM_BUILD_PATH: &str = "ton-http-api/ton-http-api-cpp";
-const COMMIT: &str = "ab081891316b3513fb86d3815e33d141fdca2c6d";
-const TON_COMMIT: &str = "bbc3bc6d52abbe3a7f852b22050708166fdaafbc";
+const COMMIT: &str = "888318b81e900d0cb38f96974dcf4c115fe7ad07";
+const TON_COMMIT: &str = "9a42919dce98971a6653d326347efcce40bad026";
 const BUILD_SCHEMA: &str = "4";
 const BROKEN_CACHE_CONSTRUCTION: &str = "cache_ = std::make_shared<Cache>(cache_size, way_size);";
 const FIXED_CACHE_CONSTRUCTION: &str = "cache_ = std::make_shared<Cache>(cache_ways, way_size);";

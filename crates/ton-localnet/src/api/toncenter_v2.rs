@@ -40,6 +40,16 @@ pub fn map_block_id(id: &LocalnetBlockId) -> response::TonBlockIdExt {
     }
 }
 
+/// Maps a stored localnet block and its exact serialized bytes to the `TonCenter` wire response.
+#[must_use]
+pub fn map_block_data(id: &LocalnetBlockId, data: &BocBytes) -> response::BlockData {
+    response::BlockData {
+        type_field: "blocks.blockData".to_owned(),
+        id: map_block_id(id),
+        data: data.to_base64(),
+    }
+}
+
 pub fn map_transactions(txs: &[LocalnetTransaction]) -> Vec<response::Transaction> {
     txs.iter().map(map_transaction).collect()
 }

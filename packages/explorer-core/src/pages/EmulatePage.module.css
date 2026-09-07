@@ -177,17 +177,8 @@
 
 .messagePlaceholder {
   flex: 1;
-  display: grid;
-  place-items: center;
+  align-content: center;
   padding: var(--acton-space-6);
-  color: var(--acton-color-text-muted);
-  font-size: var(--acton-font-size-sm);
-  line-height: 1.5;
-  text-align: center;
-}
-
-.messagePlaceholder > span {
-  max-width: 24rem;
 }
 
 .panelTitleRow {

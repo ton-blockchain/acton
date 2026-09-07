@@ -261,7 +261,7 @@ function SynchronizationProgress({node, now}: {readonly node: NodeView; readonly
                 typeof sample.progress.total_parts === "number" ? (
                 `Part ${sample.progress.current_part.toLocaleString()} / ${sample.progress.total_parts.toLocaleString()}`
               ) : typeof sample.progress.masterchain_seqno === "number" ? (
-                `Masterchain #${sample.progress.masterchain_seqno.toLocaleString()}`
+                `Masterchain block ${sample.progress.masterchain_seqno.toLocaleString()}`
               ) : (
                 "Preparing"
               )}

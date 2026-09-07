@@ -278,6 +278,16 @@ pub(crate) async fn fetch_remote_block_header_v2(
     .await
 }
 
+pub(crate) async fn fetch_remote_block_v2(
+    provider: &RemoteProvider,
+    request: v2::BlockDataRequest,
+) -> anyhow::Result<v2::BlockData> {
+    with_api_client_async(provider, move |api_client| {
+        api_client.get_block_v2(&request)
+    })
+    .await
+}
+
 pub(crate) async fn fetch_remote_block_transactions_v2(
     provider: &RemoteProvider,
     request: v2::BlockTransactionsRequest,

@@ -1,4 +1,13 @@
-import {BocInput, Button, InfoPopover, Input, Select, parseGramAmount, useToast} from "@acton/ui"
+import {
+  BocInput,
+  Button,
+  formatWalletVersion,
+  InfoPopover,
+  Input,
+  parseGramAmount,
+  Select,
+  useToast,
+} from "@acton/ui"
 import type {ToastOptions} from "@acton/ui"
 import {TonAddressInput, type TonAddressSuggestion} from "@acton/transaction-ui"
 import type {LocalnetContract} from "@acton/explorer-core/api/types"
@@ -151,7 +160,7 @@ export const AdminPage: FC<{readonly environment: StudioEnvironment}> = ({enviro
       ...(projectWallets ?? []).map(wallet => ({
         address: wallet.address,
         label: wallet.name,
-        kind: `Wallet · ${wallet.version}`,
+        kind: `Wallet · ${formatWalletVersion(wallet.version)}`,
       })),
       ...contracts.map(contract => ({
         address: contract.address,
@@ -198,7 +207,7 @@ export const AdminPage: FC<{readonly environment: StudioEnvironment}> = ({enviro
           <>
             Verified at masterchain block{" "}
             <Link to={blockPath(-1, "8000000000000000", operation.blockSeqno)}>
-              #{operation.blockSeqno}
+              {operation.blockSeqno}
             </Link>
           </>
         ) : undefined),

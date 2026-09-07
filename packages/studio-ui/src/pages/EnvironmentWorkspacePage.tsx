@@ -104,10 +104,8 @@ export function EnvironmentWorkspacePage({
 
   const canRestart =
     isManaged && (environment?.status === "stopped" || environment?.status === "failed")
-  const isStarting =
-    environment?.status === "starting" ||
-    environment?.status === "stopping" ||
-    (isLoading && !visibleError)
+  const isStarting = environment?.status === "starting" || environment?.status === "stopping"
+  const isPending = isStarting || (isLoading && !visibleError)
 
   return (
     <div className={styles.statePage}>
@@ -116,7 +114,7 @@ export function EnvironmentWorkspacePage({
           <span className={styles.stateIcon} data-error={hasFailure ? "true" : undefined}>
             {hasFailure ? (
               <CircleAlert size={21} aria-hidden="true" />
-            ) : isStarting ? (
+            ) : isPending ? (
               <LoaderCircle className={styles.loadingIcon} size={21} aria-hidden="true" />
             ) : (
               <Play size={20} aria-hidden="true" />
@@ -127,18 +125,22 @@ export function EnvironmentWorkspacePage({
               ? environmentError && !requestError
                 ? "Environment failed"
                 : "Unable to open environment"
-              : isStarting
-                ? environment?.status === "stopping"
-                  ? "Environment is stopping"
-                  : "Environment is starting"
-                : "Environment is stopped"}
+              : isLoading && !environment
+                ? "Loading environment"
+                : isStarting
+                  ? environment?.status === "stopping"
+                    ? "Environment is stopping"
+                    : "Environment is starting"
+                  : "Environment is stopped"}
           </strong>
           <span className={styles.stateDescription}>
             {hasFailure
               ? "Review the error details below, then restart the environment"
-              : isStarting
-                ? "The workspace will open when the localnet is ready"
-                : "Restart the environment to continue working with it"}
+              : isLoading && !environment
+                ? "Fetching its current state"
+                : isStarting
+                  ? "The workspace will open when the localnet is ready"
+                  : "Restart the environment to continue working with it"}
           </span>
         </div>
         {isStarting && environment?.startupTimings ? (

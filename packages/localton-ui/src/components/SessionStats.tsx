@@ -1,6 +1,6 @@
 import type {ObservabilityClient} from "../observability"
 import type {SessionStatBucket, SessionStatsView} from "../types"
-import {Button, formatDuration, useTheme} from "@acton/ui"
+import {Button, formatDuration, Skeleton, useTheme} from "@acton/ui"
 import {LineChart} from "echarts/charts"
 import {
   AriaComponent,
@@ -180,10 +180,7 @@ export function SessionStats({client}: SessionStatsProps) {
 
       {error ? <div className={styles.error}>{error}</div> : undefined}
       {!snapshot || snapshot.status === "indexing" ? (
-        <div className={styles.emptyState}>
-          <span className={styles.pulse} aria-hidden="true" />
-          Waiting for complete validator sessions
-        </div>
+        <SessionStatsSkeleton charts={charts} />
       ) : (
         <div className={styles.chartList}>
           {charts.map(chart => (
@@ -198,6 +195,25 @@ export function SessionStats({client}: SessionStatsProps) {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function SessionStatsSkeleton({charts}: {readonly charts: readonly ChartDefinition[]}) {
+  return (
+    <div className={styles.chartList} aria-label="Loading validator session statistics" aria-busy>
+      {charts.map(chart => (
+        <section className={styles.chartPanel} key={chart.title}>
+          <div className={styles.chartHeader} data-expanded="true">
+            <ChevronDown size={17} aria-hidden="true" />
+            <span>{chart.title}</span>
+          </div>
+          <Skeleton
+            className={`${styles.chart} ${chart.metrics.length > 8 ? styles.chartDense : ""}`}
+            shape="rect"
+          />
+        </section>
+      ))}
     </div>
   )
 }

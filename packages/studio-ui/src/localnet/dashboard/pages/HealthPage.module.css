@@ -17,12 +17,11 @@
 
 .summaryCard {
   min-width: 0;
-  min-height: 118px;
-  padding: 17px 18px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 8px;
+  min-height: 6.3125rem;
+  padding: 1rem 1.1rem;
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
   box-sizing: border-box;
 }
 
@@ -35,14 +34,15 @@
   align-items: center;
   gap: 7px;
   color: var(--acton-color-text-muted);
-  font-size: 0.76rem;
+  font-size: var(--acton-font-size-xs);
   font-weight: 500;
 }
 
 .summaryCard > strong {
   color: var(--acton-color-text);
-  font-size: 1.04rem;
-  font-weight: 620;
+  font-size: var(--acton-font-size-xl);
+  font-weight: var(--acton-font-weight-medium);
+  letter-spacing: -0.015em;
   line-height: 1.25;
 }
 
@@ -214,12 +214,6 @@
   box-sizing: border-box;
 }
 
-.serviceName,
-.dockerState {
-  font-family: var(--acton-font-mono);
-  font-size: 0.76rem;
-}
-
 .serviceStatus {
   font-size: 0.78rem;
   font-weight: 550;
@@ -293,17 +287,12 @@
   flex: 0 0 auto;
 }
 
-.skeletonWide,
 .skeletonValue,
-.skeletonDetail {
+.skeletonDetail,
+.chartSkeleton {
   border-radius: 5px;
   background: var(--acton-color-skeleton-base);
   animation: health-pulse 1.6s ease-in-out infinite;
-}
-
-.skeletonWide {
-  width: 6rem;
-  height: 0.75rem;
 }
 
 .skeletonValue {
@@ -314,6 +303,12 @@
 .skeletonDetail {
   width: 8rem;
   height: 0.7rem;
+}
+
+.chartSkeleton {
+  width: 100%;
+  aspect-ratio: 800 / 228;
+  display: block;
 }
 
 @keyframes health-pulse {
@@ -357,9 +352,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeletonWide,
   .skeletonValue,
-  .skeletonDetail {
+  .skeletonDetail,
+  .chartSkeleton {
     animation: none;
   }
 }

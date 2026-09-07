@@ -4,10 +4,10 @@ use super::handlers::{
     detect_hash, dump_state, emulate_ton_connect_v1, emulate_trace_v1, estimate_fee_v3,
     export_checkpoint, faucet, get_account_states_v3, get_address_balance, get_address_book_v3,
     get_address_information, get_address_information_v3, get_address_state,
-    get_adjacent_transactions_v3, get_block_header, get_block_transactions,
-    get_block_transactions_ext, get_blocks_v3, get_config_all, get_config_param,
-    get_consensus_block, get_dns_records, get_extended_address_information, get_jetton_burns,
-    get_jetton_masters, get_jetton_transfers, get_jetton_wallets, get_libraries,
+    get_adjacent_transactions_v3, get_block, get_block_header, get_block_post,
+    get_block_transactions, get_block_transactions_ext, get_blocks_v3, get_config_all,
+    get_config_param, get_consensus_block, get_dns_records, get_extended_address_information,
+    get_jetton_burns, get_jetton_masters, get_jetton_transfers, get_jetton_wallets, get_libraries,
     get_masterchain_block_shard_state_v3, get_masterchain_block_shards_v3, get_masterchain_info,
     get_masterchain_info_v3, get_messages_v3, get_metadata_v3, get_multisig_orders,
     get_multisig_wallets, get_nft_collections, get_nft_items, get_nft_sales, get_nft_transfers,
@@ -83,6 +83,7 @@ pub fn create_router(state: ServerState) -> Router {
         .route("/v2/tryLocateSourceTx", get(try_locate_source_tx))
         .route("/v2/getConfigParam", get(get_config_param))
         .route("/v2/getConfigAll", get(get_config_all))
+        .route("/v2/getBlock", get(get_block).post(get_block_post))
         .route("/v2/getBlockHeader", get(get_block_header))
         .route("/v2/getBlockTransactions", get(get_block_transactions))
         .route(

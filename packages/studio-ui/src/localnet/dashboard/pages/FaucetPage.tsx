@@ -1,5 +1,14 @@
 import {ArrowUpRight, Check, ChevronDown, Coins, Loader2} from "lucide-react"
-import {Button, Dialog, Input, parseGramAmount, parseTokenAmount, useToast} from "@acton/ui"
+import {
+  Button,
+  Dialog,
+  formatNumberValue,
+  formatWalletVersion,
+  Input,
+  parseGramAmount,
+  parseTokenAmount,
+  useToast,
+} from "@acton/ui"
 import {TonAddressInput, type TonAddressSuggestion} from "@acton/transaction-ui"
 import type {FC, FormEvent, ReactNode} from "react"
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
@@ -38,6 +47,7 @@ const PINNED_USDT_MINTER_ADDRESS = "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id
 const TOKEN_MINTER_NOT_FOUND_MESSAGE = "This address is not a token minter."
 const TOKEN_MINTER_NOT_MINTABLE_MESSAGE = "This token cannot be minted by the faucet."
 const FAUCET_TRACE_WAIT_ATTEMPTS = 60
+const FAUCET_AMOUNT_PRESETS = ["10", "100", "1000", "10000"] as const
 
 interface FaucetOption {
   readonly id: string
@@ -66,7 +76,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({
   const [mode, setMode] = useState<FaucetMode>(() => (gramFaucetEnabled ? "ton" : "jetton"))
   const [address, setAddress] = useState("")
   const [jettonMinter, setJettonMinter] = useState("")
-  const [amount, setAmount] = useState("1")
+  const [amount, setAmount] = useState("10")
   const [jettonMasters, setJettonMasters] = useState<JettonMaster[]>([])
   const [jettonsLoading, setJettonsLoading] = useState(jettonFaucetEnabled)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -210,7 +220,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({
         return {
           address: value,
           label: wallet.name,
-          description: `${wallet.version} · ${formatAddress(value, true, addressFormat)}`,
+          description: `${formatWalletVersion(wallet.version)} · ${formatAddress(value, true, addressFormat)}`,
         }
       }),
     [addressFormat, projectWallets],
@@ -614,7 +624,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({
           </div>
 
           <div className={styles.quickActions}>
-            {["1", "5", "20", "100"].map(value => (
+            {FAUCET_AMOUNT_PRESETS.map(value => (
               <Button
                 key={value}
                 type="button"
@@ -623,7 +633,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({
                 className={styles.quickActionButton}
                 onClick={() => setAmount(value)}
               >
-                {value} {symbolHint}
+                {formatNumberValue(value)} {symbolHint}
               </Button>
             ))}
           </div>

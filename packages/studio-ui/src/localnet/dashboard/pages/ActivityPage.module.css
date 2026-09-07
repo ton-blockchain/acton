@@ -32,11 +32,6 @@
   gap: 8px;
 }
 
-.presets button[aria-pressed="true"] {
-  background: var(--acton-color-text);
-  color: var(--acton-color-surface);
-}
-
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
@@ -116,9 +111,20 @@
   color: var(--acton-color-text-muted);
 }
 
-.skeletonIcon {
-  color: var(--acton-color-text-muted);
-  opacity: 0.45;
+.skeletonScenarioText {
+  position: relative;
+}
+
+.skeletonScenarioText > strong,
+.skeletonScenarioText > span {
+  visibility: hidden;
+}
+
+.skeletonScenarioPlaceholders {
+  position: absolute;
+  inset: 2px 0 auto;
+  display: grid;
+  gap: 7px;
 }
 
 .weight {
@@ -143,6 +149,26 @@
 
 .workload {
   margin-top: 24px;
+}
+
+.skeletonField {
+  display: grid;
+  gap: 8px;
+}
+
+.skeletonFieldLabel,
+.skeletonFieldDescription {
+  color: var(--acton-color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.skeletonFieldLabel {
+  font-weight: 500;
+}
+
+.skeletonFieldDescription {
+  font-size: 0.75rem;
 }
 
 .fields {
@@ -187,6 +213,7 @@
 }
 
 .empty {
+  min-height: 10.15rem;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -196,6 +223,7 @@
   border-radius: 10px;
   color: var(--acton-color-text-muted);
   font-size: 0.8125rem;
+  box-sizing: border-box;
 }
 
 .failure {

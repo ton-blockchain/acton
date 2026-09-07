@@ -247,15 +247,15 @@ function NetworkOverviewSkeleton({showTitle}: {readonly showTitle: boolean}) {
         </div>
       ) : null}
       <div className={styles.metricStrip}>
-        {["Online nodes", "Synchronized", "Active validators", "Masterchain", "Current shards"].map(
-          label => (
-            <Metric
-              key={label}
-              label={label}
-              value={<Skeleton width="4.5rem" height="1.375rem" />}
-            />
-          ),
-        )}
+        {[
+          "Online nodes",
+          "Synchronized",
+          "Active validators",
+          "Masterchain block",
+          "Current shards",
+        ].map(label => (
+          <Metric key={label} label={label} value={<Skeleton width="4.5rem" height="1.375rem" />} />
+        ))}
       </div>
     </section>
   )
@@ -463,8 +463,8 @@ function NetworkOverviewSection({
           }
         />
         <Metric
-          label="Masterchain"
-          value={network.chain ? `#${network.chain.seqno.toLocaleString()}` : "Waiting"}
+          label="Masterchain block"
+          value={network.chain ? network.chain.seqno.toLocaleString() : "Waiting"}
         />
         <Metric label="Current shards" value={String(network.chain?.shard_count ?? 0)} />
       </div>
@@ -541,10 +541,14 @@ function ValidatorsSection({nodes}: {readonly nodes: readonly NodeView[]}) {
               <DataTableHeaderCell>Validator</DataTableHeaderCell>
               <DataTableHeaderCell>Participation</DataTableHeaderCell>
               <DataTableHeaderCell>Production</DataTableHeaderCell>
-              <DataTableHeaderCell>Public key</DataTableHeaderCell>
+              <DataTableHeaderCell className={styles.validatorIdentifierColumn}>
+                Public key
+              </DataTableHeaderCell>
               <DataTableHeaderCell align="right">MC blocks</DataTableHeaderCell>
               <DataTableHeaderCell align="right">Shard blocks</DataTableHeaderCell>
-              <DataTableHeaderCell>ADNL</DataTableHeaderCell>
+              <DataTableHeaderCell className={styles.validatorIdentifierColumn}>
+                ADNL
+              </DataTableHeaderCell>
             </DataTableRow>
           </DataTableHead>
           <DataTableBody>
@@ -562,7 +566,7 @@ function ValidatorsSection({nodes}: {readonly nodes: readonly NodeView[]}) {
                   <DataTableCell>
                     <ProductionState node={node} />
                   </DataTableCell>
-                  <DataTableCell>
+                  <DataTableCell className={styles.validatorIdentifierColumn}>
                     <TechnicalValue
                       value={node.validator_public_key ?? undefined}
                       copyLabel="validator public key"
@@ -578,7 +582,7 @@ function ValidatorsSection({nodes}: {readonly nodes: readonly NodeView[]}) {
                       {node.produced_shard_blocks.toLocaleString()}
                     </span>
                   </DataTableCell>
-                  <DataTableCell>
+                  <DataTableCell className={styles.validatorIdentifierColumn}>
                     <TechnicalValue
                       value={node.validator_adnl ?? undefined}
                       copyLabel="validator ADNL"

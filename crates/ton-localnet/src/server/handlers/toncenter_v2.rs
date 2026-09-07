@@ -12,9 +12,10 @@ use std::sync::Arc;
 use ton_api::toncenter::v2 as wire;
 use ton_api::toncenter::v2::StringOrNumber;
 use ton_api::toncenter::v2::requests::{
-    AddressInformationRequest, AddressRequest, ConfigAllRequest, ConfigParamRequest,
-    DetectHashRequest, LibrariesRequest, LookupBlockRequest, RunGetMethodRequest,
-    RunGetMethodStdRequest, SendBocRequest, SeqnoRequest, TransactionsRequest, TryLocateTxRequest,
+    AddressInformationRequest, AddressRequest, BlockDataRequest, ConfigAllRequest,
+    ConfigParamRequest, DetectHashRequest, LibrariesRequest, LookupBlockRequest,
+    RunGetMethodRequest, RunGetMethodStdRequest, SendBocRequest, SeqnoRequest, TransactionsRequest,
+    TryLocateTxRequest,
 };
 use ton_api::toncenter::v2::requests::{BlockHeaderRequest, BlockTransactionsRequest};
 use tycho_types::models::{ShardIdent, StdAddr, StdAddrFormat};
@@ -373,6 +374,22 @@ pub async fn get_block_header(
     handle_result(resolve_block_header(&node, &request), Clone::clone).await
 }
 
+pub async fn get_block(
+    State(node): State<Arc<Localnet>>,
+    Query(payload): Query<BlockDataRequest>,
+) -> Response {
+    let request = parse!(parse_block_data_request(&payload));
+    handle_result(resolve_block_data(&node, &request), Clone::clone).await
+}
+
+pub async fn get_block_post(
+    State(node): State<Arc<Localnet>>,
+    Json(payload): Json<BlockDataRequest>,
+) -> Response {
+    let request = parse!(parse_block_data_request(&payload));
+    handle_result(resolve_block_data(&node, &request), Clone::clone).await
+}
+
 pub async fn get_block_transactions_ext_post(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<BlockTransactionsRequest>,
@@ -552,6 +569,11 @@ pub(super) struct ParsedBlockTransactionsRequest {
     after: Option<(u64, Hash256)>,
 }
 
+pub(super) struct ParsedBlockDataRequest {
+    selector: BlockSelector,
+    archival: Option<bool>,
+}
+
 fn parse_block_selector(
     workchain: &StringOrNumber,
     shard: &StringOrNumber,
@@ -589,6 +611,66 @@ pub(super) fn parse_block_header_request(
         payload.root_hash.as_ref(),
         payload.file_hash.as_ref(),
     )
+}
+
+pub(super) fn parse_block_data_request(
+    payload: &BlockDataRequest,
+) -> anyhow::Result<ParsedBlockDataRequest> {
+    Ok(ParsedBlockDataRequest {
+        selector: parse_block_selector(
+            &payload.workchain,
+            &payload.shard,
+            &payload.seqno,
+            payload.root_hash.as_ref(),
+            payload.file_hash.as_ref(),
+        )?,
+        archival: payload.archival,
+    })
+}
+
+pub(super) async fn resolve_block_data(
+    node: &Localnet,
+    request: &ParsedBlockDataRequest,
+) -> anyhow::Result<wire::BlockData> {
+    let selector = &request.selector;
+    if let Some(block) = node
+        .get_historical_block_v2(
+            selector.workchain,
+            selector.shard,
+            selector.seqno,
+            block_data_wire_request(request),
+        )
+        .await?
+    {
+        return Ok(block);
+    }
+
+    let block = if selector.workchain == -1 {
+        node.get_masterchain_block_header(selector.seqno).await?
+    } else {
+        node.get_block_header(selector.seqno).await?
+    };
+    validate_block_id(&block.id, selector)?;
+
+    let data = if selector.workchain == -1 {
+        node.get_masterchain_block_data(selector.seqno).await?
+    } else {
+        node.get_block_data(selector.seqno).await?
+    };
+
+    Ok(v2::map_block_data(&block.id, &data))
+}
+
+fn block_data_wire_request(request: &ParsedBlockDataRequest) -> BlockDataRequest {
+    let selector = &request.selector;
+    BlockDataRequest {
+        workchain: selector.workchain.into(),
+        shard: StringOrNumber::String(selector.shard.to_string()),
+        seqno: selector.seqno.into(),
+        root_hash: selector.root_hash.map(|hash| hash.to_base64()),
+        file_hash: selector.file_hash.map(|hash| hash.to_base64()),
+        archival: request.archival,
+    }
 }
 
 pub(super) async fn resolve_block_header(

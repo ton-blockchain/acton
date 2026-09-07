@@ -9,10 +9,6 @@
   padding: 24px 32px 48px;
 }
 
-.emptyOutput p {
-  margin: 0;
-}
-
 .workspace {
   --cell-inspector-panel-padding: 16px;
 
@@ -67,14 +63,6 @@
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
   line-height: 1.4;
-}
-
-.cellFieldFooter {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--acton-space-2);
 }
 
 .cellInput,
@@ -330,26 +318,8 @@
 
 .emptyOutput {
   min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-content: center;
   padding: 48px 24px;
-  color: var(--acton-color-text-muted);
-  text-align: center;
-}
-
-.emptyTitle {
-  color: var(--acton-color-text);
-  font-size: var(--acton-font-size-md);
-  font-weight: 700;
-}
-
-.emptyOutput p {
-  max-width: 420px;
-  margin-top: 6px;
-  font-size: var(--acton-font-size-sm);
-  line-height: 1.5;
 }
 
 .loadingOutput {
