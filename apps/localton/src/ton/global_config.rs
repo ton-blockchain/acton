@@ -193,6 +193,20 @@ impl GlobalConfig {
             .collect()
     }
 
+    /// Advances fresh-node bootstrap only after the verified hardfork states are
+    /// published in the native archive. Existing nodes retain their databases;
+    /// new nodes must start at or after the last declared hardfork.
+    pub(crate) fn use_hardfork_for_bootstrap(&mut self, seqno: u32) -> Result<()> {
+        let fork = self
+            .validator
+            .hardforks
+            .last()
+            .filter(|fork| fork.seqno == seqno)
+            .context("Bootstrap block must be the latest registered hardfork")?;
+        self.validator.init_block = fork.clone();
+        Ok(())
+    }
+
     /// Routes this host's chain operations through its own liteserver identity.
     /// DHT and validator sections retain the downloaded network identity.
     pub(crate) fn with_local_liteserver(mut self, port: u16, public_key: TonPublicKey) -> Self {

@@ -315,13 +315,43 @@ impl DockerNetwork {
         self.start_core(services).await?;
         let head = self.wait_live("localton", "observe").await?;
 
-        // One shared plan must be grafted onto the same head on every node.
+        // A newly joined node can still be a few blocks behind when the cluster
+        // stops. With validation suspended, let it reach the fixed source head
+        // before preparing the edit. Equal-height forks must still be rejected.
         for service in &services[1..] {
-            let theirs = self.wait_live(service, "observe").await?;
-            if theirs != head {
-                return Err(failure(format!(
-                    "Node {service} has a different head; no hardfork was installed"
-                )));
+            let started = Instant::now();
+            loop {
+                let theirs = self.wait_live(service, "observe").await?;
+                if theirs == head {
+                    tracing::info!(
+                        operation = "synchronize_admin_head",
+                        node = service,
+                        target = %head["seqno"],
+                        duration_ms = started.elapsed().as_millis(),
+                        outcome = "synchronized",
+                    );
+                    break;
+                }
+
+                let behind = theirs["seqno"]
+                    .as_u64()
+                    .zip(head["seqno"].as_u64())
+                    .is_some_and(|(actual, target)| actual < target);
+                if !behind || started.elapsed() >= ADMIN_TIMEOUT {
+                    return Err(failure(format!(
+                        "Node {service} did not reach the suspended head; no hardfork was installed. Expected {head}, observed {theirs}"
+                    )));
+                }
+
+                tracing::info!(
+                    operation = "synchronize_admin_head",
+                    node = service,
+                    target = %head["seqno"],
+                    current = %theirs["seqno"],
+                    duration_ms = started.elapsed().as_millis(),
+                    outcome = "waiting",
+                );
+                sleep(Duration::from_secs(1)).await;
             }
         }
 
@@ -719,6 +749,147 @@ mod tests {
                 .to_string()
                 .contains("different request")
         );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires Docker and ACTON_LOCALNET_IMAGE built with localton-admin-dev"]
+    async fn new_nodes_bootstrap_after_repeated_administrative_hardforks() {
+        use crate::{OperationStatus, runtime::Action};
+
+        assert!(std::env::var("ACTON_LOCALNET_IMAGE").is_ok());
+        let dir = tempfile::tempdir_in("/tmp").unwrap();
+        let location = catalog::create(
+            dir.path(),
+            CreateNetwork {
+                name: "hardfork-join-regression".into(),
+                port_base: Some(28600),
+                block_time_ms: Some(1000),
+                election_time_seconds: Some(3600),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let driver =
+            DockerNetwork::materialize(&location.path, dir.path(), &location.network, false)
+                .await
+                .unwrap();
+        eprintln!(
+            "Hardfork join project: {} ({})",
+            driver.project_name,
+            dir.path().display()
+        );
+
+        let result: Result<serde_json::Value, Error> = async {
+            driver.start_all().await?;
+            let runtime = Runtime::open(&location.path).await?;
+            runtime.reconcile().await;
+            let basechain = format!("0:{}", "42".repeat(32));
+            let masterchain = format!("-1:{}", "a4".repeat(32));
+            let mut joins = Vec::new();
+
+            for (index, address, balance) in [
+                (1, &basechain, "42000000000"),
+                (2, &masterchain, "7000000000"),
+            ] {
+                // The second edit leaves the basechain unchanged. Its state must
+                // still be downloadable under the new masterchain bootstrap block.
+                let request = serde_json::from_value(serde_json::json!({
+                    "kind": "accounts",
+                    "id": Uuid::new_v4().to_string(),
+                    "edits": [{
+                        "address": address,
+                        "type": "balance",
+                        "balance": balance,
+                    }],
+                }))
+                .map_err(failure)?;
+                let fork = run_edit(&runtime, request).await?;
+
+                eprintln!("Joining fresh node {index} after hardfork {fork}");
+                let accepted = runtime
+                    .submit(Action::AddNode {
+                        name: format!("after-fork-{index}"),
+                        validator: false,
+                    })
+                    .await?;
+
+                loop {
+                    let operation = runtime.operation(&accepted.id).await?;
+                    match operation.status {
+                        OperationStatus::Running => sleep(Duration::from_millis(250)).await,
+                        OperationStatus::Completed => break,
+                        OperationStatus::Failed => {
+                            return Err(failure(
+                                operation.error.unwrap_or_else(|| "Node join failed".into()),
+                            ));
+                        }
+                    }
+                }
+
+                let service = format!("node-{index}");
+                let native = driver
+                    .live_admin(&service, &["lite", "account", address], None)
+                    .await?;
+                let preserved = driver
+                    .live_admin(&service, &["lite", "account", &basechain], None)
+                    .await?;
+                joins.push(serde_json::json!({
+                    "node": service,
+                    "balance": native["balance_nano"],
+                    "preservedBasechainBalance": preserved["balance_nano"],
+                    "pastHardfork": native["block"]["seqno"].as_u64().is_some_and(|n| n > u64::from(fork)),
+                }));
+            }
+
+            // Persisted init blocks must also allow all existing databases to reopen.
+            driver.stop().await?;
+            driver.start_all().await?;
+
+            let mut restarted = Vec::new();
+            for service in ["localton", "node-1", "node-2"] {
+                let account = driver
+                    .live_admin(service, &["lite", "account", &basechain], None)
+                    .await?;
+                restarted.push(account["balance_nano"].clone());
+            }
+
+            Ok(serde_json::json!({"joins": joins, "restartedBalances": restarted}))
+        }
+        .await;
+
+        if result.is_err() {
+            let mut command = driver.compose_command();
+            command.args(["logs", "--tail", "30"]);
+            if let Ok(output) = command.output().await {
+                eprintln!("{}", String::from_utf8_lossy(&output.stdout));
+            }
+        }
+        driver.delete().await.unwrap();
+        expect_test::expect![[r#"
+            Object {
+                "joins": Array [
+                    Object {
+                        "balance": String("42000000000"),
+                        "node": String("node-1"),
+                        "pastHardfork": Bool(true),
+                        "preservedBasechainBalance": String("42000000000"),
+                    },
+                    Object {
+                        "balance": String("7000000000"),
+                        "node": String("node-2"),
+                        "pastHardfork": Bool(true),
+                        "preservedBasechainBalance": String("42000000000"),
+                    },
+                ],
+                "restartedBalances": Array [
+                    String("42000000000"),
+                    String("42000000000"),
+                    String("42000000000"),
+                ],
+            }
+        "#]]
+        .assert_debug_eq(&result.unwrap());
     }
 
     #[tokio::test]

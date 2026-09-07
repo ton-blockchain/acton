@@ -43,6 +43,8 @@ use crate::{
     },
 };
 
+#[path = "godmode_bootstrap.rs"]
+mod join_bootstrap;
 #[path = "godmode_workflow.rs"]
 mod workflow;
 pub(crate) use workflow::recover_install;
@@ -127,7 +129,7 @@ pub(crate) async fn execute(command: GodmodeCommand) -> Result<()> {
             );
         }
         GodmodeCommand::Finish(_) => {
-            let detached = finish(&layout.node)?;
+            let detached = finish(&layout)?;
             println!("{}", json!({ "detached": detached }));
         }
     }
@@ -297,7 +299,8 @@ fn install_unchecked(
 ///
 /// While a node downloads through a full-node master it stops broadcasting its
 /// own blocks, so the link must not outlive the graft that needed it.
-pub(crate) fn finish(node: &NodeLayout) -> Result<bool> {
+pub(crate) fn finish(layout: &Layout) -> Result<bool> {
+    let node = &layout.node;
     let staging = staging_dir(node);
     if !staging.join("plan.json").exists() {
         return Ok(false);
@@ -312,6 +315,10 @@ pub(crate) fn finish(node: &NodeLayout) -> Result<bool> {
     // recovery data must not silently discard a user's full-node master link.
     let original = ValidatorEngineConfig::load(&staging.join("original-engine.json"))
         .context("Cannot restore networking without the original engine configuration")?;
+
+    // Publish the download anchor before discarding the verified staging data.
+    // A retry can safely republish it after an interrupted finish.
+    join_bootstrap::publish(layout)?;
     config.restore_full_node_master(&original);
     config.save(&config_path)?;
 

@@ -118,6 +118,7 @@ pub(super) async fn live_command(layout: &Layout, command: &GodmodeCommand) -> R
                     "Shard state differs from the plan"
                 );
             }
+            join_bootstrap::stage(layout, &sources)?;
             write_json_atomic(&dir.join("verified.json"), &head)?;
             println!(
                 "{}",
@@ -445,7 +446,7 @@ mod tests {
             fs::read(staging_dir(&layout.node).join("plan.json")).unwrap()
         );
         assert_eq!(staged_blocks(&layout.node).unwrap().len(), 1);
-        assert!(finish(&layout.node).is_err());
+        assert!(finish(&layout).is_err());
     }
 
     #[test]
@@ -530,7 +531,7 @@ mod tests {
         write_json_atomic(&staging.join("verified.json"), &true).unwrap();
         fs::remove_file(staging.join("original-engine.json")).unwrap();
 
-        let error = finish(&layout.node).unwrap_err();
+        let error = finish(&layout).unwrap_err();
         let actual = format!(
             "error: {error}\nstaging retained: {}",
             staging.join("plan.json").exists()
@@ -539,5 +540,88 @@ mod tests {
             error: Cannot restore networking without the original engine configuration
             staging retained: true"#]]
         .assert_eq(&actual);
+    }
+
+    #[test]
+    fn finishing_publishes_bootstrap_states_before_advancing_the_init_block() {
+        use ton_hardfork::{HardforkPrevBlock, HardforkSources, ShardSource};
+        use tycho_types::cell::{CellBuilder, CellFamily};
+
+        let (_dir, layout, plan) = fixture();
+        install(&layout, &plan, endpoint()).unwrap();
+        let staging = staging_dir(&layout.node);
+        let read = |path: &Path| -> serde_json::Value {
+            serde_json::from_slice(&fs::read(path).unwrap()).unwrap()
+        };
+        let before = read(&layout.global_config)["validator"]["init_block"]["seqno"].clone();
+        write_json_atomic(&staging.join("verified.json"), &true).unwrap();
+        let missing = finish(&layout).unwrap_err().to_string();
+
+        // Cell authentication belongs to live verification. This scenario covers
+        // durable publication, native filenames, and retry ordering independently.
+        let sources = HardforkSources {
+            masterchain_prev: HardforkPrevBlock {
+                seqno: plan.masterchain.seqno,
+                root_hash: HashBytes(*plan.masterchain.root_hash.as_bytes()),
+                file_hash: HashBytes(*plan.masterchain.file_hash.as_bytes()),
+            },
+            masterchain_state: CellBuilder::build_from(123_u32).unwrap(),
+            basechain: Some(ShardSource {
+                shard: ShardIdent::BASECHAIN,
+                prev: HardforkPrevBlock {
+                    seqno: 7,
+                    root_hash: HashBytes([4; 32]),
+                    file_hash: HashBytes([5; 32]),
+                },
+                state: tycho_types::cell::Cell::empty_cell(),
+            }),
+        };
+        join_bootstrap::stage(&layout, &sources).unwrap();
+        let published = finish(&layout).unwrap();
+        let retried = finish(&layout).unwrap();
+        let mut files = fs::read_dir(layout.node.db.join("archive/states"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        files.sort();
+
+        expect_test::expect![[r#"
+            Object {
+                "before": Number(0),
+                "files": Array [
+                    String("state_60_-1_8000000000000000_2C5C54CC494F47B95E753FFE7DE9B56C43C9FE2030EEFD57B6CBC8D5F2B87298"),
+                    String("state_60_0_8000000000000000_C23584191C06518EEBD53B3FCF295F6E8A572AFBDAF20B5454F98EABAD6E9067"),
+                ],
+                "localInit": Object {
+                    "@type": String("ton.blockIdExt"),
+                    "file_hash": String("hKp6GGt2Djl9NdOX1Yp0v8YuID1zNKYx38ooWivI2Kc="),
+                    "root_hash": String("zyNx7+dNrX2kNbmkrx0w4yCu4dfpv8UV34G7xF6w3pU="),
+                    "seqno": Number(60),
+                    "shard": Number(-9223372036854775808),
+                    "workchain": Number(-1),
+                },
+                "missingStates": String("Verify the hardfork states before publishing its bootstrap block"),
+                "publicInit": Object {
+                    "@type": String("ton.blockIdExt"),
+                    "file_hash": String("hKp6GGt2Djl9NdOX1Yp0v8YuID1zNKYx38ooWivI2Kc="),
+                    "root_hash": String("zyNx7+dNrX2kNbmkrx0w4yCu4dfpv8UV34G7xF6w3pU="),
+                    "seqno": Number(60),
+                    "shard": Number(-9223372036854775808),
+                    "workchain": Number(-1),
+                },
+                "published": Bool(true),
+                "retried": Bool(false),
+                "stagingRetained": Bool(false),
+            }
+        "#]].assert_debug_eq(&serde_json::json!({
+            "before": before,
+            "missingStates": missing,
+            "published": published,
+            "retried": retried,
+            "publicInit": read(&layout.global_config)["validator"]["init_block"],
+            "localInit": read(&layout.node.global_config)["validator"]["init_block"],
+            "files": files,
+            "stagingRetained": staging.exists(),
+        }));
     }
 }
