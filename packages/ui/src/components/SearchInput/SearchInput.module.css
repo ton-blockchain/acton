@@ -172,6 +172,34 @@
   display: none;
 }
 
+.inlineResults {
+  min-width: 0;
+  margin-top: var(--acton-space-3);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-sans);
+}
+
+.inlineList {
+  max-height: min(24rem, 50dvh);
+  scrollbar-width: thin;
+}
+
+.inlineList::-webkit-scrollbar {
+  display: block;
+  width: 5px;
+}
+
+.inlineList:empty {
+  padding: 0;
+}
+
+.groupLabel {
+  padding: var(--acton-space-3) var(--acton-space-2) var(--acton-space-2);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
+}
+
 .dropdownLg .list {
   max-height: min(15.625rem, var(--available-height));
 }

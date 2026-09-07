@@ -8,6 +8,56 @@ const mockFetch = (
   implementation: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 ) => Object.assign(mock(implementation), {preconnect: globalThis.fetch.preconnect})
 
+test("closing a cancellable registry lookup leaves shared page requests intact", async () => {
+  const originalFetch = globalThis.fetch
+  const pending: Array<{resolve: (response: Response) => void; signal?: AbortSignal | null}> = []
+  globalThis.fetch = mockFetch(
+    async (_input, init) =>
+      new Promise<Response>((resolve, reject) => {
+        pending.push({resolve, signal: init?.signal})
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), {once: true})
+      }),
+  )
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+    const controller = new AbortController()
+
+    // Search starts first; both page consumers must share their own non-cancellable request.
+    const results = Promise.allSettled([
+      client.listContracts(controller.signal),
+      client.listContracts(),
+      client.listContracts(),
+    ])
+    controller.abort()
+    for (const request of pending) request.resolve(Response.json([]))
+
+    expect({
+      requests: pending.length,
+      cancelled: pending.filter(request => request.signal?.aborted).length,
+      results: (await results).map(result =>
+        result.status === "fulfilled" ? result.value : result.reason.name,
+      ),
+    }).toMatchInlineSnapshot(`
+      {
+        "cancelled": 1,
+        "requests": 2,
+        "results": [
+          "AbortError",
+          [],
+          [],
+        ],
+      }
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("address information falls back to the node when the index has no account", async () => {
   const originalFetch = globalThis.fetch
   const requests: string[] = []

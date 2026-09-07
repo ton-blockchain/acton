@@ -39,7 +39,6 @@ function HistorySample() {
         ariaLabel="Search history example"
         items={items}
         onValueChange={setValue}
-        open
         placeholder="Search by address or hash"
         value={value}
       />
@@ -72,7 +71,6 @@ function ResultsSample() {
         ariaLabel="Compact search results example"
         items={items}
         onValueChange={setValue}
-        open
         placeholder="Search by address or hash"
         size="sm"
         value={value}
@@ -105,6 +103,40 @@ function StateSamples() {
   )
 }
 
+function InlineResultsSample() {
+  const [value, setValue] = useState("")
+  const entries = [
+    {
+      id: "contract",
+      label: "Jetton wallet",
+      description: "Contract · Development",
+      group: "Objects",
+    },
+    {id: "wallets", label: "Wallets", description: "Page · Development", group: "Pages"},
+    {id: "contracts", label: "Contracts", description: "Page · Development", group: "Pages"},
+  ]
+
+  return (
+    <div className={styles.states}>
+      <SearchInput
+        ariaLabel="Inline Studio search example"
+        inline
+        size="md"
+        value={value}
+        onValueChange={setValue}
+        placeholder="Search names or pages"
+        items={entries
+          .filter(item => item.label.toLowerCase().includes(value.toLowerCase()))
+          .map(item => ({
+            ...item,
+            onSelect: () => setValue(item.label),
+          }))}
+        emptyContent={<p>No matching results</p>}
+      />
+    </div>
+  )
+}
+
 export const searchInputGallery = {
   id: "search-input",
   title: "Search Input",
@@ -123,9 +155,16 @@ export const searchInputGallery = {
   avoid: [
     "Do not fetch data, access localStorage, or navigate from inside SearchInput.",
     "Do not recreate the input, floating list, or delayed blur handling in feature code.",
-    "Do not use SearchInput for a static select or command palette.",
+    "Do not use SearchInput for a static select or put application actions inside the shared component",
   ],
   sections: [
+    {
+      id: "search-input-inline",
+      title: "Inline search results",
+      description:
+        "Grouped results stay inside their containing surface and support arrow-key selection",
+      content: <InlineResultsSample />,
+    },
     {
       id: "search-input-history",
       title: "Search History",

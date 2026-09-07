@@ -1332,9 +1332,10 @@ export class TonClient {
     })
   }
 
-  async listContracts(): Promise<readonly LocalnetContract[]> {
+  /** Reads the registered contracts; transient consumers can cancel without affecting other views */
+  async listContracts(signal?: AbortSignal): Promise<readonly LocalnetContract[]> {
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_listContracts")
-    return this.request(url, "Failed to fetch contracts")
+    return this.request(url, "Failed to fetch contracts", {signal})
   }
 
   async registerContract(address: string, name?: string): Promise<LocalnetContract> {
@@ -1673,6 +1674,9 @@ export class TonClient {
   }
 
   private pendingRequestKey(url: URL, options?: RequestInit): string | undefined {
+    // A caller-owned signal must not cancel another view's shared request.
+    if (options?.signal) return undefined
+
     const method = options?.method?.toUpperCase() ?? "GET"
     return method === "GET" ? url.toString() : undefined
   }

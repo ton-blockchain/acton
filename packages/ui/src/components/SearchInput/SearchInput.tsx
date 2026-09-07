@@ -1,6 +1,6 @@
 import {Autocomplete} from "@base-ui/react/autocomplete"
 import {Search, X} from "lucide-react"
-import {useCallback, useEffect, useRef, useState} from "react"
+import {Fragment, useCallback, useEffect, useRef, useState} from "react"
 import type {KeyboardEvent, ReactNode} from "react"
 
 import {Input} from "../Input/Input"
@@ -19,6 +19,8 @@ export interface SearchInputItem {
   readonly onSelect: () => void
   readonly onRemove?: () => void
   readonly removeLabel?: string
+  /** Consecutive items with the same group share a visible result heading */
+  readonly group?: string
 }
 
 export interface SearchInputProps {
@@ -28,6 +30,10 @@ export interface SearchInputProps {
   readonly disabled?: boolean
   readonly inputClassName?: string
   readonly invalid?: boolean
+  /** Keeps results inside a containing surface, such as Studio's search dialog */
+  readonly inline?: boolean
+  /** Shown below an inline field when its caller has no results to display */
+  readonly emptyContent?: ReactNode
   readonly items: readonly SearchInputItem[]
   readonly onOpenChange?: (open: boolean) => void
   readonly onFocus?: () => void
@@ -48,6 +54,8 @@ export function SearchInput({
   disabled = false,
   inputClassName,
   invalid = false,
+  inline = false,
+  emptyContent,
   items,
   onOpenChange,
   onFocus,
@@ -128,18 +136,77 @@ export function SearchInput({
     .join(" ")
   const iconSize = size === "sm" ? 16 : size === "md" ? 18 : 20
 
+  // Both presentations share Base UI's collection and keyboard selection behavior.
+  const results = (
+    <Autocomplete.List className={`${styles.list} ${inline ? styles.inlineList : ""}`}>
+      {items.map((item, index) => (
+        <Fragment key={item.id}>
+          {item.group && item.group !== items[index - 1]?.group && (
+            <div className={styles.groupLabel} role="presentation">
+              {item.group}
+            </div>
+          )}
+          <Autocomplete.Item
+            className={styles.item}
+            value={item}
+            onClick={() => {
+              item.onSelect()
+              inputRef.current?.blur()
+            }}
+          >
+            <div className={`${styles.itemButton} ${item.icon ? styles.itemButtonWithIcon : ""}`}>
+              {item.icon && (
+                <span className={styles.itemIcon} aria-hidden="true">
+                  {item.icon}
+                </span>
+              )}
+              <span className={styles.itemText}>
+                <span className={item.description ? styles.itemLabelStrong : styles.itemLabel}>
+                  {item.label}
+                </span>
+                {item.description && (
+                  <span className={styles.itemDescription}>{item.description}</span>
+                )}
+              </span>
+            </div>
+            {item.onRemove && (
+              <Tooltip content={item.removeLabel ?? "Remove item"}>
+                <button
+                  type="button"
+                  className={styles.removeButton}
+                  aria-label={item.removeLabel ?? "Remove item"}
+                  onClick={event => {
+                    event.stopPropagation()
+                    item.onRemove?.()
+                    if (items.length === 1 && !inline) setOpen(false)
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              </Tooltip>
+            )}
+          </Autocomplete.Item>
+        </Fragment>
+      ))}
+    </Autocomplete.List>
+  )
+
   return (
     <Autocomplete.Root
       itemToStringValue={item => (typeof item.label === "string" ? item.label : "")}
       items={items}
       mode="none"
-      open={!disabled && isOpen && items.length > 0}
+      inline={inline}
+      autoHighlight={inline ? "always" : false}
+      open={!disabled && (inline || (isOpen && items.length > 0))}
       openOnInputClick
       value={value}
       onItemHighlighted={item => {
         highlightedItemRef.current = item
       }}
-      onOpenChange={nextOpen => setOpen(nextOpen)}
+      onOpenChange={nextOpen => {
+        if (!inline) setOpen(nextOpen)
+      }}
       onValueChange={(nextValue, eventDetails) => {
         if (eventDetails.reason !== "item-press") {
           onValueChange(nextValue)
@@ -184,71 +251,28 @@ export function SearchInput({
           />
         </div>
       </div>
-      <Autocomplete.Portal>
-        <Autocomplete.Positioner
-          align="start"
-          anchor={controlRef}
-          className={styles.positioner}
-          data-theme={theme}
-          sideOffset={size === "sm" ? 6 : 8}
-        >
-          <Autocomplete.Popup
-            className={`${styles.dropdown} ${size === "sm" ? styles.dropdownSm : styles.dropdownLg}`}
+      {inline ? (
+        <div className={styles.inlineResults}>
+          {results}
+          {items.length === 0 && emptyContent}
+        </div>
+      ) : (
+        <Autocomplete.Portal>
+          <Autocomplete.Positioner
+            align="start"
+            anchor={controlRef}
+            className={styles.positioner}
+            data-theme={theme}
+            sideOffset={size === "sm" ? 6 : 8}
           >
-            <Autocomplete.List className={styles.list}>
-              {(item: SearchInputItem) => (
-                <Autocomplete.Item
-                  key={item.id}
-                  className={styles.item}
-                  value={item}
-                  onClick={() => {
-                    item.onSelect()
-                    inputRef.current?.blur()
-                  }}
-                >
-                  <div
-                    className={`${styles.itemButton} ${item.icon ? styles.itemButtonWithIcon : ""}`}
-                  >
-                    {item.icon && (
-                      <span className={styles.itemIcon} aria-hidden="true">
-                        {item.icon}
-                      </span>
-                    )}
-                    <span className={styles.itemText}>
-                      <span
-                        className={item.description ? styles.itemLabelStrong : styles.itemLabel}
-                      >
-                        {item.label}
-                      </span>
-                      {item.description && (
-                        <span className={styles.itemDescription}>{item.description}</span>
-                      )}
-                    </span>
-                  </div>
-                  {item.onRemove && (
-                    <Tooltip content={item.removeLabel ?? "Remove item"}>
-                      <button
-                        type="button"
-                        className={styles.removeButton}
-                        aria-label={item.removeLabel ?? "Remove item"}
-                        onClick={event => {
-                          event.stopPropagation()
-                          item.onRemove?.()
-                          if (items.length === 1) {
-                            setOpen(false)
-                          }
-                        }}
-                      >
-                        <X size={14} />
-                      </button>
-                    </Tooltip>
-                  )}
-                </Autocomplete.Item>
-              )}
-            </Autocomplete.List>
-          </Autocomplete.Popup>
-        </Autocomplete.Positioner>
-      </Autocomplete.Portal>
+            <Autocomplete.Popup
+              className={`${styles.dropdown} ${size === "sm" ? styles.dropdownSm : styles.dropdownLg}`}
+            >
+              {results}
+            </Autocomplete.Popup>
+          </Autocomplete.Positioner>
+        </Autocomplete.Portal>
+      )}
     </Autocomplete.Root>
   )
 }

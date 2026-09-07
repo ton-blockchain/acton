@@ -1,26 +1,22 @@
 import {useEffect, useRef, useState} from "react"
 import type {FC} from "react"
 import {
-  Activity,
-  Archive,
-  Binary,
   Box,
   Brackets,
-  Cable,
   ChevronLeft,
   ChevronRight,
-  HandCoins,
-  LayoutGrid,
   RadioTower,
   Search as SearchIcon,
-  Settings2,
-  Wallet,
-  Waypoints,
 } from "lucide-react"
 import type {LucideIcon} from "lucide-react"
 import {useLocation, useNavigate} from "react-router"
 
-import {supports, supportsAny} from "../../environmentCapabilities"
+import {supports} from "../../environmentCapabilities"
+import {
+  getEnvironmentNavigation,
+  type SidebarItem,
+  type NestedSidebarItem,
+} from "./environmentNavigationItems"
 import {useLocalnetRuntime} from "../LocalnetRuntimeProvider"
 import {useNetworkInfo} from "@acton/explorer-core/hooks/useNetworkInfo"
 import {useLocalnetRoutes} from "../routes"
@@ -31,17 +27,6 @@ import styles from "./DashboardPage.module.css"
 interface EnvironmentNavigationProps {
   readonly environmentName: string
   readonly onShowStudioNavigation: () => void
-}
-
-interface SidebarItem {
-  readonly label: string
-  readonly icon: LucideIcon
-  readonly path: string
-}
-
-interface NestedSidebarItem {
-  readonly label: string
-  readonly path: string
 }
 
 interface NavigationItemProps {
@@ -63,65 +48,6 @@ interface NavigationDisclosureProps {
   readonly onToggle: () => void
   readonly open: boolean
 }
-
-const primaryItems: SidebarItem[] = [{label: "Home", icon: LayoutGrid, path: "/dashboard"}]
-
-const explorerItems: NestedSidebarItem[] = [
-  {label: "Overview", path: "/explorer"},
-  {label: "Blocks", path: "/explorer/blocks"},
-  {label: "Config", path: "/explorer/config"},
-  {label: "Elections", path: "/explorer/elections"},
-  {label: "Tokens", path: "/explorer/tokens"},
-  {label: "NFTs", path: "/explorer/nfts"},
-]
-
-const networkItems: NestedSidebarItem[] = [
-  {label: "Overview", path: "/network"},
-  {label: "Nodes", path: "/network/nodes"},
-  {label: "Validators", path: "/network/validators"},
-  {label: "Stats", path: "/network/stats"},
-  {label: "Config", path: "/network/config"},
-  {label: "Activity", path: "/network/activity"},
-  {label: "Health", path: "/network/health"},
-]
-
-const contractItems: NestedSidebarItem[] = [
-  {label: "Overview", path: "/contracts"},
-  {label: "Sources", path: "/contracts/sources"},
-  {label: "ABI", path: "/contracts/abi"},
-]
-
-const standaloneItems: SidebarItem[] = [
-  {label: "Simulator", icon: Waypoints, path: "/simulator"},
-  {label: "Cell Inspector", icon: Binary, path: "/cell-inspector"},
-]
-
-const environmentItems: SidebarItem[] = [
-  {label: "Wallets", icon: Wallet, path: "/wallets"},
-  {label: "Faucet", icon: HandCoins, path: "/faucet"},
-  {label: "Snapshots", icon: Archive, path: "/snapshots"},
-  {label: "Admin actions", icon: Settings2, path: "/admin"},
-]
-
-const apiCallsItem: SidebarItem = {
-  label: "API Calls",
-  icon: Activity,
-  path: "/api-calls",
-}
-
-const integrateItem: SidebarItem = {
-  label: "Integrate",
-  icon: Cable,
-  path: "/integrate",
-}
-
-const apiReferenceItems: NestedSidebarItem[] = [
-  {label: "v2 API", path: "/api-reference/v2"},
-  {label: "v3 API", path: "/api-reference/v3"},
-  {label: "Admin API", path: "/api-reference/admin"},
-  {label: "Config API", path: "/api-reference/config"},
-  {label: "Control API", path: "/api-reference/control"},
-]
 
 const NavigationItem: FC<NavigationItemProps> = ({active, item, onSelect}) => {
   const Icon = item.icon
@@ -224,34 +150,17 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
     environment?.config.kind === "actonSimulatedLocalnet"
       ? formatForkNetworkLabel(forkNetwork)
       : undefined
-  const visibleStandaloneItems = supports(environment, "simulator") ? standaloneItems : []
-  const visibleExplorerItems = explorerItems.filter(
-    item => item.path !== "/explorer/elections" || environment?.lifecycle === "external",
-  )
-  const visibleNetworkItems = networkItems.filter(item =>
-    item.path === "/network/config"
-      ? supports(environment, "controlApi")
-      : environment?.config.kind === "fullTonNetwork" &&
-        (item.path !== "/network/health" || supports(environment, "health")),
-  )
-  const visibleEnvironmentItems = environmentItems.filter(item =>
-    item.path === "/admin"
-      ? environment?.config.kind === "fullTonNetwork" && environment.lifecycle === "managed"
-      : item.path === "/wallets"
-        ? supports(environment, "wallets")
-        : item.path === "/snapshots"
-          ? supports(environment, "snapshots")
-          : supportsAny(environment, "testnetFaucet", "gramFaucet", "jettonFaucet"),
-  )
-  const visibleApiReferenceItems = apiReferenceItems.filter(item => {
-    if (item.path === "/api-reference/v2") return supports(environment, "apiV2")
-    if (item.path === "/api-reference/v3") return supports(environment, "apiV3")
-    if (item.path === "/api-reference/config") return supports(environment, "configApi")
-    if (item.path === "/api-reference/admin") {
-      return environment?.config.kind === "fullTonNetwork" && supports(environment, "controlApi")
-    }
-    return environment?.config.kind !== "fullTonNetwork" && supports(environment, "controlApi")
-  })
+  const {
+    primaryItems,
+    visibleStandaloneItems,
+    visibleExplorerItems,
+    visibleNetworkItems,
+    visibleEnvironmentItems,
+    visibleApiReferenceItems,
+    contractItems,
+    integrateItem,
+    apiCallsItem,
+  } = getEnvironmentNavigation(environment)
   const localPathname = location.pathname.slice(routes.basePath.length) || "/"
   const isExplorerActive =
     localPathname.startsWith("/explorer") || localPathname.startsWith("/block/")
@@ -443,14 +352,14 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
           <div className={styles.navigationSectionGroup}>
             <div className={styles.navDivider} />
             <div className={styles.navSection}>
-              {supports(environment, "integration") ? (
+              {integrateItem ? (
                 <NavigationItem
                   active={integrateItem.path === localPathname}
                   item={integrateItem}
                   onSelect={path => void navigate(routes.path(path))}
                 />
               ) : undefined}
-              {supports(environment, "apiCalls") ? (
+              {apiCallsItem ? (
                 <NavigationItem
                   active={apiCallsItem.path === localPathname}
                   item={apiCallsItem}

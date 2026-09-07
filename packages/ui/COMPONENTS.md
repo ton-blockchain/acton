@@ -582,6 +582,10 @@ history persistence, validation messages, and navigation.
   coordinated layouts. Normal product usage can leave visibility uncontrolled.
 - `onFocus`: optional hook for suggestion wrappers that need to reset their
   filtering state whenever the field receives focus.
+- `inline`: keeps the results below the input inside the caller's surface,
+  such as a Dialog, with the first item highlighted and keyboard selection.
+- `emptyContent`: renders the caller's empty state when an inline list has no matches.
+- `items[].group`: labels consecutive results belonging to the same category.
 
 ### States To Review Visually
 
@@ -603,8 +607,8 @@ history persistence, validation messages, and navigation.
   opcode.
 - Let SearchInput own open/close and blur behavior instead of adding delayed
   timers in feature code.
-- Use Input for a search field without a dropdown, and use a command palette
-  for global application commands.
+- Use Input for a search field without results. Compose Dialog and an inline
+  SearchInput for global search; route resolution and actions belong to the caller.
 
 ## AddressChip
 

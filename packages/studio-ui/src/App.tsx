@@ -5,13 +5,13 @@ import {Button, CopyButton, ToastProvider, useToast} from "@acton/ui"
 
 import {ImportAccountsAction, ImportAccountsActionContext} from "./components/ImportAccountsAction"
 import {StudioShell} from "./components/StudioShell"
+import {StudioSearch} from "./components/StudioSearch"
 import {StudioConnectionOverlay} from "./components/StudioConnectionOverlay"
 import {useStudioConnection} from "./hooks/useStudioConnection"
 import {useStudioEnvironments, type StudioEnvironmentsState} from "./hooks/useStudioEnvironments"
 import {useStudioTestRuns} from "./hooks/useStudioTestRuns"
 import {EnvironmentNavigation} from "./localnet/dashboard/EnvironmentNavigation"
 import {EnvironmentNavigationActions} from "./localnet/dashboard/EnvironmentNavigationActions"
-import {DashboardSearch} from "./localnet/dashboard/DashboardSearch"
 import type {LocalnetWorkspaceShellState} from "./localnet/LocalnetWorkspace"
 import {LocalnetRuntimeProvider, useLocalnetRuntime} from "./localnet/LocalnetRuntimeProvider"
 import {FeaturePage} from "./pages/FeaturePage"
@@ -115,6 +115,7 @@ function StudioWorkspace({
 }: StudioWorkspaceProps) {
   const {showToast} = useToast()
   const location = useLocation()
+  const routerNavigate = useNavigate()
   const runtime = useLocalnetRuntime()
   const activePath: StudioPath =
     route.kind === "page"
@@ -202,6 +203,15 @@ function StudioWorkspace({
       onOpenEnvironment(environment)
     },
     [onOpenEnvironment],
+  )
+
+  const navigateSearch = useCallback(
+    (path: string) => {
+      setSidebarMode(readStudioRoute(path).kind === "environment" ? "environment" : "studio")
+      void routerNavigate(path)
+      globalThis.scrollTo({top: 0})
+    },
+    [routerNavigate],
   )
 
   const handleEnvironmentShellChange = useCallback(
@@ -412,7 +422,7 @@ function StudioWorkspace({
           showEnvironmentNavigation && environment ? `environment:${environment.id}` : "studio"
         }
         sidebarSearch={
-          showEnvironmentNavigation ? <DashboardSearch client={runtime.client} /> : undefined
+          <StudioSearch environments={environmentsState.environments} onNavigate={navigateSearch} />
         }
         sidebarSelectedTestRunId={testRuns.selectedRunId}
         sidebarTestRuns={testRuns.runs}

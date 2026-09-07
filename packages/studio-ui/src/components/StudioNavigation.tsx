@@ -11,12 +11,12 @@ import {
 } from "lucide-react"
 import {Fragment, useCallback, useEffect, useState} from "react"
 import type {ReactNode} from "react"
+import {useLocation} from "react-router"
 import {ThemeSwitch, Tooltip} from "@acton/ui"
 
 import type {StudioEnvironment, TestRunSummary} from "../studioApi"
 import type {StudioPage, StudioPath} from "../studioPages"
 import actonStudioLogo from "../assets/acton-studio-logo.svg"
-import {StudioSearch} from "./StudioSearch"
 import {TestRunsNavigationList} from "./TestRunsNavigationList"
 
 import styles from "./StudioNavigation.module.css"
@@ -69,8 +69,13 @@ export function StudioNavigation({
   onSelectTestRun,
   onToggleSidebar,
 }: StudioNavigationProps) {
+  const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), [])
+
+  useEffect(() => {
+    closeMobileMenu()
+  }, [location.pathname, closeMobileMenu])
   const navigateAndClose = useCallback(
     (path: StudioPath) => {
       onNavigate(path)
@@ -157,9 +162,7 @@ export function StudioNavigation({
           </button>
         </div>
 
-        <div className={styles.topControls}>
-          {searchContent ?? <StudioSearch onNavigate={navigateAndClose} />}
-        </div>
+        <div className={styles.topControls}>{searchContent}</div>
 
         <div className={styles.navigationFrame}>
           <div className={styles.navScroll}>

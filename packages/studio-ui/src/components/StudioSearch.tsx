@@ -1,21 +1,15 @@
 import {Search} from "lucide-react"
-import {createPortal} from "react-dom"
+import {Dialog, InlineLoader} from "@acton/ui"
 import {Suspense, lazy, useCallback, useEffect, useRef, useState} from "react"
-import type {CSSProperties} from "react"
 
-import type {StudioPath} from "../studioPages"
+import type {StudioEnvironment} from "../studioApi"
 
-import styles from "./StudioNavigation.module.css"
+import navigationStyles from "./StudioNavigation.module.css"
+import styles from "./StudioSearch.module.css"
 
 interface StudioSearchProps {
-  readonly onNavigate: (path: StudioPath) => void
-}
-
-export type SearchOriginStyle = Readonly<CSSProperties> & {
-  readonly "--search-origin-left"?: string
-  readonly "--search-origin-top"?: string
-  readonly "--search-origin-width"?: string
-  readonly "--search-origin-height"?: string
+  readonly environments: readonly StudioEnvironment[]
+  readonly onNavigate: (path: string) => void
 }
 
 const StudioSearchOverlay = lazy(async () => {
@@ -23,163 +17,100 @@ const StudioSearchOverlay = lazy(async () => {
   return {default: module.StudioSearchOverlay}
 })
 
-export function StudioSearch({onNavigate}: StudioSearchProps) {
-  const [isSearchMounted, setIsSearchMounted] = useState(false)
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
-  const [searchOriginStyle, setSearchOriginStyle] = useState<SearchOriginStyle>({})
-  const searchButtonRef = useRef<HTMLButtonElement>(null)
-  const searchAnimationRef = useRef<number | undefined>(undefined)
-
-  const measureSearchOrigin = useCallback(() => {
-    const rect = searchButtonRef.current?.getBoundingClientRect()
-    if (!rect) return
-
-    setSearchOriginStyle({
-      "--search-origin-left": `${rect.left}px`,
-      "--search-origin-top": `${rect.top}px`,
-      "--search-origin-width": `${rect.width}px`,
-      "--search-origin-height": `${rect.height}px`,
-    })
-  }, [])
+/** One search entry point throughout Studio; Dialog owns modal focus, dismissal and restoration */
+export function StudioSearch({environments, onNavigate}: StudioSearchProps) {
+  const [open, setOpen] = useState(false)
+  const [session, setSession] = useState(0)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const shortcut = /Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘ K" : "Ctrl K"
 
   const openSearch = useCallback(() => {
-    measureSearchOrigin()
-    setIsSearchMounted(true)
-    if (searchAnimationRef.current !== undefined) {
-      cancelAnimationFrame(searchAnimationRef.current)
-    }
-    searchAnimationRef.current = requestAnimationFrame(() => {
-      setIsSearchOpen(true)
-    })
-  }, [measureSearchOrigin])
-
-  const closeSearch = useCallback(() => {
-    setIsSearchOpen(false)
+    setSession(value => value + 1)
+    setOpen(true)
   }, [])
 
-  const handleGlobalKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.altKey) return
 
-      if (event.key === "Escape" && isSearchMounted) {
-        event.preventDefault()
-        closeSearch()
-        return
-      }
+      const target = event.target
+      const typing =
+        target instanceof HTMLElement &&
+        (target.matches("input, textarea, select") || target.isContentEditable)
+      const command = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k"
+      const find = !typing && !event.metaKey && !event.ctrlKey && event.key.toLowerCase() === "f"
+      if (!command && !find) return
 
-      if (event.key.toLocaleLowerCase() !== "f" || isTextEntryTarget(event.target)) return
-
+      // Do not steal shortcuts from another dialog or a composing text input.
+      if (document.querySelector('[role="dialog"][aria-modal="true"]') && !open) return
       event.preventDefault()
-      openSearch()
-    },
-    [closeSearch, isSearchMounted, openSearch],
-  )
-
-  useEffect(() => {
-    return () => {
-      if (searchAnimationRef.current !== undefined) {
-        cancelAnimationFrame(searchAnimationRef.current)
-      }
+      if (!open) openSearch()
     }
-  }, [])
 
-  useEffect(() => {
-    globalThis.addEventListener("keydown", handleGlobalKeyDown)
-    return () => globalThis.removeEventListener("keydown", handleGlobalKeyDown)
-  }, [handleGlobalKeyDown])
-
-  useEffect(() => {
-    if (!isSearchMounted) return
-
-    const handleResize = () => measureSearchOrigin()
-    globalThis.addEventListener("resize", handleResize)
-    return () => globalThis.removeEventListener("resize", handleResize)
-  }, [isSearchMounted, measureSearchOrigin])
-
-  useEffect(() => {
-    if (!isSearchMounted || isSearchOpen) return
-
-    const timeout = globalThis.setTimeout(() => {
-      setIsSearchMounted(false)
-    }, 300)
-
-    return () => globalThis.clearTimeout(timeout)
-  }, [isSearchMounted, isSearchOpen])
+    globalThis.addEventListener("keydown", handleKeyDown)
+    return () => globalThis.removeEventListener("keydown", handleKeyDown)
+  }, [open, openSearch])
 
   return (
     <>
       <button
-        ref={searchButtonRef}
+        ref={triggerRef}
         type="button"
-        className={`${styles.searchButton} ${isSearchMounted ? styles.searchButtonMorphing : ""}`}
+        className={navigationStyles.searchButton}
+        aria-label="Search Studio"
+        aria-haspopup="dialog"
+        aria-expanded={open}
         onClick={openSearch}
       >
-        <span className={styles.searchButtonValue}>
-          <Search size={16} />
-          <span>Find...</span>
+        <span className={navigationStyles.searchButtonValue}>
+          <Search size={16} aria-hidden="true" />
+          <span>Search</span>
         </span>
-        <span className={styles.searchShortcut}>F</span>
+        <kbd className={styles.shortcut}>{shortcut}</kbd>
       </button>
 
-      {isSearchMounted
-        ? createPortal(
-            <Suspense
-              fallback={
-                <SearchOverlayFallback
-                  isOpen={isSearchOpen}
-                  style={searchOriginStyle}
-                  onClose={closeSearch}
-                />
-              }
-            >
-              <StudioSearchOverlay
-                isOpen={isSearchOpen}
-                originStyle={searchOriginStyle}
-                onClose={closeSearch}
-                onNavigate={onNavigate}
-              />
-            </Suspense>,
-            document.body,
-          )
-        : undefined}
+      <Dialog
+        open={open}
+        onOpenChange={setOpen}
+        onOpenChangeComplete={nextOpen => {
+          if (!nextOpen) triggerRef.current?.focus()
+        }}
+        title="Search Studio"
+        closeLabel="Close search"
+        maxWidth="40rem"
+        contentClassName={styles.content}
+        footer={
+          <div className={styles.footer}>
+            <span>
+              <kbd>↑</kbd> <kbd>↓</kbd> Navigate
+            </span>
+            <span>
+              <kbd>↵</kbd> Open
+            </span>
+            <span>
+              <kbd>Esc</kbd> Close
+            </span>
+          </div>
+        }
+      >
+        <Suspense
+          fallback={
+            <div className={styles.loading}>
+              <InlineLoader message="Loading search" />
+            </div>
+          }
+        >
+          <StudioSearchOverlay
+            key={session}
+            environments={environments}
+            open={open}
+            onSelect={path => {
+              setOpen(false)
+              onNavigate(path)
+            }}
+          />
+        </Suspense>
+      </Dialog>
     </>
   )
-}
-
-function SearchOverlayFallback({
-  isOpen,
-  onClose,
-  style,
-}: {
-  readonly isOpen: boolean
-  readonly onClose: () => void
-  readonly style: SearchOriginStyle
-}) {
-  return (
-    <div
-      className={`${styles.searchOverlay} ${isOpen ? styles.searchOverlayOpen : ""}`}
-      aria-hidden={!isOpen}
-      style={style}
-    >
-      <button
-        type="button"
-        className={styles.searchBackdrop}
-        aria-label="Close search"
-        onClick={onClose}
-      />
-      <section className={styles.searchPanel} role="dialog" aria-modal="true" aria-label="Search">
-        <div className={styles.searchInputRow}>
-          <Search size={17} className={styles.searchInputIcon} />
-          <div className={styles.searchInput}>Loading search...</div>
-        </div>
-      </section>
-    </div>
-  )
-}
-
-function isTextEntryTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false
-
-  const tagName = target.tagName.toLowerCase()
-  return tagName === "input" || tagName === "textarea" || target.isContentEditable
 }

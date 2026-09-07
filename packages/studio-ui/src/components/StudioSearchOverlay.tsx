@@ -1,138 +1,156 @@
-import {Search} from "lucide-react"
-import {useCallback, useEffect, useMemo, useRef, useState} from "react"
-import type {KeyboardEvent as ReactKeyboardEvent} from "react"
+import {Box, Boxes, CircleUserRound, File, Globe2, History, Search, Wallet} from "lucide-react"
+import {useMemo, useState} from "react"
+import {InlineButton, InlineLoader, SearchInput} from "@acton/ui"
 
-import {studioPages, type StudioPath} from "../studioPages"
-import type {SearchOriginStyle} from "./StudioSearch"
+import {useLocalnetRuntime} from "../localnet/LocalnetRuntimeProvider"
+import {
+  buildStudioSearchIndex,
+  readSearchHistory,
+  recentSearchResults,
+  resolveSearchDestination,
+  searchStudio,
+  writeSearchHistory,
+} from "../search/studioSearch"
+import type {StudioSearchResult} from "../search/studioSearch"
+import {useSearchObjects} from "../search/useSearchObjects"
+import type {StudioEnvironment} from "../studioApi"
 
-import styles from "./StudioNavigation.module.css"
+import styles from "./StudioSearch.module.css"
 
 interface StudioSearchOverlayProps {
-  readonly isOpen: boolean
-  readonly originStyle: SearchOriginStyle
-  readonly onClose: () => void
-  readonly onNavigate: (path: StudioPath) => void
+  readonly environments: readonly StudioEnvironment[]
+  readonly open: boolean
+  readonly onSelect: (path: string) => void
 }
 
-export function StudioSearchOverlay({
-  isOpen,
-  originStyle,
-  onClose,
-  onNavigate,
-}: StudioSearchOverlayProps) {
-  const [searchQuery, setSearchQuery] = useState("")
-  const searchInputRef = useRef<HTMLInputElement>(null)
+const resultIcons = {
+  page: File,
+  environment: Boxes,
+  contract: Box,
+  wallet: Wallet,
+  address: CircleUserRound,
+  transaction: Search,
+}
 
-  const searchResults = useMemo(() => {
-    const query = searchQuery.trim().toLocaleLowerCase()
-    if (!query) return studioPages
-
-    return studioPages.filter(page => {
-      return `${page.label} ${page.shortDescription}`.toLocaleLowerCase().includes(query)
-    })
-  }, [searchQuery])
-
-  const selectSearchResult = useCallback(
-    (path: StudioPath) => {
-      onClose()
-      setSearchQuery("")
-      onNavigate(path)
-    },
-    [onClose, onNavigate],
+/** Resolves search against the active runtime while keeping navigation and history in Studio */
+export function StudioSearchOverlay({environments, open, onSelect}: StudioSearchOverlayProps) {
+  const {client, environment} = useLocalnetRuntime()
+  const [query, setQuery] = useState("")
+  const [history, setHistory] = useState(readSearchHistory)
+  const objects = useSearchObjects(client, environment, open)
+  const index = useMemo(
+    () => buildStudioSearchIndex(environments, environment, objects.contracts, objects.wallets),
+    [environments, environment, objects.contracts, objects.wallets],
   )
+  const recent = recentSearchResults(history, index, environments, environment, objects.loaded)
+  const results = query.trim()
+    ? searchStudio(query, index, environments, environment)
+    : [
+        ...recent,
+        ...index
+          .filter(
+            result =>
+              !recent.some(item => item.id === result.id) &&
+              (environment
+                ? result.kind === "page" &&
+                  result.environmentId === environment.id &&
+                  ["/explorer", "/contracts", "/wallets", "/snapshots"].includes(result.value)
+                : result.kind === "environment" ||
+                  (result.kind === "page" && !result.environmentId)),
+          )
+          .sort((a, b) => Number(b.kind === "environment") - Number(a.kind === "environment"))
+          .slice(0, 8),
+      ]
 
-  const handleSearchKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLInputElement>) => {
-      if (event.key === "Escape") {
-        event.preventDefault()
-        onClose()
-        return
-      }
+  const selectResult = (result: StudioSearchResult) => {
+    const next = [
+      result,
+      ...history.filter(item => resolveSearchDestination(item, environments)?.id !== result.id),
+    ].slice(0, 8)
+    writeSearchHistory(next)
+    setHistory(next)
+    onSelect(result.href)
+  }
 
-      if (event.key === "Enter" && searchResults[0]) {
-        event.preventDefault()
-        selectSearchResult(searchResults[0].path)
-      }
-    },
-    [onClose, searchResults, selectSearchResult],
-  )
-
-  useEffect(() => {
-    if (isOpen) searchInputRef.current?.focus()
-  }, [isOpen])
+  const removeRecent = (result: StudioSearchResult) => {
+    const next = history.filter(
+      item => resolveSearchDestination(item, environments)?.id !== result.id,
+    )
+    writeSearchHistory(next)
+    setHistory(next)
+  }
 
   return (
-    <div
-      className={`${styles.searchOverlay} ${isOpen ? styles.searchOverlayOpen : ""}`}
-      aria-hidden={!isOpen}
-      style={originStyle}
-    >
-      <button
-        type="button"
-        className={styles.searchBackdrop}
-        aria-label="Close search"
-        onClick={onClose}
-      />
-      <section className={styles.searchPanel} role="dialog" aria-modal="true" aria-label="Search">
-        <div className={styles.searchInputRow}>
-          <Search size={17} className={styles.searchInputIcon} />
-          <input
-            ref={searchInputRef}
-            className={styles.searchInput}
-            value={searchQuery}
-            placeholder="Find..."
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
-            onChange={event => setSearchQuery(event.target.value)}
-            onKeyDown={handleSearchKeyDown}
-          />
-          <button
-            type="button"
-            className={styles.searchEscButton}
-            aria-label="Close search"
-            onClick={onClose}
+    <>
+      <div className={styles.contextRow}>
+        <span className={styles.context} aria-label="Search context">
+          <Globe2 size={14} aria-hidden="true" />
+          {environment?.name ?? "All environments"}
+        </span>
+        {!query.trim() && recent.length > 0 && (
+          <InlineButton
+            onClick={() => {
+              writeSearchHistory([])
+              setHistory([])
+            }}
           >
-            <span className={styles.searchEscShortcut}>F</span>
-            <span className={styles.searchEscLabel}>Esc</span>
-          </button>
-        </div>
+            Clear recent
+          </InlineButton>
+        )}
+      </div>
 
-        <div className={styles.searchResultBody}>
-          {searchResults.length === 0 ? (
-            <div className={styles.searchEmpty}>No matching Studio pages.</div>
-          ) : (
-            <div className={styles.searchResultList}>
-              {searchResults.map(result => {
-                const Icon = result.icon
+      <SearchInput
+        ariaLabel="Search Studio"
+        autoFocus
+        inline
+        size="md"
+        value={query}
+        onValueChange={setQuery}
+        placeholder={
+          environment
+            ? "Search names, pages, or paste an address or hash"
+            : "Search pages, environments, or paste an address or hash"
+        }
+        items={results.map(result => {
+          const Icon = result.group === "Recent" ? History : resultIcons[result.kind]
+          return {
+            id: result.id,
+            label: result.title,
+            description: result.description,
+            icon: <Icon size={17} aria-hidden="true" />,
+            group: result.group,
+            onSelect: () => selectResult(result),
+            onRemove: result.group === "Recent" ? () => removeRecent(result) : undefined,
+            removeLabel: `Remove ${result.title} from recent`,
+          }
+        })}
+        onSubmit={() => {
+          if (!results[0]) return false
+          selectResult(results[0])
+        }}
+        emptyContent={
+          <div className={styles.empty} role="status">
+            {objects.loading ? "Looking for matches…" : "No matches"}
+          </div>
+        }
+      />
 
-                return (
-                  <button
-                    key={result.path}
-                    type="button"
-                    className={styles.searchResultItem}
-                    onClick={() => selectSearchResult(result.path)}
-                  >
-                    <span className={styles.searchResultIcon}>
-                      {result.path === "/" ? (
-                        <span className={styles.searchResultWorkspaceMark} />
-                      ) : (
-                        <Icon size={17} />
-                      )}
-                    </span>
-                    <span className={styles.searchResultText}>
-                      <span className={styles.searchResultTitle}>{result.label}</span>
-                      <span className={styles.searchResultDescription}>
-                        {result.shortDescription}
-                      </span>
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </section>
-    </div>
+      <div className={styles.status} aria-live="polite">
+        {objects.loading ? (
+          <InlineLoader message="Loading contracts and wallets" />
+        ) : objects.failed ? (
+          <>
+            <span>Some results are unavailable</span>
+            <InlineButton onClick={objects.retry}>Retry</InlineButton>
+          </>
+        ) : environment ? (
+          environment.status === "running" ? undefined : (
+            <span>Contracts and wallets are available when this environment is running</span>
+          )
+        ) : (
+          <span>Choose an environment to search its contracts and wallets</span>
+        )}
+      </div>
+    </>
   )
 }

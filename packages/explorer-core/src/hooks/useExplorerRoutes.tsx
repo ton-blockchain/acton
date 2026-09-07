@@ -8,6 +8,9 @@ import {
 } from "./explorerRoutesContext"
 import {useAddressFormat} from "./useNetworkInfo"
 
+// Consumers resolving a destination before selecting a network use the same route factory.
+export {createExplorerRoutes} from "./explorerRoutesContext"
+
 interface ExplorerRoutesProviderProps extends ExplorerRouteOverrides {
   readonly basePath?: string
   readonly children: ReactNode
