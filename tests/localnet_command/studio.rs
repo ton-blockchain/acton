@@ -385,22 +385,27 @@ async fn studio_uses_cli_for_lifecycle_and_http_for_nodes_and_snapshots() {
         .await
         .expect("snapshot accepted");
     snapshot_complete(&runtime, &created.id).await;
-    expect![["snapshot-1"]].assert_eq(
-        &runtime
-            .list_snapshots(&created.id)
-            .await
-            .expect("snapshots")[0]
-            .id,
-    );
+    let snapshots = runtime
+        .list_snapshots(&created.id)
+        .await
+        .expect("snapshots");
+    expect![["1:3:checkpoint"]].assert_eq(&format!(
+        "{}:{}:{}",
+        snapshots.len(),
+        snapshots[0].format_version,
+        snapshots[0].name.as_deref().expect("snapshot name"),
+    ));
+    let snapshot_id = &snapshots[0].id;
+
     runtime.stop(&created.id).await.expect("user stop");
     runtime
-        .restore_snapshot(&created.id, "snapshot-1")
+        .restore_snapshot(&created.id, snapshot_id)
         .await
         .expect("restore stopped network");
     snapshot_complete(&runtime, &created.id).await;
     running(&runtime, &created.id).await;
     runtime
-        .delete_snapshot(&created.id, "snapshot-1")
+        .delete_snapshot(&created.id, snapshot_id)
         .await
         .expect("delete snapshot");
     runtime
@@ -669,7 +674,7 @@ async fn studio_waits_for_indexer_on_independently_selected_ports() {
     })
     .await
     .expect("start accepted");
-    let waiting = wait_for_progress(&client, &operation.id, "waitingForApis", 2).await;
+    let waiting = wait_for_progress(&client, &operation.id, "waitingForApis", 3).await;
     expect![["Starting:Waiting for Indexer"]].assert_eq(&format!(
         "{:?}:{}",
         runtime

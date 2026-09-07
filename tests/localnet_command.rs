@@ -219,9 +219,12 @@ async fn cli_and_http_share_lifecycle_snapshots_and_persisted_state() {
         &["snapshot", "integration", "create", "checkpoint"],
     )
     .await;
+    let snapshot_id = snapshot["result"]["id"]
+        .as_str()
+        .expect("created bundle id");
     let restored = cli(
         &service.state(),
-        &["snapshot", "integration", "restore", "snapshot-1", "--yes"],
+        &["snapshot", "integration", "restore", snapshot_id, "--yes"],
     )
     .await;
     let node = cli(&service.state(), &["node", "integration", "add", "peer"]).await;
@@ -232,13 +235,13 @@ async fn cli_and_http_share_lifecycle_snapshots_and_persisted_state() {
           "node": "peer",
           "nodes": 1,
           "readiness": {
-            "completed": 3,
-            "detail": "TON APIs and indexer ready",
-            "total": 3,
+            "completed": 4,
+            "detail": "TON nodes, APIs and indexer ready",
+            "total": 4,
             "unit": "checks passed"
           },
           "restored": "completed",
-          "snapshot": "snapshot-1",
+          "snapshotName": "checkpoint",
           "snapshotStatus": "completed",
           "startSteps": [
             "preparing",
@@ -252,7 +255,7 @@ async fn cli_and_http_share_lifecycle_snapshots_and_persisted_state() {
             "started":started["status"],
             "startSteps":started["operation"]["completedSteps"].as_array().expect("completed steps").iter().map(|step| &step["phase"]).collect::<Vec<_>>(),
             "readiness":started["operation"]["progress"],
-            "snapshot":snapshot["result"]["id"],
+            "snapshotName":snapshot["result"]["name"],
             "snapshotStatus":snapshot["status"],
             "restored":restored["status"],
             "node":node["result"]["name"],
@@ -316,8 +319,11 @@ async fn cli_and_http_share_lifecycle_snapshots_and_persisted_state() {
         snapshot-create
         up
         stop
+        snapshot-create
         snapshot-restore
         down
+        snapshot-list
+        snapshot-delete
         up
         stop
     "]]

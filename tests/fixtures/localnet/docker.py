@@ -89,19 +89,20 @@ if 'compose' in args:
         marker.unlink(missing_ok=True)
         for node in nodes:
             node_marker(node).unlink(missing_ok=True)
-    elif verb == 'run':
-        action = command[command.index('snapshot') + 1]
-        snapshot = {'formatVersion': 1, 'id': 'snapshot-1', 'name': 'checkpoint',
-                    'createdAt': 1, 'archiveSizeBytes': 100, 'stateSizeBytes': 200,
-                    'stateSchemaVersion': 1, 'tonRelease': 'fixture', 'masterchainSeqno': 10}
-        with (root / 'events').open('a') as output:
-            output.write('snapshot-' + action + '\n')
-        print(json.dumps([snapshot] if action == 'list' else None if action == 'delete' else snapshot))
     elif verb == 'exec':
         with (root / 'events').open('a') as output:
             output.write('validation\n')
     else:
         raise SystemExit('Unexpected compose command: ' + verb)
+elif 'run' in args and 'snapshot' in args:
+    # Cold archives use a standalone container with only the selected volumes.
+    action = args[args.index('snapshot') + 1]
+    snapshot = {'formatVersion': 2, 'id': 'snapshot-1', 'name': 'checkpoint',
+                'createdAt': 1, 'archiveSizeBytes': 100, 'stateSizeBytes': 200,
+                'stateSchemaVersion': 1, 'tonRelease': 'fixture', 'masterchainSeqno': 10}
+    with (root / 'events').open('a') as output:
+        output.write('snapshot-' + action + '\n')
+    print(json.dumps([snapshot] if action == 'list' else None if action == 'delete' else snapshot))
 elif 'image' in args and 'inspect' in args:
     if (root / 'force-pull').exists() and not (root / 'image-ready').exists():
         raise SystemExit(1)
