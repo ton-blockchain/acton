@@ -8,6 +8,7 @@ These addresses are not fixtures and their balances or recent history can change
 
 | Address | What to verify | Last checked |
 | --- | --- | --- |
+| [`Ef9VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVbxn`](https://actonscan.com/address/Ef9VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVbxn?network=mainnet) | Config voting proposal `e5e148027499276e65c48749129ca014bb4e53279b1ac6314d124f4e30166076`: parameter 30 accepted at masterchain block 89031014, 2 winning rounds, 292 voters and 75.0269% weight; compare with block 89031013 | 2026-09-07 |
 | [`EQDV9A9W0GpbnFhiI6hJkGUSNIqU7Nxx-rn5FVQsAc7ZkfZB`](https://actonscan.com/address/EQDV9A9W0GpbnFhiI6hJkGUSNIqU7Nxx-rn5FVQsAc7ZkfZB?network=mainnet) | Frozen account state, no Contract type row, Unfreezer link next to Tonscan | 2026-07-30 |
 | [`EQCBMyAieemf3vF3umY0lCaQxLhwvbTFuL8eQxPYrpeZ8O4O`](https://actonscan.com/address/EQCBMyAieemf3vF3umY0lCaQxLhwvbTFuL8eQxPYrpeZ8O4O?network=mainnet) | Active account that is also suspended, suspended overview must not depend on account state | 2026-07-30 |
 | [`Ef9mDsqzIg2i8fdw0Bb7UGafA3Gc1qX5IYjp6AOZwGlfvim2`](https://actonscan.com/address/Ef9mDsqzIg2i8fdw0Bb7UGafA3Gc1qX5IYjp6AOZwGlfvim2?network=mainnet) | Suspended account with a long resolved name, name ellipsis and spacing between QR and edit controls | 2026-07-30 |
@@ -84,6 +85,7 @@ The early `v0 -> v1 -> v0 -> v1` rollback means this history cannot be found saf
 
 | Address | What to verify | Last checked |
 | --- | --- | --- |
+| [`kf9VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQft`](https://actonscan.com/address/kf9VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQft?network=testnet) | Config voting proposal `7095134fc372835c23a01741afea87b0be76d4ba09d517a10c92ba5469d9af8c`: undocumented parameter 239 did not pass; removed at masterchain block 76627643, last snapshot has zero votes and five losing rounds | 2026-09-07 |
 | [`kQAgO7g7m2763OuP-AaTVOZVhEjg5zYyCKDF660QzJp71KLB`](https://actonscan.com/address/kQAgO7g7m2763OuP-AaTVOZVhEjg5zYyCKDF660QzJp71KLB?network=testnet) | Alternating incoming and outgoing transfers around `0.01 GRAM`, useful for the small-transfer spam filter and for confirming outgoing transfers remain visible | 2026-07-30 |
 | [`kQB6XGzpO7rglhK1tR9A4l2QQu6yaYE6ALUp1vAOHMaGAfGD`](https://actonscan.com/address/kQB6XGzpO7rglhK1tR9A4l2QQu6yaYE6ALUp1vAOHMaGAfGD?network=testnet) | Repeated one-nano outgoing self-transfers, useful for confirming the spam filter never hides outgoing actions | 2026-07-30 |
 

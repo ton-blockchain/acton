@@ -1477,3 +1477,99 @@ test("account funding sends exact nanograms beyond the safe integer range", asyn
     globalThis.fetch = originalFetch
   }
 })
+
+test("rate-limited reads retry without duplicating concurrent requests", async () => {
+  const originalFetch = globalThis.fetch
+  let attempts = 0
+  globalThis.fetch = mockFetch(async () => {
+    attempts++
+    return attempts < 3
+      ? Response.json(
+          {ok: false, result: "Ratelimit per ip exceed"},
+          {
+            status: 429,
+            headers: {"Retry-After": "0"},
+          },
+        )
+      : Response.json({ok: true, result: {bytes: "account-boc"}})
+  })
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+    const values = await Promise.all([
+      client.getShardAccountCell("config", 123),
+      client.getShardAccountCell("config", 123),
+    ])
+
+    expect({attempts, values}).toMatchInlineSnapshot(`
+      {
+        "attempts": 3,
+        "values": [
+          "account-boc",
+          "account-boc",
+        ],
+      }
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("rate-limit retries are bounded and never resubmit a mutation", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: string[] = []
+  globalThis.fetch = mockFetch(async (input, init) => {
+    requests.push(`${init?.method ?? "GET"} ${new URL(String(input)).pathname}`)
+    return Response.json(
+      {ok: false, result: "Ratelimit per ip exceed"},
+      {
+        status: 429,
+        headers: {"Retry-After": "0"},
+      },
+    )
+  })
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+    const outcomes = await Promise.allSettled([
+      client.getShardAccountCell("config", 123),
+      client.sendExternalMessage("message-boc"),
+    ])
+
+    expect({
+      requests: requests.sort((left, right) => left.localeCompare(right)),
+      errors: outcomes.map(outcome =>
+        outcome.status === "rejected" ? outcome.reason.message : null,
+      ),
+    }).toMatchSnapshot()
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("preserves RPC diagnostic text carried in the result field", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = mockFetch(async () =>
+    Response.json({ok: false, result: "Block is unavailable"}, {status: 500}),
+  )
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    await expect(client.getShardAccountCell("config", 123)).rejects.toThrow("Block is unavailable")
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})

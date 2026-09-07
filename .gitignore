@@ -35,6 +35,7 @@ Thumbs.db
 .localton
 
 .env
+.env.local
 .worktree/
 gen/
 *.mnemonic

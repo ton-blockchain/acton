@@ -1,0 +1,225 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`configuration voting reads real Mainnet storage including timestamp-bearing voter dictionary leaves 1`] = `
+[
+  {
+    "critical": false,
+    "currentSet": true,
+    "expires": 1788839208,
+    "hash": "e5e148027499276e65c48749129ca014bb4e53279b1ac6314d124f4e30166076",
+    "losses": 1,
+    "neededValidators": 1,
+    "parameter": 30,
+    "percent": 74.8528,
+    "rounds": 4,
+    "voters": 291,
+    "wins": 1,
+    "won": false,
+  },
+  {
+    "critical": false,
+    "currentSet": true,
+    "expires": 1788789976,
+    "hash": "e8131c85497c998c8fcfdee823637c32ebb606df73be7cc9653f1bc11b7229e9",
+    "losses": 4,
+    "neededValidators": 244,
+    "parameter": 31,
+    "percent": 0,
+    "rounds": 2,
+    "voters": 0,
+    "wins": 0,
+    "won": false,
+  },
+]
+`;
+
+exports[`configuration voting reads real Mainnet storage including timestamp-bearing voter dictionary leaves 2`] = `
+[
+  {
+    "critical": false,
+    "currentSet": true,
+    "expires": 1788789976,
+    "hash": "e8131c85497c998c8fcfdee823637c32ebb606df73be7cc9653f1bc11b7229e9",
+    "losses": 4,
+    "neededValidators": 244,
+    "parameter": 31,
+    "percent": 0,
+    "rounds": 2,
+    "voters": 0,
+    "wins": 0,
+    "won": false,
+  },
+]
+`;
+
+exports[`configuration voting loads history and verifies an accepted proposal through the selected network client 1`] = `
+{
+  "finalVoteRecorded": true,
+  "losses": 1,
+  "outcome": "accepted",
+  "percent": 75.0269,
+  "registered": [
+    {
+      "hash": "e5e148027499276e65c48749129ca014bb4e53279b1ac6314d124f4e30166076",
+      "parameter": 30,
+    },
+  ],
+  "removed": true,
+  "requests": [
+    "/api/v1/environments/mainnet/rpc/api/v2/getConfigAll",
+    "/api/v1/environments/mainnet/rpc/api/v3/blocks?workchain=-1&limit=1&sort=desc",
+    "/api/v1/environments/mainnet/rpc/api/v2/getShardAccountCell?address=-1%3A5555555555555555555555555555555555555555555555555555555555555555&seqno=89031014",
+    "/api/v1/environments/mainnet/rpc/api/v3/transactionsByMessage?opcode=0x6e565052&direction=in&limit=10&offset=0",
+    "/api/v1/environments/mainnet/rpc/api/v3/transactionsByMessage?opcode=0xd6745246&direction=out&limit=100&offset=0",
+    "/api/v1/environments/mainnet/rpc/api/v2/getShardAccountCell?address=-1%3A5555555555555555555555555555555555555555555555555555555555555555&seqno=89031013",
+    "/api/v1/environments/mainnet/rpc/api/v3/blocks?workchain=-1&seqno=89031013&limit=1",
+  ],
+  "seqno": 89031014,
+  "time": 1787908401,
+  "voters": 292,
+  "wins": 2,
+  "won": true,
+}
+`;
+
+exports[`configuration voting loads history and verifies an accepted proposal through the selected network client 2`] = `
+[
+  {
+    "critical": false,
+    "currentSet": true,
+    "expires": 1788839208,
+    "hash": "e5e148027499276e65c48749129ca014bb4e53279b1ac6314d124f4e30166076",
+    "losses": 1,
+    "neededValidators": 1,
+    "parameter": 30,
+    "percent": 74.8528,
+    "rounds": 4,
+    "voters": 291,
+    "wins": 1,
+    "won": false,
+  },
+  {
+    "critical": false,
+    "currentSet": true,
+    "expires": 1788789976,
+    "hash": "e8131c85497c998c8fcfdee823637c32ebb606df73be7cc9653f1bc11b7229e9",
+    "losses": 4,
+    "neededValidators": 244,
+    "parameter": 31,
+    "percent": 0,
+    "rounds": 2,
+    "voters": 0,
+    "wins": 0,
+    "won": false,
+  },
+]
+`;
+
+exports[`configuration voting resolves a direct proposal link past a full history page before verifying its result 1`] = `
+{
+  "hash": "e5e148027499276e65c48749129ca014bb4e53279b1ac6314d124f4e30166076",
+  "outcome": "accepted",
+  "progress": [
+    "Searching proposal history · 0 transactions checked",
+    "Searching proposal history · 10 transactions checked",
+  ],
+  "requests": [
+    "/api/v1/environments/testnet/rpc/api/v2/getConfigAll",
+    "/api/v1/environments/testnet/rpc/api/v3/blocks?workchain=-1&limit=1&sort=desc",
+    "/api/v1/environments/testnet/rpc/api/v2/getShardAccountCell?address=-1%3A5555555555555555555555555555555555555555555555555555555555555555&seqno=89031014",
+    "/api/v1/environments/testnet/rpc/api/v3/transactionsByMessage?opcode=0x6e565052&direction=in&limit=10&offset=0",
+    "/api/v1/environments/testnet/rpc/api/v3/transactionsByMessage?opcode=0x6e565052&direction=in&limit=10&offset=10",
+    "/api/v1/environments/testnet/rpc/api/v3/transactionsByMessage?opcode=0xd6745246&direction=out&limit=100&offset=0",
+    "/api/v1/environments/testnet/rpc/api/v2/getShardAccountCell?address=-1%3A5555555555555555555555555555555555555555555555555555555555555555&seqno=89031013",
+    "/api/v1/environments/testnet/rpc/api/v3/blocks?workchain=-1&seqno=89031013&limit=1",
+  ],
+}
+`;
+
+exports[`configuration voting opens a stored proposal without reading history and stops invalid or cancelled lookups 1`] = `
+{
+  "failures": [
+    "Proposal hash must contain 64 hexadecimal characters",
+    "Navigation cancelled",
+    "Proposal was not found in this network",
+  ],
+  "hasVotingState": true,
+  "hash": "e5e148027499276e65c48749129ca014bb4e53279b1ac6314d124f4e30166076",
+  "requests": [
+    "/api/v1/environments/mainnet/rpc/api/v2/getConfigAll",
+    "/api/v1/environments/mainnet/rpc/api/v3/blocks?workchain=-1&limit=1&sort=desc",
+    "/api/v1/environments/mainnet/rpc/api/v2/getShardAccountCell?address=-1%3A5555555555555555555555555555555555555555555555555555555555555555&seqno=89031014",
+    "/api/v1/environments/mainnet/rpc/api/v3/transactionsByMessage?opcode=0x6e565052&direction=in&limit=10&offset=0",
+  ],
+}
+`;
+
+exports[`configuration voting keeps an unproven disappearance distinct from acceptance or rejection 1`] = `
+{
+  "finalVoteRecorded": false,
+  "outcome": "closed",
+  "wins": 1,
+}
+`;
+
+exports[`configuration voting finds the exact archive transition when acceptance has no outgoing receipt 1`] = `
+{
+  "checkedBlocks": [
+    89031001,
+    89031015,
+    89031008,
+    89031011,
+    89031013,
+    89031014,
+  ],
+  "finalVoteRecorded": false,
+  "outcome": "accepted",
+  "seqno": 89031014,
+}
+`;
+
+exports[`configuration voting a passing receipt does not imply that a conditional value was applied 1`] = `
+{
+  "outcome": "passed",
+  "removed": true,
+  "wins": 2,
+}
+`;
+
+exports[`configuration voting recognizes expiry before lazy contract cleanup and does not query the archive 1`] = `
+{
+  "outcome": "expired",
+  "removed": false,
+  "requests": [],
+}
+`;
+
+exports[`configuration voting requires strictly more than 75 percent and never applies weights from a different set 1`] = `
+{
+  "aboveThreshold": true,
+  "atThreshold": false,
+  "unknownSet": undefined,
+}
+`;
+
+exports[`configuration voting filters failed registrations and reads Testnet history from its own endpoint 1`] = `
+[
+  "e5e148027499276e65c48749129ca014bb4e53279b1ac6314d124f4e30166076",
+]
+`;
+
+exports[`configuration voting filters failed registrations and reads Testnet history from its own endpoint 2`] = `
+{
+  "proposals": [
+    {
+      "hash": "7095134fc372835c23a01741afea87b0be76d4ba09d517a10c92ba5469d9af8c",
+      "parameter": 239,
+    },
+  ],
+  "requests": [
+    "https://studio.test/api/v1/environments/testnet/rpc/api/v3/transactionsByMessage?opcode=0x6e565052&direction=in&limit=10&offset=0",
+  ],
+}
+`;
+
+exports[`configuration voting stops archive work when the environment or selected proposal changes 1`] = `[]`;

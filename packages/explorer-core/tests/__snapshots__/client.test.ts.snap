@@ -44,3 +44,18 @@ exports[`account history streaming subscribes to and dispatches transactions and
   },
 }
 `;
+
+exports[`rate-limit retries are bounded and never resubmit a mutation 1`] = `
+{
+  "errors": [
+    "The network RPC request limit was reached (HTTP 429) — try again shortly",
+    "The network RPC request limit was reached (HTTP 429) — try again shortly",
+  ],
+  "requests": [
+    "GET /api/v2/getShardAccountCell",
+    "GET /api/v2/getShardAccountCell",
+    "GET /api/v2/getShardAccountCell",
+    "POST /api/v2/sendBocReturnHash",
+  ],
+}
+`;

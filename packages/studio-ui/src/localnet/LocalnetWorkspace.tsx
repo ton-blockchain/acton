@@ -21,6 +21,7 @@ import {AccountPage} from "@acton/explorer-core/pages/AccountPage"
 import {BlockDetailsPage, BlocksPage} from "@acton/explorer-core/pages/BlocksPage"
 import {CellInspectorPage} from "@acton/explorer-core/pages/CellInspectorPage"
 import {ConfigPage} from "@acton/explorer-core/pages/ConfigPage"
+import {ConfigProposalPage, ConfigVotingPage} from "./dashboard/pages/ConfigVotingPage"
 import {EmulatePage} from "@acton/explorer-core/pages/EmulatePage"
 import {ExplorerIndexPage} from "@acton/explorer-core/pages/ExplorerIndexPage"
 import {FavoriteAccountsPage} from "@acton/explorer-core/pages/FavoriteAccountsPage"
@@ -68,6 +69,7 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/network/nodes": "Nodes and synchronization",
   "/network/validators": "Validators",
   "/network/stats": "Stats",
+  "/voting": "Configuration voting",
   "/faucet": "Faucet",
   "/wallets": "Wallets",
   "/simulator": "Simulator",
@@ -100,6 +102,7 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/network/nodes": "Node availability, synchronization and diagnostics",
   "/network/validators": "Elections, validator sets and block production",
   "/network/stats": "Validator session timing, block limits and message queues",
+  "/voting": "",
   "/faucet": "Fund accounts in this environment",
   "/wallets": "Project wallets available on this network, ready for TON Connect",
   "/simulator": "Build and replay messages against this network",
@@ -231,6 +234,7 @@ const AppContent: FC<AppContentProps> = ({
     localPathname.startsWith("/explorer/config")
   const isExplorerPage = localPathname === "/explorer" || localPathname.startsWith("/explorer/")
   const isAbiDetailsPage = /^\/contracts\/abi\/[^/]+$/.test(localPathname)
+  const isConfigProposalPage = /^\/voting\/[^/]+$/.test(localPathname)
   const configSeqno = /^\/explorer\/config\/(\d+)$/.exec(localPathname)?.[1]
   const pageTitle = isExplorerPage
     ? localPathname === "/explorer/config" || configSeqno
@@ -238,11 +242,14 @@ const AppContent: FC<AppContentProps> = ({
       : "Explorer"
     : isAbiDetailsPage
       ? "ABI"
-      : (LOCALNET_PAGE_TITLES[localPathname] ??
-        contractDetailsPageTitle(localPathname) ??
-        "Virtual Environment")
-  const pageDescription =
-    configSeqno === undefined
+      : isConfigProposalPage
+        ? "Configuration proposal"
+        : (LOCALNET_PAGE_TITLES[localPathname] ??
+          contractDetailsPageTitle(localPathname) ??
+          "Virtual Environment")
+  const pageDescription = isConfigProposalPage
+    ? ""
+    : configSeqno === undefined
       ? (LOCALNET_PAGE_DESCRIPTIONS[localPathname] ??
         contractDetailsPageDescription(localPathname) ??
         "Inspect blocks, accounts, transactions and contract activity")
@@ -299,6 +306,33 @@ const AppContent: FC<AppContentProps> = ({
         <main className={`${styles.main} ${allowsOverflow ? styles.allowsOverflow : ""}`}>
           <Routes>
             <Route path={basePath} element={<Navigate to={path("/dashboard")} replace />} />
+            <Route
+              path={path("/voting/:proposalHash")}
+              element={
+                runtime.environment?.config.kind === "remoteTonNetwork" ? (
+                  <DashboardPage>
+                    <ConfigProposalPage
+                      key={`${runtime.environment.id}:${localPathname}`}
+                      client={client}
+                    />
+                  </DashboardPage>
+                ) : (
+                  fallback
+                )
+              }
+            />
+            <Route
+              path={path("/voting")}
+              element={
+                runtime.environment?.config.kind === "remoteTonNetwork" ? (
+                  <DashboardPage>
+                    <ConfigVotingPage key={runtime.environment.id} client={client} />
+                  </DashboardPage>
+                ) : (
+                  fallback
+                )
+              }
+            />
             <Route
               path={path("/dashboard")}
               element={

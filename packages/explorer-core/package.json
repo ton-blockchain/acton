@@ -10,6 +10,7 @@
     "./config/ParameterEditor": "./src/config/editor/ParameterEditor.tsx",
     "./api/client": "./src/api/client.ts",
     "./api/config": "./src/api/config.ts",
+    "./api/configVoting": "./src/api/configVoting.ts",
     "./api/compilerAbi": "./src/api/compilerAbi.ts",
     "./api/compilerAbiCatalog": "./src/api/compilerAbiCatalog.ts",
     "./api/jettonWallets": "./src/api/jettonWallets.ts",

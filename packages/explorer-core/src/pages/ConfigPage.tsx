@@ -21,6 +21,8 @@ import {
   Input,
   NumberValue,
   ParsedValueView,
+  ParsedValueDiffView,
+  buildStorageDiff,
   Percentage,
   RawDataBlock,
   Skeleton,
@@ -339,19 +341,10 @@ function ConfigContent({
   )
 }
 
-/** Shared decoded parameter presentation, with optional application-owned actions. */
-export function ConfigParameterCard({
-  parameter,
-  actions,
-  descriptionExtra,
-}: {
-  readonly parameter: NetworkConfigParameter
-  readonly actions?: ReactNode
-  readonly descriptionExtra?: ReactNode
-}) {
-  const hasValueTab =
-    parameter.parsedValue !== undefined || parameter.contractBytecode !== undefined
-  const hasCompactValue =
+// Keep the config card and its comparison on the same presentation path:
+// domain-specific values retain units, while generic TL-B trees use the shared diff.
+function hasFormattedConfigValue(parameter: NetworkConfigParameter): boolean {
+  return (
     parameter.address !== undefined ||
     parameter.contractBytecode !== undefined ||
     parameter.burningConfiguration !== undefined ||
@@ -366,6 +359,22 @@ export function ConfigParameterCard({
     parameter.validatorSet !== undefined ||
     parameter.suspendedAddresses !== undefined ||
     parameter.bridgeConfiguration !== undefined
+  )
+}
+
+/** Shared decoded parameter presentation, with optional application-owned actions. */
+export function ConfigParameterCard({
+  parameter,
+  actions,
+  descriptionExtra,
+}: {
+  readonly parameter: NetworkConfigParameter
+  readonly actions?: ReactNode
+  readonly descriptionExtra?: ReactNode
+}) {
+  const hasValueTab =
+    parameter.parsedValue !== undefined || parameter.contractBytecode !== undefined
+  const hasCompactValue = hasFormattedConfigValue(parameter)
   const [activeTab, setActiveTab] = useState<"raw" | "value" | "tlb">(hasValueTab ? "value" : "raw")
   const tabs = [
     ...(hasValueTab ? [{label: "Value", value: "value" as const}] : []),
@@ -375,27 +384,11 @@ export function ConfigParameterCard({
 
   return (
     <article id={`config-parameter-${parameter.id}`} className={styles.parameterCard}>
-      <header className={styles.parameterHeader}>
-        <ConfigParameterAnchor id={parameter.id} className={styles.parameterId} />
-        <div className={styles.parameterTitleRow}>
-          <h3 className={styles.parameterTitle}>{parameter.title}</h3>
-          <InfoPopover
-            ariaLabel={`About configuration parameter ${parameter.id}`}
-            contentClassName={styles.infoContent}
-          >
-            <p>{parameter.description}</p>
-            <a href={tonConfigDocsHref(parameter.id)} target="_blank" rel="noreferrer">
-              Read the TON configuration reference
-              <ExternalLink size={13} aria-hidden="true" />
-            </a>
-          </InfoPopover>
-        </div>
-        {actions && <div className={styles.parameterActions}>{actions}</div>}
-        <p className={styles.parameterDescription}>
-          {parameter.description}
-          {descriptionExtra ? <>. {descriptionExtra}</> : null}
-        </p>
-      </header>
+      <ConfigParameterHeader
+        parameter={parameter}
+        actions={actions}
+        descriptionExtra={descriptionExtra}
+      />
 
       <ContentTabs
         ariaLabel={`Views for configuration parameter ${parameter.id}`}
@@ -433,6 +426,41 @@ export function ConfigParameterCard({
         )}
       </ContentTabs>
     </article>
+  )
+}
+
+/** Shares parameter identity and reference information between config values and proposal changes. */
+export function ConfigParameterHeader({
+  parameter,
+  actions,
+  descriptionExtra,
+}: {
+  readonly parameter: Pick<NetworkConfigParameter, "id" | "title" | "description">
+  readonly actions?: ReactNode
+  readonly descriptionExtra?: ReactNode
+}) {
+  return (
+    <header className={styles.parameterHeader}>
+      <ConfigParameterAnchor id={parameter.id} className={styles.parameterId} />
+      <div className={styles.parameterTitleRow}>
+        <h3 className={styles.parameterTitle}>{parameter.title}</h3>
+        <InfoPopover
+          ariaLabel={`About configuration parameter ${parameter.id}`}
+          contentClassName={styles.infoContent}
+        >
+          <p>{parameter.description}</p>
+          <a href={tonConfigDocsHref(parameter.id)} target="_blank" rel="noreferrer">
+            Read the TON configuration reference
+            <ExternalLink size={13} aria-hidden="true" />
+          </a>
+        </InfoPopover>
+      </div>
+      {actions && <div className={styles.parameterActions}>{actions}</div>}
+      <p className={styles.parameterDescription}>
+        {parameter.description}
+        {descriptionExtra ? <>. {descriptionExtra}</> : null}
+      </p>
+    </header>
   )
 }
 
@@ -486,6 +514,17 @@ function ConfigParameterValueDiff({
   readonly before?: NetworkConfigParameter
   readonly after: NetworkConfigParameter
 }) {
+  const parsedDiff = useMemo(() => {
+    if (hasFormattedConfigValue(after) || !after.parsedValue) return undefined
+
+    return buildStorageDiff(
+      before?.parsedValue ? {name: "ConfigParam", value: before.parsedValue} : undefined,
+      {name: "ConfigParam", value: after.parsedValue},
+    )
+  }, [before, after])
+
+  if (parsedDiff) return <ParsedValueDiffView diff={parsedDiff} />
+
   if (before === undefined) {
     return (
       <div className={styles.configValueDiffAdded}>

@@ -15,6 +15,7 @@ import {
   Search as SearchIcon,
   Settings2,
   Wallet,
+  Vote,
   Waypoints,
 } from "lucide-react"
 import type {LucideIcon} from "lucide-react"
@@ -225,7 +226,12 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
     environment?.config.kind === "actonSimulatedLocalnet"
       ? formatForkNetworkLabel(forkNetwork)
       : undefined
-  const visibleStandaloneItems = supports(environment, "simulator") ? standaloneItems : []
+  const visibleStandaloneItems = [
+    ...(supports(environment, "simulator") ? standaloneItems : []),
+    ...(environment?.config.kind === "remoteTonNetwork"
+      ? [{label: "Voting", icon: Vote, path: "/voting"}]
+      : []),
+  ]
   const visibleNetworkItems = networkItems.filter(item =>
     item.path === "/network/config"
       ? supports(environment, "controlApi")
@@ -415,7 +421,10 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
           {visibleStandaloneItems.map(item => (
             <NavigationItem
               key={item.label}
-              active={item.path === localPathname}
+              active={
+                item.path === localPathname ||
+                (item.path === "/voting" && localPathname.startsWith("/voting/"))
+              }
               item={item}
               onSelect={path => void navigate(routes.path(path))}
             />

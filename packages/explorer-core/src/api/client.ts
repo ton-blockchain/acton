@@ -866,6 +866,21 @@ export class TonClient {
     return this.request(url, "Failed to fetch transaction by message")
   }
 
+  /** Reads protocol messages without scanning tick/tock transactions in account history. */
+  async getTransactionsByOpcode(
+    opcode: number,
+    direction: "in" | "out",
+    limit = 20,
+    offset = 0,
+  ): Promise<V3TransactionDetailsResponse> {
+    const url = this.buildUrl(this.v3BaseUrl, "/transactionsByMessage")
+    url.searchParams.set("opcode", `0x${opcode.toString(16)}`)
+    url.searchParams.set("direction", direction)
+    url.searchParams.set("limit", String(limit))
+    url.searchParams.set("offset", String(offset))
+    return this.request(url, "Failed to fetch protocol transactions")
+  }
+
   async getAccountActions(
     address: string,
     limit = 20,
@@ -1620,7 +1635,34 @@ export class TonClient {
   }
 
   private async fetchRequest<T>(url: URL, errorMessage: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(url.toString(), this.withRequestHeaders(url, options))
+    let response = await fetch(url.toString(), this.withRequestHeaders(url, options))
+
+    // Public RPC limits are shared by IP. Retry reads briefly so a page's initial
+    // requests can recover from that burst without ever resubmitting a mutation.
+    for (let attempt = 0; response.status === 429 && attempt < 2; attempt++) {
+      if ((options?.method ?? "GET").toUpperCase() !== "GET") break
+
+      const retryAfter = response.headers.get("Retry-After")
+      const delay =
+        retryAfter === null
+          ? 1000 * 2 ** attempt
+          : /^\d+$/.test(retryAfter)
+            ? Number(retryAfter) * 1000
+            : Date.parse(retryAfter) - Date.now()
+
+      // A longer server cooldown needs an explicit later retry by the caller.
+      if (!Number.isFinite(delay) || delay > 10_000) break
+
+      await response.body?.cancel()
+      await new Promise(resolve => setTimeout(resolve, Math.max(0, delay)))
+      options?.signal?.throwIfAborted()
+      response = await fetch(url.toString(), this.withRequestHeaders(url, options))
+    }
+
+    if (response.status === 429) {
+      throw new Error("The network RPC request limit was reached (HTTP 429) — try again shortly")
+    }
+
     if (response.status === 401) {
       this.onUnauthorized?.()
     }
@@ -1628,7 +1670,10 @@ export class TonClient {
 
     if (this.isApiResponse<T>(raw)) {
       if (!raw.ok) {
-        throw new Error(raw.error || errorMessage)
+        throw new Error(
+          raw.error ||
+            ("result" in raw && typeof raw.result === "string" ? raw.result : errorMessage),
+        )
       }
       return raw.result
     }

@@ -2,7 +2,7 @@ import path from "node:path"
 import {createRequire} from "node:module"
 
 import react from "@vitejs/plugin-react"
-import {defineConfig} from "vite"
+import {defineConfig, loadEnv} from "vite"
 import {nodePolyfills} from "vite-plugin-node-polyfills"
 
 import {gzipEmbeddedAssets} from "../ui/vite/embeddedAssets.ts"
@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url)
 const nodePolyfillsRoot = path.dirname(path.dirname(require.resolve("vite-plugin-node-polyfills")))
 const outputDirectory = path.resolve(import.meta.dirname, "dist")
 
-export default defineConfig({
+export default defineConfig(({mode}) => ({
   plugins: [
     themeBootstrap({storageKey: "acton-studio-theme"}),
     react(),
@@ -40,10 +40,10 @@ export default defineConfig({
   server: {
     port: 3015,
     proxy: {
-      "/api": "http://127.0.0.1:3016",
+      "/api": loadEnv(mode, import.meta.dirname).VITE_STUDIO_API_PROXY ?? "http://127.0.0.1:3016",
     },
   },
   preview: {
     port: 3015,
   },
-})
+}))
