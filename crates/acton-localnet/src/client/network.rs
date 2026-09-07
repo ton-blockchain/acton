@@ -195,6 +195,13 @@ impl Client {
         .await
     }
 
+    /// Looks up a committed operation without submitting or replaying it.
+    pub async fn admin_operation_by_id(&self, id: &str) -> Result<Option<AdminOperation>, Error> {
+        uuid::Uuid::parse_str(id).map_err(|_| Error::invalid("Invalid operation ID"))?;
+        self.request(Method::GET, &format!("/v1/network/admin?id={id}"), None)
+            .await
+    }
+
     /// Reads the active or latest durable administrative operation.
     pub async fn admin_operation(&self) -> Result<Option<AdminOperation>, Error> {
         self.request(Method::GET, "/v1/network/admin", None).await

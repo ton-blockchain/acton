@@ -24,6 +24,15 @@ pub struct FullTonAccountImport {
     pub(crate) shard_account_boc_hex: Option<String>,
 }
 
+/// Imports source accounts through one recoverable hardfork. The caller must reuse
+/// the ID after a lost response; Studio pins the resolved cells before submission.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ImportAccountsRequest {
+    pub id: String,
+    pub accounts: Vec<FullTonAccountImport>,
+}
+
 pub use acton_localnet::Node as FullTonNode;
 
 /// User-selected properties for a node that Studio should join to a running network.
@@ -670,6 +679,36 @@ pub trait EnvironmentRuntime: Send + Sync {
         })
     }
 
+    /// Checks whether this exact import has already been prepared, so retries do
+    /// not fetch a newer source state. A reused ID with different input is rejected.
+    fn has_account_import(
+        &self,
+        _environment_id: &str,
+        _request: ImportAccountsRequest,
+    ) -> EnvironmentRuntimeFuture<'_, bool> {
+        Box::pin(async {
+            Err(EnvironmentRuntimeError::Conflict {
+                code: "account_import_unavailable",
+                message: "Account imports require a managed full TON network".into(),
+            })
+        })
+    }
+
+    /// Saves resolved source cells before admitting the hardfork. Successful imports
+    /// are registered in Contracts independently of the requesting browser.
+    fn import_accounts(
+        &self,
+        _environment_id: &str,
+        _request: ImportAccountsRequest,
+    ) -> EnvironmentRuntimeFuture<'_, AdminOperation> {
+        Box::pin(async {
+            Err(EnvironmentRuntimeError::Conflict {
+                code: "account_import_unavailable",
+                message: "Account imports require a managed full TON network".into(),
+            })
+        })
+    }
+
     /// Admits an edit in the owning localnet service. The request ID makes retries
     /// safe after a lost response; the service continues work after callers disconnect.
     fn start_admin(
@@ -685,10 +724,12 @@ pub trait EnvironmentRuntime: Send + Sync {
         })
     }
 
-    /// Reads the latest durable result without blocking on an in-progress edit.
+    /// Reads a durable result by ID, or the latest result, without waiting for an
+    /// in-progress network edit. Finished imports are registered before returning.
     fn admin_operation(
         &self,
         _environment_id: &str,
+        _operation_id: Option<&str>,
     ) -> EnvironmentRuntimeFuture<'_, Option<AdminOperation>> {
         Box::pin(async { Ok(None) })
     }

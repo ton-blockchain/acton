@@ -31,26 +31,12 @@ import type {
   AdminRequest,
   StudioEnvironment,
 } from "../../../studioApi"
+import {adminOperationPhases as phases} from "../../adminOperation"
 import styles from "./AdminPage.module.css"
 import pageStyles from "../DashboardPage.module.css"
 import {useLocalnetRuntime} from "../../LocalnetRuntimeProvider"
 import {useOptionalWalletRuntime} from "../../wallet/useWalletRuntime"
 import {getContractIdentity} from "../contracts/contractPresentation"
-
-const phases: Record<string, string> = {
-  preparing: "Preparing operation",
-  stopping: "Stopping network",
-  backingUp: "Saving recovery snapshots",
-  suspending: "Suspending validators",
-  building: "Building hardfork",
-  installing: "Installing hardfork",
-  verifying: "Verifying state on every node",
-  resuming: "Checking block production",
-  indexing: "Waiting for the indexer",
-  restoring: "Restoring previous state",
-  completed: "Changes applied",
-  failed: "Operation failed",
-}
 
 const actionHelp: Record<AdminAccountChange["type"], string> = {
   balance: "Sets the account balance to the specified GRAM amount",

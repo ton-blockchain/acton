@@ -86,10 +86,11 @@ impl DockerNetwork {
     pub(crate) async fn saved_admin_operation(
         &self,
         request: Option<&AdminRequest>,
+        id: Option<&str>,
     ) -> Result<Option<AdminOperation>, Error> {
         let dir = self.compose_file.with_file_name("admin-operations");
-        let id = match request {
-            Some(request) => request.id().to_owned(),
+        let id = match id.or_else(|| request.map(AdminRequest::id)) {
+            Some(id) => id.to_owned(),
             None => match tokio::fs::read(dir.join("latest.json")).await {
                 Ok(bytes) => serde_json::from_slice::<String>(&bytes).map_err(failure)?,
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -694,11 +695,15 @@ mod tests {
             .save_admin_operation(&request, &operation)
             .await
             .unwrap();
-        let interrupted = driver.saved_admin_operation(None).await.unwrap().unwrap();
+        let interrupted = driver
+            .saved_admin_operation(None, None)
+            .await
+            .unwrap()
+            .unwrap();
         assert!(!interrupted.is_active());
         assert_eq!(interrupted.phase, "failed");
         let retry = driver
-            .saved_admin_operation(Some(&request))
+            .saved_admin_operation(Some(&request), None)
             .await
             .unwrap()
             .unwrap();
@@ -708,7 +713,7 @@ mod tests {
         let changed: AdminRequest = serde_json::from_value(changed).unwrap();
         assert!(
             driver
-                .saved_admin_operation(Some(&changed))
+                .saved_admin_operation(Some(&changed), None)
                 .await
                 .unwrap_err()
                 .to_string()

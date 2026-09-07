@@ -276,10 +276,20 @@ async fn shutdown(State(state): State<ApiState>) -> Result<StatusCode, Error> {
     Ok(StatusCode::ACCEPTED)
 }
 
+#[derive(Deserialize)]
+struct AdminOperationQuery {
+    id: Option<String>,
+}
+
 async fn admin_operation(
     State(state): State<ApiState>,
+    Query(query): Query<AdminOperationQuery>,
 ) -> Result<Json<Option<AdminOperation>>, Error> {
-    state.runtime.admin_operation().await.map(Json)
+    state
+        .runtime
+        .admin_operation_by_id(query.id.as_deref())
+        .await
+        .map(Json)
 }
 
 async fn start_admin(

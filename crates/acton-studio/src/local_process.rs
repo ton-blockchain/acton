@@ -1,4 +1,6 @@
-use crate::{AdminOperation, AdminRequest};
+use crate::{AdminOperation, AdminRequest, ImportAccountsRequest};
+
+mod imports;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener as StdTcpListener};
 use std::path::{Path, PathBuf};
@@ -707,6 +709,37 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         })
     }
 
+    fn has_account_import(
+        &self,
+        id: &str,
+        request: ImportAccountsRequest,
+    ) -> EnvironmentRuntimeFuture<'_, bool> {
+        let id = id.to_owned();
+        Box::pin(async move {
+            let environment = find_environment(&self.inner, &id).await?;
+            full_localnet(&environment)?;
+            imports::load(&self.inner, &id, &request)
+                .await
+                .map(|record| record.is_some())
+        })
+    }
+
+    fn import_accounts(
+        &self,
+        id: &str,
+        request: ImportAccountsRequest,
+    ) -> EnvironmentRuntimeFuture<'_, AdminOperation> {
+        let id = id.to_owned();
+        Box::pin(async move {
+            let environment = find_environment(&self.inner, &id).await?;
+            let guard = environment.lifecycle.lock().await;
+            ensure_environment_not_deleted(&environment).await?;
+            let result = imports::start(&self.inner, &environment, &id, request).await;
+            drop(guard);
+            result
+        })
+    }
+
     fn start_admin(
         &self,
         environment_id: &str,
@@ -727,16 +760,28 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
     fn admin_operation(
         &self,
         environment_id: &str,
+        operation_id: Option<&str>,
     ) -> EnvironmentRuntimeFuture<'_, Option<AdminOperation>> {
         let id = environment_id.to_owned();
+        let operation_id = operation_id.map(str::to_owned);
         Box::pin(async move {
             let environment = find_environment(&self.inner, &id).await?;
-            full_localnet(&environment)?
-                .client()
-                .await?
-                .admin_operation()
-                .await
-                .map_err(localnet::error)
+            let client = full_localnet(&environment)?.client().await?;
+            let operation = match operation_id {
+                Some(id) => client.admin_operation_by_id(&id).await,
+                None => client.admin_operation().await,
+            }
+            .map_err(localnet::error)?;
+            drop(client);
+            if operation
+                .as_ref()
+                .is_some_and(|operation| operation.phase == "completed")
+            {
+                let guard = environment.lifecycle.lock().await;
+                imports::reconcile(&self.inner, &environment).await?;
+                drop(guard);
+            }
+            Ok(operation)
         })
     }
 
@@ -1621,6 +1666,12 @@ async fn monitor_full_ton_network(
                         && matches!(child_status, Ok(None));
                     if !pending_start {
                         refresh_full_localnet(&environment, network).await;
+                    }
+                    if let Err(error) = imports::reconcile(&runtime, &environment).await {
+                        log::error!(
+                            "operation=account_import target={} outcome=registration_pending error={error}",
+                            driver.location.path.display()
+                        );
                     }
                     if previous != EnvironmentStatus::Running
                         && environment.details.read().await.status == EnvironmentStatus::Running

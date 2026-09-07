@@ -34,7 +34,7 @@ impl Runtime {
 
         let network = entry.record.read().await.clone();
         if let Some(driver) = DockerNetwork::load(&entry.data_dir, &network).await?
-            && let Some(previous) = driver.saved_admin_operation(Some(&request)).await?
+            && let Some(previous) = driver.saved_admin_operation(Some(&request), None).await?
         {
             return Ok(previous);
         }
@@ -169,9 +169,24 @@ impl Runtime {
 
     /// Reads progress without waiting for the deployment mutation lock.
     pub async fn admin_operation(&self) -> Result<Option<AdminOperation>, Error> {
+        self.admin_operation_by_id(None).await
+    }
+
+    /// Reads a durable result by ID without replaying an edit. This also lets consumers
+    /// reconcile their metadata after restarting, even if a newer edit has finished.
+    pub async fn admin_operation_by_id(
+        &self,
+        id: Option<&str>,
+    ) -> Result<Option<AdminOperation>, Error> {
+        if let Some(id) = id {
+            uuid::Uuid::parse_str(id).map_err(|_| Error::invalid("Invalid operation ID"))?;
+        }
+
         let entry = self.entry().await?;
         let current = entry.admin_operation.read().await.clone();
-        if let Some(operation) = current {
+        if let Some(operation) = current
+            && id.is_none_or(|id| id == operation.id)
+        {
             return Ok(Some(operation));
         }
         let Ok(_guard) = entry.mutation.try_lock() else {
@@ -181,7 +196,7 @@ impl Runtime {
         let Some(driver) = DockerNetwork::load(&entry.data_dir, &network).await? else {
             return Ok(None);
         };
-        driver.saved_admin_operation(None).await
+        driver.saved_admin_operation(None, id).await
     }
 }
 

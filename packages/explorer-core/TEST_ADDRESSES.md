@@ -87,6 +87,14 @@ The early `v0 -> v1 -> v0 -> v1` rollback means this history cannot be found saf
 | [`kQAgO7g7m2763OuP-AaTVOZVhEjg5zYyCKDF660QzJp71KLB`](https://actonscan.com/address/kQAgO7g7m2763OuP-AaTVOZVhEjg5zYyCKDF660QzJp71KLB?network=testnet) | Alternating incoming and outgoing transfers around `0.01 GRAM`, useful for the small-transfer spam filter and for confirming outgoing transfers remain visible | 2026-07-30 |
 | [`kQB6XGzpO7rglhK1tR9A4l2QQu6yaYE6ALUp1vAOHMaGAfGD`](https://actonscan.com/address/kQB6XGzpO7rglhK1tR9A4l2QQu6yaYE6ALUp1vAOHMaGAfGD?network=testnet) | Repeated one-nano outgoing self-transfers, useful for confirming the spam filter never hides outgoing actions | 2026-07-30 |
 
+## Full localnet
+
+These accounts belong to an isolated local test environment, not a public network. Recreate the imported account from the fixture in `crates/acton-studio/src/local_process/imports/tests.rs` when the environment is no longer available
+
+| Address | What to verify | Last checked |
+| --- | --- | --- |
+| `kQBFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRdNV` | After importing into a running full localnet, Explorer shows an active account with 1 GRAM and no transaction history; Contracts shows its imported name. Verified on two running nodes, with code and data matching the source and an unrelated account preserved | 2026-09-07 |
+
 ## Adding an entry
 
 - Use a full user-friendly URL-safe address and include the network in the link

@@ -758,9 +758,13 @@ export interface AdminOperation {
   readonly blockSeqno: number | null
 }
 
-export function fetchStudioAdminOperation(environmentId: string, signal?: AbortSignal) {
+export function fetchStudioAdminOperation(
+  environmentId: string,
+  signal?: AbortSignal,
+  operationId?: string,
+) {
   return requestJson<AdminOperation | null>(
-    `/api/v1/environments/${encodeURIComponent(environmentId)}/admin`,
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/admin${operationId ? `?id=${encodeURIComponent(operationId)}` : ""}`,
     {signal},
   )
 }
@@ -768,6 +772,23 @@ export function fetchStudioAdminOperation(environmentId: string, signal?: AbortS
 export function startStudioAdminOperation(environmentId: string, request: AdminRequest) {
   return requestJson<AdminOperation>(
     `/api/v1/environments/${encodeURIComponent(environmentId)}/admin`,
+    {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(request),
+    },
+  )
+}
+
+/** Source selections are resolved and pinned by Studio, never by the browser. */
+export interface ImportAccountsRequest {
+  readonly id: string
+  readonly accounts: readonly FullTonAccountImport[]
+}
+
+export function importStudioAccounts(environmentId: string, request: ImportAccountsRequest) {
+  return requestJson<AdminOperation>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/imports`,
     {
       method: "POST",
       headers: {"Content-Type": "application/json"},

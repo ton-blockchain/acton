@@ -59,8 +59,9 @@ pub use environment::{
     EnvironmentLifecycle, EnvironmentNetwork, EnvironmentRuntime, EnvironmentRuntimeError,
     EnvironmentRuntimeFuture, EnvironmentSnapshot, EnvironmentSnapshotOperation,
     EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings,
-    EnvironmentStatus, FullTonAccountImport, FullTonNode, NetworkConfigUpdate, PublicTonNetwork,
-    RemoveFullTonNodeRequest, StudioEnvironment, UpdateEnvironmentRequest,
+    EnvironmentStatus, FullTonAccountImport, FullTonNode, ImportAccountsRequest,
+    NetworkConfigUpdate, PublicTonNetwork, RemoveFullTonNodeRequest, StudioEnvironment,
+    UpdateEnvironmentRequest,
 };
 pub use environment_catalog::{
     MAINNET_ENVIRONMENT_ID, PUBLIC_TON_ENVIRONMENT_IDS, TESTNET_ENVIRONMENT_ID,
@@ -419,6 +420,10 @@ impl StudioServer {
                 get(get_environment_snapshot_operation),
             )
             .route(
+                "/environments/{environment_id}/imports",
+                post(import_environment_accounts),
+            )
+            .route(
                 "/environments/{environment_id}/admin",
                 get(get_admin_operation)
                     .post(start_admin_operation)
@@ -764,6 +769,12 @@ async fn resolve_full_ton_account_imports(
         return Ok(());
     };
 
+    resolve_account_imports(state, imported_accounts).await
+}
+
+fn normalize_account_imports(
+    imported_accounts: &mut [FullTonAccountImport],
+) -> Result<(), StudioApiError> {
     let mut addresses = BTreeSet::new();
     for account in imported_accounts {
         let source_environment_id = account.source_environment_id.trim().to_owned();
@@ -794,7 +805,24 @@ async fn resolve_full_ton_account_imports(
             }));
         }
         account.address = address.to_base64(false, true, true);
+    }
+    Ok(())
+}
 
+async fn resolve_account_imports(
+    state: &StudioState,
+    accounts: &mut [FullTonAccountImport],
+) -> Result<(), StudioApiError> {
+    normalize_account_imports(accounts)?;
+    for account in accounts {
+        let canonical_address = TonAddress::from_str(&account.address)
+            .map_err(|error| {
+                StudioApiError(EnvironmentRuntimeError::InvalidRequest {
+                    code: "full_ton_import_address_invalid",
+                    message: error.to_string(),
+                })
+            })?
+            .to_hex();
         let source = state
             .environment_runtime
             .get(&account.source_environment_id)
@@ -1386,12 +1414,73 @@ async fn start_admin_operation(
     ))
 }
 
-/// Read the current or most recent administrative operation.
+/// Import accounts into the existing network through an administrative hardfork.
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/imports",
+    tag = "Environments",
+    params(("environment_id" = String, Path, description = "Environment id")),
+    request_body = ImportAccountsRequest,
+    responses((status = 200, body = AdminOperation), (status = 409, body = StudioApiErrorBody))
+)]
+async fn import_environment_accounts(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+    Json(mut request): Json<ImportAccountsRequest>,
+) -> Result<Json<AdminOperation>, StudioApiError> {
+    if uuid::Uuid::parse_str(&request.id).is_err()
+        || request.accounts.is_empty()
+        || request.accounts.len() > 100
+    {
+        return Err(StudioApiError(EnvironmentRuntimeError::InvalidRequest {
+            code: "account_import_invalid",
+            message: "Import requires a UUID and between 1 and 100 accounts".into(),
+        }));
+    }
+    normalize_account_imports(&mut request.accounts)?;
+    if request
+        .accounts
+        .iter()
+        .any(|account| account.source_environment_id == environment_id)
+    {
+        return Err(StudioApiError(EnvironmentRuntimeError::InvalidRequest {
+            code: "account_import_same_environment",
+            message: "Choose a different environment as the import source".into(),
+        }));
+    }
+
+    // Read a prepared request before touching the source. A retry must import the
+    // originally selected state even if its source has changed or is now offline.
+    if !state
+        .environment_runtime
+        .has_account_import(&environment_id, request.clone())
+        .await
+        .map_err(StudioApiError)?
+    {
+        resolve_account_imports(&state, &mut request.accounts).await?;
+    }
+    state
+        .environment_runtime
+        .import_accounts(&environment_id, request)
+        .await
+        .map(Json)
+        .map_err(StudioApiError)
+}
+
+#[derive(Deserialize)]
+struct AdminOperationQuery {
+    id: Option<String>,
+}
+
+/// Read a durable administrative result, or the latest operation when no ID is given.
 #[utoipa::path(
     get,
     path = "/api/v1/environments/{environment_id}/admin",
     tag = "Environments",
-    params(("environment_id" = String, Path, description = "Environment id")),
+    params(
+        ("environment_id" = String, Path, description = "Environment id"),
+        ("id" = Option<String>, Query, description = "Read this operation without replaying it")
+    ),
     responses(
         (status = 200, body = Option<AdminOperation>),
         (status = 404, body = StudioApiErrorBody)
@@ -1400,11 +1489,12 @@ async fn start_admin_operation(
 async fn get_admin_operation(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
+    Query(query): Query<AdminOperationQuery>,
 ) -> Result<Json<Option<AdminOperation>>, StudioApiError> {
     Ok(Json(
         state
             .environment_runtime
-            .admin_operation(&environment_id)
+            .admin_operation(&environment_id, query.id.as_deref())
             .await
             .map_err(StudioApiError)?,
     ))

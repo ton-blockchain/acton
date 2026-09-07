@@ -3,6 +3,7 @@ import {lazy, Suspense, useCallback, useEffect, useState} from "react"
 import {useLocation, useNavigate, useSearchParams} from "react-router"
 import {Button, CopyButton, ToastProvider, useToast} from "@acton/ui"
 
+import {ImportAccountsAction, ImportAccountsActionContext} from "./components/ImportAccountsAction"
 import {StudioShell} from "./components/StudioShell"
 import {StudioConnectionOverlay} from "./components/StudioConnectionOverlay"
 import {useStudioConnection} from "./hooks/useStudioConnection"
@@ -150,6 +151,7 @@ function StudioWorkspace({
   const {connectionLost, connectionState, markConnected} = useStudioConnection()
   const [isEnvironmentCreateOpen, setIsEnvironmentCreateOpen] = useState(false)
   const [isTestRunOpen, setIsTestRunOpen] = useState(false)
+  const [accountImportEnvironmentId, setAccountImportEnvironmentId] = useState<string>()
   const [sidebarMode, setSidebarMode] = useState<"studio" | "environment">(() =>
     route.kind === "environment" ? "environment" : "studio",
   )
@@ -263,8 +265,24 @@ function StudioWorkspace({
   const showEnvironmentNavigation =
     Boolean(environmentRoute && environment) && sidebarMode === "environment"
 
+  const importEnvironment =
+    environment?.config.kind === "fullTonNetwork" && environment.lifecycle === "managed"
+      ? environment
+      : undefined
+  const isAccountImportOpen = Boolean(
+    importEnvironment && accountImportEnvironmentId === importEnvironment.id,
+  )
+  const onImportOpenChange = useCallback(
+    (open: boolean) => setAccountImportEnvironmentId(open ? importEnvironment?.id : undefined),
+    [importEnvironment?.id],
+  )
+
   return (
-    <>
+    <ImportAccountsActionContext
+      value={
+        importEnvironment ? {open: isAccountImportOpen, onOpenChange: onImportOpenChange} : null
+      }
+    >
       {connectionLost ? <StudioConnectionOverlay /> : undefined}
 
       <StudioShell
@@ -281,33 +299,35 @@ function StudioWorkspace({
         headerMode={hasSelectedTestRun ? "hidden" : "visible"}
         headerActions={
           environmentRoute ? (
-            activeEnvironmentShell?.headerActions ? (
-              activeEnvironmentShell.headerActions
-            ) : activeEnvironmentShell?.primaryAction ? (
-              <Button
-                variant="primary"
-                size="sm"
-                leadingIcon={
-                  activeEnvironmentShell.primaryAction.icon === "plus" ? (
-                    <Plus size={16} aria-hidden="true" />
-                  ) : (
-                    <Archive size={16} aria-hidden="true" />
-                  )
-                }
-                onClick={activeEnvironmentShell.primaryAction.onClick}
-              >
-                {activeEnvironmentShell.primaryAction.label}
-              </Button>
-            ) : activeEnvironmentShell?.rpcUrl ? (
-              <CopyButton
-                value={activeEnvironmentShell.rpcUrl}
-                label="Copy RPC endpoint"
-                copiedLabel="RPC endpoint copied"
-                size="sm"
-              >
-                Copy RPC
-              </CopyButton>
-            ) : undefined
+            <>
+              {activeEnvironmentShell?.headerActions ? (
+                activeEnvironmentShell.headerActions
+              ) : activeEnvironmentShell?.primaryAction ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  leadingIcon={
+                    activeEnvironmentShell.primaryAction.icon === "plus" ? (
+                      <Plus size={16} aria-hidden="true" />
+                    ) : (
+                      <Archive size={16} aria-hidden="true" />
+                    )
+                  }
+                  onClick={activeEnvironmentShell.primaryAction.onClick}
+                >
+                  {activeEnvironmentShell.primaryAction.label}
+                </Button>
+              ) : activeEnvironmentShell?.rpcUrl ? (
+                <CopyButton
+                  value={activeEnvironmentShell.rpcUrl}
+                  label="Copy RPC endpoint"
+                  copiedLabel="RPC endpoint copied"
+                  size="sm"
+                >
+                  Copy RPC
+                </CopyButton>
+              ) : undefined}
+            </>
           ) : activePath === "/" ? (
             <>
               <Button
@@ -461,7 +481,18 @@ function StudioWorkspace({
           <FeaturePage page={studioFeaturePages[activePath]} onAction={showIntegrationToast} />
         )}
       </StudioShell>
-    </>
+      {environmentRoute && importEnvironment && (
+        <ImportAccountsAction
+          key={importEnvironment.id}
+          environment={importEnvironment}
+          environments={environmentsState.environments}
+          basePath={environmentRoute.basePath}
+          onCompleted={environmentsState.refresh}
+          open={isAccountImportOpen}
+          onOpenChange={onImportOpenChange}
+        />
+      )}
+    </ImportAccountsActionContext>
   )
 }
 

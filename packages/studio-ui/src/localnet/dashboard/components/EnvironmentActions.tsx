@@ -28,6 +28,7 @@ import {useCallback, useRef, useState} from "react"
 import type {ChangeEvent, FC, FormEvent} from "react"
 
 import {supports, supportsAny} from "../../../environmentCapabilities"
+import {ImportAccountsButton} from "../../../components/ImportAccountsAction"
 import type {StudioEnvironment} from "../../../studioApi"
 import type {TonClient} from "@acton/explorer-core/api/client"
 import type {LocalnetCheckpoint} from "@acton/explorer-core/api/types"
@@ -399,6 +400,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
 
           {hasStateActions || hasSnapshots || hasAdminActions ? (
             <div className={styles.environmentActionGroup} aria-label="State actions">
+              {hasAdminActions ? <ImportAccountsButton /> : undefined}
               {hasAdminActions ? (
                 <InlineButton leadingIcon={<Settings2 size={15} />} onClick={onAdminActions}>
                   Admin actions

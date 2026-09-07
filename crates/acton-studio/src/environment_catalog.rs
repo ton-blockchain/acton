@@ -1,4 +1,4 @@
-use crate::{AdminOperation, AdminRequest};
+use crate::{AdminOperation, AdminRequest, ImportAccountsRequest};
 use std::sync::Arc;
 
 use toncenter_keys::{TONCENTER_MAINNET_API_KEY_ENV, TONCENTER_TESTNET_API_KEY_ENV};
@@ -240,6 +240,22 @@ impl EnvironmentRuntime for EnvironmentCatalogRuntime {
             .enter_full_ton_validation(environment_id, node_id)
     }
 
+    fn has_account_import(
+        &self,
+        id: &str,
+        request: ImportAccountsRequest,
+    ) -> EnvironmentRuntimeFuture<'_, bool> {
+        self.managed.has_account_import(id, request)
+    }
+
+    fn import_accounts(
+        &self,
+        id: &str,
+        request: ImportAccountsRequest,
+    ) -> EnvironmentRuntimeFuture<'_, AdminOperation> {
+        self.managed.import_accounts(id, request)
+    }
+
     fn start_admin(
         &self,
         id: &str,
@@ -248,8 +264,12 @@ impl EnvironmentRuntime for EnvironmentCatalogRuntime {
         self.managed.start_admin(id, request)
     }
 
-    fn admin_operation(&self, id: &str) -> EnvironmentRuntimeFuture<'_, Option<AdminOperation>> {
-        self.managed.admin_operation(id)
+    fn admin_operation(
+        &self,
+        id: &str,
+        operation_id: Option<&str>,
+    ) -> EnvironmentRuntimeFuture<'_, Option<AdminOperation>> {
+        self.managed.admin_operation(id, operation_id)
     }
 
     fn list_snapshots(
