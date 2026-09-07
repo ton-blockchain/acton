@@ -8,6 +8,9 @@ use crate::{Error, Node};
 use std::time::Duration;
 use tokio::time::timeout;
 
+#[cfg(test)]
+mod tests;
+
 impl DockerNetwork {
     /// Starts or gracefully stops one service without removing its container or state volume.
     /// Explicit service selection and --no-deps leave the network owner and peer nodes alone.

@@ -1,38 +1,11 @@
 //! Opt-in Docker regression covering the real owner, node archives and indexer.
 
 use super::*;
-use crate::{CreateNetwork, Operation, OperationStatus, Runtime, catalog, runtime::Action};
+use crate::docker::test_support::{block, completed, head, operation};
+use crate::{CreateNetwork, Runtime, catalog, runtime::Action};
 use anyhow::{Context as _, Result, ensure};
 use serde_json::{Value, json};
 use std::time::Duration;
-
-async fn operation(runtime: &Runtime, action: Action) -> Result<Operation> {
-    let accepted = runtime.submit(action).await?;
-    eprintln!("Running {}", accepted.kind);
-    tokio::time::timeout(Duration::from_secs(720), async {
-        loop {
-            // Progress and inventory must remain readable while the mutation is held.
-            runtime.snapshots().await?;
-            let operation = runtime.operation(&accepted.id).await?;
-            if operation.status != OperationStatus::Running {
-                eprintln!("{}: {:?}", operation.kind, operation.status);
-                return Ok(operation);
-            }
-            tokio::time::sleep(Duration::from_millis(200)).await;
-        }
-    })
-    .await?
-}
-
-async fn completed(runtime: &Runtime, action: Action) -> Result<Value> {
-    let operation = operation(runtime, action).await?;
-    ensure!(
-        operation.status == OperationStatus::Completed,
-        "{:?}",
-        operation.error
-    );
-    Ok(operation.result.unwrap_or(Value::Null))
-}
 
 async fn indexed_accounts(driver: &DockerNetwork) -> Result<String> {
     let mut command = driver.compose_command();
@@ -57,67 +30,6 @@ async fn indexed_accounts(driver: &DockerNetwork) -> Result<String> {
         )
         .await?;
     Ok(String::from_utf8(output.stdout)?)
-}
-
-async fn lite(driver: &DockerNetwork, service: &str, query: &str) -> Result<String> {
-    // Address each node's own liteserver. The pinned image's generic CLI can
-    // select the downloaded bootstrap config instead of the joined node config.
-    let mut command = driver.compose_command();
-    command.args([
-        "exec",
-        "-T",
-        service,
-        "/opt/ton/lite-client",
-        "-v",
-        "0",
-        "-t",
-        "10",
-        "-C",
-        "/var/lib/localton/node/global.config.json",
-        "-c",
-        query,
-    ]);
-    let output = driver
-        .command_output(
-            command,
-            "query node liteserver",
-            "snapshot_test",
-            Duration::from_secs(15),
-        )
-        .await
-        .with_context(|| format!("Liteserver query on {service}"))?;
-    Ok(format!(
-        "{}\n{}",
-        String::from_utf8(output.stdout)?,
-        String::from_utf8(output.stderr)?
-    ))
-}
-
-async fn head(driver: &DockerNetwork, service: &str) -> Result<u32> {
-    let output = lite(driver, service, "last").await?;
-    output
-        .split("(-1,8000000000000000,")
-        .skip(1)
-        .filter_map(|block| block.split(')').next()?.parse().ok())
-        .max()
-        .context("Masterchain head missing from lite-client output")
-}
-
-async fn block(driver: &DockerNetwork, service: &str, seqno: u32) -> Result<Value> {
-    let output = lite(
-        driver,
-        service,
-        &format!("byseqno -1:8000000000000000 {seqno}"),
-    )
-    .await?;
-    let prefix = format!("(-1,8000000000000000,{seqno}):");
-    let hashes = output
-        .split(&prefix)
-        .nth(1)
-        .and_then(|value| value.split_whitespace().next())
-        .with_context(|| format!("Block {seqno} identity missing on {service}: {output}"))?;
-    ensure!(hashes.len() == 129, "Invalid block hashes from {service}");
-    Ok(json!({"seqno": seqno, "hashes": hashes}))
 }
 
 #[tokio::test]

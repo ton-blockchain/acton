@@ -170,7 +170,7 @@ pub(crate) async fn configure_genesis_identity(
         })
     }
     .await;
-    temporary.stop().await?;
+    stop_bootstrap(&mut temporary, node).await?;
     workflow_result(node, "configure_genesis_identity", started, &result);
     result
 }
@@ -230,7 +230,7 @@ pub(super) async fn configure_full_node_identity(
     }
     .await;
 
-    temporary.stop().await?;
+    stop_bootstrap(&mut temporary, node).await?;
     workflow_result(node, "configure_full_node_identity", started, &result);
 
     result
@@ -445,6 +445,46 @@ async fn start_bootstrap(
             verbosity: node.verbosity,
         })
         .await
+}
+
+/// Ends bootstrap in an earlier ADNL epoch than the subsequent persistent engine.
+///
+/// TON identifies a process restart with a Unix timestamp rounded down to seconds.
+/// Reusing the same keys within that second leaves peers on the old channel and
+/// packet sequence, which can strand a fresh node while downloading its zerostate.
+/// Both genesis and joined nodes reuse their bootstrap identities on startup.
+async fn stop_bootstrap(temporary: &mut ServiceHandle, node: &NodeSettings) -> Result<()> {
+    temporary.stop().await?;
+
+    let started = std::time::Instant::now();
+    let stopped_at = SystemTime::now().duration_since(UNIX_EPOCH)?;
+    let next_epoch = Duration::from_secs(stopped_at.as_secs() + 1);
+    info!(
+        operation = "bootstrap_adnl_handoff",
+        node = %node.name,
+        target = "validator-engine",
+        duration_ms = 0,
+        outcome = "waiting",
+        "Waiting for a distinct ADNL restart timestamp"
+    );
+
+    // Recheck wall time after the timer: the protocol uses wall-clock seconds,
+    // whereas Tokio's timers use a monotonic clock and can wake at a boundary.
+    while let Some(remaining) =
+        next_epoch.checked_sub(SystemTime::now().duration_since(UNIX_EPOCH)?)
+    {
+        sleep(remaining).await;
+    }
+
+    info!(
+        operation = "bootstrap_adnl_handoff",
+        node = %node.name,
+        target = "validator-engine",
+        duration_ms = started.elapsed().as_millis(),
+        outcome = "success",
+        "Bootstrap identities can be reused by the persistent engine"
+    );
+    Ok(())
 }
 
 /// Derives the authenticated loopback endpoint from Localton-owned node paths.

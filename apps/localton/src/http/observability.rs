@@ -71,6 +71,7 @@ type SharedGeoIp = Arc<RwLock<Option<GeoIpResolver>>>;
 
 #[derive(Clone)]
 struct ObservabilityState {
+    layout: Layout,
     store: SharedStore,
     network: watch::Receiver<Option<VerifiedNetworkState>>,
     local_node_is_network_source: bool,
@@ -340,6 +341,7 @@ pub(super) async fn start(
     .context("failed to open the validator session metrics index")?;
 
     let state = ObservabilityState {
+        layout: layout.clone(),
         store: Arc::clone(&store),
         network: network_snapshot,
         local_node_is_network_source,
@@ -574,11 +576,26 @@ async fn forget_observation_handler(
     path = "/healthz",
     tag = "observability",
     responses(
-        (status = 200, description = "A current local observation is available", body = String),
-        (status = 503, description = "The local observation is missing or stale", body = String)
+        (status = 200, description = "The node is ready and local telemetry is current", body = String),
+        (status = 503, description = "The node is starting or local telemetry is stale", body = String),
+        (status = 500, description = "Runtime state could not be read", body = String)
     )
 )]
 async fn health_handler(State(state): State<ObservabilityState>) -> Response {
+    // Joined nodes expose this endpoint to Docker Compose before their first
+    // block is available. A live telemetry publisher alone must not finish join.
+    match RuntimeState::load(&state.layout.runtime) {
+        Ok(runtime) if runtime.ready && runtime.node.running && runtime.instance_pid.is_some() => {}
+        Ok(_) => return (StatusCode::SERVICE_UNAVAILABLE, "STARTING").into_response(),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Runtime state unavailable",
+            )
+                .into_response();
+        }
+    }
+
     let now = unix_time();
     match state.store.read().await.local() {
         Some(observation) if observation.expires_at > now => (StatusCode::OK, "OK").into_response(),
@@ -819,6 +836,66 @@ mod tests {
         assert!(document["paths"]["/api/v1/stats/tps"]["get"].is_object());
         assert!(document["paths"]["/api/v1/observations"]["post"].is_object());
         assert!(document["components"]["schemas"]["NetworkView"].is_object());
+    }
+
+    #[tokio::test]
+    async fn health_waits_for_node_readiness_even_with_fresh_telemetry() -> Result<()> {
+        let directory = tempfile::tempdir_in("/tmp")?;
+        let layout = Layout::new(directory.path().join("observer"));
+        layout.create_dirs()?;
+        Settings::default().save_atomic(&layout.settings)?;
+
+        let identity =
+            ObserverIdentity::load_or_create(&layout.observability.join("identity.json"))?;
+        let store = Arc::new(RwLock::new(ObservationStore::new(
+            "network".to_owned(),
+            identity,
+            60,
+        )));
+        let (_network_updates, network) = watch::channel(None);
+        let state = ObservabilityState {
+            layout: layout.clone(),
+            store: Arc::clone(&store),
+            network,
+            local_node_is_network_source: false,
+            geoip: Arc::new(RwLock::new(None)),
+            tps: None,
+            session_stats: SessionStatsStore::open(
+                layout.observability.join("sessions.sqlite3"),
+                "replica".to_owned(),
+            )?,
+            block_time_target_ms: 1_000,
+        };
+
+        let mut runtime = RuntimeState::new();
+        runtime.mark_instance_started();
+        runtime.node.running = true;
+        runtime.node.status = "synchronizing".to_owned();
+
+        // The heartbeat is deliberately fresh throughout startup and shutdown.
+        // Readiness belongs to the node lifecycle, not the telemetry publisher.
+        let mut statuses = Vec::new();
+        for (ready, running) in [(false, true), (true, true), (true, false)] {
+            runtime.ready = ready;
+            runtime.node.running = running;
+            runtime.save_atomic(&layout.runtime)?;
+            publish_runtime_observation(&layout, 60, None, "http://localhost", &store).await?;
+            statuses.push(health_handler(State(state.clone())).await.status().as_u16());
+        }
+
+        std::fs::write(&layout.runtime, "incomplete JSON")?;
+        statuses.push(health_handler(State(state)).await.status().as_u16());
+
+        expect_test::expect![[r#"
+            [
+                503,
+                200,
+                503,
+                500,
+            ]
+        "#]]
+        .assert_debug_eq(&statuses);
+        Ok(())
     }
 
     #[tokio::test]

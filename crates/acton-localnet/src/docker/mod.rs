@@ -65,6 +65,9 @@ mod process;
 mod progress;
 mod snapshots;
 
+#[cfg(test)]
+mod test_support;
+
 pub(crate) use snapshots::list_snapshots;
 
 use compose::render_compose;
