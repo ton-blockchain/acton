@@ -856,7 +856,7 @@ const AppContent: FC<AppContentProps> = ({
         </main>
       </div>
 
-      {runtime.isAuthOverlayOpen && supports(runtime.environment, "controlApi") && (
+      {runtime.isAuthOverlayOpen && runtime.browserApiTokenEnabled && (
         <LocalnetAuthOverlay
           localnetApiToken={runtime.localnetApiToken}
           onClear={runtime.clearAuthToken}
@@ -951,8 +951,8 @@ const LocalnetAuthOverlay: FC<LocalnetAuthOverlayProps> = ({
   const title = required ? "Localnet API token required" : "Localnet API token"
   const description =
     required && localnetApiToken
-      ? "The saved token was rejected by the localnet API. Paste the current token printed by the running localnet process."
-      : "Paste the localnet API token to use protected routes from this browser. The token will be saved locally."
+      ? "The saved token was rejected by simulated localnet — paste its current API token"
+      : "For simulated localnet started with --require-auth, use the token printed at startup or set through ACTON_LOCALNET_AUTH_TOKEN — it is saved only in this browser"
 
   return (
     <Dialog

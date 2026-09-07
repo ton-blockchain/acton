@@ -10,6 +10,9 @@ use serde_json::{Value, json};
 use std::{os::unix::fs::PermissionsExt, path::Path, process::Stdio, time::Duration};
 use tokio::process::{Child, Command};
 
+#[path = "localnet_command/docker_prerequisites.rs"]
+mod docker_prerequisites;
+
 #[path = "localnet_command/isolation.rs"]
 mod isolation;
 
@@ -245,6 +248,7 @@ async fn cli_and_http_share_lifecycle_snapshots_and_persisted_state() {
           "snapshotStatus": "completed",
           "startSteps": [
             "preparing",
+            "checkingDocker",
             "checkingImage",
             "startingContainers",
             "waitingForApis"

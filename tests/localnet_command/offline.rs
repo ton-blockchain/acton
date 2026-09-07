@@ -66,7 +66,7 @@ async fn stopped_service_keeps_logs_operations_and_observed_status_available() {
         }"#]].assert_eq(&serde_json::to_string_pretty(&json!({
             "logs": logs["logs"], "operation": operation["status"], "waited": waited["status"],
             "stopped": stopped["status"], "running": running["status"], "unknown": unknown["status"],
-            "daemonError": unknown["error"].as_str().expect("inspection error").contains("Docker daemon is unavailable"),
+            "daemonError": unknown["error"].as_str().expect("inspection error").contains("Docker is not running"),
         })).expect("offline results"));
 
     let operation_path = directory

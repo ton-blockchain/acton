@@ -31,6 +31,7 @@ export interface LocalnetRuntime {
   readonly isAuthOverlayRequired: boolean
   readonly jettonFaucetEnabled: boolean
   readonly localnetApiToken?: string
+  readonly browserApiTokenEnabled: boolean
   readonly metadataRegistry: CompositeMetadataRegistry
   readonly openAuthOverlay: () => void
   readonly rpcBaseUrl: string
@@ -63,6 +64,9 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
   const apiV3BaseUrl = environment?.endpoints.apiV3 ?? `${rpcBaseUrl}/api/v3`
   const controlBaseUrl = environment?.endpoints.control ?? rpcBaseUrl
   const controlEnabled = supports(environment, "controlApi")
+  // Full localnet control uses a service token owned by the Studio server.
+  // Only simulated localnet can require a browser-supplied bearer token.
+  const browserApiTokenEnabled = environment?.config.kind === "actonSimulatedLocalnet"
   const toncenterApiCompatible = environment?.network.supportsActions ?? !controlEnabled
   const contractsEnabled = supports(environment, "contracts")
   const gramFaucetEnabled = supports(environment, "gramFaucet")
@@ -76,19 +80,20 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
       environment?.network.testOnly,
     ],
   )
-  const [localnetApiToken, setLocalnetApiTokenState] = useState<string>()
+  const [storedApiToken, setLocalnetApiTokenState] = useState<string>()
+  const localnetApiToken = browserApiTokenEnabled ? storedApiToken : undefined
   const [isAuthOverlayOpen, setIsAuthOverlayOpen] = useState(false)
   const [isAuthOverlayRequired, setIsAuthOverlayRequired] = useState(false)
 
   useEffect(() => {
     setLocalnetApiTokenState(
-      environmentId
+      environmentId && browserApiTokenEnabled
         ? localStorage.getItem(apiTokenStorageKey(environmentId)) || undefined
         : undefined,
     )
     setIsAuthOverlayOpen(false)
     setIsAuthOverlayRequired(false)
-  }, [environmentId])
+  }, [environmentId, browserApiTokenEnabled])
 
   const setLocalnetApiToken = useCallback(
     (token: string | undefined) => {
@@ -107,9 +112,11 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
   )
 
   const openAuthOverlay = useCallback(() => {
+    if (!browserApiTokenEnabled) return
+
     setIsAuthOverlayRequired(false)
     setIsAuthOverlayOpen(true)
-  }, [])
+  }, [browserApiTokenEnabled])
 
   const closeAuthOverlay = useCallback(() => {
     setIsAuthOverlayRequired(false)
@@ -117,9 +124,11 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
   }, [])
 
   const requireAuthToken = useCallback(() => {
+    if (!browserApiTokenEnabled) return
+
     setIsAuthOverlayRequired(true)
     setIsAuthOverlayOpen(true)
-  }, [])
+  }, [browserApiTokenEnabled])
 
   const saveAuthToken = useCallback(
     (token: string) => {
@@ -177,6 +186,7 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
     () => ({
       apiV2BaseUrl,
       apiV3BaseUrl,
+      browserApiTokenEnabled,
       clearAuthToken,
       client,
       closeAuthOverlay,
@@ -195,6 +205,7 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
     [
       apiV2BaseUrl,
       apiV3BaseUrl,
+      browserApiTokenEnabled,
       clearAuthToken,
       client,
       closeAuthOverlay,

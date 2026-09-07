@@ -5,6 +5,7 @@ use crate::{Error, Operation, OperationStatus, OperationStep, Status, storage};
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use tokio::io::AsyncWriteExt;
 
 #[derive(Clone)]
 pub(crate) enum Action {
@@ -128,6 +129,27 @@ impl Runtime {
                 }
                 Err(error) => {
                     let message = format!("{error}\nFull log: {}", context.operation.log_path);
+                    // Preflight can fail before a child opens the log. Keep the published
+                    // diagnostic path useful even when no container has been created.
+                    let logged = async {
+                        let mut log = tokio::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(&context.operation.log_path)
+                            .await?;
+                        log.write_all(format!("\n{error}\n").as_bytes()).await
+                    }
+                    .await;
+                    if let Err(log_error) = logged {
+                        log::error!(
+                            "operation={} target={} duration_ms={} outcome=log_failed path={} error={log_error}",
+                            context.operation.kind,
+                            context.entry.record.read().await.id,
+                            context.operation.duration_ms,
+                            context.operation.log_path
+                        );
+                    }
+
                     context.operation.status = OperationStatus::Failed;
                     "failed".clone_into(&mut context.operation.phase);
                     context.operation.error = Some(message.clone());
@@ -271,7 +293,17 @@ impl Context {
             }
         }
 
-        let driver = self.runtime.driver(&self.entry).await?;
+        let starting = matches!(action, Action::Start);
+        if starting {
+            let mut record = self.entry.record.write().await;
+            record.status = Status::Starting;
+            record.error = None;
+            record.startup_timings = None;
+            drop(record);
+            self.phase("checkingDocker").await?;
+        }
+
+        let driver = self.runtime.driver(&self.entry, starting).await?;
         self.recover_snapshot(&driver).await?;
         match action {
             Action::Start => {

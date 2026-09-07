@@ -21,12 +21,12 @@ export const EnvironmentNavigationActions: FC<EnvironmentNavigationActionsProps>
   const location = useLocation()
   const navigate = useNavigate()
   const routes = useLocalnetRoutes()
-  const {environment} = useLocalnetRuntime()
+  const {environment, browserApiTokenEnabled} = useLocalnetRuntime()
   const localPathname = location.pathname.slice(routes.basePath.length) || "/"
 
   return (
     <>
-      {supports(environment, "controlApi") ? (
+      {browserApiTokenEnabled ? (
         <Tooltip
           content={localnetApiToken ? "Environment API token set" : "Set environment API token"}
         >

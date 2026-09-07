@@ -115,12 +115,15 @@ pub(super) async fn docker_text(mut command: Command) -> Result<String, Error> {
             code: "environment_start_failed",
             message: "Timed out while inspecting the active Docker context".to_owned(),
         })?
-        .map_err(|error| Error::Internal {
-            code: "environment_start_failed",
-            message: format!("Failed to inspect the active Docker context: {error}"),
+        .map_err(|error| {
+            super::prerequisites::spawn_error(&error, "inspect the active Docker context")
         })?;
     if !output.status.success() {
         let details = String::from_utf8_lossy(&output.stderr);
+        if let Some(error) = super::prerequisites::runtime_failure(details.trim()) {
+            return Err(error);
+        }
+
         return Err(Error::Internal {
             code: "environment_start_failed",
             message: format!("Docker context inspection failed: {}", details.trim()),

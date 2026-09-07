@@ -104,6 +104,72 @@ async fn snapshot_complete(runtime: &LocalProcessEnvironmentRuntime, id: &str) {
 }
 
 #[tokio::test]
+async fn studio_reports_docker_recovery_and_restarts_the_same_environment_after_fixing_it() {
+    let mut service = Service::start(false).await;
+    let independent = service.client().await;
+    let executable = executable(service.root.path(), false);
+    std::fs::write(
+        service.root.path().join("Acton.toml"),
+        "[package]\nname = \"studio-fixture\"\nversion = \"0.1.0\"\n[contracts]\n",
+    )
+    .expect("project manifest");
+    let marker = service.root.path().join("docker-unavailable");
+    std::fs::write(&marker, "").expect("Docker is not running");
+    let runtime = studio(service.root.path(), &executable).await;
+    let created = runtime
+        .create(request("Docker recovery"))
+        .await
+        .expect("create environment");
+    let failed = tokio::time::timeout(Duration::from_secs(20), async {
+        loop {
+            let environment = runtime.get(&created.id).await.expect("environment");
+            if environment.status == EnvironmentStatus::Failed {
+                break environment;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .expect("Studio exposes startup failure");
+    let error = failed
+        .error
+        .expect("Studio retains actionable Docker error");
+    expect![[r"
+        Docker is not running
+        Start Docker Desktop or your Docker Engine service, wait until it is ready, then retry"]]
+    .assert_eq(&error.lines().take(2).collect::<Vec<_>>().join("\n"));
+
+    std::fs::remove_file(marker).expect("Docker is available again");
+    let EnvironmentConfig::FullTonNetwork {
+        api_v2_port,
+        api_v3_port,
+        ..
+    } = created.config
+    else {
+        panic!("full localnet")
+    };
+    let v2 = api_listener(api_v2_port).await;
+    let v3 = api_listener(api_v3_port).await;
+    runtime
+        .restart(&created.id)
+        .await
+        .expect("retry same environment");
+    let ready = running(&runtime, &created.id).await;
+    expect![["true:Running:None"]].assert_eq(&format!(
+        "{}:{:?}:{:?}",
+        ready.id == created.id,
+        ready.status,
+        ready.error
+    ));
+    runtime.shutdown().await.expect("Studio shutdown");
+    v2.abort();
+    v3.abort();
+    let _ = tokio::join!(v2, v3);
+    service.stop(&independent).await;
+    drop(service);
+}
+
+#[tokio::test]
 async fn studio_uses_cli_for_lifecycle_and_http_for_nodes_and_snapshots() {
     let mut service = Service::start(false).await;
     let independent = service.client().await;

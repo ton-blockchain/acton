@@ -11,8 +11,23 @@ root = Path(os.environ['LOCALNET_TEST_DIR'])
 marker = root / 'running'
 network_marker = marker
 
+if (root / 'docker-error').exists():
+    raise SystemExit((root / 'docker-error').read_text())
+
 if (root / 'docker-unavailable').exists():
-    raise SystemExit('Docker daemon is unavailable')
+    raise SystemExit('Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?')
+
+if 'info' in args:
+    if (root / 'docker-timeout').exists():
+        time.sleep(15)
+    print('27.0.0')
+    raise SystemExit(0)
+
+if 'compose' in args and 'version' in args:
+    if (root / 'compose-unavailable').exists():
+        raise SystemExit("docker: 'compose' is not a docker command")
+    print('2.30.0')
+    raise SystemExit(0)
 
 if 'compose' in args:
     compose_path = Path(args[args.index('-f') + 1])

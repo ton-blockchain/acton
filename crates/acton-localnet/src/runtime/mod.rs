@@ -168,9 +168,11 @@ impl Runtime {
         Ok(entry)
     }
 
-    async fn driver(&self, entry: &Entry) -> Result<DockerNetwork, Error> {
+    async fn driver(&self, entry: &Entry, verify_docker: bool) -> Result<DockerNetwork, Error> {
         let record = entry.record.read().await.clone();
-        let driver = DockerNetwork::materialize(&entry.data_dir, &self.inner.root, &record).await?;
+        let driver =
+            DockerNetwork::materialize(&entry.data_dir, &self.inner.root, &record, verify_docker)
+                .await?;
         entry.record.write().await.state = Some(driver.state_location());
 
         Ok(driver)

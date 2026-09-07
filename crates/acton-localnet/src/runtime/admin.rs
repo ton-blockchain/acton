@@ -61,7 +61,7 @@ impl Runtime {
             });
         }
 
-        let driver = self.driver(&entry).await?;
+        let driver = self.driver(&entry, false).await?;
         let mut operation = AdminOperation {
             id: request.id().into(),
             phase: "preparing".into(),

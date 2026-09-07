@@ -23,7 +23,8 @@ async fn joined_node_serves_same_chain() -> Result<()> {
     .await?;
     let runtime = Runtime::open(&location.path).await?;
     let driver =
-        DockerNetwork::materialize(&location.path, directory.path(), &location.network).await?;
+        DockerNetwork::materialize(&location.path, directory.path(), &location.network, false)
+            .await?;
     eprintln!("Join regression state: {}", location.path.display());
     eprintln!("Join regression deployment: {}", driver.project_name);
 

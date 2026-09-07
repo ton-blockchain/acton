@@ -744,9 +744,10 @@ mod tests {
         storage::write_json(&location.path.join("network.json"), &location.network)
             .await
             .unwrap();
-        let driver = DockerNetwork::materialize(&location.path, dir.path(), &location.network)
-            .await
-            .unwrap();
+        let driver =
+            DockerNetwork::materialize(&location.path, dir.path(), &location.network, false)
+                .await
+                .unwrap();
         eprintln!(
             "Docker admin test project: {} ({})",
             driver.project_name,

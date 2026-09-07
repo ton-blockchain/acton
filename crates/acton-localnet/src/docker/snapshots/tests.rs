@@ -49,7 +49,8 @@ async fn whole_network_snapshot_roundtrip_and_rollback() -> Result<()> {
     .await?;
     let runtime = Runtime::open(&location.path).await?;
     let driver =
-        DockerNetwork::materialize(&location.path, directory.path(), &location.network).await?;
+        DockerNetwork::materialize(&location.path, directory.path(), &location.network, false)
+            .await?;
     eprintln!("Snapshot regression deployment: {}", driver.project_name);
 
     // Cleanup runs before assertions too, so a regression does not leave a live network.
@@ -65,7 +66,8 @@ async fn whole_network_snapshot_roundtrip_and_rollback() -> Result<()> {
         .await?;
 
         let network = runtime.get().await;
-        let driver = DockerNetwork::materialize(&location.path, directory.path(), &network).await?;
+        let driver =
+            DockerNetwork::materialize(&location.path, directory.path(), &network, false).await?;
         // A joined full node need not retain blocks from before it joined.
         // Verify a new block that both nodes have actually processed.
         let seqno = tokio::time::timeout(Duration::from_secs(240), async {
@@ -258,7 +260,8 @@ async fn interrupted_snapshot_restore_recovers_on_owner_restart() -> Result<()> 
     .await?;
     let runtime = Runtime::open(&location.path).await?;
     let driver =
-        DockerNetwork::materialize(&location.path, directory.path(), &location.network).await?;
+        DockerNetwork::materialize(&location.path, directory.path(), &location.network, false)
+            .await?;
 
     let result: Result<Value> = async {
         completed(&runtime, Action::Start).await?;

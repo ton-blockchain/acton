@@ -37,6 +37,9 @@ export function EnvironmentWorkspacePage({
   const requestError = loadError ?? restartError
   const environmentError = environment?.error?.trim()
   const visibleError = requestError ?? environmentError
+  // Runtime errors keep recovery copy before the full diagnostic paragraph.
+  const [failureTitle, ...recoverySteps] = visibleError?.split("\n\n")[0].split("\n") ?? []
+  const hasRecoverySteps = recoverySteps.length > 0
   const hasFailure = Boolean(visibleError || environment?.status === "failed")
   const isManaged = environment?.lifecycle === "managed"
   const isSnapshotsPage =
@@ -122,8 +125,8 @@ export function EnvironmentWorkspacePage({
           </span>
           <strong className={styles.stateTitle}>
             {hasFailure
-              ? environmentError && !requestError
-                ? "Environment failed"
+              ? hasRecoverySteps
+                ? failureTitle
                 : "Unable to open environment"
               : isLoading && !environment
                 ? "Loading environment"
@@ -135,7 +138,9 @@ export function EnvironmentWorkspacePage({
           </strong>
           <span className={styles.stateDescription}>
             {hasFailure
-              ? "Review the error details below, then restart the environment"
+              ? hasRecoverySteps
+                ? recoverySteps.join("\n")
+                : "Review the diagnostic details, resolve the reported cause, then retry"
               : isLoading && !environment
                 ? "Fetching its current state"
                 : isStarting
@@ -149,7 +154,7 @@ export function EnvironmentWorkspacePage({
         {visibleError ? (
           <RawDataBlock
             className={styles.errorDetails}
-            title="Error details"
+            title="Diagnostic details"
             value={visibleError}
             wrap
             copyLabel="error details"
@@ -165,7 +170,7 @@ export function EnvironmentWorkspacePage({
               loading={isRestarting}
               onClick={() => void handleRestart()}
             >
-              Restart environment
+              {hasFailure ? "Retry" : "Restart environment"}
             </Button>
           ) : visibleError ? (
             <Button variant="outline" size="sm" onClick={() => void onRetry()}>
