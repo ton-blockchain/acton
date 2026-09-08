@@ -486,6 +486,13 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
     [activeTab, transactionAddresses, actionAddresses],
   )
   const metadataRegistry = useMetadataRegistry()
+  const resolveVerifiedSourceByCodeHash = useCallback(
+    async (codeHash: string) => {
+      const source = await metadataRegistry.getSource({codeHash})
+      return source.verified && source.bundle ? source : undefined
+    },
+    [metadataRegistry],
+  )
   const messageNamesByAddress = useMessageNamesByAddress({
     client,
     metadataRegistry,
@@ -1537,6 +1544,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                 compilerAbiError={compilerAbiError}
                 verifiedSource={verifiedSource}
                 verifiedSourceLoading={verifiedSourceLoading}
+                resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
                 onContractClick={onAddressClick}
               />
             </Suspense>

@@ -1,14 +1,16 @@
-import {useMemo, useState} from "react"
+import {useCallback, useMemo, useState} from "react"
 import type {FC, JSX} from "react"
-import {ParsedValueView, RawDataBlock} from "@acton/ui"
+import {ParsedValueView, RawDataBlock, type ParsedCodeCell} from "@acton/ui"
 
 import {
   AbiPanel,
+  CodeCellDetails,
   ContractSourcePanel,
   decodeStorageDataCell,
   type AbiTab,
   type ContractData,
   type ContractVerifiedSource,
+  type ResolveVerifiedSourceByCodeHash,
 } from "@acton/transaction-ui"
 import {Cell} from "@ton/core"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
@@ -27,6 +29,7 @@ interface ContractCodeProps {
   readonly compilerAbiError?: string
   readonly verifiedSource?: ContractVerifiedSource
   readonly verifiedSourceLoading?: boolean
+  readonly resolveVerifiedSourceByCodeHash?: ResolveVerifiedSourceByCodeHash
   readonly onContractClick?: (address: string) => void
 }
 
@@ -73,6 +76,7 @@ export const ContractCode: FC<ContractCodeProps> = ({
   compilerAbiError,
   verifiedSource,
   verifiedSourceLoading = false,
+  resolveVerifiedSourceByCodeHash,
   onContractClick,
 }) => {
   const [activeTab, setActiveTab] = useState<ContractCodeTab>(() => readContractHashTab())
@@ -115,6 +119,18 @@ export const ContractCode: FC<ContractCodeProps> = ({
     : "No ABI registered for storage decoding"
   const hasVerifiedSource = Boolean(verifiedSource?.verified && verifiedSource.bundle)
   const hasLocalVerifiedSource = verifiedSource?.bundle?.storage_revision === "local"
+
+  const handleCellInspect = useCallback(
+    (boc: string) => {
+      const cellUrl = new URL(routes.cellPath, globalThis.location.origin)
+      cellUrl.searchParams.set("cell", boc)
+      const network = new URLSearchParams(globalThis.location.search).get("network")
+      if (network) cellUrl.searchParams.set("network", network)
+
+      globalThis.open(cellUrl.toString(), "_blank", "noopener,noreferrer")
+    },
+    [routes.cellPath],
+  )
 
   const handleContractTabChange = (tab: ContractCodeTab) => {
     setActiveTab(tab)
@@ -165,6 +181,8 @@ export const ContractCode: FC<ContractCodeProps> = ({
             contracts={contracts}
             addressFormat={addressFormat}
             onContractClick={onContractClick}
+            onCellInspect={handleCellInspect}
+            resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
             unavailableMessage={storageUnavailableMessage}
           />
         ) : activeTab === "abi" ? (
@@ -213,6 +231,8 @@ function StoragePanel({
   contracts,
   addressFormat,
   onContractClick,
+  onCellInspect,
+  resolveVerifiedSourceByCodeHash,
   unavailableMessage,
 }: {
   readonly activeTab: StorageTab
@@ -227,6 +247,8 @@ function StoragePanel({
   readonly contracts: Map<string, ContractData>
   readonly addressFormat: AddressFormatOptions
   readonly onContractClick?: (address: string) => void
+  readonly onCellInspect: (boc: string) => void
+  readonly resolveVerifiedSourceByCodeHash?: ResolveVerifiedSourceByCodeHash
   readonly unavailableMessage: string
 }): JSX.Element {
   const formatStorageAddress = (address: string) => formatAddress(address, false, addressFormat)
@@ -280,6 +302,13 @@ function StoragePanel({
                 contracts={contracts}
                 formatAddress={formatStorageAddress}
                 onContractClick={onContractClick}
+                onCellInspect={onCellInspect}
+                renderCodeCellDetails={(cell: ParsedCodeCell) => (
+                  <CodeCellDetails
+                    cell={cell}
+                    resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
+                  />
+                )}
                 fallbackTypeName={parsedStorage.name}
               />
             </div>

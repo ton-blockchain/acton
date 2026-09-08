@@ -218,8 +218,11 @@ function ParsedScalarValue({
       ? {bocHex: value.rawValue, fieldName}
       : undefined
   const canShowCode = codeCell !== undefined && renderCodeCellDetails !== undefined
-  const cellBoc = value.typeName === "Cell" ? value.rawValue : undefined
-  const canInspectCell = cellBoc !== undefined && onCellInspect !== undefined
+  const inspectableType =
+    value.typeName === "Cell" || value.typeName === "Slice" ? value.typeName : undefined
+  const inspectableBoc = inspectableType ? value.rawValue : undefined
+  const canInspectCell = inspectableBoc !== undefined && onCellInspect !== undefined
+  const inspectableLabel = inspectableType?.toLowerCase()
 
   if (!value.rawValue && !canShowCode && !canInspectCell) return scalarValue
 
@@ -253,11 +256,11 @@ function ParsedScalarValue({
           )}
           {canInspectCell && (
             <InlineAction
-              label="Inspect cell"
-              title="Open this cell in the Cell Inspector"
+              label={`Inspect ${inspectableLabel}`}
+              title={`Open this ${inspectableLabel} in the Cell Inspector`}
               size="compact"
               icon={<Binary />}
-              onClick={() => onCellInspect(cellBoc)}
+              onClick={() => onCellInspect(inspectableBoc)}
             />
           )}
           {value.rawValue && (
@@ -265,7 +268,7 @@ function ParsedScalarValue({
               value={value.rawValue}
               label="Copy raw value"
               copiedLabel="Raw value copied"
-              title="Copy this cell's raw BoC as hex"
+              title={`Copy this ${inspectableLabel ?? "value"}'s raw BoC as hex`}
               size="compact"
               icon={<Copy />}
               copiedIcon={<Check />}
