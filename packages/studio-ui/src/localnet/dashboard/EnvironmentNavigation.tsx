@@ -73,6 +73,7 @@ const explorerItems: NestedSidebarItem[] = [
   {label: "Elections", path: "/explorer/elections"},
   {label: "Tokens", path: "/explorer/tokens"},
   {label: "NFTs", path: "/explorer/nfts"},
+  {label: "Favorites", path: "/explorer/favorites"},
 ]
 
 const networkItems: NestedSidebarItem[] = [
