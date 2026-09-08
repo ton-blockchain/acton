@@ -18,7 +18,7 @@ fn masterchain_info(live: &Live) -> Result<v2::MasterchainInfo> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn address_information_request_and_response_variants() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let fixture = fixture(&live)?;
@@ -38,7 +38,7 @@ fn address_information_request_and_response_variants() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn address_request_detect_pack_and_unpack_responses() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let fixture = fixture(&live)?;
@@ -68,7 +68,7 @@ fn address_request_detect_pack_and_unpack_responses() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn detect_hash_request_accepts_base64_and_hex() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let fixture = fixture(&live)?;
@@ -91,7 +91,7 @@ fn detect_hash_request_accepts_base64_and_hex() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn libraries_request_accepts_one_and_multiple_hashes() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let fixture = fixture(&live)?;
@@ -113,7 +113,7 @@ fn libraries_request_accepts_one_and_multiple_hashes() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn transactions_request_covers_limit_cursor_and_archival() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let fixture = fixture(&live)?;
@@ -158,7 +158,7 @@ fn transactions_request_covers_limit_cursor_and_archival() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn block_transactions_ext_uses_raw_transaction_ext_wire_types() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let masterchain = masterchain_info(&live)?;
@@ -205,7 +205,7 @@ fn block_transactions_ext_uses_raw_transaction_ext_wire_types() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn try_locate_tx_request_and_transaction_response() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let fixture = fixture(&live)?;
@@ -244,7 +244,7 @@ fn try_locate_tx_request_and_transaction_response() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn config_param_request_covers_param_alias_and_seqno() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let seqno = i32::try_from(masterchain_info(&live)?.last.seqno)?;
@@ -268,7 +268,7 @@ fn config_param_request_covers_param_alias_and_seqno() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn config_all_request_covers_latest_and_explicit_seqno() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let seqno = i32::try_from(masterchain_info(&live)?.last.seqno)?;
@@ -284,7 +284,7 @@ fn config_all_request_covers_latest_and_explicit_seqno() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn block_header_request_covers_id_and_hashes() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let block = masterchain_info(&live)?.last;
@@ -306,7 +306,7 @@ fn block_header_request_covers_id_and_hashes() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn block_data_request_returns_the_selected_block_boc() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let block = masterchain_info(&live)?.last;
@@ -333,7 +333,7 @@ fn block_data_request_returns_the_selected_block_boc() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn lookup_block_request_covers_seqno_lt_and_unixtime() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let block = &fixture(&live)?.block;
@@ -369,7 +369,7 @@ fn lookup_block_request_covers_seqno_lt_and_unixtime() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn run_get_method_request_covers_latest_and_historical_state() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let seqno = u32::try_from(masterchain_info(&live)?.last.seqno)?;
@@ -419,7 +419,7 @@ fn run_get_method_request_covers_latest_and_historical_state() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn json_rpc_request_and_generic_response() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
 
@@ -456,7 +456,7 @@ fn json_rpc_request_and_generic_response() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn send_boc_request_deserializes_real_error_without_broadcasting() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
 
@@ -496,7 +496,7 @@ fn send_boc_request_deserializes_real_error_without_broadcasting() -> Result<()>
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn json_rpc_typed_params_cover_address_information() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let fixture = fixture(&live)?;

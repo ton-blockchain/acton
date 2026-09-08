@@ -1,4 +1,4 @@
-//! Localnet-to-`TonCenter` v3 typed response mappers.
+//! Localnet-to-`TON Center` v3 typed response mappers.
 //!
 //! Mapping notes:
 //! - jetton and NFT metadata is a local projection and omits fields unavailable in local state;

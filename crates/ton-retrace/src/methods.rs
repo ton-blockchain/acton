@@ -431,7 +431,7 @@ pub(crate) fn compute_final_data(
 
 /// Loads a library cell (T‑lib) by its 256‑bit hash.
 ///
-/// Fetches the library from `TonCenter`.
+/// Fetches the library from `TON Center`.
 pub(crate) async fn get_library_by_hash(net: Network, hash: &str) -> anyhow::Result<Cell> {
     let toncenter = TonCenterClient::new(net)?;
     let data = toncenter.get_libraries(hash).await?;

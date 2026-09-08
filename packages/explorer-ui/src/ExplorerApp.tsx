@@ -95,7 +95,7 @@ type NetworkFormMode =
 const EXPLORER_NETWORK_STORAGE_KEY = "explorerNetwork"
 const EXPLORER_CUSTOM_NETWORKS_STORAGE_KEY = "explorerCustomNetworks"
 const ACTON_VERIFIER_API = createVerifierApi({
-  baseUrl: "https://verifier.acton.monster/api/v1",
+  baseUrl: "https://verifier-staging.actonscan.com/api/v1",
 })
 const DEFAULT_CUSTOM_NETWORK_NAME = "Devnet"
 const SHARED_NETWORK_NAME_QUERY_PARAM = "network.name"

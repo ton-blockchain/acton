@@ -5941,7 +5941,7 @@ fun main() {
     let captured = captured
         .lock()
         .expect("captured toncenter requests mutex poisoned");
-    assert_eq!(captured.len(), 1, "expected exactly one TonCenter request");
+    assert_eq!(captured.len(), 1, "expected exactly one TON Center request");
     assert_eq!(captured[0].method, "GET");
     assert!(
         captured[0].path.starts_with("/getConfigAll"),

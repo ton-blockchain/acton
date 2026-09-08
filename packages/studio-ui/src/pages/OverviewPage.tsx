@@ -78,7 +78,7 @@ export function OverviewPage({
       ? "Studio server is available"
       : connectionState === "connecting"
         ? "Looking for Studio server"
-        : "Start Studio with acton studio start"
+        : "Start Studio with acton studio"
   const connectionDotClass =
     connectionState === "connected"
       ? styles.statusDotConnected

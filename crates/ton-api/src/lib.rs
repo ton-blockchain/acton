@@ -290,7 +290,7 @@ impl TonApiClient {
     ) -> anyhow::Result<T> {
         let response = self.send_with_retry(|| self.build_request(url), transport_error_context)?;
         if !response.status().is_success() {
-            anyhow::bail!("TonCenter API returned status: {}", response.status());
+            anyhow::bail!("TON Center API returned status: {}", response.status());
         }
         response.json().context(response_error_context.to_owned())
     }
@@ -306,14 +306,14 @@ impl TonApiClient {
         );
         let response = self.send_with_retry(
             || self.build_request(&url).query(query),
-            "Failed to send TonCenter v2 request",
+            "Failed to send TON Center v2 request",
         )?;
         if !response.status().is_success() {
             return Err(Self::handle_fail(response));
         }
         let response: v2::TonlibResponse<T> = response
             .json()
-            .context("Failed to parse TonCenter v2 response")?;
+            .context("Failed to parse TON Center v2 response")?;
         Ok(response.result)
     }
 
@@ -404,7 +404,7 @@ impl TonApiClient {
         self.network.clone()
     }
 
-    /// Get account state from `TonCenter`
+    /// Get account state from `TON Center`
     pub fn get_account_state(&self, address: &str) -> anyhow::Result<v3::AccountStateFull> {
         let accounts = self.get_account_states(&[address])?;
         accounts
@@ -413,7 +413,7 @@ impl TonApiClient {
             .ok_or_else(|| anyhow!("Account not found"))
     }
 
-    /// Get multiple account states from `TonCenter`
+    /// Get multiple account states from `TON Center`
     pub fn get_account_states(
         &self,
         addresses: &[&str],
@@ -436,21 +436,21 @@ impl TonApiClient {
 
         let response = self.send_with_retry(
             || self.build_request(&url),
-            "Failed to send request to TonCenter",
+            "Failed to send request to TON Center",
         )?;
 
         if !response.status().is_success() {
-            anyhow::bail!("TonCenter API returned status: {}", response.status());
+            anyhow::bail!("TON Center API returned status: {}", response.status());
         }
 
         let data: v3::AccountStatesResponse = response
             .json()
-            .context("Failed to parse TonCenter response")?;
+            .context("Failed to parse TON Center response")?;
 
         Ok(data.accounts)
     }
 
-    /// Get contract BOC from `TonCenter` (tries mainnet first, then testnet)
+    /// Get contract BOC from `TON Center` (tries mainnet first, then testnet)
     pub fn get_contract_boc(&self, address: &str) -> anyhow::Result<String> {
         let state = self.get_account_state(address)?;
 
@@ -489,7 +489,7 @@ impl TonApiClient {
         let seqno = seqno
             .map(u32::try_from)
             .transpose()
-            .context("Masterchain seqno does not fit TonCenter v2 request")?;
+            .context("Masterchain seqno does not fit TON Center v2 request")?;
         let json = v2::JsonRpcRequest::new(
             "1",
             "runGetMethod",
@@ -588,7 +588,7 @@ impl TonApiClient {
 
         let response = self.send_with_retry(
             || self.build_request(&url),
-            "Failed to send request to TonCenter",
+            "Failed to send request to TON Center",
         )?;
 
         if !response.status().is_success() {
@@ -597,7 +597,7 @@ impl TonApiClient {
 
         response
             .json()
-            .context("Failed to parse TonCenter response")
+            .context("Failed to parse TON Center response")
     }
 
     pub fn get_last_block_seqno(&self) -> anyhow::Result<u64> {
@@ -626,7 +626,7 @@ impl TonApiClient {
 
     fn get_masterchain_block_time(&self, seqno: u64) -> anyhow::Result<u32> {
         let request_seqno =
-            u32::try_from(seqno).context("Masterchain seqno does not fit TonCenter v2 request")?;
+            u32::try_from(seqno).context("Masterchain seqno does not fit TON Center v2 request")?;
         let header = self.get_block_header_v2(&v2::BlockHeaderRequest {
             workchain: (-1).into(),
             shard: v2::StringOrNumber::String(i64::MIN.to_string()),
@@ -780,7 +780,7 @@ impl TonApiClient {
         self.get_v2_result("/getBlockHeader", request)
     }
 
-    /// Fetches the exact serialized block selected by a `TonCenter` v2 block request.
+    /// Fetches the exact serialized block selected by a `TON Center` v2 block request.
     pub fn get_block_v2(&self, request: &v2::BlockDataRequest) -> anyhow::Result<v2::BlockData> {
         self.get_v2_result("/getBlock", request)
     }
@@ -822,7 +822,7 @@ impl TonApiClient {
 
         let response = self.send_with_retry(
             || self.build_request(&url),
-            "Failed to send request to TonCenter",
+            "Failed to send request to TON Center",
         )?;
 
         if !response.status().is_success() {
@@ -831,7 +831,7 @@ impl TonApiClient {
 
         let data: v2::TonlibResponse<v2::AddressInformation> = response
             .json()
-            .context("Failed to parse TonCenter response")?;
+            .context("Failed to parse TON Center response")?;
 
         Ok(data.result)
     }
@@ -852,7 +852,7 @@ impl TonApiClient {
 
         let response = self.send_with_retry(
             || self.build_request(&url),
-            "Failed to send getShardAccountCell request to TonCenter",
+            "Failed to send getShardAccountCell request to TON Center",
         )?;
 
         if !response.status().is_success() {
@@ -880,7 +880,7 @@ impl TonApiClient {
                 self.build_request(&url)
                     .query(&[("libraries", hash_hex.as_str())])
             },
-            "Failed to send request to TonCenter for library",
+            "Failed to send request to TON Center for library",
         )?;
 
         if !response.status().is_success() {
@@ -889,7 +889,7 @@ impl TonApiClient {
 
         let data: v2::TonlibResponse<v2::LibraryResult> = response
             .json()
-            .context("Failed to parse TonCenter libraries response")?;
+            .context("Failed to parse TON Center libraries response")?;
 
         let boc_data = data
             .result
@@ -905,7 +905,7 @@ impl TonApiClient {
         let seqno = seqno
             .map(u32::try_from)
             .transpose()
-            .context("Masterchain seqno does not fit TonCenter v2 request")?;
+            .context("Masterchain seqno does not fit TON Center v2 request")?;
         let data: v2::ConfigInfo = self.get_v2_result(
             "/getConfigAll",
             &v2::ConfigAllRequest {
@@ -953,7 +953,7 @@ impl TonApiClient {
         )?;
 
         if !response.status().is_success() {
-            anyhow::bail!("TonCenter API returned status: {}", response.status());
+            anyhow::bail!("TON Center API returned status: {}", response.status());
         }
 
         let data: v2::TonlibResponse<Vec<v2::Transaction>> = response
@@ -989,7 +989,7 @@ impl TonApiClient {
     fn handle_fail(response: Response) -> anyhow::Error {
         let status = response.status();
         let Ok(data) = response.json::<v2::TonlibErrorResponse>() else {
-            return anyhow!("TonCenter API returned status: {status}");
+            return anyhow!("TON Center API returned status: {status}");
         };
 
         let raw_msg = data
@@ -1009,7 +1009,7 @@ impl TonApiClient {
         let Ok(data) = response.json::<v2::TonlibErrorResponse>() else {
             return SendBocError::new(
                 SendBocErrorKind::Other,
-                format!("TonCenter API returned status: {status}"),
+                format!("TON Center API returned status: {status}"),
             );
         };
 
@@ -1122,7 +1122,10 @@ impl TonApiClient {
         )?;
 
         if !response.status().is_success() {
-            anyhow::bail!("TonCenter v3 traces returned status: {}", response.status());
+            anyhow::bail!(
+                "TON Center v3 traces returned status: {}",
+                response.status()
+            );
         }
 
         let data: v3::TracesResponse =

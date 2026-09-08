@@ -4356,7 +4356,7 @@ fn has_unmatched_internal_out_messages(transactions: &[V3TraceTransaction]) -> b
 
 /// Synthesize a `Transaction` cell from a toncenter v3 trace summary.
 ///
-/// `TonCenter` `/traces` only ships structured summary fields, not the raw `BoC`, so we
+/// `TON Center` `/traces` only ships structured summary fields, not the raw `BoC`, so we
 /// reconstruct a structurally valid `Transaction` from them. The synthesized cell's
 /// `repr_hash` matches the on-chain hash for traces whose external-in messages carry no
 /// non-standard fields; when toncenter reports a distinct `hash_norm` (i.e. the original

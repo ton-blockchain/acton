@@ -149,7 +149,7 @@ fn wallet_valid_until(
     now: u32,
 ) -> anyhow::Result<u32> {
     if matches!(version, WalletVersion::V3R1 | WalletVersion::V3R2) {
-        // TonCenter's V3 composer always uses a five-minute window.
+        // TON Center's V3 composer always uses a five-minute window.
         return now
             .checked_add(DEFAULT_VALID_UNTIL_SECONDS)
             .context("Default valid_until overflows u32");

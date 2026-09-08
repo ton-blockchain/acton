@@ -49,7 +49,7 @@ pub struct RunGetMethodRequest {
     /// A method name or signed 32-bit method id.
     pub method: StringOrNumber,
     pub stack: Vec<Value>,
-    /// Historical masterchain seqno supported by `TonCenter` v2 and Acton simulated localnet.
+    /// Historical masterchain seqno supported by `TON Center` v2 and Acton simulated localnet.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seqno: Option<StringOrNumber>,
 }
@@ -132,7 +132,7 @@ pub struct ConfigAllRequest {
 
 /// Selects a block whose complete serialized `BoC` should be returned by `getBlock`.
 ///
-/// `TonCenter` resolves the block by workchain, shard, and seqno when either hash is absent. The
+/// `TON Center` resolves the block by workchain, shard, and seqno when either hash is absent. The
 /// optional archival flag selects an upstream liteserver and has no effect on locally stored blocks.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockDataRequest {

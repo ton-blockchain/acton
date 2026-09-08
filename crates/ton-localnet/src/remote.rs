@@ -116,7 +116,7 @@ impl RemoteProvider {
         }
 
         let fork_seqno = u32::try_from(fork_seqno)
-            .context("Fork block seqno does not fit TonCenter v2 request")?;
+            .context("Fork block seqno does not fit TON Center v2 request")?;
         let shards = Arc::new(
             fetch_remote_shards_v2(self, fork_seqno)
                 .await?

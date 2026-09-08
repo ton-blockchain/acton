@@ -14,7 +14,7 @@ pub struct TonlibResponse<T> {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonRpcResponse<T> {
-    /// `TonCenter` accepts JSON-RPC requests but may omit JSON-RPC metadata in responses.
+    /// `TON Center` accepts JSON-RPC requests but may omit JSON-RPC metadata in responses.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub jsonrpc: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -108,7 +108,7 @@ pub struct DetectHash {
     pub hex: String,
 }
 
-/// Complete raw block payload returned by the `TonCenter` v2 `getBlock` method.
+/// Complete raw block payload returned by the `TON Center` v2 `getBlock` method.
 ///
 /// `data` is the base64 representation of the block `BoC`; `id` identifies the exact bytes and is
 /// suitable for validating the requested root and file hashes.
@@ -698,7 +698,7 @@ mod tests {
             "error": "API key does not exist",
             "code": 401
         }))
-        .expect("TonCenter errors may omit @extra");
+        .expect("TON Center errors may omit @extra");
 
         assert!(without_extra.extra.is_empty());
 
@@ -708,7 +708,7 @@ mod tests {
             "code": 500,
             "@extra": "request-1"
         }))
-        .expect("TonCenter errors may include @extra");
+        .expect("TON Center errors may include @extra");
 
         assert_eq!(with_extra.extra, "request-1");
     }

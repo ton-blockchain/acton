@@ -35,7 +35,7 @@ pub(super) fn choose(
     }
     anyhow::ensure!(
         !networks.is_empty(),
-        "No localnet networks found; run `acton localnet start <name>`"
+        "No localnet networks found; run `acton full-localnet start <name>`"
     );
     if networks.len() == 1 {
         return Ok(networks.pop());

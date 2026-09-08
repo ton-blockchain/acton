@@ -12,8 +12,8 @@ interface VerifierAbiItem {
   readonly abi?: unknown
 }
 
-const VERIFIER_SOURCE_URL = "https://verifier.acton.monster/api/v1/verification/source"
-const VERIFIER_ABI_URL = "https://verifier.acton.monster/api/v1/abi"
+const VERIFIER_SOURCE_URL = "https://verifier-staging.actonscan.com/api/v1/verification/source"
+const VERIFIER_ABI_URL = "https://verifier-staging.actonscan.com/api/v1/abi"
 const DEFAULT_REQUEST_TIMEOUT_MS = 5000
 
 export interface VerifierMetadataRegistryOptions {

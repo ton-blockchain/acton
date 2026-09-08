@@ -239,7 +239,7 @@ fn test_rpc_info_prints_remote_account_without_local_abi_match() {
     let captured = captured
         .lock()
         .expect("captured requests mutex should not be poisoned");
-    assert_eq!(captured.len(), 1, "expected exactly one TonCenter request");
+    assert_eq!(captured.len(), 1, "expected exactly one TON Center request");
     assert_eq!(captured[0].method, "GET");
     assert!(
         captured[0]
@@ -251,7 +251,7 @@ fn test_rpc_info_prints_remote_account_without_local_abi_match() {
     assert_eq!(
         header_value(&captured[0].headers, "X-API-Key"),
         Some("custom-mock-api-key"),
-        "rpc info should send TonCenter API keys for custom networks from MOCK_API_KEY",
+        "rpc info should send TON Center API keys for custom networks from MOCK_API_KEY",
     );
 }
 
@@ -353,7 +353,7 @@ fn test_rpc_info_forwards_block_number_to_account_info() {
     let captured = captured
         .lock()
         .expect("captured requests mutex should not be poisoned");
-    assert_eq!(captured.len(), 1, "expected exactly one TonCenter request");
+    assert_eq!(captured.len(), 1, "expected exactly one TON Center request");
     assert_request_snapshot(
         &captured[0],
         "integration/snapshots/rpc/test_rpc_info_block_number.request.txt",
@@ -491,7 +491,7 @@ fn test_rpc_info_decodes_storage_from_verifier_abi() {
 
     toncenter_handle
         .join()
-        .expect("TonCenter mock server thread must finish");
+        .expect("TON Center mock server thread must finish");
     verifier_handle
         .join()
         .expect("verifier mock server thread must finish");
@@ -507,7 +507,7 @@ fn test_rpc_info_decodes_storage_from_verifier_abi() {
 
     let toncenter_captured = toncenter_captured
         .lock()
-        .expect("captured TonCenter requests mutex should not be poisoned");
+        .expect("captured TON Center requests mutex should not be poisoned");
     assert_eq!(toncenter_captured.len(), 1);
 }
 
@@ -915,7 +915,7 @@ fn test_rpc_block_prints_full_toncenter_masterchain_info() {
     let captured = captured
         .lock()
         .expect("captured requests mutex should not be poisoned");
-    assert_eq!(captured.len(), 1, "expected exactly one TonCenter request");
+    assert_eq!(captured.len(), 1, "expected exactly one TON Center request");
     assert_eq!(captured[0].method, "GET");
     assert_eq!(
         captured[0].path, "/api/v2/getMasterchainInfo",
@@ -924,7 +924,7 @@ fn test_rpc_block_prints_full_toncenter_masterchain_info() {
     assert_eq!(
         header_value(&captured[0].headers, "X-API-Key"),
         Some("custom-mock-api-key"),
-        "rpc block should send TonCenter API keys for custom networks from MOCK_API_KEY",
+        "rpc block should send TON Center API keys for custom networks from MOCK_API_KEY",
     );
 }
 
@@ -957,7 +957,7 @@ fn test_rpc_block_number_uses_custom_network_and_api_key() {
     let captured = captured
         .lock()
         .expect("captured requests mutex should not be poisoned");
-    assert_eq!(captured.len(), 1, "expected exactly one TonCenter request");
+    assert_eq!(captured.len(), 1, "expected exactly one TON Center request");
     assert_eq!(captured[0].method, "GET");
     assert_eq!(
         captured[0].path, "/api/v2/getMasterchainInfo",
@@ -966,7 +966,7 @@ fn test_rpc_block_number_uses_custom_network_and_api_key() {
     assert_eq!(
         header_value(&captured[0].headers, "X-API-Key"),
         Some("custom-mock-api-key"),
-        "rpc block-number should send TonCenter API keys for custom networks from MOCK_API_KEY",
+        "rpc block-number should send TON Center API keys for custom networks from MOCK_API_KEY",
     );
 }
 
@@ -1069,7 +1069,7 @@ fn test_rpc_trace_uses_v3_traces_and_formatter_context() {
     assert_eq!(
         captured.len(),
         4,
-        "expected exactly four TonCenter requests"
+        "expected exactly four TON Center requests"
     );
     for request_idx in [0, 2] {
         assert_eq!(captured[request_idx].method, "GET");
@@ -1081,7 +1081,7 @@ fn test_rpc_trace_uses_v3_traces_and_formatter_context() {
         assert_eq!(
             header_value(&captured[request_idx].headers, "X-API-Key"),
             Some("custom-mock-api-key"),
-            "rpc trace should send TonCenter API keys for custom networks from MOCK_API_KEY",
+            "rpc trace should send TON Center API keys for custom networks from MOCK_API_KEY",
         );
     }
     for request_idx in [1, 3] {
@@ -1170,7 +1170,7 @@ fn test_rpc_trace_show_bodies_uses_verifier_abi_for_local_boc_without_abi() {
 
     toncenter_handle
         .join()
-        .expect("TonCenter mock server thread must finish");
+        .expect("TON Center mock server thread must finish");
     verifier_handle
         .join()
         .expect("verifier mock server thread must finish");
@@ -1186,7 +1186,7 @@ fn test_rpc_trace_show_bodies_uses_verifier_abi_for_local_boc_without_abi() {
 
     let toncenter_captured = toncenter_captured
         .lock()
-        .expect("captured TonCenter requests mutex should not be poisoned");
+        .expect("captured TON Center requests mutex should not be poisoned");
     assert_eq!(toncenter_captured.len(), 2);
 }
 
@@ -1229,7 +1229,7 @@ fn test_rpc_trace_formats_v3_trace_without_in_msg() {
     let captured = captured
         .lock()
         .expect("captured requests mutex should not be poisoned");
-    assert_eq!(captured.len(), 1, "expected exactly one TonCenter request");
+    assert_eq!(captured.len(), 1, "expected exactly one TON Center request");
     assert_eq!(
         captured[0].path,
         format!("/api/v3/traces?tx_hash={TRACE_ROOT_HASH}&limit=1"),

@@ -80,7 +80,7 @@ Possible fix:
 
 Possible fix:
 - check network access with {}
-- retry after TonCenter is reachable, or use {custom_network_flag} with a working {custom_network_api_v2} endpoint",
+- retry after TON Center is reachable, or use {custom_network_flag} with a working {custom_network_api_v2} endpoint",
                 "acton doctor".yellow()
             )
         }
@@ -317,7 +317,7 @@ Failed to send BOC: tcp connect error: Connection refused",
 
 Possible fix:
 - check network access with acton doctor
-- retry after TonCenter is reachable, or use --net custom:<name> with a working [networks.<name>].api.v2 endpoint
+- retry after TON Center is reachable, or use --net custom:<name> with a working [networks.<name>].api.v2 endpoint
 
 Details:
 Failed to send BOC: request timed out",

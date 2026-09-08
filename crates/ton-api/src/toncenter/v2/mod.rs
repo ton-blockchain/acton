@@ -1,4 +1,4 @@
-//! `TonCenter` API v2 contract.
+//! `TON Center` API v2 contract.
 //!
 //! Source schema: <https://toncenter.com/api/v2/openapi.json>
 //! (`v2.1.14` when these definitions were last synchronized).

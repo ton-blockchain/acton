@@ -8,7 +8,7 @@ fn live() -> Result<Option<Live>> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn emulate_request_deserializes_real_validation_error() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
 
@@ -29,7 +29,7 @@ fn emulate_request_deserializes_real_validation_error() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn emulate_request_covers_success_response_and_option_variants() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let Ok(boc) = env::var("ACTON_TONCENTER_LIVE_EMULATE_BOC") else {
@@ -64,7 +64,7 @@ fn emulate_request_covers_success_response_and_option_variants() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn ton_connect_emulate_request_deserializes_real_validation_error() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
 
@@ -91,7 +91,7 @@ fn ton_connect_emulate_request_deserializes_real_validation_error() -> Result<()
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn ton_connect_emulate_request_covers_success_response() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let Ok(raw_request) = env::var("ACTON_TONCENTER_LIVE_TONCONNECT_JSON") else {

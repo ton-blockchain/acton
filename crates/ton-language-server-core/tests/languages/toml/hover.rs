@@ -138,7 +138,7 @@ fn resolves_dynamic_network_and_contract_paths() {
             networks.mainnet.api.v2
             ```
 
-            The URL for the `TonCenter` API v2. For localnet this defaults to `http://127.0.0.1:<localnet.port>/api/v2` with `5411` as the fallback port
+            The URL for the `TON Center` API v2. For localnet this defaults to `http://127.0.0.1:<localnet.port>/api/v2` with `5411` as the fallback port
 
             - Type: `string`"#]],
     );
@@ -377,7 +377,7 @@ fn documents_quoted_and_dotted_keys() {
             networks."dev.net".api.v3
             ```
 
-            The URL for the `TonCenter` API v3. For localnet this defaults to `http://127.0.0.1:<localnet.port>/api/v3` with `5411` as the fallback port
+            The URL for the `TON Center` API v3. For localnet this defaults to `http://127.0.0.1:<localnet.port>/api/v3` with `5411` as the fallback port
 
             - Type: `string`"#]],
     );

@@ -850,7 +850,7 @@ async fn studio_ctrl_c_reports_progress_before_actual_shutdown_completion() {
     let mut child = Command::new(executable)
         .arg("--project-root")
         .arg(service.root.path())
-        .args(["studio", "start", "--port", &port, "--no-open"])
+        .args(["studio", "--port", &port, "--no-open"])
         .stdin(Stdio::null())
         .stdout(Stdio::from(log.try_clone().expect("clone output")))
         .stderr(Stdio::from(log))

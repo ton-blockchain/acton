@@ -53,7 +53,7 @@ Etherscan and Blockscout:
   a source bundle to the registry.
 - Git is the source of record for accepted source bundles.
 - The SQLite registry index is derived state and can be rebuilt from Git.
-- The configured TonCenter v3 provider is trusted to report payment
+- The configured TON Center v3 provider is trusted to report payment
   transactions, message bodies, and finality correctly.
 - Users who need stronger assurance can download a bundle, recompute its
   `source_bundle_hash`, recompile it, and compare the resulting `code_hash`.
@@ -121,7 +121,7 @@ waits for the finalized recipient transaction and sends its hash to `/verify`.
 After `Payment finalized:`, the CLI displays a testnet Actonscan URL. The URL
 contains the finalized transaction hash in lowercase hexadecimal form.
 
-The backend gets the transaction from TonCenter v3. It accepts the transaction
+The backend gets the transaction from TON Center v3. It accepts the transaction
 only when all these conditions are true:
 
 - The transaction is finalized and is not emulated or aborted.
@@ -130,7 +130,7 @@ only when all these conditions are true:
 - The incoming value is not less than the configured minimum.
 - The comment equals the ticket comment for the requested code hash.
 
-TonCenter sees the configured payment address, wallet-history reads, and each
+TON Center sees the configured payment address, wallet-history reads, and each
 transaction hash that the backend checks. Operators must treat this metadata as
 visible to their provider. A compromised provider can bypass the payment gate,
 but it cannot make mismatched source code pass compilation.
@@ -146,7 +146,7 @@ payment to `retryable` in the same server process.
 
 One payment permits at most three claims, including claims after an expired
 processing lease. The fourth claim returns `payment_used` without another
-TonCenter request. Each claim has a generation number. A stale worker cannot
+TON Center request. Each claim has a generation number. A stale worker cannot
 finish a newer claim after its lease expires.
 
 For a successful public verification, the backend stores the payment
@@ -361,7 +361,7 @@ Important cases:
 - Invalid storage configuration, repository integrity errors, Git commit
   errors, and cleanup errors consume the payment.
 - A payment can enter `processing` at most three times. Later claims return
-  `payment_used` without a TonCenter request.
+  `payment_used` without a TON Center request.
 - An expired claim cannot finish a newer claim because each claim has a
   generation number.
 - Other results after a payment claim, including generic internal failures:

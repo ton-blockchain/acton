@@ -24,7 +24,7 @@ cd first_counter
 Run Studio from the project root:
 
 ```bash
-acton studio start
+acton studio
 ```
 
 Studio listens on `127.0.0.1:3015` by default and opens the workspace in the default browser. Keep
@@ -33,13 +33,13 @@ the command running while you use the UI.
 Use another port when `3015` is already occupied:
 
 ```bash
-acton studio start --port 3020
+acton studio --port 3020
 ```
 
 Prevent the browser from opening automatically when starting Studio from an IDE or another process:
 
 ```bash
-acton studio start --no-open
+acton studio --no-open
 ```
 
 Studio accepts only a loopback host. It is intended for use on the same machine as the Acton project

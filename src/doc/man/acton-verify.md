@@ -92,7 +92,7 @@ This option conflicts with `--new`. The Acton verifier always uses testnet.
 
 {{/options}}
 
-## TonCenter API Keys
+## TON Center API Keys
 
 Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
 `TONCENTER_TESTNET_API_KEY`, depending on `--net`.
