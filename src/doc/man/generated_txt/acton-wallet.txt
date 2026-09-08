@@ -365,7 +365,7 @@ EXAMPLES
               cat body.boc.base64 | acton wallet sign deployer
 
 SEE ALSO
-       o  acton help localnet
+       o  acton help full-localnet
 
        o  Wallet command guide
           <https://ton-blockchain.github.io/acton/docs/commands/wallet>

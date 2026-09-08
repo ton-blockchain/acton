@@ -42,9 +42,9 @@ Built for **humans**. Perfect for **AI**.
   together on a fast simulated TON network, with an optional fork when you need
   state from a public network. You keep full control over network state and
   block production, and can run the same environment in CI.
-- **Move beyond simulation.** When `acton simulated-localnet` is not enough, use Localton
-  to start real TON nodes and the supporting network stack on your computer,
-  then test the dApp locally before moving to Testnet.
+- **Move beyond simulation.** When `acton simulated-localnet` is not enough, use
+  `acton full-localnet` to start real TON nodes and the supporting network stack
+  on your computer, then test the dApp locally before moving to Testnet.
 - **Work visually.** Acton Studio brings test history, local environments,
   explorer views, wallets, and message simulation into one browser workspace
   for developing and debugging the entire dApp.

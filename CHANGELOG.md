@@ -71,7 +71,7 @@ integration remains hidden and preview-only.
   verifier outages.
 - Added `acton doc abi <contract-or-code-hash>` for formatted compiler ABI JSON
   from project contracts, the built-in ABI catalog, or the verifier.
-- Added `acton localnet` for project-scoped real TON networks backed by Docker
+- Added `acton full-localnet` for project-scoped real TON networks backed by Docker
   and Localton. It can create, start, list, inspect, stop, gracefully shut down,
   and delete named networks; tail durable logs; inspect or wait for operations;
   manage nodes and validator participation; and create, restore, or delete cold

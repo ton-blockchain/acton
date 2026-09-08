@@ -956,7 +956,7 @@ enum Commands {
         command: SimulatedLocalnetCommand,
     },
     #[command(about = "Run and manage real TON development networks")]
-    Localnet {
+    FullLocalnet {
         #[command(flatten)]
         args: commands::localnet::LocalnetArgs,
     },
@@ -1794,7 +1794,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("verify", "[CONTRACT_NAME]"),
         ("library", "<COMMAND>"),
         ("simulated-localnet", "<COMMAND>"),
-        ("localnet", "<COMMAND>"),
+        ("full-localnet", "<COMMAND>"),
         // ("studio", "<COMMAND>"),
         ("retrace", "<TX_HASH>"),
     ];
@@ -2163,7 +2163,10 @@ fn load_project_dotenv(project_roots_configured: bool) {
 
 fn configure_studio_public_network_routing(command: &Commands, project_roots_configured: bool) {
     if !project_roots_configured
-        || matches!(command, Commands::Studio { .. } | Commands::Localnet { .. })
+        || matches!(
+            command,
+            Commands::Studio { .. } | Commands::FullLocalnet { .. }
+        )
         || !configured_manifest_path().is_file()
     {
         return;
@@ -2718,7 +2721,7 @@ fn main() {
             ))
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
-        Commands::Localnet { args } => commands::localnet::localnet_cmd(args),
+        Commands::FullLocalnet { args } => commands::localnet::localnet_cmd(args),
         Commands::Studio { command } => match command {
             StudioCommand::Start {
                 host,
@@ -3047,7 +3050,7 @@ const fn command_checks_toolchain_version(command: &Commands) -> bool {
                 | Commands::Completions { .. }
                 | Commands::Doctor
                 | Commands::Studio { .. }
-                | Commands::Localnet { .. }
+                | Commands::FullLocalnet { .. }
         )
 }
 
