@@ -325,7 +325,7 @@ impl EnvironmentRuntime for TestEnvironmentRuntime {
                         duration_ms: 18,
                     }],
                 }),
-                logs: format!("last {tail} startup lines"),
+                logs: format!("last {tail} \u{1b}[31mstartup\u{1b}[0m lines"),
             })
         })
     }

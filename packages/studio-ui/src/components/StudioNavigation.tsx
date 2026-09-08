@@ -70,6 +70,7 @@ export function StudioNavigation({
   onToggleSidebar,
 }: StudioNavigationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [networksOpen, setNetworksOpen] = useState(false)
   const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), [])
   const navigateAndClose = useCallback(
     (path: StudioPath) => {
@@ -256,41 +257,67 @@ export function StudioNavigation({
                             ) : undefined}
                             {page.path === "/virtual-environments" && networks.length > 0 ? (
                               <div>
-                                <div className={styles.networkNavLabel}>
-                                  <Globe2 size={18} aria-hidden="true" />
-                                  <span>Networks</span>
+                                <button
+                                  type="button"
+                                  className={styles.navItem}
+                                  aria-controls="studio-networks-navigation"
+                                  aria-expanded={networksOpen}
+                                  onClick={() => setNetworksOpen(open => !open)}
+                                >
+                                  <span className={styles.navItemMain}>
+                                    <Globe2 size={18} aria-hidden="true" />
+                                    <span>Networks</span>
+                                  </span>
+                                  <ChevronRight
+                                    className={`${styles.networkNavChevron} ${
+                                      networksOpen ? styles.networkNavChevronOpen : ""
+                                    }`}
+                                    size={17}
+                                    aria-hidden="true"
+                                  />
+                                </button>
+                                <div
+                                  id="studio-networks-navigation"
+                                  className={`${styles.environmentNavDisclosure} ${
+                                    networksOpen ? styles.environmentNavDisclosureOpen : ""
+                                  }`}
+                                  aria-hidden={!networksOpen}
+                                >
+                                  <div className={styles.environmentNavClip}>
+                                    <ul className={styles.environmentNavList} aria-label="Networks">
+                                      {networks.map(network => (
+                                        <li key={network.id}>
+                                          <button
+                                            type="button"
+                                            className={`${styles.environmentNavItem} ${
+                                              activeNetworkId === network.id
+                                                ? styles.environmentNavItemActive
+                                                : ""
+                                            }`}
+                                            aria-current={
+                                              activeNetworkId === network.id ? "page" : undefined
+                                            }
+                                            tabIndex={networksOpen ? 0 : -1}
+                                            onClick={() => openEnvironmentAndClose(network)}
+                                          >
+                                            <span className={styles.networkNavIdentity}>
+                                              <span className={styles.environmentNavName}>
+                                                {network.name}
+                                              </span>
+                                            </span>
+                                            <span
+                                              className={styles.environmentStatusDot}
+                                              data-status={network.status}
+                                              role="img"
+                                              aria-label={`Status: ${network.status}`}
+                                              title={network.status}
+                                            />
+                                          </button>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
                                 </div>
-                                <ul className={styles.environmentNavList} aria-label="Networks">
-                                  {networks.map(network => (
-                                    <li key={network.id}>
-                                      <button
-                                        type="button"
-                                        className={`${styles.environmentNavItem} ${
-                                          activeNetworkId === network.id
-                                            ? styles.environmentNavItemActive
-                                            : ""
-                                        }`}
-                                        aria-current={
-                                          activeNetworkId === network.id ? "page" : undefined
-                                        }
-                                        onClick={() => openEnvironmentAndClose(network)}
-                                      >
-                                        <span className={styles.networkNavIdentity}>
-                                          <span className={styles.environmentNavName}>
-                                            {network.name}
-                                          </span>
-                                        </span>
-                                        <span
-                                          className={styles.environmentStatusDot}
-                                          data-status={network.status}
-                                          role="img"
-                                          aria-label={`Status: ${network.status}`}
-                                          title={network.status}
-                                        />
-                                      </button>
-                                    </li>
-                                  ))}
-                                </ul>
                               </div>
                             ) : undefined}
                             {page.path === "/tests" && navigationTestRuns.length > 0 ? (
