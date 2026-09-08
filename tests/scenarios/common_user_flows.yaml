@@ -31,22 +31,22 @@ scenarios:
         status: active
 
   - id: deploy_script_fails_when_toncenter_is_unavailable
-    title: User runs a deploy script but TonCenter is unavailable
+    title: User runs a deploy script but TON Center is unavailable
 
     environment: |
       The user already has a normal project with a deploy script.
       The user targets testnet and wants to broadcast a transaction.
-      TonCenter is unavailable in this scenario.
+      TON Center is unavailable in this scenario.
       Requests may time out or return a temporary server error.
 
     steps:
       - The user runs `acton script scripts/deploy.tolk --net testnet`.
-      - The CLI tries to contact TonCenter.
+      - The CLI tries to contact TON Center.
       - The external service does not respond successfully.
 
     expected:
       - The command fails.
-      - The CLI shows a user-facing error that clearly points to the network or TonCenter.
+      - The CLI shows a user-facing error that clearly points to the network or TON Center.
       - The failure does not look like a panic or an internal crash.
       - The error output is stable enough for a stderr snapshot.
 

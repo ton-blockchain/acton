@@ -5695,7 +5695,7 @@ fn localnet_v3_indexes_real_vesting_actions() {
 }
 
 #[test]
-#[ignore = "optional live TonCenter fork contract test"]
+#[ignore = "optional live TON Center fork contract test"]
 fn localnet_fork_supports_emulate_v1_emulate_ton_connect() {
     let raw_request = std::env::var("ACTON_TONCENTER_LIVE_TONCONNECT_JSON")
         .expect("ACTON_TONCENTER_LIVE_TONCONNECT_JSON is required");

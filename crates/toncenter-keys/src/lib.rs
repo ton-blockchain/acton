@@ -1,17 +1,17 @@
-//! `TonCenter` API key resolution shared across Acton crates.
+//! `TON Center` API key resolution shared across Acton crates.
 
 use ton_networks::Network;
 
-/// Environment variable for the mainnet `TonCenter` API key.
+/// Environment variable for the mainnet `TON Center` API key.
 pub const TONCENTER_MAINNET_API_KEY_ENV: &str = "TONCENTER_MAINNET_API_KEY";
 
-/// Environment variable for the testnet `TonCenter` API key.
+/// Environment variable for the testnet `TON Center` API key.
 pub const TONCENTER_TESTNET_API_KEY_ENV: &str = "TONCENTER_TESTNET_API_KEY";
 
 /// Environment variable for the protected Acton simulated localnet API token.
 pub const LOCALNET_API_KEY_ENV: &str = "ACTON_LOCALNET_AUTH_TOKEN";
 
-/// Returns the `TonCenter` API key env var name for the selected network.
+/// Returns the `TON Center` API key env var name for the selected network.
 #[must_use]
 pub fn env_var_name(network: &Network) -> Option<String> {
     match network {
@@ -22,7 +22,7 @@ pub fn env_var_name(network: &Network) -> Option<String> {
     }
 }
 
-/// Resolves the `TonCenter` API key for the selected network from the process environment.
+/// Resolves the `TON Center` API key for the selected network from the process environment.
 #[must_use]
 pub fn api_key(network: &Network) -> Option<String> {
     api_key_with(network, |name| std::env::var(name).ok())
@@ -38,7 +38,7 @@ where
         .filter(|value| !value.is_empty())
 }
 
-/// Returns the TonCenter-compatible API key env var name for a custom network.
+/// Returns the TON Center-compatible API key env var name for a custom network.
 ///
 /// `custom:foo` becomes `FOO_API_KEY`, and non-alphanumeric characters are normalized to `_`.
 #[must_use]

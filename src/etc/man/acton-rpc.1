@@ -17,7 +17,7 @@ Query blockchain account state through a configured network endpoint.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'inspect the latest masterchain block object returned by TonCenter
+\h'-04'\(bu\h'+03'inspect the latest masterchain block object returned by TON Center
 .RE
 .sp
 .RS 4
@@ -33,7 +33,7 @@ Query blockchain account state through a configured network endpoint.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'render a TonCenter v3 trace as a decoded transaction tree
+\h'-04'\(bu\h'+03'render a TON Center v3 trace as a decoded transaction tree
 .RE
 .sp
 .RS 4
@@ -112,7 +112,7 @@ verifier response has the same \fBcode_hash\fR
 If no ABI match is found, Acton still prints the raw remote account information
 and reports that decoded storage is unavailable.
 .SS "acton rpc call"
-Call a contract get\-method through TonCenter.
+Call a contract get\-method through TON Center.
 .SS "Synopsis"
 \fBacton rpc call\fR [\fIoptions\fR] \fIaddress\fR \fImethod\fR [\fIargs\fR\[u2026]]
 .SS "Options"
@@ -164,7 +164,7 @@ field value.
 .sp
 \fB\-\-raw\fR
 .RS 4
-Print the raw TonCenter stack without ABI decoding.
+Print the raw TON Center stack without ABI decoding.
 .RE
 .SS "ABI Arguments"
 When \fB\-\-abi\fR is provided, Acton loads that file before making the RPC request
@@ -224,12 +224,12 @@ addresses, \fBaddr_none\fR, plain BoC hex as \fBcell\fR, and explicit \fBcell:\f
 .SS "Output"
 When ABI metadata is available and the result stack width matches the
 get\-method return type, Acton prints the decoded Tolk value. Otherwise it prints
-the raw TonCenter stack in a compact field\-per\-line format.
+the raw TON Center stack in a compact field\-per\-line format.
 .sp
 Raw output uses decimal integers, URL\-friendly addresses, \fBaddr_none\fR for
 two\-bit none addresses, and one \fBfieldN: type = value\fR line per stack item.
 .SS "acton rpc block"
-Print the latest masterchain block info returned by TonCenter.
+Print the latest masterchain block info returned by TON Center.
 .SS "Synopsis"
 \fBacton rpc block\fR [\fIoptions\fR]
 .SS "Options"
@@ -244,7 +244,7 @@ Supported values include \fBmainnet\fR, \fBtestnet\fR, \fBlocalnet\fR, and
 \fBcustom:<name>\fR\&.
 .RE
 .SS "Output"
-\fBacton rpc block\fR prints the full TonCenter \fBgetMasterchainInfo\fR JSON response
+\fBacton rpc block\fR prints the full TON Center \fBgetMasterchainInfo\fR JSON response
 for the selected network.
 .SS "acton rpc block-number"
 Print the latest masterchain block number for a network.
@@ -265,7 +265,7 @@ Supported values include \fBmainnet\fR, \fBtestnet\fR, \fBlocalnet\fR, and
 \fBacton rpc block\-number\fR prints only the latest masterchain block \fBseqno\fR as a
 decimal number.
 .SS "acton rpc trace"
-Fetch a TonCenter v3 trace by root transaction hash and render it in a stable
+Fetch a TON Center v3 trace by root transaction hash and render it in a stable
 text format.
 .SS "Synopsis"
 \fBacton rpc trace\fR [\fIoptions\fR] \fIhash\fR
@@ -273,7 +273,7 @@ text format.
 .sp
 \fIhash\fR
 .RS 4
-Root transaction hash to query through TonCenter v3 \fB/traces\fR\&.
+Root transaction hash to query through TON Center v3 \fB/traces\fR\&.
 .RE
 .sp
 \fB\-\-net\fR \fInetwork\fR
@@ -360,7 +360,7 @@ workflow. It remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
 .SH "NETWORK RESOLUTION"
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBmainnet\fR and \fBtestnet\fR use the built\-in TonCenter endpoints
+\h'-04'\(bu\h'+03'\fBmainnet\fR and \fBtestnet\fR use the built\-in TON Center endpoints
 .RE
 .sp
 .RS 4
@@ -373,7 +373,7 @@ workflow. It remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
 .sp
 For \fBcustom:<name>\fR, Acton needs access to the selected project or manifest so
 it can read the custom network configuration.
-.SH "TONCENTER API KEYS"
+.SH "TON CENTER API KEYS"
 Built\-in \fBmainnet\fR/\fBtestnet\fR requests read \fBTONCENTER_MAINNET_API_KEY\fR or
 \fBTONCENTER_TESTNET_API_KEY\fR, depending on the selected network.
 .sp

@@ -40,7 +40,7 @@ impl Launcher {
         command
             .arg("--project-root")
             .arg(&self.project_root)
-            .args(["localnet", "--state-dir"])
+            .args(["full-localnet", "--state-dir"])
             .arg(&self.catalog_root)
             .arg(action)
             .arg(&network.network.id)

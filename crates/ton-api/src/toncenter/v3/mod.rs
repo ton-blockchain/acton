@@ -1,4 +1,4 @@
-//! `TonCenter` API v3 contract.
+//! `TON Center` API v3 contract.
 //!
 //! Source schema: <https://toncenter.com/api/v3/doc.json>
 //! (Swagger `1.2.6` when these definitions were consolidated).

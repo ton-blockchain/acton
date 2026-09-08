@@ -390,7 +390,7 @@ May be passed multiple times.
 
 {{> options-project-resolved }}
 
-## TonCenter API Keys
+## TON Center API Keys
 
 When tests fork from the built-in `mainnet`/`testnet` backends, authenticated
 requests read `TONCENTER_MAINNET_API_KEY` or `TONCENTER_TESTNET_API_KEY`.

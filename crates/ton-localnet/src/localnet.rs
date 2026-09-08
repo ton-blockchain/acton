@@ -445,7 +445,7 @@ pub struct LocalnetBlockTransactions {
 pub struct LocalnetAcceptedExternalMessage {
     /// Hash of the exact external-in message BOC accepted into the localnet queue.
     pub msg_hash: Hash256,
-    /// TEP-467 normalized hash used by TonCenter-compatible lookups for external-in messages.
+    /// TEP-467 normalized hash used by TON Center-compatible lookups for external-in messages.
     pub msg_hash_norm: Hash256,
 }
 
@@ -1155,7 +1155,7 @@ impl Localnet {
 
     /// Returns transactions for a parsed account address.
     ///
-    /// This typed API is shared by `LiteAPI` and `TonCenter` adapters so both
+    /// This typed API is shared by `LiteAPI` and `TON Center` adapters so both
     /// transports use the same actor request and pagination semantics.
     pub async fn get_transactions_by_address(
         &self,
@@ -1298,7 +1298,7 @@ impl Localnet {
             .fork_block_number
             .map(u32::try_from)
             .transpose()
-            .context("Fork block seqno does not fit TonCenter v2 request")?
+            .context("Fork block seqno does not fit TON Center v2 request")?
         else {
             return Ok(None);
         };

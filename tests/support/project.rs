@@ -1473,7 +1473,7 @@ impl ActonCommand {
         self
     }
 
-    /// Specify `TonCenter` API key env value for test requests
+    /// Specify `TON Center` API key env value for test requests
     ///
     /// # Examples
     /// ```

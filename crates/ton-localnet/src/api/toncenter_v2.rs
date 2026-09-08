@@ -1,4 +1,4 @@
-//! Localnet-to-`TonCenter` v2 response adapters.
+//! Localnet-to-`TON Center` v2 response adapters.
 //!
 //! Known `OpenAPI` deviations:
 //! - `map_run_get_method` adds local `vm_log` to the legacy `RunGetMethodResult`;
@@ -40,7 +40,7 @@ pub fn map_block_id(id: &LocalnetBlockId) -> response::TonBlockIdExt {
     }
 }
 
-/// Maps a stored localnet block and its exact serialized bytes to the `TonCenter` wire response.
+/// Maps a stored localnet block and its exact serialized bytes to the `TON Center` wire response.
 #[must_use]
 pub fn map_block_data(id: &LocalnetBlockId, data: &BocBytes) -> response::BlockData {
     response::BlockData {

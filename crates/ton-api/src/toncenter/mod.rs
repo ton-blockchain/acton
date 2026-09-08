@@ -1,4 +1,4 @@
-//! `TonCenter` wire types grouped by API generation.
+//! `TON Center` wire types grouped by API generation.
 //!
 //! The modules follow the upstream schemas instead of the client call sites that
 //! happen to consume them. This keeps request and response DTOs reusable by both

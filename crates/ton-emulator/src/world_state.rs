@@ -537,7 +537,7 @@ impl RemoteAccountState {
         };
 
         let last_trans_lt = info.last_transaction_id.lt.parse::<u64>()?;
-        // TonCenter returns the transaction start LT. AccountStorage stores the
+        // TON Center returns the transaction start LT. AccountStorage stores the
         // end LT, which is not available in v2, so use the minimal valid value.
         let storage_last_trans_lt = last_trans_lt.saturating_add(1);
         let last_trans_hash = decode_toncenter_hash(&info.last_transaction_id.hash)?;
@@ -613,11 +613,11 @@ pub(crate) fn decode_toncenter_hash(hash: &str) -> anyhow::Result<HashBytes> {
     let decoded = base64::engine::general_purpose::STANDARD
         .decode(hash)
         .or_else(|_| base64::engine::general_purpose::URL_SAFE.decode(hash))
-        .map_err(|err| anyhow!("Invalid TonCenter transaction hash '{hash}': {err}"))?;
+        .map_err(|err| anyhow!("Invalid TON Center transaction hash '{hash}': {err}"))?;
     let len = decoded.len();
     let bytes: [u8; 32] = decoded
         .try_into()
-        .map_err(|_| anyhow!("TonCenter transaction hash must be 32 bytes, got {len}"))?;
+        .map_err(|_| anyhow!("TON Center transaction hash must be 32 bytes, got {len}"))?;
 
     Ok(HashBytes(bytes))
 }

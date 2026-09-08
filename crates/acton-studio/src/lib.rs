@@ -199,7 +199,7 @@ impl PublicToncenterApiKeys {
     ///
     /// Distributed binaries carry application keys supplied at compile time.
     /// Runtime keys take precedence so operators can replace them without rebuilding.
-    /// These defaults only authenticate Studio's requests to the public `TonCenter` APIs.
+    /// These defaults only authenticate Studio's requests to the public `TON Center` APIs.
     fn from_environment() -> Self {
         let mut keys = Self::default();
 

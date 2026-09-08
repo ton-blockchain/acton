@@ -83,7 +83,7 @@ When omitted, Acton uses `12345`.
 - Without `--net`, Acton tries mainnet and then testnet
 - `localnet` and `custom:<name>` are not supported by the retrace backend
 
-## TonCenter API Keys
+## TON Center API Keys
 
 Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
 `TONCENTER_TESTNET_API_KEY`, depending on the selected network.

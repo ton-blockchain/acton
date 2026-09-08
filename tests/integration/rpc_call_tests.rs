@@ -402,7 +402,7 @@ fn test_rpc_call_uses_verifier_abi_and_cache() {
 
     toncenter_handle
         .join()
-        .expect("TonCenter mock server thread must finish");
+        .expect("TON Center mock server thread must finish");
     verifier_handle
         .join()
         .expect("verifier mock server thread must finish");
@@ -422,7 +422,7 @@ fn test_rpc_call_uses_verifier_abi_and_cache() {
 
     let toncenter_captured = toncenter_captured
         .lock()
-        .expect("captured TonCenter requests mutex should not be poisoned");
+        .expect("captured TON Center requests mutex should not be poisoned");
     assert_eq!(toncenter_captured.len(), 8);
 }
 
@@ -939,7 +939,7 @@ fn test_rpc_call_custom_network_sends_api_key() {
     assert_eq!(
         header_value(&captured[1], "X-API-Key"),
         Some("custom-mock-api-key"),
-        "rpc call should send TonCenter API keys for custom networks from MOCK_API_KEY",
+        "rpc call should send TON Center API keys for custom networks from MOCK_API_KEY",
     );
 }
 

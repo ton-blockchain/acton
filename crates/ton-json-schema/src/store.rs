@@ -604,7 +604,7 @@ mod tests {
                             "properties": {
                                 "v2": {
                                     "type": "string",
-                                    "description": "TonCenter v2 endpoint"
+                                    "description": "TON Center v2 endpoint"
                                 }
                             }
                         }
@@ -641,7 +641,7 @@ mod tests {
             ])
             .expect("summary should exist");
 
-        assert_eq!(doc.description.as_deref(), Some("TonCenter v2 endpoint"));
+        assert_eq!(doc.description.as_deref(), Some("TON Center v2 endpoint"));
         Ok(())
     }
 

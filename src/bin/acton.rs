@@ -948,7 +948,7 @@ enum Commands {
     },
     #[command(
         about = "Run Acton's simplified TON development environment",
-        long_about = "Run Acton's fast, deterministic TON development environment for local execution, forked-state workflows, and faucet funding. It produces TON-compatible blocks and exposes LiteAPI, TonCenter v2/v3, Streaming API, and Emulate API surfaces used by many contract and dApp workflows.\n\nActon simulated localnet is a custom simplified implementation, not a real TON network or validator cluster. It does not model validators, consensus, shard elections, or the full production node and indexer stack.",
+        long_about = "Run Acton's fast, deterministic TON development environment for local execution, forked-state workflows, and faucet funding. It produces TON-compatible blocks and exposes LiteAPI, TON Center v2/v3, Streaming API, and Emulate API surfaces used by many contract and dApp workflows.\n\nActon simulated localnet is a custom simplified implementation, not a real TON network or validator cluster. It does not model validators, consensus, shard elections, or the full production node and indexer stack.",
         after_help = detailed_help_pointer("simulated-localnet")
     )]
     SimulatedLocalnet {
@@ -956,7 +956,7 @@ enum Commands {
         command: SimulatedLocalnetCommand,
     },
     #[command(about = "Run and manage real TON development networks")]
-    Localnet {
+    FullLocalnet {
         #[command(flatten)]
         args: commands::localnet::LocalnetArgs,
     },
@@ -1189,7 +1189,7 @@ pub enum SimulatedLocalnetCommand {
             long,
             value_name = "MS",
             value_parser = clap::value_parser!(u64).range(1..),
-            help = "Delay TonCenter v2/v3 and Emulate API responses, in milliseconds (default: [localnet].response-delay-ms)"
+            help = "Delay TON Center v2/v3 and Emulate API responses, in milliseconds (default: [localnet].response-delay-ms)"
         )]
         response_delay_ms: Option<u64>,
         #[arg(
@@ -1785,7 +1785,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("verify", "[CONTRACT_NAME]"),
         ("library", "<COMMAND>"),
         ("simulated-localnet", "<COMMAND>"),
-        ("localnet", "<COMMAND>"),
+        ("full-localnet", "<COMMAND>"),
         // ("studio", "<COMMAND>"),
         ("retrace", "<TX_HASH>"),
     ];
@@ -2154,7 +2154,10 @@ fn load_project_dotenv(project_roots_configured: bool) {
 
 fn configure_studio_public_network_routing(command: &Commands, project_roots_configured: bool) {
     if !project_roots_configured
-        || matches!(command, Commands::Studio { .. } | Commands::Localnet { .. })
+        || matches!(
+            command,
+            Commands::Studio { .. } | Commands::FullLocalnet { .. }
+        )
         || !configured_manifest_path().is_file()
     {
         return;
@@ -2709,7 +2712,7 @@ fn main() {
             ))
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
-        Commands::Localnet { args } => commands::localnet::localnet_cmd(args),
+        Commands::FullLocalnet { args } => commands::localnet::localnet_cmd(args),
         Commands::Studio {
             host,
             port,
@@ -3036,7 +3039,7 @@ const fn command_checks_toolchain_version(command: &Commands) -> bool {
                 | Commands::Completions { .. }
                 | Commands::Doctor
                 | Commands::Studio { .. }
-                | Commands::Localnet { .. }
+                | Commands::FullLocalnet { .. }
         )
 }
 
@@ -3539,7 +3542,7 @@ fn validate_merged_test_fork_network(
         .toncenter_v2_url(&custom_networks)
         .map_err(|err| anyhow::anyhow!("Invalid test fork network '{fork_net}': {err}"))?;
     reqwest::Url::parse(&v2_url).map_err(|err| {
-        anyhow::anyhow!("Invalid TonCenter v2 URL for test fork network '{fork_net}': {err}")
+        anyhow::anyhow!("Invalid TON Center v2 URL for test fork network '{fork_net}': {err}")
     })?;
 
     Ok(())

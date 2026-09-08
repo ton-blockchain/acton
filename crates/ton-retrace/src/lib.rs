@@ -13,17 +13,17 @@
 //! *   **Transaction Discovery**: Locating the transaction and its containing blocks.
 //! *   **State Reconstruction**: Reconstructing the exact account state prior to the transaction
 //!     by re-playing all preceding transactions in the same block.
-//! *   **Library Resolution**: Resolving exotic library cells via `TonCenter`.
+//! *   **Library Resolution**: Resolving exotic library cells via `TON Center`.
 //! *   **Execution Replay**: Sequential replay of all account transactions within the same master‑block.
 //! *   **Detailed Reporting**: Providing a breakdown of money movements, VM logs, and generated actions.
 //!
 //! # Configuration
 //!
-//! This library can work without API keys, but a `TonCenter` API key is strongly
+//! This library can work without API keys, but a `TON Center` API key is strongly
 //! recommended for higher limits and faster execution.
 //!
-//! *   `TONCENTER_MAINNET_API_KEY`: Your `TonCenter` mainnet V3 API key.
-//! *   `TONCENTER_TESTNET_API_KEY`: Your `TonCenter` testnet V3 API key.
+//! *   `TONCENTER_MAINNET_API_KEY`: Your `TON Center` mainnet V3 API key.
+//! *   `TONCENTER_TESTNET_API_KEY`: Your `TON Center` testnet V3 API key.
 //!
 //! # Main Entry Points
 //!

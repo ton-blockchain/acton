@@ -1,7 +1,7 @@
-//! Types for `TonCenter` Emulate API v1.
+//! Types for `TON Center` Emulate API v1.
 //!
 //! The published Swagger document describes requests but leaves endpoint `responses` empty.
-//! Response types therefore follow the payload returned by `TonCenter` and reuse v3 entities.
+//! Response types therefore follow the payload returned by `TON Center` and reuse v3 entities.
 
 pub mod requests;
 pub mod responses;

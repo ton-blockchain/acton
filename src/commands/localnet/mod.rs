@@ -99,7 +99,7 @@ async fn run(args: LocalnetArgs) -> anyhow::Result<()> {
         service::connect_or_start(&root, location).await?
     } else {
         (Client::connect(&location.path).await.with_context(|| format!(
-            "Network {:?} has no running service; run `acton localnet start {:?}` or `acton localnet serve {:?}`",
+            "Network {:?} has no running service; run `acton full-localnet start {:?}` or `acton full-localnet serve {:?}`",
             location.network.name, location.network.name, location.network.name
         ))?, None)
     };

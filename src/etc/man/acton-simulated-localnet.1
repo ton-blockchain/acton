@@ -10,7 +10,7 @@ acton\-simulated\-localnet \[em] Run Acton\[cq]s simplified TON development envi
 .SH "DESCRIPTION"
 Acton simulated localnet is a fast, deterministic TON development environment
 for local execution, forked\-state development, and faucet\-based funding. It
-produces TON\-compatible blocks and provides LiteAPI, TonCenter v2/v3, Streaming
+produces TON\-compatible blocks and provides LiteAPI, TON Center v2/v3, Streaming
 API, and Emulate API surfaces used by many contract and dApp workflows.
 .sp
 It is Acton\[cq]s custom simplified implementation, not a real TON network or
@@ -63,7 +63,7 @@ Maximum \fB/api\fR requests per second to simulate provider rate limits.
 .sp
 \fB\-\-response\-delay\-ms\fR \fIms\fR
 .RS 4
-Delay TonCenter v2/v3 and Emulate API responses.
+Delay TON Center v2/v3 and Emulate API responses.
 .RE
 .sp
 \fB\-\-block\-interval\-ms\fR \fIms\fR
@@ -317,7 +317,7 @@ CLI flags override config values for the current invocation. In particular,
 \fB\-\-db\-path\fR overrides \fB[localnet].db\-path\fR\&. A relative path in \fBActon.toml\fR
 resolves from the project root, while a relative \fB\-\-db\-path\fR resolves from the
 current working directory.
-.SH "TONCENTER API KEYS"
+.SH "TON CENTER API KEYS"
 When localnet forks from the built\-in \fBmainnet\fR/\fBtestnet\fR backends,
 authenticated requests read \fBTONCENTER_MAINNET_API_KEY\fR or
 \fBTONCENTER_TESTNET_API_KEY\fR\&.
@@ -348,7 +348,7 @@ X\-API\-Key: <TOKEN>
 .RE
 .sp
 \fBAuthorization: Bearer\fR is the preferred form. \fBX\-API\-Key\fR is accepted for
-TonCenter\-compatible clients. Browser WebSocket clients can pass \fBtoken=<TOKEN>\fR
+TON Center\-compatible clients. Browser WebSocket clients can pass \fBtoken=<TOKEN>\fR
 only on \fB/api/streaming/v2/ws\fR\&.
 .sp
 For CLI subcommands that call localnet control routes, pass \fB\-\-auth\-token\fR or
@@ -553,7 +553,7 @@ Acton Studio exposes the same parameter editor under \fBConfig\fR in the
 \fBNetwork\fR section for simulated localnet environments. Changes preserve all
 other parameters and historical configs.
 .sp
-TonCenter\-compatible message endpoints such as \fB/api/v2/sendBoc\fR and
+TON Center\-compatible message endpoints such as \fB/api/v2/sendBoc\fR and
 \fB/api/v3/message\fR accept external\-in messages only. Use
 \fB/acton_sendInternalMessage\fR when local tooling needs to inject a raw internal
 message.

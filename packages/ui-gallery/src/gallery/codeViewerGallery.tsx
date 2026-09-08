@@ -81,7 +81,7 @@ export const codeViewerGallery = {
         <CodeViewer
           files={sourceFiles}
           entrypoint="contracts/JettonWallet.tolk"
-          externalActionUrl="https://verifier.acton.monster/example"
+          externalActionUrl="https://verifier-staging.actonscan.com/example"
           externalActionLabel="View verification"
         />
       ),

@@ -1,4 +1,4 @@
-//! Internal HTTP clients for interacting with external TON APIs (`TonCenter`, `TonHub`).
+//! Internal HTTP clients for interacting with external TON APIs (`TON Center`, `TonHub`).
 
 use crate::Network;
 use crate::types::{BlockInfo, BlocksResponse, TransactionData, TransactionTransactionsResponse};
@@ -44,7 +44,7 @@ fn proxy_enabled_from_value(value: Option<&OsStr>) -> bool {
     })
 }
 
-/// Client for `TonCenter` V2/V3 API.
+/// Client for `TON Center` V2/V3 API.
 ///
 /// Used for fetching transaction metadata, block information, and library cells.
 pub(crate) struct TonCenterClient {
@@ -54,7 +54,7 @@ pub(crate) struct TonCenterClient {
 }
 
 impl TonCenterClient {
-    /// Creates a new `TonCenter` client for the specified network.
+    /// Creates a new `TON Center` client for the specified network.
     pub(crate) fn new(network: Network) -> anyhow::Result<Self> {
         let base_url = match network {
             Network::Mainnet => "https://toncenter.com/api/v3".to_string(),
@@ -70,9 +70,9 @@ impl TonCenterClient {
         })
     }
 
-    /// Applies a simple global rate limit for unauthenticated `TonCenter` requests.
+    /// Applies a simple global rate limit for unauthenticated `TON Center` requests.
     ///
-    /// `TonCenter` has stricter limits without an API key, so we serialize
+    /// `TON Center` has stricter limits without an API key, so we serialize
     /// requests and keep at least 1 second between request starts.
     async fn maybe_wait_for_rate_limit(&self) {
         if self.api_key.is_some() {
@@ -109,17 +109,17 @@ impl TonCenterClient {
         self.maybe_wait_for_rate_limit().await;
         let response = request.send().await?;
         if !response.status().is_success() {
-            anyhow::bail!("TonCenter V3 returned status: {}", response.status());
+            anyhow::bail!("TON Center V3 returned status: {}", response.status());
         }
 
         let result: serde_json::Value = response.json().await?;
 
         if let Some(error) = result.get("error") {
-            anyhow::bail!("TonCenter V3 error: {error}");
+            anyhow::bail!("TON Center V3 error: {error}");
         }
 
         let response_data: TransactionData = serde_json::from_value(result)
-            .map_err(|e| anyhow::anyhow!("Failed to decode TonCenter V3 response: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("Failed to decode TON Center V3 response: {e}"))?;
         Ok(response_data)
     }
 
@@ -146,21 +146,21 @@ impl TonCenterClient {
         self.maybe_wait_for_rate_limit().await;
         let response = request.send().await?;
         if !response.status().is_success() {
-            anyhow::bail!("TonCenter V3 returned status: {}", response.status());
+            anyhow::bail!("TON Center V3 returned status: {}", response.status());
         }
 
         let result: serde_json::Value = response.json().await?;
 
         if let Some(error) = result.get("error") {
-            anyhow::bail!("TonCenter V3 error: {error}");
+            anyhow::bail!("TON Center V3 error: {error}");
         }
 
         let response_data: BlocksResponse = serde_json::from_value(result)
-            .map_err(|e| anyhow::anyhow!("Failed to decode TonCenter V3 response: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("Failed to decode TON Center V3 response: {e}"))?;
         Ok(response_data)
     }
 
-    /// Fetches transactions for an account using `TonCenter` V2 JSON-RPC.
+    /// Fetches transactions for an account using `TON Center` V2 JSON-RPC.
     ///
     /// Used as a fallback or for specific V2-only functionality.
     pub(crate) async fn get_transactions_toncenter(
@@ -196,13 +196,13 @@ impl TonCenterClient {
         self.maybe_wait_for_rate_limit().await;
         let response = request.send().await?;
         if !response.status().is_success() {
-            anyhow::bail!("TonCenter V2 returned status: {}", response.status());
+            anyhow::bail!("TON Center V2 returned status: {}", response.status());
         }
 
         let result: serde_json::Value = response.json().await?;
 
         if let Some(error) = result.get("error") {
-            anyhow::bail!("TonCenter V2 error: {error}");
+            anyhow::bail!("TON Center V2 error: {error}");
         }
 
         let result = result.get("result").and_then(|v| v.as_array()).cloned();
@@ -225,13 +225,13 @@ impl TonCenterClient {
         self.maybe_wait_for_rate_limit().await;
         let response = request.send().await?;
         if !response.status().is_success() {
-            anyhow::bail!("TonCenter V2 returned status: {}", response.status());
+            anyhow::bail!("TON Center V2 returned status: {}", response.status());
         }
 
         let result: serde_json::Value = response.json().await?;
 
         if let Some(error) = result.get("error") {
-            anyhow::bail!("TonCenter V2 error: {error}");
+            anyhow::bail!("TON Center V2 error: {error}");
         }
 
         let result = result
@@ -263,7 +263,7 @@ impl TonCenterClient {
         self.maybe_wait_for_rate_limit().await;
         let response = request.send().await?;
         if !response.status().is_success() {
-            anyhow::bail!("TonCenter V2 returned status: {}", response.status());
+            anyhow::bail!("TON Center V2 returned status: {}", response.status());
         }
 
         #[derive(Deserialize)]
@@ -286,19 +286,19 @@ impl TonCenterClient {
         let data: TonCenterConfigAllResponse = response
             .json()
             .await
-            .context("Failed to parse TonCenter getConfigAll response")?;
+            .context("Failed to parse TON Center getConfigAll response")?;
 
         if !data.ok {
             anyhow::bail!(
                 "{}",
                 data.error
-                    .unwrap_or_else(|| "TonCenter returned ok=false for getConfigAll".into())
+                    .unwrap_or_else(|| "TON Center returned ok=false for getConfigAll".into())
             );
         }
 
         let config_boc = data
             .result
-            .ok_or_else(|| anyhow::anyhow!("TonCenter getConfigAll response has no result"))?
+            .ok_or_else(|| anyhow::anyhow!("TON Center getConfigAll response has no result"))?
             .config
             .bytes;
 
@@ -329,7 +329,7 @@ impl TonCenterClient {
         self.maybe_wait_for_rate_limit().await;
         let response = request.send().await?;
         if !response.status().is_success() {
-            anyhow::bail!("TonCenter V2 returned status: {}", response.status());
+            anyhow::bail!("TON Center V2 returned status: {}", response.status());
         }
 
         #[derive(Deserialize)]
@@ -352,14 +352,17 @@ impl TonCenterClient {
         if !data.ok {
             anyhow::bail!(
                 "{}",
-                data.error
-                    .unwrap_or_else(|| "TonCenter returned ok=false for getShardAccountCell".into())
+                data.error.unwrap_or_else(|| {
+                    "TON Center returned ok=false for getShardAccountCell".into()
+                })
             );
         }
 
         let cell_boc = data
             .result
-            .ok_or_else(|| anyhow::anyhow!("TonCenter getShardAccountCell response has no result"))?
+            .ok_or_else(|| {
+                anyhow::anyhow!("TON Center getShardAccountCell response has no result")
+            })?
             .bytes;
 
         Boc::decode_base64(&cell_boc).context("Failed to decode shard account cell BOC data")

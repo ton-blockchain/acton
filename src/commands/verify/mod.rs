@@ -39,7 +39,7 @@ const MAINNET_VERIFIER_BACKEND: &str = "https://verifier-mainnet.tonstudio.io";
 const TESTNET_VERIFIER_BACKEND: &str = "https://verifier-testnet.tonstudio.io";
 const VERIFY_BACKEND_ENV: &str = "ACTON_VERIFY_BACKEND";
 const VERIFY_BACKENDS_ENV: &str = "ACTON_VERIFY_BACKENDS";
-const NEW_VERIFIER_BACKEND: &str = "https://verifier.acton.monster";
+const NEW_VERIFIER_BACKEND: &str = "https://verifier-staging.actonscan.com";
 const NEW_VERIFY_BACKEND_ENV: &str = "ACTON_NEW_VERIFY_BACKEND";
 const NEW_VERIFIER_PAYMENT_COMMENT_PREFIX: &str = "acton-verify:v1:";
 

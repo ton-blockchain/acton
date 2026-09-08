@@ -1,9 +1,9 @@
-Render a TonCenter v3 trace as a decoded transaction tree
+Render a TON Center v3 trace as a decoded transaction tree
 
 Usage: acton[EXE] rpc trace [OPTIONS] <HASH>
 
 Arguments:
-  <HASH>  Root transaction hash to query through TonCenter v3 /traces
+  <HASH>  Root transaction hash to query through TON Center v3 /traces
 
 Options:
       --color <WHEN>          Control when to use colored output [default: auto] [possible values: auto, always, never]

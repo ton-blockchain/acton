@@ -72,7 +72,7 @@ OPTIONS
            This option conflicts with --new. The Acton verifier always uses
            testnet.
 
-TONCENTER API KEYS
+TON CENTER API KEYS
        Built-in mainnet/testnet requests read TONCENTER_MAINNET_API_KEY or
        TONCENTER_TESTNET_API_KEY, depending on --net.
 

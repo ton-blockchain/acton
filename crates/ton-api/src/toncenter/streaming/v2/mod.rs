@@ -1,4 +1,4 @@
-//! Types for `TonCenter` Streaming API v2.
+//! Types for `TON Center` Streaming API v2.
 //!
 //! Streaming does not publish an `OpenAPI` document. The protocol contract is maintained in the
 //! official SSE, WebSocket, and notification reference documentation.

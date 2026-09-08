@@ -34,7 +34,7 @@ Typical follow-up commands are:
 - `acton wallet export-mnemonic` for interactive export
 - `acton wallet remove -y` to remove a wallet non-interactively
 
-## TonCenter API Keys
+## TON Center API Keys
 
 Testnet balance-backed wallet flows read `TONCENTER_TESTNET_API_KEY`,
 including `wallet list --balance` and the interactive post-airdrop balance
@@ -315,7 +315,7 @@ to appear on testnet and lets you skip that wait by pressing `Enter`, unless
 
 ## Listing, Signing, And Export
 
-- `wallet list --balance` resolves balances through TonCenter and also respects
+- `wallet list --balance` resolves balances through TON Center and also respects
   `TONCENTER_TESTNET_API_KEY`; the same environment variable is used when
   `wallet new` waits for testnet funds after an interactive auto-airdrop
 - `wallet sign` auto-detects hex and base64 input, preferring hex when a payload
@@ -421,6 +421,6 @@ wallets, the keyring ID usually matches the wallet name.
 
 ## See Also
 
-- `acton help localnet`
+- `acton help full-localnet`
 - [Wallet command guide](https://ton-blockchain.github.io/acton/docs/commands/wallet)
 - [Wallet management guide](https://ton-blockchain.github.io/acton/docs/wallets)

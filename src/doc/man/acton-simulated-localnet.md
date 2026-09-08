@@ -12,7 +12,7 @@ acton-simulated-localnet --- Run Acton's simplified TON development environment
 
 Acton simulated localnet is a fast, deterministic TON development environment
 for local execution, forked-state development, and faucet-based funding. It
-produces TON-compatible blocks and provides LiteAPI, TonCenter v2/v3, Streaming
+produces TON-compatible blocks and provides LiteAPI, TON Center v2/v3, Streaming
 API, and Emulate API surfaces used by many contract and dApp workflows.
 
 It is Acton's custom simplified implementation, not a real TON network or
@@ -66,7 +66,7 @@ Maximum `/api` requests per second to simulate provider rate limits.
 {{/option}}
 
 {{#option "`--response-delay-ms` _ms_" }}
-Delay TonCenter v2/v3 and Emulate API responses.
+Delay TON Center v2/v3 and Emulate API responses.
 {{/option}}
 
 {{#option "`--block-interval-ms` _ms_" }}
@@ -336,7 +336,7 @@ CLI flags override config values for the current invocation. In particular,
 resolves from the project root, while a relative `--db-path` resolves from the
 current working directory.
 
-## TonCenter API Keys
+## TON Center API Keys
 
 When localnet forks from the built-in `mainnet`/`testnet` backends,
 authenticated requests read `TONCENTER_MAINNET_API_KEY` or
@@ -368,7 +368,7 @@ X-API-Key: <TOKEN>
 ```
 
 `Authorization: Bearer` is the preferred form. `X-API-Key` is accepted for
-TonCenter-compatible clients. Browser WebSocket clients can pass `token=<TOKEN>`
+TON Center-compatible clients. Browser WebSocket clients can pass `token=<TOKEN>`
 only on `/api/streaming/v2/ws`.
 
 For CLI subcommands that call localnet control routes, pass `--auth-token` or
@@ -467,7 +467,7 @@ Acton Studio exposes the same parameter editor under **Config** in the
 **Network** section for simulated localnet environments. Changes preserve all
 other parameters and historical configs.
 
-TonCenter-compatible message endpoints such as `/api/v2/sendBoc` and
+TON Center-compatible message endpoints such as `/api/v2/sendBoc` and
 `/api/v3/message` accept external-in messages only. Use
 `/acton_sendInternalMessage` when local tooling needs to inject a raw internal
 message.

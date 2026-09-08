@@ -180,7 +180,7 @@ fn acton(root: &Path, args: &[&str]) -> std::process::Command {
     command
         .arg("--project-root")
         .arg(root)
-        .arg("localnet")
+        .arg("full-localnet")
         .args(args)
         .env(
             "PATH",
@@ -271,7 +271,7 @@ async fn cli_and_http_share_lifecycle_snapshots_and_persisted_state() {
     let human = Command::new(env!("CARGO_BIN_EXE_acton"))
         .arg("--project-root")
         .arg(service.root.path())
-        .args(["localnet", "--state-dir"])
+        .args(["full-localnet", "--state-dir"])
         .arg(service.state())
         .args(["status", "integration"])
         .env("NO_COLOR", "1")

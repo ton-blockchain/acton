@@ -159,7 +159,7 @@ SUBCOMMANDS
           After a successful top-up, Acton updates last_topup_timestamp in the
           stored library metadata.
 
-TONCENTER API KEYS
+TON CENTER API KEYS
        Built-in mainnet/testnet requests read TONCENTER_MAINNET_API_KEY or
        TONCENTER_TESTNET_API_KEY, depending on the selected network.
 
