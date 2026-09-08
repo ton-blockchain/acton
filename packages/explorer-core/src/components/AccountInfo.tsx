@@ -60,6 +60,7 @@ interface AccountInfoDetail {
 
 interface AccountInfoProps {
   readonly address: string
+  readonly sourceVerification?: ReactNode
   readonly domain?: string
   readonly domains?: readonly string[]
   readonly state?: AddressInformation
@@ -92,6 +93,7 @@ interface CollectiblePreview {
 
 export const AccountInfo: FC<AccountInfoProps> = ({
   address,
+  sourceVerification,
   domain,
   domains = [],
   state,
@@ -739,6 +741,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
           </div>
 
           <div className={styles.statusBar}>
+            {sourceVerification}
             {stateLoading ? (
               <div className={`${styles.skeleton} ${styles.statusSkeleton}`} />
             ) : (

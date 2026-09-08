@@ -52,6 +52,7 @@ import {WalletsPage} from "./dashboard/pages/WalletsPage"
 import {useLocalnetRuntime} from "./LocalnetRuntimeProvider"
 import {localnetPath} from "./routes"
 import {WalletRuntimeProvider} from "./wallet/WalletRuntimeProvider"
+import {VerificationAction, VerificationProvider} from "./verification/VerificationProvider"
 import "@acton/ui/styles/tokens.css"
 import "./index.css"
 import styles from "./LocalnetWorkspace.module.css"
@@ -178,7 +179,7 @@ export const LocalnetWorkspace: FC<LocalnetWorkspaceProps> = ({
             networkLabel={environment.network.label}
             chainId={environment.network.chainId}
           >
-            {content}
+            <VerificationProvider>{content}</VerificationProvider>
           </WalletRuntimeProvider>
         ) : (
           content
@@ -818,6 +819,9 @@ const AppContent: FC<AppContentProps> = ({
                 <DashboardPage embedded>
                   <AccountPage
                     client={client}
+                    renderSourceVerification={({address, codeHash}) => (
+                      <VerificationAction address={address} codeHash={codeHash} />
+                    )}
                     enableJettonMint={runtime.jettonFaucetEnabled}
                     jettonMintPath={path("/faucet")}
                     showActonscanLink

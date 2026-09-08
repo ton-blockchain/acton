@@ -72,7 +72,9 @@ pub async fn studio_start_cmd(
         .with_contract_registry(contract_registry)
         .with_test_run_runtime(test_run_runtime);
     if let Some((_, wallet_runtime)) = configured_project {
-        server = server.with_wallet_runtime(wallet_runtime);
+        server = server
+            .with_wallet_runtime(wallet_runtime)
+            .with_verification_runtime(super::verify::ProjectVerificationRuntime::default());
     }
     let daemon_guard = StudioDaemonGuard::register(&project_root, reporter_url)?;
 

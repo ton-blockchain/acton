@@ -1,0 +1,11 @@
+testnet: reviewed sources, prepared once, no wallet request, ready after dismissal
+testnet: code change before payment blocks signing
+testnet: proof published meanwhile skips payment
+mainnet: reviewed sources, prepared once, no wallet request, ready after dismissal
+mainnet: code change before payment blocks signing
+mainnet: proof published meanwhile skips payment
+mainnet: dynamic Testnet payment precedes source publication
+reload: failed upload resumes with the same payment, no second signing or broadcast
+mismatch: publication disabled
+registry error: toast, retry available
+public proof: verified link replaces publication

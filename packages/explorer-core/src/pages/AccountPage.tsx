@@ -1,6 +1,6 @@
 import {useLocation, useNavigate, useParams} from "react-router"
 import {useCallback, useEffect, useMemo, useReducer, useRef, useState} from "react"
-import type {FC, SetStateAction} from "react"
+import type {FC, ReactNode, SetStateAction} from "react"
 
 import {codeLookupHashHex} from "@acton/transaction-ui"
 import {Dialog, HighlightedCode, RawDataBlock, TokenAmount} from "@acton/ui"
@@ -82,6 +82,11 @@ import styles from "./AccountPage.module.css"
 
 interface AccountPageProps {
   readonly client: TonClient
+  /** Host-owned source publication action; standalone explorers remain read-only */
+  readonly renderSourceVerification?: (target: {
+    readonly address: string
+    readonly codeHash?: string
+  }) => ReactNode
   readonly enableJettonMint?: boolean
   readonly enableTransactionStreaming?: boolean
   readonly jettonMintPath?: string
@@ -206,6 +211,7 @@ function resolveStateUpdate<T>(current: T, update: SetStateAction<T>): T {
 
 export const AccountPage: FC<AccountPageProps> = ({
   client,
+  renderSourceVerification,
   enableJettonMint = false,
   enableTransactionStreaming = true,
   jettonMintPath,
@@ -2070,6 +2076,10 @@ export const AccountPage: FC<AccountPageProps> = ({
                   onCollectiblesClick={() => handleTabChange("nfts")}
                   hasContextCard={hasHeaderContextCard}
                   showActonscanLink={showActonscanLink}
+                  sourceVerification={renderSourceVerification?.({
+                    address: formattedAddress,
+                    codeHash: accountCodeLookupHash,
+                  })}
                 />
               )}
               {hasHeaderContextCard && (

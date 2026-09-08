@@ -43,6 +43,7 @@ mod test_api;
 mod test_run;
 mod test_runtime;
 mod testnet_faucet;
+mod verification;
 mod wallet;
 
 pub use api_calls::{
@@ -81,6 +82,13 @@ pub use test_run::{
     test_contract_artifact_file_name, test_history_dir, test_output_paths, test_trace_dir,
 };
 pub use test_runtime::{TestRunRuntime, TestRunRuntimeError, TestRunRuntimeFuture};
+pub use verification::{
+    StartVerificationRequest, VerificationCandidate, VerificationFile, VerificationFuture,
+    VerificationMessage, VerificationOperation, VerificationPayment, VerificationPaymentRequest,
+    VerificationPhase, VerificationPreview, VerificationRuntime, VerificationStatus,
+    VerificationTarget,
+};
+
 pub use wallet::{
     SignWalletRequest, SignWalletResponse, StudioWallet, WalletRuntime, WalletRuntimeError,
     WalletRuntimeFuture,
@@ -249,6 +257,7 @@ pub struct StudioServer {
     environment_runtime: Arc<dyn EnvironmentRuntime>,
     test_run_runtime: Arc<dyn TestRunRuntime>,
     wallet_runtime: Arc<dyn WalletRuntime>,
+    verification_runtime: Option<Arc<dyn VerificationRuntime>>,
 }
 
 impl StudioServer {
@@ -265,6 +274,7 @@ impl StudioServer {
             )),
             test_run_runtime: Arc::new(test_runtime::EmptyTestRunRuntime::new()),
             wallet_runtime: Arc::new(wallet::EmptyWalletRuntime),
+            verification_runtime: None,
         }
     }
 
@@ -303,6 +313,16 @@ impl StudioServer {
         self
     }
 
+    /// Enables project source previews and publication without granting the verifier wallet access.
+    #[must_use]
+    pub fn with_verification_runtime<R: VerificationRuntime + 'static>(
+        mut self,
+        runtime: R,
+    ) -> Self {
+        self.verification_runtime = Some(Arc::new(runtime));
+        self
+    }
+
     #[must_use]
     pub const fn workspace(&self) -> Option<&StudioWorkspace> {
         self.config.workspace.as_ref()
@@ -327,6 +347,7 @@ impl StudioServer {
             environment_runtime: Arc::clone(&self.environment_runtime),
             test_run_runtime: Arc::clone(&self.test_run_runtime),
             wallet_runtime: Arc::clone(&self.wallet_runtime),
+            verification_runtime: self.verification_runtime.clone(),
             http_client: reqwest::Client::builder()
                 .use_rustls_tls()
                 .build()
@@ -457,6 +478,7 @@ impl StudioServer {
             )
             .merge(testnet_faucet::router())
             .merge(test_api::router())
+            .merge(verification::router())
             .fallback(api_not_found);
         let app = Router::new()
             .nest("/api/v1", api)
@@ -510,6 +532,7 @@ pub(crate) struct StudioState {
     environment_runtime: Arc<dyn EnvironmentRuntime>,
     test_run_runtime: Arc<dyn TestRunRuntime>,
     wallet_runtime: Arc<dyn WalletRuntime>,
+    verification_runtime: Option<Arc<dyn VerificationRuntime>>,
     http_client: reqwest::Client,
     toncenter_api_keys: PublicToncenterApiKeys,
     testnet_faucet_url: reqwest::Url,

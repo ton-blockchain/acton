@@ -16,6 +16,7 @@ import {useNavigate, useParams} from "react-router"
 import {TablePage} from "../../../components/TablePage"
 import {supports} from "../../../environmentCapabilities"
 import {useLocalnetRuntime} from "../../LocalnetRuntimeProvider"
+import {VerificationAction} from "../../verification/VerificationProvider"
 import type {TonClient} from "@acton/explorer-core/api/client"
 import type {LocalnetContract} from "@acton/explorer-core/api/types"
 import {ExplorerAddressChip} from "@acton/explorer-core/components/ExplorerAddressChip"
@@ -121,6 +122,7 @@ export function ContractPage({client, section}: ContractPageProps) {
               </div>
             </div>
             <div className={styles.identityActions}>
+              <VerificationAction address={contract.address} codeHash={contract.codeHash} />
               <Button size="sm" variant="outline" leadingIcon={<Search />} onClick={openExplorer}>
                 Open in Explorer
               </Button>

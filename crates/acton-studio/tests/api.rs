@@ -143,7 +143,7 @@ async fn openapi_contract_lists_every_studio_operation_and_resolves_schema_refer
         openapi: 3.1.0
         title: Acton Studio API
         version: 1.0.0
-        operations: 71
+        operations: 77
         DELETE /api/v1/environments/{environment_id}
         DELETE /api/v1/environments/{environment_id}/nodes/{node_id}
         DELETE /api/v1/environments/{environment_id}/snapshots/{snapshot_id}
@@ -164,6 +164,9 @@ async fn openapi_contract_lists_every_studio_operation_and_resolves_schema_refer
         GET /api/v1/environments/{environment_id}/rpc/{path}
         GET /api/v1/environments/{environment_id}/snapshot-operation
         GET /api/v1/environments/{environment_id}/snapshots
+        GET /api/v1/environments/{environment_id}/startup
+        GET /api/v1/environments/{environment_id}/verification/operations/{id}
+        GET /api/v1/environments/{environment_id}/verification/status
         GET /api/v1/environments/{environment_id}/wallets
         GET /api/v1/health
         GET /api/v1/info
@@ -208,6 +211,9 @@ async fn openapi_contract_lists_every_studio_operation_and_resolves_schema_refer
         POST /api/v1/environments/{environment_id}/snapshots
         POST /api/v1/environments/{environment_id}/snapshots/{snapshot_id}/restore
         POST /api/v1/environments/{environment_id}/stop
+        POST /api/v1/environments/{environment_id}/verification/operations
+        POST /api/v1/environments/{environment_id}/verification/operations/{id}/payment
+        POST /api/v1/environments/{environment_id}/verification/preview
         POST /api/v1/environments/{environment_id}/wallets/{wallet_name}/sign
         POST /api/v1/test-runs
         POST /api/v1/test-runs/{run_id}/cancel
@@ -215,7 +221,7 @@ async fn openapi_contract_lists_every_studio_operation_and_resolves_schema_refer
         POST /api/v1/testnet-faucet/challenge
         POST /api/v1/testnet-faucet/claim
         PUT /api/v1/environments/{environment_id}/network/activity
-        schemas: 99
+        schemas: 112
         missing schema references: none"]]
     .assert_eq(&actual);
 }

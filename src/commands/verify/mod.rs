@@ -32,6 +32,10 @@ use tycho_types::models::{
     StdAddr,
 };
 
+mod studio;
+
+pub(crate) use studio::ProjectVerificationRuntime;
+
 const DEFAULT_VERIFIER_ID: &str = "verifier.ton.org";
 const MAINNET_SOURCE_REGISTRY: &str = "EQD-BJSVUJviud_Qv7Ymfd3qzXdrmV525e3YDzWQoHIAiInL";
 const TESTNET_SOURCE_REGISTRY: &str = "EQCsdKYwUaXkgJkz2l0ol6qT_WxeRbE_wBCwnEybmR0u5TO8";
@@ -112,24 +116,8 @@ pub fn verify_cmd(
     }
 
     println!("  {} Compiling contract", "→".blue().bold());
-    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&config.mappings());
-    let compilation_result = compiler.compile(Path::new(&contract_path), false);
-
-    let (code_boc64, source_map) = match compilation_result {
-        tolk_compiler::CompilerResult::Success(result) => {
-            println!("  {} Compiled successfully", "✓".green().bold());
-            let source_map = result
-                .source_map
-                .ok_or_else(|| anyhow!("Compiler did not produce symbol types for verification"))?;
-            (result.code_boc64, source_map)
-        }
-        tolk_compiler::CompilerResult::Error(error) => {
-            anyhow::bail!(
-                "{}\nFix compilation error first to verify contract",
-                error.message
-            );
-        }
-    };
+    let (code_boc64, source_map) = compile_verification_contract(&config, &contract_path)?;
+    println!("  {} Compiled successfully", "✓".green().bold());
 
     let code = Boc::decode_base64(&code_boc64)?;
     let code_hash = code.repr_hash();
@@ -199,25 +187,7 @@ pub fn verify_cmd(
         anyhow::bail!("No source files found");
     }
 
-    let project_root = acton_config::config::project_root();
-    let mut upload_parts: Vec<UploadPart> = Vec::new();
-    let mut normalized_source_paths: Vec<(String, bool)> = Vec::new();
-
-    for (path, is_entrypoint) in &source_files {
-        let path = dunce::canonicalize(path).unwrap_or_else(|_| path.clone());
-        let file_content = fs::read(&path).context("Failed to read source file")?;
-        let Some(filename) = path.file_name().and_then(|it| it.to_str()) else {
-            anyhow::bail!("Failed to get filename from path: {}", path.display());
-        };
-        let source_path = normalize_source_path_for_verifier(&path, project_root);
-        normalized_source_paths.push((source_path.clone(), *is_entrypoint));
-
-        upload_parts.push(UploadPart {
-            field_name: source_path,
-            file_name: filename.to_string(),
-            bytes: file_content,
-        });
-    }
+    let (upload_parts, normalized_source_paths) = collect_verification_sources(&source_files)?;
 
     let version = compiler_version.unwrap_or_else(|| "1.4.2".to_owned());
 
@@ -672,6 +642,56 @@ pub fn verify_cmd(
     Ok(())
 }
 
+/// Compile with the same mappings and optimization level for CLI and Studio previews.
+fn compile_verification_contract(
+    config: &ActonConfig,
+    contract_path: &Path,
+) -> anyhow::Result<(String, tolk_compiler::SourceMap)> {
+    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&config.mappings());
+    match compiler.compile(contract_path, false) {
+        tolk_compiler::CompilerResult::Success(result) => Ok((
+            result.code_boc64,
+            result
+                .source_map
+                .context("Compiler did not produce symbol types for verification")?,
+        )),
+        tolk_compiler::CompilerResult::Error(error) => {
+            anyhow::bail!(
+                "{}\nFix compilation error first to verify contract",
+                error.message
+            )
+        }
+    }
+}
+
+type VerificationSourceParts = (Vec<UploadPart>, Vec<(String, bool)>);
+
+/// Capture dependencies once so approval applies to the exact bytes sent to the verifier.
+fn collect_verification_sources(
+    source_files: &[(PathBuf, bool)],
+) -> anyhow::Result<VerificationSourceParts> {
+    let project_root = acton_config::config::project_root();
+    let mut upload_parts: Vec<UploadPart> = Vec::new();
+    let mut normalized_source_paths: Vec<(String, bool)> = Vec::new();
+
+    for (path, is_entrypoint) in source_files {
+        let path = dunce::canonicalize(path).unwrap_or_else(|_| path.clone());
+        let file_content = fs::read(&path).context("Failed to read source file")?;
+        let Some(filename) = path.file_name().and_then(|it| it.to_str()) else {
+            anyhow::bail!("Failed to get filename from path: {}", path.display());
+        };
+        let source_path = normalize_source_path_for_verifier(&path, project_root);
+        normalized_source_paths.push((source_path.clone(), *is_entrypoint));
+
+        upload_parts.push(UploadPart {
+            field_name: source_path,
+            file_name: filename.to_string(),
+            bytes: file_content,
+        });
+    }
+    Ok((upload_parts, normalized_source_paths))
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct TolkCompilerSettings {
@@ -904,6 +924,7 @@ fn friendly_new_verifier_error(body: &str) -> Option<&'static str> {
     NewVerifierKnownError::from_response_body(body).map(NewVerifierKnownError::friendly_message)
 }
 
+#[derive(Clone)]
 struct NewVerifierPaymentQuote {
     payment_address: String,
     amount_nano: String,
@@ -1384,6 +1405,27 @@ fn verify_with_new_verifier(
         )?,
     };
 
+    upload_new_verifier_sources(
+        &backend,
+        code_hash,
+        upload_parts,
+        &sources_json,
+        &compile_params_json,
+        &tx_hash,
+    )
+}
+
+/// Publishes the exact reviewed bundle against one finalized payment transaction.
+/// Retrying reuses that payment; signing and payment approval belong to the caller.
+fn upload_new_verifier_sources(
+    backend: &str,
+    code_hash: &str,
+    upload_parts: &[UploadPart],
+    sources_json: &str,
+    compile_params_json: &str,
+    tx_hash: &str,
+) -> anyhow::Result<()> {
+    let verify_url = format!("{backend}/api/v1/verify");
     println!("  {} Sending sources to new verifier", "→".blue().bold());
 
     let source_max_attempts = 8;
@@ -1393,9 +1435,9 @@ fn verify_with_new_verifier(
         let form = build_new_verify_form(
             upload_parts,
             code_hash,
-            &tx_hash,
-            &sources_json,
-            &compile_params_json,
+            tx_hash,
+            sources_json,
+            compile_params_json,
         )?;
         let source_client = build_verify_http_client()
             .context("Failed to create HTTP client for new verifier backend")?;
@@ -1466,6 +1508,10 @@ fn verify_with_new_verifier(
         .json()
         .context("Failed to parse new verifier response")?;
 
+    if verify_result.verification_result != NewVerificationResult::Mismatch {
+        ensure_ticket_code_hash(code_hash, &verify_result.code_hash)?;
+    }
+
     match verify_result.verification_result {
         NewVerificationResult::AlreadyVerified => {
             println!("  {} Contract was already verified", "✓".green().bold());
@@ -1484,7 +1530,7 @@ fn verify_with_new_verifier(
                 );
             }
             println!();
-            show_new_verifier_link(&backend, code_hash);
+            show_new_verifier_link(backend, code_hash);
             return Ok(());
         }
         NewVerificationResult::Mismatch => {
@@ -1521,7 +1567,7 @@ fn verify_with_new_verifier(
 
     println!();
     println!("{}", "✓ Contract verification completed!".green().bold());
-    show_new_verifier_link(&backend, code_hash);
+    show_new_verifier_link(backend, code_hash);
 
     Ok(())
 }

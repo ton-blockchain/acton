@@ -56,6 +56,140 @@ const VERIFY_TEST_PAYMENT_TX_HASH_BASE64: &str = "oH2VGnArkQ1fZbcQyozpZnvQ89gDz4
 
 static VERIFY_BACKEND_MOCK_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
+#[test]
+fn studio_verification_uses_new_verifier_tickets_and_preserves_status_failures() {
+    let project = ProjectBuilder::new("studio-verification-preview")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+    let compiled = compile_simple_contract_boc_base64(&project);
+    let account =
+        toncenter_v3_account_states_ok_response(VERIFY_TEST_ADDRESS, Some(&compiled), "active");
+    let (v3_url, v3_server, _) = spawn_toncenter_v3_mock(vec![account; 3]);
+    let status_response = |verified| VerifierMockResponse {
+        status: 200,
+        body: serde_json::json!({"code_hash": VERIFY_TEST_CODE_HASH, "verified": verified})
+            .to_string(),
+        headers: vec![],
+    };
+    let (verifier_url, verifier_server, captured) = spawn_verifier_mock(vec![
+        status_response(false),
+        payment_ticket_response(),
+        status_response(true),
+        new_verifier_error_response(502, "Source storage unavailable"),
+    ]);
+
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("Studio test port");
+    let port = listener.local_addr().expect("bound address").port();
+    drop(listener);
+
+    let client = reqwest::blocking::Client::builder()
+        .no_proxy()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .expect("test HTTP client");
+    let mut studio = project
+        .acton()
+        .env("ACTON_NEW_VERIFY_BACKEND", &verifier_url)
+        .env(TEST_TONCENTER_TESTNET_V3_URL_ENV, &v3_url)
+        .env(TONCENTER_TESTNET_API_KEY_ENV, VERIFY_TEST_API_KEY)
+        .arg("--project-root")
+        .arg(project.path().to_str().expect("project path"))
+        .arg("studio")
+        .arg("start")
+        .arg("--no-open")
+        .arg("--port")
+        .arg(&port.to_string())
+        .spawn()
+        .expect("start Studio fixture");
+
+    // Always reap the child before inspecting the result, including failed requests.
+    let result = (|| -> anyhow::Result<serde_json::Value> {
+        let base = format!("http://127.0.0.1:{port}/api/v1");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        while client.get(format!("{base}/info")).send().is_err() {
+            anyhow::ensure!(std::time::Instant::now() < deadline, "Studio did not start");
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+
+        let base = format!("{base}/environments/testnet/verification");
+        let preview = client
+            .post(format!("{base}/preview"))
+            .json(&serde_json::json!({"address": VERIFY_TEST_ADDRESS}))
+            .send()?
+            .error_for_status()?
+            .json::<serde_json::Value>()?;
+        let published = client
+            .get(format!("{base}/status"))
+            .query(&[("address", VERIFY_TEST_ADDRESS)])
+            .send()?
+            .error_for_status()?
+            .json::<serde_json::Value>()?;
+        let failed = client
+            .get(format!("{base}/status"))
+            .query(&[("address", VERIFY_TEST_ADDRESS)])
+            .send()?;
+        let status = failed.status().as_u16();
+        let error = failed.json::<serde_json::Value>()?;
+
+        Ok(serde_json::json!({
+            "verifiedBefore": preview["status"]["verified"],
+            "paymentAmount": preview["payment"]["amount"],
+            "paymentNetwork": preview["payment"]["network"],
+            "candidateMatches": preview["candidates"][0]["matches"],
+            "sourceFile": preview["candidates"][0]["files"][0]["path"],
+            "verifiedAfter": published["verified"],
+            "verifierFailure": {"status": status, "body": error},
+        }))
+    })();
+    let _ = studio.kill();
+    let output = studio.wait_with_output().expect("Studio process output");
+
+    let mut result = result.unwrap_or_else(|error| {
+        panic!(
+            "Studio verification requests: {error:#}\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    });
+    verifier_server.join().expect("verifier mock completed");
+    v3_server.join().expect("account state mock completed");
+
+    result["verifierRequests"] = serde_json::json!(
+        captured
+            .lock()
+            .expect("captured verifier requests")
+            .iter()
+            .map(|request| format!("{} {}", request.method, request.path))
+            .collect::<Vec<_>>()
+    );
+
+    expect_test::expect![[r#"
+        {
+          "candidateMatches": true,
+          "paymentAmount": "10000000",
+          "paymentNetwork": "testnet",
+          "sourceFile": "contracts/simple.tolk",
+          "verifiedAfter": true,
+          "verifiedBefore": false,
+          "verifierFailure": {
+            "body": {
+              "error": {
+                "code": "verification_failed",
+                "message": "Acton verifier status failed: HTTP 502 Bad Gateway: {\"error\":\"Source storage unavailable\"}"
+              }
+            },
+            "status": 500
+          },
+          "verifierRequests": [
+            "GET /api/v1/verification/status?code_hash=e67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973",
+            "POST /api/v1/take_ticket",
+            "GET /api/v1/verification/status?code_hash=e67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973",
+            "GET /api/v1/verification/status?code_hash=e67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973"
+          ]
+        }"#]]
+        .assert_eq(&serde_json::to_string_pretty(&result).expect("snapshot JSON"));
+}
+
 fn write_deployer_wallets(project_path: &Path) {
     std::fs::write(project_path.join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
         .expect("failed to write wallets.toml");

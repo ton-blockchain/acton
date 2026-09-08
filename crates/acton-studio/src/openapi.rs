@@ -36,6 +36,7 @@ pub(crate) async fn handler() -> Json<utoipa::openapi::OpenApi> {
 pub fn openapi() -> utoipa::openapi::OpenApi {
     let mut document = StudioApiDoc::openapi();
     document.merge(crate::test_api::openapi());
+    document.merge(crate::verification::openapi());
     document
 }
 
