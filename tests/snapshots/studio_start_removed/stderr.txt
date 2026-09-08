@@ -1,0 +1,5 @@
+error: unexpected argument 'start' found
+
+Usage: acton[EXE] studio [OPTIONS]
+
+For more information, try '--help'.

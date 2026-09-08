@@ -161,7 +161,7 @@ integration remains hidden and preview-only.
 
 ### Acton Studio
 
-- Added Acton Studio, started with `acton studio start`. It defaults to
+- Added Acton Studio, started with `acton studio`. It defaults to
   `127.0.0.1:3015`, opens the browser, enforces one instance per project, and
   currently rejects non-loopback hosts because environment control and project
   wallet signing are unauthenticated.

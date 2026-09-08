@@ -30,7 +30,7 @@ impl StudioCliProcess {
             let child = project
                 .acton()
                 .current_dir(project.path())
-                .args(["studio", "start", "--port", &port_arg, "--no-open"])
+                .args(["studio", "--port", &port_arg, "--no-open"])
                 .spawn()
                 .expect("Studio CLI process must start");
             let mut studio = Self {

@@ -14,7 +14,6 @@ fn studio_start_port_conflict_is_reported_with_hint() {
         .acton()
         .current_dir(project.path())
         .arg("studio")
-        .arg("start")
         .arg("--port")
         .arg(&port)
         .arg("--no-open")
@@ -36,7 +35,7 @@ fn studio_start_rejects_non_loopback_host() {
     project
         .acton()
         .current_dir(project.path())
-        .args(["studio", "start", "--host", "0.0.0.0", "--no-open"])
+        .args(["studio", "--host", "0.0.0.0", "--no-open"])
         .run()
         .failure()
         .assert_not_contains("Starting Acton Studio")
@@ -87,7 +86,7 @@ fn studio_start_rejects_a_second_instance_for_the_same_project() {
     project
         .acton()
         .current_dir(project.path())
-        .args(["studio", "start", "--port", &second_port_arg, "--no-open"])
+        .args(["studio", "--port", &second_port_arg, "--no-open"])
         .run()
         .failure()
         .assert_not_contains("Starting Acton Studio")

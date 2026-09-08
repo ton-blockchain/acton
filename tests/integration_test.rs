@@ -289,13 +289,13 @@ fn test_acton_studio_help() {
 }
 
 #[test]
-fn test_acton_studio_start_help() {
+fn test_acton_studio_start_subcommand_is_removed() {
     snapbox::cmd::Command::acton_ui()
-        .args(["studio", "start", "--help"])
+        .args(["studio", "start"])
         .assert()
-        .success()
-        .stdout_eq(snapbox::file!["snapshots/studio_start/stdout.txt"])
-        .stderr_eq(snapbox::str![""]);
+        .failure()
+        .stdout_eq(snapbox::str![""])
+        .stderr_eq(snapbox::file!["snapshots/studio_start_removed/stderr.txt"]);
 }
 
 #[test]

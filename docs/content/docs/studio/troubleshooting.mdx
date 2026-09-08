@@ -13,7 +13,7 @@ Docker services, public network provider, or the application using an endpoint.
 Studio reports the address it could not bind and suggests selecting another port:
 
 ```bash
-acton studio start --port 3020
+acton studio --port 3020
 ```
 
 Use the new origin for browser access and generated integration endpoints. Only one Studio daemon
@@ -25,7 +25,7 @@ Stop Studio, change to the directory containing the intended `Acton.toml`, and s
 
 ```bash
 cd /path/to/project
-acton studio start
+acton studio
 ```
 
 The Overview status strip shows the resolved project name and path. Test reporting and project
@@ -33,7 +33,7 @@ wallet discovery use this workspace identity.
 
 ### Browser did not open
 
-Read the URL printed by `acton studio start` and open it manually. `--no-open` disables automatic
+Read the URL printed by `acton studio` and open it manually. `--no-open` disables automatic
 browser opening intentionally.
 
 ## Tests do not appear

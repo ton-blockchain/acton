@@ -960,10 +960,25 @@ enum Commands {
         #[command(flatten)]
         args: commands::localnet::LocalnetArgs,
     },
-    #[command(about = "Manage Acton Studio")]
+    #[command(about = "Start Acton Studio")]
     Studio {
-        #[command(subcommand)]
-        command: StudioCommand,
+        #[arg(
+            long,
+            value_name = "IP",
+            default_value = "127.0.0.1",
+            help = "Address for the Studio server to listen on"
+        )]
+        host: IpAddr,
+        #[arg(
+            long,
+            value_name = "PORT",
+            default_value_t = DEFAULT_STUDIO_PORT,
+            value_parser = clap::value_parser!(u16).range(1..),
+            help = "Studio server port"
+        )]
+        port: u16,
+        #[arg(long, help = "Do not open Studio in the default browser")]
+        no_open: bool,
     },
     #[command(
         about = "Format project Tolk source files",
@@ -1333,30 +1348,6 @@ pub enum SimulatedLocalnetCommand {
     Checkpoint {
         #[command(subcommand)]
         command: SimulatedLocalnetCheckpointCommand,
-    },
-}
-
-#[derive(Subcommand, Clone)]
-pub enum StudioCommand {
-    #[command(about = "Start Acton Studio")]
-    Start {
-        #[arg(
-            long,
-            value_name = "IP",
-            default_value = "127.0.0.1",
-            help = "Address for the Studio server to listen on"
-        )]
-        host: IpAddr,
-        #[arg(
-            long,
-            value_name = "PORT",
-            default_value_t = DEFAULT_STUDIO_PORT,
-            value_parser = clap::value_parser!(u16).range(1..),
-            help = "Studio server port"
-        )]
-        port: u16,
-        #[arg(long, help = "Do not open Studio in the default browser")]
-        no_open: bool,
     },
 }
 
@@ -2719,19 +2710,17 @@ fn main() {
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
         Commands::Localnet { args } => commands::localnet::localnet_cmd(args),
-        Commands::Studio { command } => match command {
-            StudioCommand::Start {
-                host,
-                port,
-                no_open,
-            } => {
-                let rt = tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .build()
-                    .expect("Failed to initialize tokio runtime for Studio");
-                rt.block_on(commands::studio::studio_start_cmd(host, port, !no_open))
-            }
-        },
+        Commands::Studio {
+            host,
+            port,
+            no_open,
+        } => {
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .expect("Failed to initialize tokio runtime for Studio");
+            rt.block_on(commands::studio::studio_start_cmd(host, port, !no_open))
+        }
         Commands::SimulatedLocalnet { command } => {
             match command {
                 SimulatedLocalnetCommand::Start {
