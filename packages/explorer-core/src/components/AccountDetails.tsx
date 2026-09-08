@@ -2743,7 +2743,7 @@ function getHistoryActionDisplay(
         action.details.source,
         action.details.asset,
         context.ownerAddress,
-        () => valueLines(textValueLine(action.details.key, "neutral")),
+        () => valueLines(actionNftValueLine(action.details.asset, null, context.metadata)),
         "DNS",
       )
     case "delete_dns":
@@ -2751,7 +2751,7 @@ function getHistoryActionDisplay(
         action.details.source,
         action.details.asset,
         context.ownerAddress,
-        () => valueLines(textValueLine(action.details.hash, "neutral")),
+        () => valueLines(actionNftValueLine(action.details.asset, null, context.metadata)),
         "DNS",
       )
     case "renew_dns":
@@ -3688,17 +3688,6 @@ function rawValueLine(
     label: `${valueSign(displayTone)}${readableAmount}`,
     tone: displayTone,
   }
-}
-
-function textValueLine(
-  value: string | null | undefined,
-  tone: HistoryValueTone,
-): HistoryTextValueLine | undefined {
-  if (!isNonEmptyString(value)) {
-    return undefined
-  }
-
-  return {kind: "text", label: value, tone}
 }
 
 function actionNftValueLine(
