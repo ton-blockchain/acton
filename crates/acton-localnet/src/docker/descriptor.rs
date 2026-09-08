@@ -103,7 +103,9 @@ pub(super) async fn resolve_docker_target() -> Result<DockerTarget, Error> {
     }
 
     let mut command = Command::new("docker");
-    command.args(["context", "show"]);
+    // Docker 20.10 does not provide `context show`. Inspecting the implicit active context works
+    // with both older Docker Desktop releases and current Docker CLI versions.
+    command.args(["context", "inspect", "--format", "{{.Name}}"]);
     docker_text(command).await.map(DockerTarget::Context)
 }
 
