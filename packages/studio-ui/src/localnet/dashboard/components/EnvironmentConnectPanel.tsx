@@ -36,7 +36,7 @@ const integrationOptions = [
   {
     id: "ton-client",
     label: "JavaScript app",
-    description: "Create an @ton/ton client",
+    description: "Connect an @ton/ton client",
     icon: Braces,
   },
   {
@@ -388,6 +388,10 @@ function EndpointRow({
   )
 }
 
+/**
+ * Builds a self-contained prompt for a coding agent. The prompt includes exact connection values
+ * and guards against duplicate clients, configuration sections, and unrelated project changes.
+ */
 function integrationPromptFor({
   actonConfig,
   actonRunCommand,
@@ -413,39 +417,114 @@ function integrationPromptFor({
 }): string {
   if (target === "acton") {
     if (!actonConfig) {
-      return `Run an Acton script on "${environmentName}". Studio routes the built-in ${actonNetworkName} network while it is running:
+      return `Connect this Acton project to the Acton Studio environment "${environmentName}"
 
-${actonRunCommand}`
+Requirements:
+- Inspect Acton.toml and the scripts directory before you change files
+- Use the existing project structure and commands
+- Do not add a custom network entry because Studio routes Acton's built-in ${actonNetworkName} network while this environment is running
+- Keep unrelated configuration and code unchanged
+
+Run an existing script with this command:
+
+\`\`\`shell
+${actonRunCommand}
+\`\`\`
+
+If scripts/deploy.tolk does not exist, replace that path with the relevant existing script
+
+Validation:
+- Run the selected script while Acton Studio and this environment are running
+- Report the files that you changed and the validation result`
     }
 
-    return `Connect the Acton project to "${environmentName}" by adding this configuration to Acton.toml:
+    return `Connect this Acton project to the Acton Studio environment "${environmentName}"
 
+Requirements:
+- Inspect Acton.toml and the scripts directory before you change files
+- Add or update the network section with the exact configuration below
+- If the network section exists, update it instead of adding a duplicate section
+- Keep unrelated configuration and code unchanged
+
+Acton.toml configuration:
+
+\`\`\`toml
 ${actonConfig}
+\`\`\`
 
-Then run a script on the localnet:
+Run an existing script with this command:
 
-${actonRunCommand}`
+\`\`\`shell
+${actonRunCommand}
+\`\`\`
+
+If scripts/deploy.tolk does not exist, replace that path with the relevant existing script
+
+Validation:
+- Run the selected script while Acton Studio and this environment are running
+- Report the files that you changed and the validation result`
   }
 
   if (target === "ton-client") {
-    return `Connect the JavaScript application to "${environmentName}" with @ton/ton:
+    return `Connect this JavaScript or TypeScript application to the Acton Studio environment "${environmentName}" with @ton/ton
 
+Requirements:
+- Inspect the package manager, existing TonClient creation, and endpoint configuration before you change files
+- Reuse the existing TonClient and configuration path when they exist
+- Do not create a second client or replace the project's package manager
+- If @ton/ton is missing, add it with the package manager that the project already uses
+- Keep existing client options and unrelated code unchanged
+
+TON Center v2 JSON-RPC endpoint: ${withoutTrailingSlash(urls.apiV2 ?? "")}/jsonRPC
+
+Use this setup only if the application has no TonClient:
+
+\`\`\`typescript
 ${tonClientSetup}
+\`\`\`
 
-Make requests with the same TonClient API as testnet and mainnet:
+Use this safe read request to validate the connection:
 
-${tonClientRequest}`
+\`\`\`typescript
+${tonClientRequest}
+\`\`\`
+
+The endpoint is available while Acton Studio and this environment are running
+
+Validation:
+- Run the project's existing typecheck and relevant tests
+- Run the read request against this environment
+- Report the files that you changed and the validation result`
   }
 
+  const v2JsonRpc = urls.apiV2 ? `${withoutTrailingSlash(urls.apiV2)}/jsonRPC` : undefined
   const endpointLines = [
     urls.apiV2 ? `TON Center v2: ${urls.apiV2}` : undefined,
+    v2JsonRpc ? `TON Center v2 JSON-RPC: ${v2JsonRpc}` : undefined,
     urls.apiV3 ? `TON Center v3: ${urls.apiV3}` : undefined,
     urls.explorer ? `Explorer: ${urls.explorer}` : undefined,
   ].filter((line): line is string => Boolean(line))
 
-  return `Connect the TON application to "${environmentName}" through Acton Studio. Find the Mainnet or Testnet TON Center endpoint in the application configuration, then replace it with the matching endpoint below.
+  return `Connect this TON application to the Acton Studio environment "${environmentName}"
 
-${endpointLines.join("\n")}`
+Requirements:
+- Search the configuration, .env files, and source code for current Mainnet or Testnet TON Center URLs
+- Identify the API version for each client from its current endpoint and request format
+- Replace each public endpoint base with the matching Acton Studio endpoint below
+- Keep existing request paths, HTTP methods, payloads, client options, and unrelated configuration unchanged
+- Do not convert TON Center v2 calls to v3 or v3 calls to v2
+
+Connection values:
+
+${endpointLines.map(line => `- ${line}`).join("\n")}
+
+Use the TON Center v2 JSON-RPC URL only for clients that require the complete JSON-RPC endpoint
+These endpoints are available while Acton Studio and this environment are running
+
+Validation:
+- Search again for public TON Center URLs and review every remaining match
+- Run the project's existing checks and one safe read request through the configured client
+- Report the files that you changed, the endpoints that you replaced, and the validation result`
 }
 
 function toAbsoluteUrl(value: string | undefined): string | undefined {
