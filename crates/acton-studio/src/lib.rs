@@ -1113,7 +1113,10 @@ async fn get_environment_startup(
         .environment_runtime
         .startup_state(&environment_id, query.tail.unwrap_or(100).min(200))
         .await
-        .map(Json)
+        .map(|mut startup| {
+            startup.logs = strip_terminal_escapes(&startup.logs);
+            Json(startup)
+        })
         .map_err(StudioApiError)
 }
 
@@ -1387,6 +1390,10 @@ async fn wallet_environment(
 }
 
 fn public_environment(mut environment: StudioEnvironment) -> StudioEnvironment {
+    if let Some(error) = environment.error.as_mut() {
+        *error = strip_terminal_escapes(error);
+    }
+
     let environment_root = format!(
         "{STUDIO_ENVIRONMENTS_PATH}/{}",
         urlencoding::encode(&environment.id)
@@ -1421,6 +1428,63 @@ fn public_environment(mut environment: StudioEnvironment) -> StudioEnvironment {
         .then(|| format!("{environment_root}/observability")),
     };
     environment
+}
+
+/// Removes terminal control sequences before process output crosses the browser API boundary.
+/// Durable localnet logs remain untouched so command-line diagnostics keep their original bytes.
+fn strip_terminal_escapes(text: &str) -> String {
+    strip_ansi_escapes::strip_str(text)
+}
+
+#[cfg(test)]
+mod terminal_output_tests {
+    use expect_test::expect;
+
+    use super::{public_environment, strip_terminal_escapes};
+    use crate::{
+        EnvironmentConfig, EnvironmentEndpoints, EnvironmentStatus, PublicTonNetwork,
+        StudioEnvironment,
+    };
+
+    #[test]
+    fn strips_terminal_escapes_from_container_output() {
+        let actual = [
+            "\u{1b}[1;36mworker output\u{1b}[0m",
+            "\u{1b}[32m INFO\u{1b}[0m \u{1b}[3moperation\u{1b}[0m=\"start\"",
+        ]
+        .map(strip_terminal_escapes)
+        .join("\n");
+
+        expect![[r#"worker output
+ INFO operation="start""#]]
+        .assert_eq(&actual);
+    }
+
+    #[test]
+    fn browser_environment_errors_are_plain_text() {
+        let mut environment = StudioEnvironment::new(
+            "failed-network",
+            "Failed network",
+            EnvironmentStatus::Failed,
+            EnvironmentConfig::RemoteTonNetwork {
+                network: PublicTonNetwork::Testnet,
+            },
+            EnvironmentEndpoints::default(),
+        );
+        environment.error = Some(
+            "\u{1b}[31mDocker failed\u{1b}[0m\nContainer logs:\n\u{1b}[1;36mworker failed\u{1b}[0m"
+                .to_owned(),
+        );
+
+        let error = public_environment(environment)
+            .error
+            .expect("failed environment should keep its diagnostic text");
+
+        expect![[r"Docker failed
+Container logs:
+worker failed"]]
+        .assert_eq(&error);
+    }
 }
 
 /// Apply account edits through a coordinated hardfork.
@@ -2262,7 +2326,7 @@ impl IntoResponse for StudioApiError {
             Json(StudioApiErrorBody {
                 error: StudioApiErrorDetails {
                     code,
-                    message: self.0.to_string(),
+                    message: strip_terminal_escapes(&self.0.to_string()),
                 },
             }),
         )
