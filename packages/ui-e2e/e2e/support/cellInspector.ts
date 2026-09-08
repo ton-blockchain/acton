@@ -250,7 +250,7 @@ async function installRegistryAbiRoute(
     await page.route("**/acton_getCompilerAbi?**", route => route.fulfill({json: {}}))
   }
 
-  await page.route("https://verifier.acton.monster/api/v1/abi?**", route =>
+  await page.route("https://verifier-staging.actonscan.com/api/v1/abi?**", route =>
     route.fulfill({
       json: {
         items: [
@@ -297,7 +297,7 @@ async function installVerifiedSourceRoute(
     return
   }
 
-  await page.route("https://verifier.acton.monster/api/v1/verification/source?**", route =>
+  await page.route("https://verifier-staging.actonscan.com/api/v1/verification/source?**", route =>
     route.fulfill({json: source}),
   )
 }
