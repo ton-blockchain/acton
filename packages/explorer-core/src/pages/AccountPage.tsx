@@ -9,7 +9,7 @@ import {Cell} from "@ton/core"
 
 import type {AccountHistorySortOrder, TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
-import {sortJettonWalletsByAmount} from "../api/jettonWallets"
+import {sortJettonWalletsForDisplay} from "../api/jettonWallets"
 import {isAddressSuspended} from "../api/suspendedAccounts"
 import type {
   AddressInformation,
@@ -1203,7 +1203,7 @@ export const AccountPage: FC<AccountPageProps> = ({
         })
         if (!isActive) return
         setAccountTokensState({
-          wallets: sortJettonWalletsByAmount(wallets),
+          wallets: sortJettonWalletsForDisplay(wallets),
           isLoading: false,
           isLoadingMore: false,
           hasMore: wallets.length === ACCOUNT_TOKENS_INITIAL_LIMIT,
@@ -1616,7 +1616,7 @@ export const AccountPage: FC<AccountPageProps> = ({
         })
         if (!isActive) return
         setJettonHoldersState({
-          wallets: sortJettonWalletsByAmount(masterHolders),
+          wallets: sortJettonWalletsForDisplay(masterHolders),
           loadedAccountKey: accountRequestKey,
           isLoading: false,
           isLoadingMore: false,
