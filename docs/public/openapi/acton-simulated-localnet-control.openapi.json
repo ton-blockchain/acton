@@ -14,7 +14,7 @@
   "tags": [
     {
       "name": "Localnet Control",
-      "description": "Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.\n\nThese routes are intended for local development tooling and should not be exposed publicly. When localnet is started with --require-auth, these routes require the localnet API token. Rate limiting applies only to /api routes, and response delay applies only to TonCenter-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled."
+      "description": "Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.\n\nThese routes are intended for local development tooling and should not be exposed publicly. When localnet is started with --require-auth, these routes require the localnet API token. Rate limiting applies only to /api routes, and response delay applies only to TON Center-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled."
     }
   ],
   "security": [
@@ -691,7 +691,7 @@
         "tags": ["Localnet Control"],
         "operationId": "sendInternalMessage",
         "summary": "Send a raw internal message",
-        "description": "Injects a base64-encoded internal message BOC into the local internal queue. TonCenter-compatible message endpoints accept external-in messages only.",
+        "description": "Injects a base64-encoded internal message BOC into the local internal queue. TON Center-compatible message endpoints accept external-in messages only.",
         "requestBody": {
           "required": true,
           "content": {
@@ -877,7 +877,7 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key",
-        "description": "Alternative localnet API token header for TonCenter-compatible clients."
+        "description": "Alternative localnet API token header for TON Center-compatible clients."
       }
     },
     "parameters": {
@@ -2058,7 +2058,7 @@
           "response_delay_ms": {
             "type": "integer",
             "minimum": 0,
-            "description": "Response delay in milliseconds for TonCenter-compatible API responses."
+            "description": "Response delay in milliseconds for TON Center-compatible API responses."
           }
         }
       },

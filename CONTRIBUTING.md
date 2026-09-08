@@ -197,7 +197,7 @@ disabled.
 ### Bundled mainnet config
 
 Acton embeds a default mainnet blockchain config for local emulation in
-`crates/ton-executor/src/default_config.boc64`. Refresh it from TonCenter with:
+`crates/ton-executor/src/default_config.boc64`. Refresh it from TON Center with:
 
 ```bash
 cargo xtask update-default-config
@@ -205,7 +205,7 @@ cargo xtask update-default-config
 
 The task fetches `getConfigAll`, validates that `result.config.bytes` is a valid
 BOC, and writes the base64 string into the bundled config file. The
-`ton-executor` test suite also checks the bundled value against TonCenter when
+`ton-executor` test suite also checks the bundled value against TON Center when
 the endpoint is available; network, HTTP, or invalid-response failures are
 reported as a skipped check rather than a failing test.
 
@@ -685,19 +685,19 @@ Rules:
 
 ## Useful environment variables
 
-- `TONCENTER_MAINNET_API_KEY`: API key for TonCenter mainnet requests.
-- `TONCENTER_TESTNET_API_KEY`: API key for TonCenter testnet requests.
+- `TONCENTER_MAINNET_API_KEY`: API key for TON Center mainnet requests.
+- `TONCENTER_TESTNET_API_KEY`: API key for TON Center testnet requests.
 - `ACTON_STUDIO_TONCENTER_MAINNET_API_KEY` and
   `ACTON_STUDIO_TONCENTER_TESTNET_API_KEY`: build-time application keys embedded
   in the Rust binary for Studio's public-network requests. Runtime
   `TONCENTER_MAINNET_API_KEY` and `TONCENTER_TESTNET_API_KEY` values override them.
 - `VITE_LOCALNET_TONCENTER_API_KEY`: API key sent by the localnet UI to
-  TonCenter-compatible `/api/v2` and `/api/v3` endpoints.
+  TON Center-compatible `/api/v2` and `/api/v3` endpoints.
 - `DISABLE_TMP_DIR_CLEANUP_IN_TESTS=1`: preserve temp test directories.
 - `ACTON_LOG_DIR`: custom directory for Acton debug logs.
 
 In generated projects, `.env` is usually the simplest place to set the
-TonCenter keys because Acton loads that file automatically.
+TON Center keys because Acton loads that file automatically.
 
 Release and published trunk builds require the `TONCENTER_MAINNET_API_KEY` and
 `TONCENTER_TESTNET_API_KEY` GitHub Actions secrets. The build workflows pass them

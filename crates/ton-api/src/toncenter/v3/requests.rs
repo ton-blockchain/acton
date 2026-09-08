@@ -295,7 +295,7 @@ pub struct EstimateFeeRequest {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PendingTransactionsQuery {
-    /// `TonCenter` currently requires at least one account even though its Swagger marks it optional.
+    /// `TON Center` currently requires at least one account even though its Swagger marks it optional.
     #[serde(default)]
     pub account: Vec<String>,
     #[serde(default)]

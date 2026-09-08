@@ -4,14 +4,14 @@ This document describes how to deploy the verifier backend as a Docker service o
 
 The Docker image contains the verifier backend, Node.js, the compiler worker,
 Git, and OpenSSH. It does not run a TON node. The verifier always needs a
-TonCenter v3 endpoint for TON testnet payment verification.
+TON Center v3 endpoint for TON testnet payment verification.
 
 ## Architecture
 
 At runtime the service needs:
 
 - Verifier HTTP backend exposed on port `3000`.
-- TonCenter-compatible API endpoint for address-to-code-hash resolution.
+- TON Center-compatible API endpoint for address-to-code-hash resolution.
 - Testnet wallet address that receives verification payments.
 - SQLite payment ledger that prevents transaction replay.
 - Git source repository for verified source bundles.
@@ -250,7 +250,7 @@ known replay records. A failed scan retries with an exponential delay.
 
 One payment permits at most three verification claims. The limit includes a
 claim that resumes after an expired processing lease. Later claims fail as
-used without another TonCenter request.
+used without another TON Center request.
 
 ## Systemd Wrapper
 
@@ -463,7 +463,7 @@ Common causes:
 - Host key verification blocks the first connection.
 - The branch configured in `SOURCE_REPOSITORY_BRANCH` is protected.
 
-### TonCenter lookup fails
+### TON Center lookup fails
 
 Check:
 
@@ -518,7 +518,7 @@ Binding to `127.0.0.1:3000` inside the container will not expose the service cor
 - Run one write-capable verifier instance for each payment wallet. SQLite does
   not coordinate payment claims or startup recovery across replicas.
 - Keep only one verifier instance writing to the same Git checkout. The current Git storage lock is process-local.
-- Treat the configured TonCenter provider as trusted for payment data and
+- Treat the configured TON Center provider as trusted for payment data and
   finality. The provider sees the payment address, wallet-history reads, and
   transaction hashes.
 - Before changing the payment address or increasing the minimum amount, stop
@@ -535,5 +535,5 @@ Binding to `127.0.0.1:3000` inside the container will not expose the service cor
   alone does not stop a funded attacker.
 - Do not submit secrets in source files. Git and the source API publish every
   accepted source bundle.
-- Monitor logs for failed Git pushes, compiler errors, and TonCenter API errors.
+- Monitor logs for failed Git pushes, compiler errors, and TON Center API errors.
 - Monitor `/healthz` for payment-history recovery failures.

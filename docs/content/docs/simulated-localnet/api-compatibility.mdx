@@ -1,6 +1,6 @@
 ---
 title: "API compatibility"
-description: "Coverage matrix for Acton's simulated LiteAPI, TonCenter v2/v3, Streaming API, and Emulate API surfaces"
+description: "Coverage matrix for Acton's simulated LiteAPI, TON Center v2/v3, Streaming API, and Emulate API surfaces"
 ---
 
 Acton simulated localnet implements the TON-compatible surfaces listed on this page for local
@@ -8,7 +8,7 @@ contract and dApp workflows. It is Acton's custom simplified implementation, not
 network. Use the coverage matrices to decide whether a workflow can use the simulation or
 requires a Full localnet.
 
-## TonCenter v2 Coverage Matrix
+## TON Center v2 Coverage Matrix
 
 | Method | Endpoint                                | Available in local node | OpenAPI summary                     |
 |--------|-----------------------------------------|-------------------------|-------------------------------------|
@@ -48,22 +48,22 @@ requires a Full localnet.
 | `POST` | `/api/v2/runGetMethod`                  | ✅                       | Run get method                      |
 | `POST` | `/api/v2/runGetMethodStd`               | ✅                       | Run get method with std stack       |
 
-## TonCenter v3 Coverage Matrix
+## TON Center v3 Coverage Matrix
 
-The matrix below tracks all endpoints from the current TonCenter v3 OpenAPI specification.
+The matrix below tracks all endpoints from the current TON Center v3 OpenAPI specification.
 
 | Method | Endpoint                                 | Available in local node | Purpose                                                              |
 |--------|------------------------------------------|-------------------------|----------------------------------------------------------------------|
 | `GET`  | `/api/v3/traces`                         | ✅                       | Returns transaction trace tree for a transaction hash.               |
-| `GET`  | `/api/v3/blocks`                         | ✅                       | Returns block metadata with TonCenter v3 blockchain filters.         |
+| `GET`  | `/api/v3/blocks`                         | ✅                       | Returns block metadata with TON Center v3 blockchain filters.         |
 | `GET`  | `/api/v3/accountStates`                  | ✅                       | Returns account states with `interfaces` and token metadata.         |
 | `GET`  | `/api/v3/addressInformation`             | ✅                       | Returns account state in `V2AddressInformation` shape.               |
 | `GET`  | `/api/v3/walletInformation`              | ✅                       | Returns wallet type, state, seqno, and wallet id when available.     |
 | `GET`  | `/api/v3/addressBook`                    | ✅                       | Returns address forms and locally detected interfaces.               |
 | `GET`  | `/api/v3/metadata`                       | ✅                       | Returns locally indexed jetton and NFT metadata.                     |
 | `GET`  | `/api/v3/masterchainInfo`                | ✅                       | Returns the first and latest local masterchain blocks.               |
-| `GET`  | `/api/v3/transactions`                   | ✅                       | Returns transactions with TonCenter v3 blockchain filters.           |
-| `GET`  | `/api/v3/messages`                       | ✅                       | Returns messages with TonCenter v3 filters.                          |
+| `GET`  | `/api/v3/transactions`                   | ✅                       | Returns transactions with TON Center v3 blockchain filters.           |
+| `GET`  | `/api/v3/messages`                       | ✅                       | Returns messages with TON Center v3 filters.                          |
 | `GET`  | `/api/v3/adjacentTransactions`           | ✅                       | Returns transactions connected by inbound or outbound messages.      |
 | `GET`  | `/api/v3/walletStates`                   | ✅                       | Returns wallet projections for existing account states.              |
 | `GET`  | `/api/v3/topAccountsByBalance`           | ✅                       | Returns accounts sorted by balance.                                  |
@@ -98,7 +98,7 @@ message bodies retain `body_raw` and use `parsed_body_type: "unknown"`.
 
 ## Streaming API v2
 
-Acton simulated localnet supports a TonCenter Streaming API v2-compatible
+Acton simulated localnet supports a TON Center Streaming API v2-compatible
 subset for local tools and the bundled explorer UI. For protocol details,
 request fields, finality behavior, and notification schemas, use the
 [official TON Center Streaming API documentation](https://docs.ton.org/api/streaming/overview).

@@ -55,7 +55,7 @@ integration remains hidden and preview-only.
 
 - Added `acton rpc call <address> <method> [args...]` for typed get-method calls
   on mainnet, testnet, localnet, and custom networks. It accepts ABI method names
-  or numeric ids, parses Tolk values, decodes results, supports raw TonCenter
+  or numeric ids, parses Tolk values, decodes results, supports raw TON Center
   stacks, and emits structured JSON errors.
 - `acton rpc call` and `acton rpc info` gained `--block-number` for pinned
   masterchain state and `--abi <path>` for explicit compiler ABI JSON or Tolk
@@ -148,7 +148,7 @@ integration remains hidden and preview-only.
   zero padding that ignores ANSI escape sequences.
 - Dynamic pack/unpack and rendering now cover `bitsN`, bit-string map keys,
   `addr_none`, maps, generic containers, large numeric values, and legacy empty
-  TonCenter list values more consistently.
+  TON Center list values more consistently.
 - Added linter rule `E031`, `unnecessary-not-null-assertion`, with a safe
   automatic fix. Compiler and linter diagnostics are also available through the
   language server.
@@ -189,7 +189,7 @@ integration remains hidden and preview-only.
   authors, block-time measurements, transaction throughput, and pending queue
   data, and can promote an existing full node to a validator.
 - Packaged Studio builds can access mainnet and testnet without separate runtime
-  TonCenter API-key configuration.
+  TON Center API-key configuration.
 - Studio gained explorer, tests, contracts, simulator tools, debugger, faucet,
   wallets, snapshots, API reference, configuration, control API, settings, and
   troubleshooting pages, plus a complete documentation section.
@@ -213,12 +213,12 @@ integration remains hidden and preview-only.
   through `acton simulated-localnet checkpoint`, including import and export over HTTP.
   Imports validate histories, hashes, references, transactions, messages,
   queues, and configuration before atomic replacement.
-- Added typed TonCenter v2, v3, Emulation, and Streaming APIs with stable error
+- Added typed TON Center v2, v3, Emulation, and Streaming APIs with stable error
   models, browser CORS, SSE and WebSocket subscriptions, paged histories, rate
   limiting, configurable latency, and API-call timing. Metadata lookup supports
   batched address names and compiler ABIs, and get methods on nonexistent or
   uninitialized accounts return exit code `-13`.
-- Expanded TonCenter compatibility across blocks, messages, transactions,
+- Expanded TON Center compatibility across blocks, messages, transactions,
   accounts, wallet and token data, masterchain and shard state, fee estimation,
   Jetton and NFT activity, DNS, multisig, vesting, pending data, address books,
   metadata, and Ton Connect emulation.
@@ -275,7 +275,7 @@ integration remains hidden and preview-only.
 ### Actonscan and Explorer
 
 - Added standalone Actonscan for mainnet, testnet, and custom
-  TonCenter-compatible networks. Custom networks can be edited, persisted, and
+  TON Center-compatible networks. Custom networks can be edited, persisted, and
   shared without API keys; address formatting, history, names, and branding are
   network-aware.
 - Added account, transaction, action, block, token, Jetton, NFT, Locker,
@@ -323,7 +323,7 @@ integration remains hidden and preview-only.
   token formatting; streaming account updates; historical navigation; lazy
   account and block loading; copy actions; QR and address variants; Open Graph
   images; installable-app metadata; and responsive layouts.
-- Added edge-cached historical TonCenter proxies for mainnet and testnet and a
+- Added edge-cached historical TON Center proxies for mainnet and testnet and a
   network TPS panel backed by the Actonscan backend.
 - Repeated ABI catalog updates added hundreds of opcode and code-hash mappings,
   substantially reducing unknown messages in sampled traces.
@@ -379,7 +379,7 @@ integration remains hidden and preview-only.
 ### Testnet Faucet
 
 - Added the Rust testnet faucet service with proof-of-work challenge and claim
-  endpoints, SQLite-backed jobs, one wallet worker, TonCenter retries, Valkey
+  endpoints, SQLite-backed jobs, one wallet worker, TON Center retries, Valkey
   windows, structured logs, graceful shutdown, health, version, statistics,
   OpenAPI, Docker, and deployment workflows.
 - Challenges are bounded, expiring, versioned, atomically consumed, tied to the
@@ -666,7 +666,7 @@ update, and a broad documentation refresh.
 - Added an initial OpenAPI description for the localnet control API and docs
   generation support for that API.
 - Localnet now uses `127.0.0.1` instead of `localhost` for generated endpoints.
-- Internal messages sent through TonCenter-compatible endpoints are now
+- Internal messages sent through TON Center-compatible endpoints are now
   rejected, with raw internal-message flows moved to the Acton-specific
   endpoint.
 - Added work-in-progress wallet support, faucet simplification, explorer
@@ -955,7 +955,7 @@ linter, formatter, docs, templates, and editor integrations.
   running, while `acton up` remains available from the same directory so users
   can install the expected version.
 - New projects and templates now pin the current Acton version, include clearer
-  `.env.example` guidance, and document proxy and TonCenter API-key behavior
+  `.env.example` guidance, and document proxy and TON Center API-key behavior
   more explicitly.
 - Added `acton init --stdlib-only` for refreshing `.acton/` without reading or
   patching `Acton.toml`.
@@ -967,7 +967,7 @@ linter, formatter, docs, templates, and editor integrations.
 - Testnet wallet airdrop requests now include a stable non-empty
   `x-device-uid` header derived from the local machine identifier, while
   keeping the device value out of the JSON claim payload.
-- Added `acton rpc trace` for rendering TonCenter v3 traces as stable decoded
+- Added `acton rpc trace` for rendering TON Center v3 traces as stable decoded
   transaction trees, plus `acton rpc block` and `acton rpc block-number` for
   latest masterchain block inspection.
 - Added Nushell support to `acton completions`, while the completion generator
@@ -999,7 +999,7 @@ linter, formatter, docs, templates, and editor integrations.
   `package.json` and `package-lock.json` field order, avoiding unnecessary
   lockfile churn in generated projects.
 - Counter, Jetton, NFT, empty-app, and wallet-extension templates were refined
-  with owner checks, cleaner tests, better TonCenter key handling, Tolk
+  with owner checks, cleaner tests, better TON Center key handling, Tolk
   metadata strings, fewer unnecessary casts, and more consistent generated app
   wiring.
 - Jetton, NFT, and wallet-extension template tests now use more consistent
@@ -1023,7 +1023,7 @@ linter, formatter, docs, templates, and editor integrations.
   earlier, reports missing wallets with better setup guidance, and correctly
   merges CLI flags with `Acton.toml` settings.
 - Fork-mode tests now preserve remote last-transaction LT/hash metadata from
-  TonCenter, and additional fork-mode coverage was added for scripts and
+  TON Center, and additional fork-mode coverage was added for scripts and
   test-runner flows.
 - Mutation testing now checks that the baseline test run is green before
   mutating and gives clearer output when filtering selects no baseline tests.
@@ -1253,7 +1253,7 @@ found after 0.3.1.
 ### Fixed
 
 - Fixed wrapper generation around unused imports and shard address calculation.
-- Fixed NFT and Jetton template issues, including TonCenter key handling in app
+- Fixed NFT and Jetton template issues, including TON Center key handling in app
   templates.
 - Fixed the Counter app template by aligning wallet flows with TonConnect UI.
 - Fixed `net.isDeployed` and related matcher logic for prefunded and
@@ -1332,7 +1332,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   jobs, or shell aliases, remove it everywhere. If you still want local
   execution against remote state, keep using `--fork-net` without `--net`.
 
-- TonCenter authentication is now environment-only and split by network.
+- TON Center authentication is now environment-only and split by network.
   User-facing `--api-key` flags and the `[test].api-key` config field were
   removed. Use `TONCENTER_TESTNET_API_KEY` for testnet flows and
   `TONCENTER_MAINNET_API_KEY` for mainnet flows.
@@ -1550,7 +1550,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   the already-existing `localnet` network name.
 - Added a bundled localnet explorer UI with better account pages, ABI-aware
   contract display, wallet support in `v3/accountStates`, account type
-  reporting, opcode display, and broader TonCenter v3 compatibility.
+  reporting, opcode display, and broader TON Center v3 compatibility.
 - Added state persistence controls for localnet startup and shutdown via JSON
   load/dump flows, plus clearer localnet wallet-airdrop guidance across CLI
   errors.

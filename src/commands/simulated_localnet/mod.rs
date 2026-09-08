@@ -63,7 +63,7 @@ pub async fn simulated_localnet_start_cmd(
         "Notice".yellow().bold()
     );
     println!(
-        "             It provides TON-compatible blocks, LiteAPI, TonCenter v2/v3, Streaming API, and Emulate API"
+        "             It provides TON-compatible blocks, LiteAPI, TON Center v2/v3, Streaming API, and Emulate API"
     );
 
     if load_state.is_some() && db_path.is_some() {

@@ -94,7 +94,7 @@ fn assert_api_key_header(request: &CapturedToncenterRequest) {
     assert_eq!(
         header_value(request, "X-API-Key"),
         Some(TEST_API_KEY),
-        "expected TonCenter request to carry X-API-Key header"
+        "expected TON Center request to carry X-API-Key header"
     );
 }
 
@@ -699,7 +699,7 @@ fn test_disasm_from_blockchain_custom_network_address_with_mock_toncenter() {
     assert_eq!(captured[0].method, "GET");
     assert!(
         captured[0].path.starts_with("/accountStates?address="),
-        "unexpected TonCenter path: {}",
+        "unexpected TON Center path: {}",
         captured[0].path
     );
     assert_api_key_header(&captured[0]);

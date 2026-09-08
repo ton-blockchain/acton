@@ -211,7 +211,7 @@ impl ToncenterClient {
                 }
 
                 return Err(anyhow!(
-                    "TonCenter API returned status: {} for {}. Error: {}",
+                    "TON Center API returned status: {} for {}. Error: {}",
                     status,
                     operation,
                     body
@@ -235,7 +235,7 @@ impl ToncenterClient {
                 }
 
                 return Err(anyhow!(
-                    "TonCenter JSON-RPC error for {}: {}",
+                    "TON Center JSON-RPC error for {}: {}",
                     operation,
                     error
                 ));

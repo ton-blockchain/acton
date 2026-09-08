@@ -117,14 +117,14 @@ pub enum ContractDependency {
     },
 }
 
-/// `TonCenter` API endpoints for a custom network
+/// `TON Center` API endpoints for a custom network
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CustomNetworkApiConfig {
-    /// The URL for the `TonCenter` API v2. For localnet this defaults to
+    /// The URL for the `TON Center` API v2. For localnet this defaults to
     /// `http://127.0.0.1:<localnet.port>/api/v2` with `5411` as the fallback port
     pub v2: Option<String>,
-    /// The URL for the `TonCenter` API v3. For localnet this defaults to
+    /// The URL for the `TON Center` API v3. For localnet this defaults to
     /// `http://127.0.0.1:<localnet.port>/api/v3` with `5411` as the fallback port
     pub v3: Option<String>,
 }
@@ -141,7 +141,7 @@ pub struct CustomNetworkConfig {
     /// Base URL used to build transaction links for this network. Acton appends
     /// `/tx/<hash>` automatically and derives links from `api.v2` when omitted
     pub explorer: Option<String>,
-    /// `TonCenter` API endpoints for this network
+    /// `TON Center` API endpoints for this network
     pub api: Option<CustomNetworkApiConfig>,
 }
 

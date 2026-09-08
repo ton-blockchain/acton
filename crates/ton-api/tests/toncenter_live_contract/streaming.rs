@@ -28,7 +28,7 @@ fn subscription(address: String) -> Subscription {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test; requires an API key"]
+#[ignore = "optional live TON Center contract test; requires an API key"]
 fn sse_subscription_request_and_status_response() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     if live.require_api_key().is_none() {
@@ -67,7 +67,7 @@ fn sse_subscription_request_and_status_response() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test; requires an API key"]
+#[ignore = "optional live TON Center contract test; requires an API key"]
 fn websocket_request_covers_ping_subscribe_and_unsubscribe() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let Some(api_key) = live.require_api_key() else {
@@ -83,9 +83,9 @@ fn websocket_request_covers_ping_subscribe_and_unsubscribe() -> Result<()> {
     );
     let request = url
         .into_client_request()
-        .context("invalid live TonCenter WebSocket URL")?;
+        .context("invalid live TON Center WebSocket URL")?;
     live.wait_for_rate_limit()?;
-    let (mut socket, _) = connect(request).context("live TonCenter WebSocket handshake failed")?;
+    let (mut socket, _) = connect(request).context("live TON Center WebSocket handshake failed")?;
 
     send_and_expect_status(
         &mut socket,

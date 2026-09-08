@@ -15,11 +15,11 @@ Query blockchain account state through a configured network endpoint.
 `acton rpc` is intended for fast inspection workflows when you want to:
 
 - fetch the latest masterchain block number for a network
-- inspect the latest masterchain block object returned by TonCenter
+- inspect the latest masterchain block object returned by TON Center
 - call contract get-methods with ABI-parsed or raw TVM stack arguments
 - check whether an account is active, frozen, or uninitialized
 - inspect balance, last transaction metadata, and state hashes
-- render a TonCenter v3 trace as a decoded transaction tree
+- render a TON Center v3 trace as a decoded transaction tree
 - match deployed code against a local Acton project by `code_hash`
 - decode account storage and get-method results through local, bundled, or
   verifier ABI metadata when a match is found
@@ -91,7 +91,7 @@ and reports that decoded storage is unavailable.
 
 ### acton rpc call
 
-Call a contract get-method through TonCenter.
+Call a contract get-method through TON Center.
 
 #### Synopsis
 
@@ -140,7 +140,7 @@ field value.
 {{/option}}
 
 {{#option "`--raw`" }}
-Print the raw TonCenter stack without ABI decoding.
+Print the raw TON Center stack without ABI decoding.
 {{/option}}
 
 {{/options}}
@@ -184,14 +184,14 @@ addresses, `addr_none`, plain BoC hex as `cell`, and explicit `cell:`, `slice:`,
 
 When ABI metadata is available and the result stack width matches the
 get-method return type, Acton prints the decoded Tolk value. Otherwise it prints
-the raw TonCenter stack in a compact field-per-line format.
+the raw TON Center stack in a compact field-per-line format.
 
 Raw output uses decimal integers, URL-friendly addresses, `addr_none` for
 two-bit none addresses, and one `fieldN: type = value` line per stack item.
 
 ### acton rpc block
 
-Print the latest masterchain block info returned by TonCenter.
+Print the latest masterchain block info returned by TON Center.
 
 #### Synopsis
 
@@ -214,7 +214,7 @@ Supported values include `mainnet`, `testnet`, `localnet`, and
 
 #### Output
 
-`acton rpc block` prints the full TonCenter `getMasterchainInfo` JSON response
+`acton rpc block` prints the full TON Center `getMasterchainInfo` JSON response
 for the selected network.
 
 ### acton rpc block-number
@@ -247,7 +247,7 @@ decimal number.
 
 ### acton rpc trace
 
-Fetch a TonCenter v3 trace by root transaction hash and render it in a stable
+Fetch a TON Center v3 trace by root transaction hash and render it in a stable
 text format.
 
 #### Synopsis
@@ -259,7 +259,7 @@ text format.
 {{#options command="acton rpc trace"}}
 
 {{#option "_hash_" }}
-Root transaction hash to query through TonCenter v3 `/traces`.
+Root transaction hash to query through TON Center v3 `/traces`.
 {{/option}}
 
 {{#option "`--net` _network_" }}
@@ -314,14 +314,14 @@ entry, or verifier response, Acton prints the matched contract name. Add
 
 ## Network Resolution
 
-- `mainnet` and `testnet` use the built-in TonCenter endpoints
+- `mainnet` and `testnet` use the built-in TON Center endpoints
 - `localnet` uses the configured localnet or its default URL
 - `custom:<name>` resolves through `[networks.<name>]` in `Acton.toml`
 
 For `custom:<name>`, Acton needs access to the selected project or manifest so
 it can read the custom network configuration.
 
-## TonCenter API Keys
+## TON Center API Keys
 
 Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
 `TONCENTER_TESTNET_API_KEY`, depending on the selected network.

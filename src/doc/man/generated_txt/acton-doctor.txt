@@ -92,7 +92,7 @@ API REACHABILITY
        After the local environment report, acton doctor probes the default
        remote services Acton commonly uses:
 
-       o  TonCenter v2 and v3 for mainnet and testnet
+       o  TON Center v2 and v3 for mainnet and testnet
 
        o  TonHub v4 for mainnet and testnet
 

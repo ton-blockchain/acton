@@ -12,7 +12,7 @@ fn live() -> Result<Option<Live>> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn address_information_query_covers_v2_switch() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let account = fixture(&live)?.transaction.account.clone();
@@ -31,7 +31,7 @@ fn address_information_query_covers_v2_switch() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn wallet_information_query_covers_wallet_and_no_state_account() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
 
@@ -51,7 +51,7 @@ fn wallet_information_query_covers_wallet_and_no_state_account() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn masterchain_info_response_matches_typed_contract() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let response: v3::MasterchainInfo = live.get(
@@ -64,7 +64,7 @@ fn masterchain_info_response_matches_typed_contract() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn address_book_query_covers_repeated_addresses() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let response: v3::AddressBook = live.get(
@@ -80,7 +80,7 @@ fn address_book_query_covers_repeated_addresses() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn metadata_query_covers_token_and_plain_account() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let response: v3::Metadata = live.get(
@@ -100,7 +100,7 @@ fn metadata_query_covers_token_and_plain_account() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn transactions_by_masterchain_block_query_covers_pagination_and_sorting() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let info: v3::MasterchainInfo = live.get(
@@ -122,7 +122,7 @@ fn transactions_by_masterchain_block_query_covers_pagination_and_sorting() -> Re
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn messages_query_covers_hash_addresses_ranges_directions_and_externals() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let transaction = &fixture(&live)?.transaction;
@@ -189,7 +189,7 @@ fn messages_query_covers_hash_addresses_ranges_directions_and_externals() -> Res
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn adjacent_transactions_query_and_response_match_typed_contract() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let transaction = &fixture(&live)?.transaction;
@@ -226,7 +226,7 @@ fn adjacent_transactions_query_and_response_match_typed_contract() -> Result<()>
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn wallet_states_query_covers_wallet_contract_and_no_state_account() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let response: v3::WalletStatesResponse = live.get(
@@ -252,7 +252,7 @@ fn wallet_states_query_covers_wallet_contract_and_no_state_account() -> Result<(
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn top_accounts_by_balance_query_and_response_match_typed_contract() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let accounts: Vec<v3::AccountBalance> = live.get(
@@ -271,7 +271,7 @@ fn top_accounts_by_balance_query_and_response_match_typed_contract() -> Result<(
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn estimate_fee_request_and_response_match_typed_contract() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let messages: v3::MessagesResponse = live.get(
@@ -312,7 +312,7 @@ fn estimate_fee_request_and_response_match_typed_contract() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn pending_actions_query_and_response_match_typed_contract() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let fixture = fixture(&live)?;
@@ -336,7 +336,7 @@ fn pending_actions_query_and_response_match_typed_contract() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn pending_traces_query_and_response_match_typed_contract() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let fixture = fixture(&live)?;
@@ -357,7 +357,7 @@ fn pending_traces_query_and_response_match_typed_contract() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn account_states_query_covers_repeated_addresses_and_boc() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let fixture = fixture(&live)?;
@@ -381,7 +381,7 @@ fn account_states_query_covers_repeated_addresses_and_boc() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn traces_query_covers_hash_account_ranges_actions_and_sorting() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let transaction = &fixture(&live)?.transaction;
@@ -430,7 +430,7 @@ fn traces_query_covers_hash_account_ranges_actions_and_sorting() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn transactions_query_covers_hash_block_account_ranges_and_exclusion() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let fixture = fixture(&live)?;
@@ -474,7 +474,7 @@ fn transactions_query_covers_hash_block_account_ranges_and_exclusion() -> Result
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn blocks_query_covers_hash_block_ranges_and_sorting() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let block = &fixture(&live)?.block;
@@ -509,7 +509,7 @@ fn blocks_query_covers_hash_block_ranges_and_sorting() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn masterchain_block_shard_queries_match_typed_contracts() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let seqno = i32::try_from(fixture(&live)?.transaction.mc_block_seqno)?;
@@ -532,7 +532,7 @@ fn masterchain_block_shard_queries_match_typed_contracts() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn transactions_by_message_query_covers_hash_body_opcode_and_direction() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let transaction = &fixture(&live)?.transaction;
@@ -576,7 +576,7 @@ fn transactions_by_message_query_covers_hash_body_opcode_and_direction() -> Resu
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn pending_transactions_query_covers_account_and_trace_filters() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let transaction = &fixture(&live)?.transaction;
@@ -598,7 +598,7 @@ fn pending_transactions_query_covers_account_and_trace_filters() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn jetton_masters_query_covers_pagination_address_and_admin() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let initial: v3::JettonMastersResponse = live.get(
@@ -627,7 +627,7 @@ fn jetton_masters_query_covers_pagination_address_and_admin() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn jetton_wallets_query_covers_filters_balance_and_sorting() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let masters: v3::JettonMastersResponse = live.get(
@@ -673,7 +673,7 @@ fn jetton_wallets_query_covers_filters_balance_and_sorting() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn nft_items_query_covers_filters_sale_and_sorting() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let initial: v3::NftItemsResponse = live.get(
@@ -708,7 +708,7 @@ fn nft_items_query_covers_filters_sale_and_sorting() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn dns_records_query_and_response_match_typed_contract() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let response: v3::DnsRecordsResponse = live.get(
@@ -726,7 +726,7 @@ fn dns_records_query_and_response_match_typed_contract() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn jetton_transfers_query_and_response_match_typed_contract() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let initial: v3::JettonTransfersResponse = live.get(
@@ -762,7 +762,7 @@ fn jetton_transfers_query_and_response_match_typed_contract() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn jetton_burns_query_and_response_match_typed_contract() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let initial: v3::JettonBurnsResponse = live.get(
@@ -797,7 +797,7 @@ fn jetton_burns_query_and_response_match_typed_contract() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn nft_collections_query_and_response_match_typed_contract() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let initial: v3::NftCollectionsResponse = live.get(
@@ -825,7 +825,7 @@ fn nft_collections_query_and_response_match_typed_contract() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn nft_sales_query_covers_no_state_address() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let _: v3::NftSalesResponse = live.get(
@@ -839,7 +839,7 @@ fn nft_sales_query_covers_no_state_address() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn nft_transfers_query_and_response_match_typed_contract() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let initial: v3::NftTransfersResponse = live.get(
@@ -875,7 +875,7 @@ fn nft_transfers_query_and_response_match_typed_contract() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn multisig_orders_query_covers_no_state_address() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     for parse_actions in [None, Some(false), Some(true)] {
@@ -896,7 +896,7 @@ fn multisig_orders_query_covers_no_state_address() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn multisig_wallets_query_covers_no_state_address() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     for include_orders in [None, Some(false), Some(true)] {
@@ -917,7 +917,7 @@ fn multisig_wallets_query_covers_no_state_address() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn vesting_query_covers_no_state_address() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     for check_whitelist in [None, Some(false), Some(true)] {
@@ -937,7 +937,7 @@ fn vesting_query_covers_no_state_address() -> Result<()> {
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn send_message_request_deserializes_real_error_without_broadcasting() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
 
@@ -960,7 +960,7 @@ fn send_message_request_deserializes_real_error_without_broadcasting() -> Result
 }
 
 #[test]
-#[ignore = "optional live TonCenter contract test"]
+#[ignore = "optional live TON Center contract test"]
 fn run_get_method_request_and_response() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
 

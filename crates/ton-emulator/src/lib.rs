@@ -13,7 +13,7 @@
 //! - [`WorldState`]: Manages the state of all emulated accounts, logical time (LT),
 //!   and global libraries.
 //! - [`AccountsState`]: Defines how account data is retrieved, supporting both purely
-//!   local in-memory state and forked state from `TonCenter`.
+//!   local in-memory state and forked state from `TON Center`.
 //!
 //! ## Key Features
 //!

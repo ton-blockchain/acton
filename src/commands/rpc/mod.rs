@@ -51,7 +51,7 @@ pub enum RpcCommand {
         #[arg(long, help = "Skip domain inspectors such as jetton detection")]
         raw: bool,
     },
-    #[command(about = "Call a contract get-method through TonCenter")]
+    #[command(about = "Call a contract get-method through TON Center")]
     Call {
         #[arg(help = "Contract address in friendly or raw format")]
         address: String,
@@ -86,10 +86,10 @@ pub enum RpcCommand {
             help = "Include ABI field comments in the result"
         )]
         with_comments: bool,
-        #[arg(long, help = "Print the raw TonCenter stack without ABI decoding")]
+        #[arg(long, help = "Print the raw TON Center stack without ABI decoding")]
         raw: bool,
     },
-    #[command(about = "Print the latest masterchain block info returned by TonCenter")]
+    #[command(about = "Print the latest masterchain block info returned by TON Center")]
     Block {
         #[arg(
             long,
@@ -105,9 +105,9 @@ pub enum RpcCommand {
         )]
         net: Option<String>,
     },
-    #[command(about = "Render a TonCenter v3 trace as a decoded transaction tree")]
+    #[command(about = "Render a TON Center v3 trace as a decoded transaction tree")]
     Trace {
-        #[arg(help = "Root transaction hash to query through TonCenter v3 /traces")]
+        #[arg(help = "Root transaction hash to query through TON Center v3 /traces")]
         hash: String,
         #[arg(
             long,

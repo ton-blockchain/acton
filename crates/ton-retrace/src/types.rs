@@ -21,7 +21,7 @@ pub struct BaseTxInfo {
     pub address: StdAddr,
 }
 
-// --- TonCenter v3 API Types ---
+// --- TON Center v3 API Types ---
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct TransactionData {

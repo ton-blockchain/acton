@@ -47,7 +47,7 @@ impl Live {
             .connect_timeout(Duration::from_secs(10))
             .timeout(REQUEST_TIMEOUT)
             .build()
-            .context("failed to construct live TonCenter HTTP client")?;
+            .context("failed to construct live TON Center HTTP client")?;
 
         Ok(Some(Self {
             client,
@@ -164,7 +164,7 @@ impl Live {
         let lock = LAST_REQUEST.get_or_init(|| Mutex::new(None));
         let mut last = lock
             .lock()
-            .map_err(|_| anyhow::anyhow!("live TonCenter rate limiter is poisoned"))?;
+            .map_err(|_| anyhow::anyhow!("live TON Center rate limiter is poisoned"))?;
         if let Some(previous) = *last {
             thread::sleep(delay.saturating_sub(previous.elapsed()));
         }
@@ -181,7 +181,7 @@ impl Live {
         self.wait_for_rate_limit()?;
         self.authorized(request)
             .send()
-            .with_context(|| format!("{operation}: live TonCenter request failed"))
+            .with_context(|| format!("{operation}: live TON Center request failed"))
     }
 
     fn send_success<T>(&self, request: RequestBuilder, operation: &str) -> Result<T>
@@ -190,7 +190,7 @@ impl Live {
     {
         let (status, text) = self.send(request, operation)?;
         if !status.is_success() {
-            bail!("{operation}: TonCenter returned HTTP {status}: {text}");
+            bail!("{operation}: TON Center returned HTTP {status}: {text}");
         }
         decode(&text, operation, status)
     }
@@ -200,12 +200,12 @@ impl Live {
         for attempt in 1..=MAX_ATTEMPTS {
             let current = request
                 .try_clone()
-                .context("TonCenter request body cannot be retried")?;
+                .context("TON Center request body cannot be retried")?;
             let response = self.send_raw(current, operation)?;
             let status = response.status();
             let text = response
                 .text()
-                .with_context(|| format!("{operation}: failed to read TonCenter response body"))?;
+                .with_context(|| format!("{operation}: failed to read TON Center response body"))?;
             if attempt == MAX_ATTEMPTS
                 || (status != StatusCode::TOO_MANY_REQUESTS && !status.is_server_error())
             {
@@ -221,7 +221,7 @@ pub(crate) fn fixture(live: &Live) -> Result<&'static Fixture> {
     let fixture = FIXTURE.get_or_init(|| Mutex::new(None));
     let mut fixture = fixture
         .lock()
-        .map_err(|_| anyhow::anyhow!("live TonCenter fixture cache is poisoned"))?;
+        .map_err(|_| anyhow::anyhow!("live TON Center fixture cache is poisoned"))?;
     if let Some(fixture) = *fixture {
         return Ok(fixture);
     }
@@ -246,7 +246,7 @@ fn load_fixture(live: &Live) -> Result<Fixture> {
         .transactions
         .into_iter()
         .next()
-        .context("TonCenter v3 returned no recent transactions for live-test fixture")?;
+        .context("TON Center v3 returned no recent transactions for live-test fixture")?;
 
     let blocks: v3::BlocksResponse = live.get(
         &live.v3_url,
@@ -262,7 +262,7 @@ fn load_fixture(live: &Live) -> Result<Fixture> {
         .blocks
         .into_iter()
         .next()
-        .context("TonCenter v3 returned no recent blocks for live-test fixture")?;
+        .context("TON Center v3 returned no recent blocks for live-test fixture")?;
 
     Ok(Fixture { transaction, block })
 }
@@ -289,9 +289,9 @@ where
     T: Serialize + ?Sized,
 {
     let Value::Object(fields) =
-        serde_json::to_value(query).context("failed to serialize typed TonCenter query")?
+        serde_json::to_value(query).context("failed to serialize typed TON Center query")?
     else {
-        bail!("TonCenter query must serialize to a JSON object");
+        bail!("TON Center query must serialize to a JSON object");
     };
 
     let mut pairs = Vec::new();

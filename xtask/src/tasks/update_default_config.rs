@@ -66,28 +66,28 @@ fn fetch_default_config_boc64(url: &str) -> Result<String> {
         .connect_timeout(Duration::from_secs(HTTP_CONNECT_TIMEOUT_SECS))
         .timeout(Duration::from_secs(HTTP_REQUEST_TIMEOUT_SECS))
         .build()
-        .context("failed to create TonCenter HTTP client")?;
+        .context("failed to create TON Center HTTP client")?;
 
     let response = client
         .get(url)
         .send()
-        .with_context(|| format!("failed to send TonCenter getConfigAll request: {url}"))?;
+        .with_context(|| format!("failed to send TON Center getConfigAll request: {url}"))?;
     let status = response.status();
 
     if !status.is_success() {
-        bail!("TonCenter getConfigAll request failed with status {status}");
+        bail!("TON Center getConfigAll request failed with status {status}");
     }
 
     let response: TonCenterConfigAllResponse = response
         .json()
-        .context("failed to parse TonCenter getConfigAll response JSON")?;
+        .context("failed to parse TON Center getConfigAll response JSON")?;
 
     if !response.ok {
-        bail!("TonCenter returned ok=false for getConfigAll");
+        bail!("TON Center returned ok=false for getConfigAll");
     }
 
     Boc::decode_base64(&response.result.config.bytes)
-        .context("TonCenter getConfigAll config bytes are not a valid BOC")?;
+        .context("TON Center getConfigAll config bytes are not a valid BOC")?;
 
     Ok(response.result.config.bytes)
 }

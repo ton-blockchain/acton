@@ -810,7 +810,7 @@ fn render_cell_address(
     ty_idx: TyIdx,
     cell: &CellLike,
 ) -> RenderedValue {
-    // TonCenter returns address stack values as cells, so ABI address fields
+    // TON Center returns address stack values as cells, so ABI address fields
     // need this decode path before falling back to generic cell rendering.
     let decoded_cell = decode_cell_like(cell);
     if matches!(symbols.ty_by_idx(ty_idx), Some(Ty::AddressAny))
@@ -2605,7 +2605,7 @@ fn debug_format(
         },
 
         Ty::Slice | Ty::Remaining | Ty::BitsN { .. } => match r.read_slot() {
-            // TonCenter can encode get-method slice values as cells in legacy stack JSON.
+            // TON Center can encode get-method slice values as cells in legacy stack JSON.
             SlotValue::Live(VmStackValue::Cell(cell)) => {
                 let (bits, refs, hash) = cell_like_meta(cell);
                 render_openable_cell_like(
@@ -2674,7 +2674,7 @@ fn debug_format(
         },
 
         Ty::Address | Ty::AddressOpt | Ty::AddressExt | Ty::AddressAny => match r.read_slot() {
-            // TonCenter encodes get-method address values as cells in legacy stack JSON.
+            // TON Center encodes get-method address values as cells in legacy stack JSON.
             SlotValue::Live(VmStackValue::Cell(cell)) => {
                 render_cell_address(symbols, ty_name, ty_idx, cell)
             }
