@@ -1,11 +1,16 @@
 testnet: reviewed sources, prepared once, no wallet request, ready after dismissal
-testnet: code change before payment blocks signing
+testnet: unexpected registry hash blocks signing
 testnet: proof published meanwhile skips payment
 mainnet: reviewed sources, prepared once, no wallet request, ready after dismissal
-mainnet: code change before payment blocks signing
+mainnet: unexpected registry hash blocks signing
 mainnet: proof published meanwhile skips payment
+progress: signing, sending, finality, upload and error update one toast, dialog stays open
 mainnet: dynamic Testnet payment precedes source publication
-reload: failed upload resumes with the same payment, no second signing or broadcast
+same code hash: another instance resumes the existing attempt
+different code hash: independent source review preserves the original payment
+expired paid preview: dialog stays open, sources can be reviewed again
+reload: renewed source review resumes with the same payment, no second signing or broadcast
+expired unpaid preview: new source review restores the payment confirmation
 mismatch: publication disabled
-registry error: toast, retry available
+registry error: toast, dialog stays open with source review retry
 public proof: verified link replaces publication

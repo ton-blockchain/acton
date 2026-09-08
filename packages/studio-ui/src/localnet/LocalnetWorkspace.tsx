@@ -819,8 +819,8 @@ const AppContent: FC<AppContentProps> = ({
                 <DashboardPage embedded>
                   <AccountPage
                     client={client}
-                    renderSourceVerification={({address, codeHash}) => (
-                      <VerificationAction address={address} codeHash={codeHash} />
+                    renderSourceVerification={({codeHash}) => (
+                      <VerificationAction codeHash={codeHash} />
                     )}
                     enableJettonMint={runtime.jettonFaucetEnabled}
                     jettonMintPath={path("/faucet")}

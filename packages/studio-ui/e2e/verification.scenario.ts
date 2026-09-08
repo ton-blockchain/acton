@@ -8,7 +8,13 @@ export async function verificationScenario(page: Page) {
   const codeHash = "22".repeat(32)
   let matches = true
   let verified = false
-  let deployedHash = codeHash
+  let statusHashOverride: string | undefined
+  let otherCodeHash = codeHash
+  let previews = 0
+  let lastPreviewId = ""
+  const previewHashes = new Map<string, string>()
+  const expired = new Set<string>()
+  const otherAddress = `0:${"46".repeat(32)}`
   let failPreview = false
   let preparations = 0
   let publications = 0
@@ -16,6 +22,9 @@ export async function verificationScenario(page: Page) {
   let paymentHash = ""
   const paymentNetworks: string[] = []
   let walletRequests = 0
+  let operationPolls = 0
+  let pausedPath: string | undefined
+  let releaseRequest: (() => void) | undefined
 
   await page.unrouteAll({behavior: "ignoreErrors"})
   await page.route("**/api/v1/**", async route => {
@@ -24,10 +33,22 @@ export async function verificationScenario(page: Page) {
       .url()
       .split("?")[0]
       .replace(/^https?:\/\/[^/]+/, "")
+    if (pausedPath && path.endsWith(pausedPath)) {
+      await new Promise<void>(resolve => {
+        releaseRequest = resolve
+      })
+    }
     const network = path.includes("/mainnet/") ? "mainnet" : "testnet"
+    const requestedHash = path.endsWith("/verification/preview")
+      ? route.request().postDataJSON().codeHash
+      : decodeURIComponent(
+          route
+            .request()
+            .url()
+            .match(/[?&]codeHash=([^&]+)/)?.[1] ?? codeHash,
+        )
     const status = {
-      address,
-      codeHash: deployedHash,
+      codeHash: statusHashOverride ?? requestedHash,
       verified,
       verifierUrl: `https://verifier.acton.monster/${codeHash}`,
     }
@@ -73,7 +94,16 @@ export async function verificationScenario(page: Page) {
         },
       ]
     if (path.endsWith("/acton_listContracts"))
-      body = [{address, codeHash, name: "Counter", status: "active", sourceKind: "network"}]
+      body = [
+        {address, codeHash, name: "Counter", status: "active", sourceKind: "network"},
+        {
+          address: otherAddress,
+          codeHash: otherCodeHash,
+          name: "Other",
+          status: "active",
+          sourceKind: "network",
+        },
+      ]
     if (path.endsWith("/verification/status")) body = status
     if (path.endsWith("/verification/preview")) {
       if (failPreview) {
@@ -83,8 +113,12 @@ export async function verificationScenario(page: Page) {
         })
         return
       }
+      if (route.request().postDataJSON().address)
+        throw new Error("Verification preview is tied to an address")
+      lastPreviewId = `preview-${++previews}`
+      previewHashes.set(lastPreviewId, requestedHash)
       body = {
-        id: "preview",
+        id: lastPreviewId,
         status,
         compilerVersion: "1.4.2",
         payment: {
@@ -97,7 +131,7 @@ export async function verificationScenario(page: Page) {
           {
             contractId: "Counter",
             sourcePath: "contracts/counter.tolk",
-            codeHash,
+            codeHash: requestedHash,
             matches,
             error: null,
             files: [
@@ -108,27 +142,45 @@ export async function verificationScenario(page: Page) {
         ],
       }
     }
+    const operationId = path.endsWith("/verification/operations")
+      ? route.request().postDataJSON().previewId
+      : path.match(/verification\/operations\/([^/]+)/)?.[1]
+    if (operationId && expired.has(operationId)) {
+      await route.fulfill({
+        status: 409,
+        json: {
+          error: {
+            code: "verification_preview_expired",
+            message: "This verification preview expired; check the sources again",
+          },
+        },
+      })
+      return
+    }
     if (path.endsWith("/verification/operations")) {
+      if (!previewHashes.has(operationId)) throw new Error("Unknown preview")
       preparations += 1
       body = {
-        id: "preview",
+        id: operationId,
         phase: "ready",
         message: {address: paymentAddress, amount: "12340000", payload: "te6ccgEBAQEAAgAAAA=="},
         error: null,
       }
     }
-    if (path.endsWith("/verification/operations/preview/payment")) {
+    if (operationId && path.endsWith("/payment")) {
       const receivedHash = route.request().postDataJSON().messageHash
       if (paymentHash && receivedHash !== paymentHash) throw new Error("Retry changed the payment")
       paymentHash = receivedHash
       publications += 1
-      body = {id: "preview", phase: "confirmingPayment", message: null, error: null}
+      operationPolls = 0
+      body = {id: operationId, phase: "confirmingPayment", message: null, error: null}
     }
-    if (path.endsWith("/verification/operations/preview")) {
-      verified = !failUpload
+    if (operationId && !path.endsWith("/payment") && !path.endsWith("/verification/operations")) {
+      operationPolls += 1
+      verified = operationPolls > 1 && !failUpload
       body = {
-        id: "preview",
-        phase: failUpload ? "failed" : "verified",
+        id: operationId,
+        phase: operationPolls === 1 ? "uploadingSources" : failUpload ? "failed" : "verified",
         message: null,
         error: failUpload ? "Source storage is temporarily unavailable" : null,
       }
@@ -162,6 +214,7 @@ export async function verificationScenario(page: Page) {
   })
 
   const observations: string[] = []
+  const notifications = page.getByRole("region", {name: "Notifications"})
   const dialog = page.getByRole("dialog", {name: "Verify contract source", exact: true})
   const open = page.getByRole("button", {name: "Verify source", exact: true})
   const publish = dialog.getByRole("button", {name: "Continue", exact: true})
@@ -171,20 +224,21 @@ export async function verificationScenario(page: Page) {
     await page.goto(`/networks/${network}/contracts/${address}`)
     if (network === "testnet") {
       await page.evaluate(() => {
-        sessionStorage.removeItem("acton:verification:testnet")
-        sessionStorage.removeItem("acton:verification:mainnet")
+        for (const key of Object.keys(sessionStorage)) {
+          if (key.startsWith("acton:verification:")) sessionStorage.removeItem(key)
+        }
       })
       await page.reload()
     }
     await open.click()
-    await dialog.getByText("Compiled code matches the deployed contract").waitFor()
+    await dialog.getByText("Compiled code matches the requested hash").waitFor()
     await publish.waitFor({state: "visible"})
     await page.waitForFunction(() =>
       [...document.querySelectorAll("button")].some(
         button => button.textContent === "Continue" && !button.disabled,
       ),
     )
-    if (publications !== 0 || preparations !== (network === "testnet" ? 0 : 1))
+    if (publications !== 0 || preparations !== (network === "testnet" ? 0 : 2))
       throw new Error("Preview uploaded files without approval")
 
     await publish.click()
@@ -198,23 +252,25 @@ export async function verificationScenario(page: Page) {
       `${network}: reviewed sources, prepared once, no wallet request, ready after dismissal`,
     )
 
-    deployedHash = "33".repeat(32)
+    statusHashOverride = "33".repeat(32)
     await dialog.getByRole("button", {name: "Pay and verify", exact: true}).click()
     await page
       .getByRole("region", {name: "Notifications"})
-      .getByText("The deployed code changed; check the project sources again")
+      .getByText("The verifier returned a different code hash; payment has not been sent")
       .waitFor()
     if (walletRequests !== 0) throw new Error("Code change did not block signing")
-    observations.push(`${network}: code change before payment blocks signing`)
-    deployedHash = codeHash
+    observations.push(`${network}: unexpected registry hash blocks signing`)
+    statusHashOverride = undefined
+    await dialog.getByRole("button", {name: "Check sources again", exact: true}).click()
+    await publish.click()
+    await dialog.getByRole("button", {name: "Pay and verify", exact: true}).waitFor()
 
     verified = true
     await dialog.getByRole("button", {name: "Pay and verify", exact: true}).click()
-    await dialog.getByText("Source verified", {exact: true}).waitFor()
+    await notifications.getByText("Source verified", {exact: true}).waitFor()
     if (walletRequests !== 0) throw new Error("Existing proof triggered another payment")
     observations.push(`${network}: proof published meanwhile skips payment`)
     verified = false
-    await close.click()
   }
 
   // Exercise signing and broadcast through the existing wallet adapter, then retry after reload.
@@ -222,8 +278,35 @@ export async function verificationScenario(page: Page) {
   await page.reload()
   await open.click()
   await publish.click()
+  pausedPath = "/sign"
   await dialog.getByRole("button", {name: "Pay and verify", exact: true}).click()
-  await dialog.getByRole("button", {name: "Retry verification", exact: true}).waitFor()
+  await notifications.getByText("Signing Testnet payment", {exact: true}).waitFor()
+  await dialog.waitFor({state: "visible"})
+
+  pausedPath = "/api/v3/message"
+  releaseRequest?.()
+  await notifications.getByText("Sending Testnet payment", {exact: true}).waitFor()
+  pausedPath = "/payment"
+  releaseRequest?.()
+  await notifications.getByText("Waiting for finalized Testnet payment", {exact: true}).waitFor()
+  const progressToast = await notifications.locator('[data-variant="loading"]').elementHandle()
+  pausedPath = undefined
+  releaseRequest?.()
+  await notifications.getByText("Uploading sources", {exact: true}).waitFor()
+  if (
+    !(await progressToast?.evaluate(element => element.textContent?.includes("Uploading sources")))
+  ) {
+    throw new Error("Progress creates a new toast instead of updating it")
+  }
+  await notifications.getByText("Retry verification", {exact: true}).waitFor()
+  if (
+    !(await progressToast?.evaluate(element => element.getAttribute("data-variant") === "error"))
+  ) {
+    throw new Error("Error does not replace the progress toast")
+  }
+  observations.push(
+    "progress: signing, sending, finality, upload and error update one toast, dialog stays open",
+  )
   if (
     walletRequests !== 2 ||
     publications !== 1 ||
@@ -235,17 +318,65 @@ export async function verificationScenario(page: Page) {
   }
   observations.push("mainnet: dynamic Testnet payment precedes source publication")
 
+  const paidPreviewId = lastPreviewId
+  await close.click()
+  await page.goto(`/networks/mainnet/contracts/${otherAddress}`)
+  await open.click()
+  await dialog.getByRole("button", {name: "Retry verification", exact: true}).waitFor()
+  if (lastPreviewId !== paidPreviewId)
+    throw new Error("Another instance of the same code starts another attempt")
+  observations.push("same code hash: another instance resumes the existing attempt")
+  await close.click()
+
+  otherCodeHash = "55".repeat(32)
+  await page.reload()
+  await open.click()
+  await publish.waitFor()
+  if (lastPreviewId === paidPreviewId)
+    throw new Error("Different code hash opened the previous attempt")
+  await close.click()
+  await page.goto(`/networks/mainnet/contracts/${address}`)
+  await open.click()
+  await dialog.getByRole("button", {name: "Retry verification", exact: true}).waitFor()
+  observations.push("different code hash: independent source review preserves the original payment")
+
+  expired.add(paidPreviewId)
+  await dialog.getByRole("button", {name: "Retry verification", exact: true}).click()
+  await dialog.getByRole("button", {name: "Check sources again", exact: true}).waitFor()
+  await notifications
+    .getByText("This verification preview expired; check the sources again", {exact: true})
+    .waitFor()
+  if (walletRequests !== 2) throw new Error("Expired attempt requests another payment")
+  await dialog.getByRole("button", {name: "Check sources again", exact: true}).click()
+  await dialog.getByRole("button", {name: "Resume verification", exact: true}).waitFor()
+  if (lastPreviewId === paidPreviewId) throw new Error("Expired preview was not replaced")
+  if (await dialog.getByRole("button", {name: "Pay and verify", exact: true}).count())
+    throw new Error("Recovery offers another payment")
+  observations.push("expired paid preview: dialog stays open, sources can be reviewed again")
+
   await page.reload()
   await open.click()
   failUpload = false
-  await dialog.getByRole("button", {name: "Retry verification", exact: true}).click()
-  await dialog.getByText("Source verified", {exact: true}).waitFor()
+  await dialog.getByRole("button", {name: "Resume verification", exact: true}).click()
+  await notifications.getByText("Source verified", {exact: true}).waitFor()
   if (walletRequests !== 2 || publications !== 2) throw new Error("Retry paid again")
   observations.push(
-    "reload: failed upload resumes with the same payment, no second signing or broadcast",
+    "reload: renewed source review resumes with the same payment, no second signing or broadcast",
   )
-  await close.click()
   verified = false
+
+  await page.reload()
+  await open.click()
+  await publish.waitFor()
+  expired.add(lastPreviewId)
+  await publish.click()
+  await dialog.getByRole("button", {name: "Check sources again", exact: true}).waitFor()
+  await dialog.getByRole("button", {name: "Check sources again", exact: true}).click()
+  await publish.click()
+  await dialog.getByRole("button", {name: "Pay and verify", exact: true}).waitFor()
+  if (walletRequests !== 2) throw new Error("Unpaid expiration used the wallet")
+  await close.click()
+  observations.push("expired unpaid preview: new source review restores the payment confirmation")
 
   // A fresh page with a mismatched build must not allow publication.
   matches = false
@@ -263,10 +394,10 @@ export async function verificationScenario(page: Page) {
     .getByRole("region", {name: "Notifications"})
     .getByText("The source registry is unavailable")
     .waitFor()
-  if ((await dialog.innerText()).includes("The source registry is unavailable"))
+  await dialog.getByRole("button", {name: "Check sources again", exact: true}).waitFor()
+  if (await dialog.getByText("The source registry is unavailable", {exact: true}).count())
     throw new Error("API error rendered inside dialog")
-  observations.push("registry error: toast, retry available")
-  await close.click()
+  observations.push("registry error: toast, dialog stays open with source review retry")
 
   verified = true
   failPreview = false

@@ -17,7 +17,6 @@ use crate::{EnvironmentRuntimeError, PublicTonNetwork, StudioApiError, StudioSta
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct VerificationStatus {
-    pub address: String,
     pub code_hash: String,
     pub verified: bool,
     pub verifier_url: String,
@@ -72,10 +71,11 @@ pub struct VerificationPaymentRequest {
     pub message_hash: String,
 }
 
-/// Identifies an on-chain account in the network selected by the environment route.
+/// Identifies compiled code independently of the accounts that deploy it.
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct VerificationTarget {
-    pub address: String,
+    pub code_hash: String,
 }
 
 /// Explicit publication approval for a previously reviewed candidate and payer.
@@ -126,13 +126,13 @@ pub trait VerificationRuntime: Send + Sync {
     fn status(
         &self,
         network: PublicTonNetwork,
-        address: String,
+        code_hash: String,
     ) -> VerificationFuture<'_, VerificationStatus>;
 
     fn preview(
         &self,
         network: PublicTonNetwork,
-        address: String,
+        code_hash: String,
     ) -> VerificationFuture<'_, VerificationPreview>;
 
     fn start(
@@ -207,7 +207,7 @@ fn runtime(state: &StudioState) -> Result<&dyn VerificationRuntime, StudioApiErr
     path = "/api/v1/environments/{environment_id}/verification/status",
     params(
         ("environment_id" = String, Path),
-        ("address" = String, Query)
+        ("codeHash" = String, Query)
     ),
     responses(
         (status = 200, body = VerificationStatus),
@@ -224,7 +224,7 @@ async fn status(
 ) -> Result<Json<VerificationStatus>, StudioApiError> {
     let network = network(&state, &id).await?;
     runtime(&state)?
-        .status(network, target.address)
+        .status(network, target.code_hash)
         .await
         .map(Json)
         .map_err(StudioApiError)
@@ -252,7 +252,7 @@ async fn preview(
 ) -> Result<Json<VerificationPreview>, StudioApiError> {
     let network = network(&state, &id).await?;
     runtime(&state)?
-        .preview(network, target.address)
+        .preview(network, target.code_hash)
         .await
         .map(Json)
         .map_err(StudioApiError)

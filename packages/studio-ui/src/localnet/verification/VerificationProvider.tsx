@@ -6,7 +6,6 @@ import {
   Dialog,
   DialogActions,
   GramAmount,
-  InlineLoader,
   Select,
   SourceLocationValue,
   TechnicalValue,
@@ -25,9 +24,8 @@ import {
   type ReactNode,
 } from "react"
 
-import {formatAddress, toRawAddress} from "@acton/explorer-core/components/utils"
 import {normalizeCodeHash} from "@acton/explorer-core/metadata/codeHash"
-import {fetchStudioInfo} from "../../studioApi"
+import {fetchStudioInfo, StudioRequestError} from "../../studioApi"
 import {useLocalnetRuntime} from "../LocalnetRuntimeProvider"
 import {TonConnectWalletSelector} from "../wallet/TonConnectRequestDialog"
 import {useOptionalWalletRuntime, type WalletRuntimeContextValue} from "../wallet/useWalletRuntime"
@@ -49,11 +47,12 @@ type Phase =
   | "sending"
   | "confirming"
   | "pending"
+  | "expired"
   | "verified"
   | "failed"
 
 interface VerificationFlow {
-  readonly address: string
+  readonly codeHash: string
   readonly phase: Phase
   readonly preview?: VerificationPreview
   readonly operation?: VerificationOperation
@@ -65,12 +64,12 @@ interface VerificationFlow {
 interface VerificationContextValue {
   readonly available: boolean
   readonly statuses: Readonly<Record<string, VerificationStatus>>
-  readonly check: (address: string, codeHash: string) => Promise<void>
-  readonly open: (address: string) => void
+  readonly check: (codeHash: string) => Promise<void>
+  readonly open: (codeHash: string) => void
 }
 
 const VerificationContext = createContext<VerificationContextValue | undefined>(undefined)
-const preparingLabels = {
+const progressLabels = {
   uploadingSources: "Uploading sources",
   confirmingPayment: "Waiting for finalized Testnet payment",
   ready: "Ready for Testnet payment",
@@ -84,37 +83,60 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
   const environmentWallets = useOptionalWalletRuntime()
   const [testnetWallets, setTestnetWallets] = useState<WalletRuntimeContextValue>()
   const wallets = environment?.network.id === "testnet" ? environmentWallets : testnetWallets
-  const {showToast} = useToast()
+  const {showToast, updateToast, dismissToast} = useToast()
   const api = useMemo(() => verificationApi(environment?.id ?? ""), [environment?.id])
   const [hasProject, setHasProject] = useState(false)
   const [statuses, setStatuses] = useState<Record<string, VerificationStatus>>({})
-  const storageKey = `acton:verification:${environment?.id}`
-  const [flow, updateFlow] = useState<VerificationFlow | undefined>(() => {
-    try {
-      const saved = JSON.parse(
-        sessionStorage.getItem(storageKey) ?? "null",
-      ) as VerificationFlow | null
-      return saved?.paymentMessageHash && saved.operation && saved.preview
-        ? {...saved, phase: "pending"}
-        : undefined
-    } catch {
-      return undefined
+  const storagePrefix = `acton:verification:${environment?.id}`
+  const attempts = useMemo(() => {
+    const saved = new Map<string, {key: string; flow: VerificationFlow}>()
+
+    // Use the reviewed code hash to restore paid attempts, regardless of their original instance.
+    for (const key of Object.keys(sessionStorage).filter(key => key.startsWith(storagePrefix))) {
+      try {
+        const attempt = JSON.parse(sessionStorage.getItem(key) ?? "null") as VerificationFlow | null
+        if (!attempt?.paymentMessageHash || !attempt.operation || !attempt.preview) continue
+
+        const phase = ["expired", "failed", "review"].includes(attempt.phase)
+          ? attempt.phase
+          : "pending"
+        const codeHash = normalizeCodeHash(attempt.preview.status.codeHash)
+        if (!codeHash) continue
+        saved.set(codeHash, {key, flow: {...attempt, codeHash, phase}})
+      } catch {
+        // A malformed saved entry must not prevent opening another contract.
+      }
     }
-  })
+
+    return saved
+  }, [storagePrefix])
+  const [flow, updateFlow] = useState<VerificationFlow>()
   const [open, setOpen] = useState(false)
   const [contractId, setContractId] = useState("")
   const [walletId, setWalletId] = useState("")
   const activeRequest = useRef(false)
+  const progressToastId = useRef<string | undefined>(undefined)
   const alive = useRef(true)
   const checked = useRef(new Set<string>())
   const available = hasProject && environment?.config.kind === "remoteTonNetwork"
 
+  const beginProgress = (title: string) => {
+    if (progressToastId.current) dismissToast(progressToastId.current)
+    const id = showToast({variant: "loading", title, durationMs: 0})
+    progressToastId.current = id
+    return id
+  }
+
   const setFlow = (next: VerificationFlow) => {
+    const codeHash = next.codeHash
+    const key = attempts.get(codeHash)?.key ?? `${storagePrefix}:${codeHash}`
+    attempts.set(codeHash, {key, flow: next})
+
     // Save the reference before broadcast, so even a lost response cannot lead to a second charge.
     if (next.paymentMessageHash && next.phase !== "verified") {
-      sessionStorage.setItem(storageKey, JSON.stringify(next))
+      sessionStorage.setItem(key, JSON.stringify(next))
     } else {
-      sessionStorage.removeItem(storageKey)
+      sessionStorage.removeItem(key)
     }
     if (alive.current) updateFlow(next)
   }
@@ -130,33 +152,47 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
     return () => {
       alive.current = false
       controller.abort()
+      if (progressToastId.current) dismissToast(progressToastId.current)
     }
-  }, [])
+  }, [dismissToast])
 
   const reportError = useCallback(
-    (error: unknown) => {
-      showToast({
-        variant: "error",
+    (error: unknown, toastId?: string, retry?: {label: string; run: () => void}) => {
+      const feedback = {
+        variant: "error" as const,
         title: "Source verification failed",
-        description:
-          error instanceof Error ? error.message : "Unable to verify the contract source",
-      })
+        description: (
+          <span className={styles.feedback}>
+            <span>
+              {error instanceof Error ? error.message : "Unable to verify the contract source"}
+            </span>
+            {retry && (
+              <Button size="sm" variant="outline" onClick={retry.run}>
+                {retry.label}
+              </Button>
+            )}
+          </span>
+        ),
+        durationMs: retry ? 0 : 8000,
+      }
+      if (toastId) updateToast(toastId, feedback)
+      else showToast(feedback)
     },
-    [showToast],
+    [showToast, updateToast],
   )
 
   const saveStatus = useCallback((status: VerificationStatus) => {
-    setStatuses(current => ({...current, [toRawAddress(status.address)]: status}))
+    setStatuses(current => ({...current, [status.codeHash]: status}))
   }, [])
 
   const check = useCallback(
-    async (address: string, codeHash: string) => {
-      const key = `${toRawAddress(address)}:${normalizeCodeHash(codeHash)}`
+    async (codeHash: string) => {
+      const key = codeHash
       if (!available || checked.current.has(key)) return
       checked.current.add(key)
 
       try {
-        const status = await api.status(address)
+        const status = await api.status(codeHash)
         if (alive.current) saveStatus(status)
       } catch (error) {
         checked.current.delete(key)
@@ -166,54 +202,87 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
     [api, available, reportError, saveStatus],
   )
 
-  const preview = async (address: string) => {
+  const preview = async (codeHash: string, previous?: VerificationFlow) => {
     if (activeRequest.current) {
-      setOpen(true)
       return
     }
 
     activeRequest.current = true
-    setFlow({address, phase: "preview"})
+    setFlow({...previous, codeHash, phase: "preview"})
     setOpen(true)
+    const toastId = beginProgress("Checking code hash and project sources")
 
     try {
-      const result = await api.preview(address)
+      const result = await api.preview(codeHash)
       if (!alive.current) return
 
+      // Bind renewed sources to the same reviewed code before reusing its payment.
+      if (normalizeCodeHash(result.status.codeHash) !== normalizeCodeHash(codeHash)) {
+        throw new Error(
+          "The preview returned a different code hash; the saved payment has not been used",
+        )
+      }
+
       saveStatus(result.status)
+      if (result.status.verified) {
+        markVerified({codeHash, phase: "verified", preview: result}, result.status, toastId)
+        return
+      }
       setContractId(
         result.candidates.find(candidate => candidate.matches)?.contractId ??
           result.candidates[0]?.contractId ??
           "",
       )
-      setWalletId(wallets?.runtimeWallets[0]?.id ?? "")
-      setFlow({address, phase: result.status.verified ? "verified" : "review", preview: result})
+      setWalletId(previous?.walletId ?? wallets?.runtimeWallets[0]?.id ?? "")
+      setFlow({...previous, codeHash, contractId: undefined, phase: "review", preview: result})
+      setOpen(true)
+      updateToast(toastId, {variant: "info", title: "Project sources checked", durationMs: 4000})
     } catch (error) {
       if (!alive.current) return
-      setFlow({address, phase: "failed"})
-      reportError(error)
+      setFlow({...previous, codeHash, phase: "failed"})
+      reportError(error, toastId, {
+        label: "Check sources again",
+        run: () => void preview(codeHash, previous),
+      })
     } finally {
       activeRequest.current = false
     }
   }
 
-  const openVerification = (address: string) => {
-    if (flow && ["preparing", "ready", "sending", "confirming", "pending"].includes(flow.phase)) {
-      setOpen(true)
+  const openVerification = (codeHash: string) => {
+    if (
+      activeRequest.current &&
+      flow &&
+      normalizeCodeHash(flow.codeHash) !== normalizeCodeHash(codeHash)
+    ) {
+      showToast({
+        variant: "info",
+        title: "A verification is running",
+        description: "Wait for it to finish before starting another contract",
+      })
       return
     }
 
-    if (flow && toRawAddress(flow.address) === toRawAddress(address) && flow.phase !== "failed") {
+    const saved = attempts.get(codeHash)?.flow
+    if (saved && saved.phase !== "verified") {
+      setFlow(saved)
+      setContractId(
+        saved.contractId ??
+          saved.preview?.candidates.find(candidate => candidate.matches)?.contractId ??
+          "",
+      )
+      setWalletId(saved.walletId ?? "")
       setOpen(true)
     } else {
-      void preview(address)
+      void preview(codeHash)
     }
   }
 
-  const markVerified = (current: VerificationFlow, status: VerificationStatus) => {
+  const markVerified = (current: VerificationFlow, status: VerificationStatus, toastId: string) => {
     saveStatus(status)
     setFlow({...current, phase: "verified"})
-    showToast({
+    setOpen(false)
+    updateToast(toastId, {
       variant: "success",
       title: "Source verified",
       description: (
@@ -221,6 +290,7 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
           View in Acton Verifier
         </a>
       ),
+      durationMs: 6000,
     })
   }
 
@@ -229,8 +299,11 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
     if (!flow?.preview || !wallet || activeRequest.current) return
 
     activeRequest.current = true
-    const current = {...flow, contractId, walletId: selectedWalletId}
+    let current = {...flow, contractId, walletId: selectedWalletId}
     setFlow({...current, phase: "preparing"})
+    const toastId = beginProgress(
+      current.paymentMessageHash ? "Restoring verification" : "Preparing Testnet payment",
+    )
 
     try {
       const operation = await api.start(flow.preview.id, contractId, wallet.record.address)
@@ -238,17 +311,26 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
       if (operation.phase !== "ready" || !operation.message) {
         throw new Error(operation.error ?? "The verifier did not return a payment transaction")
       }
-      setFlow({...current, phase: "ready", operation})
+      current = {...current, operation}
+      if (current.paymentMessageHash) {
+        await confirm(current, toastId)
+      } else {
+        setFlow({...current, phase: "ready"})
+        updateToast(toastId, {
+          variant: "info",
+          title: "Ready for Testnet payment",
+          durationMs: 4000,
+        })
+      }
     } catch (error) {
       if (!alive.current) return
-      setFlow({...current, phase: "failed"})
-      reportError(error)
+      handleFailure(current, error, toastId)
     } finally {
       activeRequest.current = false
     }
   }
 
-  const confirm = async (current: VerificationFlow) => {
+  const confirm = async (current: VerificationFlow, toastId: string) => {
     if (!current.operation || !current.paymentMessageHash) {
       throw new Error(
         "The wallet did not return a payment reference; check its transactions before sending another payment",
@@ -256,19 +338,35 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
     }
 
     // Resubmitting the same reference resumes the server operation without paying again.
+    updateToast(toastId, {
+      title: progressLabels.confirmingPayment,
+      variant: "loading",
+      description: undefined,
+      durationMs: 0,
+    })
     let operation = await api.completePayment(current.operation.id, current.paymentMessageHash)
+    let lastPhase: VerificationOperation["phase"] = "confirmingPayment"
     while (alive.current) {
       setFlow({...current, phase: "confirming", operation})
       if (operation.phase === "failed") throw new Error(operation.error ?? "Verification failed")
       if (operation.phase === "verified") {
-        const status = await api.status(current.address)
-        if (!status.verified || status.codeHash !== current.preview?.status.codeHash) {
+        updateToast(toastId, {title: "Checking published verification"})
+        const status = await api.status(current.codeHash)
+        if (
+          !status.verified ||
+          normalizeCodeHash(status.codeHash) !== normalizeCodeHash(current.codeHash)
+        ) {
           throw new Error(
-            "Verification finished for the reviewed code, but the contract now has different code",
+            "The verifier returned a different code hash; verification could not be confirmed",
           )
         }
-        markVerified(current, status)
+        markVerified(current, status, toastId)
         return
+      }
+
+      if (operation.phase !== lastPhase) {
+        updateToast(toastId, {title: progressLabels[operation.phase]})
+        lastPhase = operation.phase
       }
 
       await new Promise(resolve => setTimeout(resolve, 1500))
@@ -284,20 +382,22 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
 
     activeRequest.current = true
     setFlow({...current, phase: "sending"})
+    const toastId = beginProgress("Checking verification status")
     let sendAttempted = false
 
     try {
       // Recheck after the review delay, before asking the project wallet to sign.
-      const status = await api.status(current.address)
+      const status = await api.status(current.codeHash)
       if (!alive.current) return
-      if (status.codeHash !== current.preview?.status.codeHash) {
-        throw new Error("The deployed code changed; check the project sources again")
+      if (normalizeCodeHash(status.codeHash) !== normalizeCodeHash(current.codeHash)) {
+        throw new Error("The verifier returned a different code hash; payment has not been sent")
       }
       if (status.verified) {
-        markVerified(current, status)
+        markVerified(current, status, toastId)
         return
       }
 
+      updateToast(toastId, {title: "Signing Testnet payment"})
       const signed = await wallet.wallet.getSignedSendTransaction({
         fromAddress: wallet.record.address,
         validUntil: Math.floor(Date.now() / 1000) + 300,
@@ -312,35 +412,55 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
       current = {...current, paymentMessageHash: getNormalizedExtMessageHash(signed).hash}
       setFlow({...current, phase: "sending"})
       sendAttempted = true
+      updateToast(toastId, {title: "Sending Testnet payment"})
       await wallet.wallet.getClient().sendBoc(signed)
 
       // Start the server-owned upload even if navigation unmounted this provider while sending.
-      await confirm(current)
+      await confirm(current, toastId)
     } catch (error) {
       if (!alive.current) return
       // A lost send response can still mean the transaction was broadcast.
       // Keep payment disabled while its outcome is unknown.
-      setFlow({...current, phase: sendAttempted ? "pending" : "ready"})
-      reportError(error)
+      handleFailure(
+        sendAttempted ? current : {...current, paymentMessageHash: undefined},
+        error,
+        toastId,
+      )
     } finally {
       activeRequest.current = false
     }
   }
 
-  const refreshConfirmation = async () => {
-    if (!flow || activeRequest.current) return
+  const refreshConfirmation = async (current = flow) => {
+    if (!current || activeRequest.current) return
     activeRequest.current = true
+    const toastId = beginProgress("Resuming verification with the same payment")
 
     try {
-      await confirm(flow)
+      await confirm(current, toastId)
     } catch (error) {
       if (alive.current) {
-        setFlow({...flow, phase: "pending"})
-        reportError(error)
+        handleFailure(current, error, toastId)
       }
     } finally {
       activeRequest.current = false
     }
+  }
+
+  const handleFailure = (current: VerificationFlow, error: unknown, toastId: string) => {
+    const expired =
+      error instanceof StudioRequestError && error.code === "verification_preview_expired"
+    const phase = expired ? "expired" : current.paymentMessageHash ? "pending" : "failed"
+    setFlow({...current, phase})
+    setOpen(true)
+
+    reportError(
+      error,
+      toastId,
+      phase === "pending"
+        ? {label: "Retry verification", run: () => void refreshConfirmation(current)}
+        : {label: "Check sources again", run: () => void preview(current.codeHash, current)},
+    )
   }
 
   const selectedContractId = flow?.contractId ?? contractId
@@ -399,7 +519,7 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
                 }
                 onClick={() => void prepare()}
               >
-                Continue
+                {flow.paymentMessageHash ? "Resume verification" : "Continue"}
               </Button>
             )}
             {flow?.phase === "ready" && (
@@ -412,9 +532,9 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
                 Retry verification
               </Button>
             )}
-            {flow?.phase === "failed" && (
-              <Button variant="primary" onClick={() => void preview(flow.address)}>
-                Check again
+            {(flow?.phase === "failed" || flow?.phase === "expired") && (
+              <Button variant="primary" onClick={() => void preview(flow.codeHash, flow)}>
+                Check sources again
               </Button>
             )}
             <Button variant="outline" onClick={() => setOpen(false)}>
@@ -426,17 +546,8 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
         <div className={styles.content}>
           {flow && (
             <div className={styles.target}>
-              <span>{environment?.network.label}</span>
-              <AddressChip
-                address={formatAddress(flow.address, false, {
-                  testOnly: environment?.network.testOnly,
-                })}
-              />
-            </div>
-          )}
-          {flow?.phase === "preview" && (
-            <div className={styles.loading}>
-              <InlineLoader message="Checking deployed code and project sources" />
+              <span>Code hash</span>
+              <TechnicalValue value={flow.codeHash} copyLabel="code hash" />
             </div>
           )}
           {flow?.preview && flow.phase !== "verified" && (
@@ -462,7 +573,7 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
                   {candidate.matches ? (
                     <>
                       <Check size={16} />
-                      Compiled code matches the deployed contract
+                      Compiled code matches the requested hash
                     </>
                   ) : (
                     <span>
@@ -485,12 +596,6 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
                   <dt>Compiler</dt>
                   <dd>Tolk {flow.preview.compilerVersion}</dd>
                 </div>
-                <div>
-                  <dt>Code hash</dt>
-                  <dd>
-                    <TechnicalValue value={flow.preview.status.codeHash} copyLabel="code hash" />
-                  </dd>
-                </div>
               </dl>
               {candidate && candidate.files.length > 0 && (
                 <Disclosure label={`Source files (${candidate.files.length})`}>
@@ -507,7 +612,7 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
               {walletOptions.length > 0 ? (
                 <TonConnectWalletSelector
                   options={
-                    flow.phase === "review"
+                    flow.phase === "review" && !flow.paymentMessageHash
                       ? walletOptions
                       : walletOptions.filter(wallet => wallet.id === selectedWalletId)
                   }
@@ -521,8 +626,10 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
               )}
               {flow.phase === "review" && (
                 <p className={styles.note}>
-                  The listed source files will be published through Acton Verifier after payment
-                  {flow.preview.payment && (
+                  {flow.paymentMessageHash
+                    ? "The reviewed source files will be published using your saved Testnet payment · No new transaction will be sent"
+                    : "The listed source files will be published through Acton Verifier after payment"}
+                  {!flow.paymentMessageHash && flow.preview.payment && (
                     <>
                       {" "}
                       · <GramAmount value={flow.preview.payment.amount} /> on Testnet plus network
@@ -533,7 +640,6 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
               )}
             </>
           )}
-          {flow?.phase === "preparing" && <InlineLoader message="Preparing Testnet payment" />}
           {flow?.phase === "ready" && flow.operation?.message && (
             <>
               <dl className={styles.details}>
@@ -555,25 +661,6 @@ export function VerificationProvider({children}: {readonly children: ReactNode})
                 finalized, Studio uploads the reviewed source files to Acton Verifier
               </p>
             </>
-          )}
-          {flow?.phase === "sending" && <InlineLoader message="Sending verification transaction" />}
-          {flow?.phase === "confirming" && (
-            <InlineLoader message={preparingLabels[flow.operation?.phase ?? "confirmingPayment"]} />
-          )}
-          {flow?.phase === "pending" && (
-            <p className={styles.note}>
-              Verification has not finished yet · Retry with the same payment without sending
-              another transaction
-            </p>
-          )}
-          {flow?.phase === "verified" && (
-            <div className={styles.success}>
-              <ShieldCheck />
-              <span>Source verified</span>
-              <a href={flow.preview?.status.verifierUrl} target="_blank" rel="noreferrer">
-                View in Acton Verifier <ExternalLink size={14} />
-              </a>
-            </div>
           )}
         </div>
       </Dialog>
@@ -597,21 +684,16 @@ function TestnetWalletBridge({
 }
 
 /** Shared entry point used by Contracts and the embedded Explorer */
-export function VerificationAction({
-  address,
-  codeHash,
-}: {
-  readonly address: string
-  readonly codeHash?: string
-}) {
+export function VerificationAction({codeHash}: {readonly codeHash?: string}) {
   const context = useContext(VerificationContext)
+  const hash = normalizeCodeHash(codeHash)
 
   useEffect(() => {
-    if (context?.available && codeHash) void context.check(address, codeHash)
-  }, [address, codeHash, context?.available, context?.check])
+    if (context?.available && hash) void context.check(hash)
+  }, [hash, context?.available, context?.check])
 
-  if (!context?.available || !codeHash) return null
-  const status = context.statuses[toRawAddress(address)]
+  if (!context?.available || !hash) return null
+  const status = context.statuses[hash]
 
   return status?.verified && normalizeCodeHash(status.codeHash) === normalizeCodeHash(codeHash) ? (
     <a className={styles.verified} href={status.verifierUrl} target="_blank" rel="noreferrer">
@@ -624,7 +706,7 @@ export function VerificationAction({
       variant="outline"
       size="sm"
       leadingIcon={<ShieldCheck />}
-      onClick={() => context.open(address)}
+      onClick={() => context.open(hash)}
     >
       Verify source
     </Button>

@@ -742,10 +742,12 @@ export async function requestJson<T>(input: string, init?: RequestInit): Promise
   return (await response.json()) as T
 }
 
+/** Keeps the server's error code so callers can recover without matching translated messages */
 export class StudioRequestError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly code?: string,
   ) {
     super(message)
   }
@@ -756,7 +758,7 @@ async function request(input: string, init?: RequestInit): Promise<Response> {
   if (response.ok) return response
 
   const fallbackMessage = `Studio server returned ${response.status}`
-  let body: {readonly error?: {readonly message?: unknown}} | null
+  let body: {readonly error?: {readonly message?: unknown; readonly code?: unknown}} | null
   try {
     body = (await response.json()) as typeof body
   } catch {
@@ -767,6 +769,7 @@ async function request(input: string, init?: RequestInit): Promise<Response> {
   throw new StudioRequestError(
     typeof message === "string" && message ? message : fallbackMessage,
     response.status,
+    typeof body?.error?.code === "string" ? body.error.code : undefined,
   )
 }
 

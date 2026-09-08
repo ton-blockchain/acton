@@ -122,7 +122,7 @@ export function ContractPage({client, section}: ContractPageProps) {
               </div>
             </div>
             <div className={styles.identityActions}>
-              <VerificationAction address={contract.address} codeHash={contract.codeHash} />
+              <VerificationAction codeHash={contract.codeHash} />
               <Button size="sm" variant="outline" leadingIcon={<Search />} onClick={openExplorer}>
                 Open in Explorer
               </Button>

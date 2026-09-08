@@ -2,7 +2,6 @@ import {requestJson} from "../../studioApi"
 
 /** Public verification is independent of matching a local source artifact */
 export interface VerificationStatus {
-  readonly address: string
   readonly codeHash: string
   readonly verified: boolean
   readonly verifierUrl: string
@@ -46,14 +45,16 @@ export function verificationApi(environmentId: string) {
   const base = `/api/v1/environments/${encodeURIComponent(environmentId)}/verification`
 
   return {
-    status: (address: string, signal?: AbortSignal) =>
-      requestJson<VerificationStatus>(`${base}/status?${new URLSearchParams({address})}`, {signal}),
+    status: (codeHash: string, signal?: AbortSignal) =>
+      requestJson<VerificationStatus>(`${base}/status?${new URLSearchParams({codeHash})}`, {
+        signal,
+      }),
 
-    preview: (address: string) =>
+    preview: (codeHash: string) =>
       requestJson<VerificationPreview>(`${base}/preview`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({address}),
+        body: JSON.stringify({codeHash}),
       }),
 
     start: (previewId: string, contractId: string, senderAddress: string) =>

@@ -16,12 +16,11 @@ impl VerificationRuntime for TestVerificationRuntime {
     fn status(
         &self,
         network: PublicTonNetwork,
-        address: String,
+        code_hash: String,
     ) -> VerificationFuture<'_, VerificationStatus> {
         Box::pin(async move {
             Ok(VerificationStatus {
-                address,
-                code_hash: "deployed-code".to_owned(),
+                code_hash,
                 verified: network == PublicTonNetwork::Mainnet,
                 verifier_url: format!("https://verifier.example/{network:?}"),
             })
@@ -31,12 +30,12 @@ impl VerificationRuntime for TestVerificationRuntime {
     fn preview(
         &self,
         network: PublicTonNetwork,
-        address: String,
+        code_hash: String,
     ) -> VerificationFuture<'_, VerificationPreview> {
         Box::pin(async move {
             Ok(VerificationPreview {
                 id: "reviewed-sources".to_owned(),
-                status: self.status(network, address).await?,
+                status: self.status(network, code_hash).await?,
                 compiler_version: "1.4.2".to_owned(),
                 candidates: Vec::new(),
                 payment: None,
@@ -104,12 +103,12 @@ async fn verification_routes_preserve_network_and_two_phase_publication() {
     for network in ["mainnet", "testnet"] {
         let base = format!("/api/v1/environments/{network}/verification");
         let requests = [
-            Request::get(format!("{base}/status?address=contract"))
+            Request::get(format!("{base}/status?codeHash=compiled-code"))
                 .body(Body::empty())
                 .expect("status request"),
             Request::post(format!("{base}/preview"))
                 .header("content-type", "application/json")
-                .body(Body::from(json!({"address": "contract"}).to_string()))
+                .body(Body::from(json!({"codeHash": "compiled-code"}).to_string()))
                 .expect("preview request"),
             Request::post(format!("{base}/operations"))
                 .header("content-type", "application/json")
@@ -140,10 +139,10 @@ async fn verification_routes_preserve_network_and_two_phase_publication() {
 
     expect![[r#"
         200 OK
-        {"address":"contract","codeHash":"deployed-code","verified":true,"verifierUrl":"https://verifier.example/Mainnet"}
+        {"codeHash":"compiled-code","verified":true,"verifierUrl":"https://verifier.example/Mainnet"}
 
         200 OK
-        {"id":"reviewed-sources","status":{"address":"contract","codeHash":"deployed-code","verified":true,"verifierUrl":"https://verifier.example/Mainnet"},"compilerVersion":"1.4.2","candidates":[],"payment":null}
+        {"id":"reviewed-sources","status":{"codeHash":"compiled-code","verified":true,"verifierUrl":"https://verifier.example/Mainnet"},"compilerVersion":"1.4.2","candidates":[],"payment":null}
 
         409 Conflict
         {"error":{"code":"verification_preview_expired","message":"This preview belongs to another network"}}
@@ -155,10 +154,10 @@ async fn verification_routes_preserve_network_and_two_phase_publication() {
         {"error":{"code":"verification_preview_expired","message":"This preview belongs to another network"}}
 
         200 OK
-        {"address":"contract","codeHash":"deployed-code","verified":false,"verifierUrl":"https://verifier.example/Testnet"}
+        {"codeHash":"compiled-code","verified":false,"verifierUrl":"https://verifier.example/Testnet"}
 
         200 OK
-        {"id":"reviewed-sources","status":{"address":"contract","codeHash":"deployed-code","verified":false,"verifierUrl":"https://verifier.example/Testnet"},"compilerVersion":"1.4.2","candidates":[],"payment":null}
+        {"id":"reviewed-sources","status":{"codeHash":"compiled-code","verified":false,"verifierUrl":"https://verifier.example/Testnet"},"compilerVersion":"1.4.2","candidates":[],"payment":null}
 
         200 OK
         {"id":"reviewed-sources","phase":"confirmingPayment","message":null,"error":null}
@@ -177,7 +176,7 @@ async fn verification_without_a_project_returns_an_actionable_error() {
         router,
         Request::post("/api/v1/environments/testnet/verification/preview")
             .header("content-type", "application/json")
-            .body(Body::from(json!({"address": "contract"}).to_string()))
+            .body(Body::from(json!({"codeHash": "compiled-code"}).to_string()))
             .expect("preview request"),
     )
     .await;

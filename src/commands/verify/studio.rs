@@ -14,10 +14,10 @@ use acton_studio::{
 use serde::Deserialize;
 
 use super::{
-    ActonConfig, Boc, Context, FromStr, HashBytes, Network, NewVerifierPaymentQuote, Path,
-    TonAddress, TonApiClient, UploadPart, anyhow, build_verify_http_client,
-    collect_verification_sources, compile_verification_contract, configured_project_root,
-    format_ton_address, new_verifier_backend, new_verifier_compile_params, new_verifier_sources,
+    ActonConfig, Boc, Context, FromStr, HashBytes, NewVerifierPaymentQuote, Path, TonAddress,
+    UploadPart, anyhow, build_verify_http_client, collect_verification_sources,
+    compile_verification_contract, configured_project_root, format_ton_address,
+    new_verifier_backend, new_verifier_compile_params, new_verifier_sources,
     normalize_source_path_for_verifier, source_files_from_source_map, take_new_verifier_ticket,
     truncate_for_display, upload_new_verifier_sources, wait_for_new_verifier_payment,
 };
@@ -56,11 +56,11 @@ struct SourceSnapshot {
 impl VerificationRuntime for ProjectVerificationRuntime {
     fn status(
         &self,
-        network: PublicTonNetwork,
-        address: String,
+        _network: PublicTonNetwork,
+        code_hash: String,
     ) -> VerificationFuture<'_, VerificationStatus> {
         Box::pin(async move {
-            tokio::task::spawn_blocking(move || public_status(network, &address))
+            tokio::task::spawn_blocking(move || public_status(&code_hash))
                 .await
                 .map_err(worker_error)?
                 .map_err(verification_error)
@@ -70,7 +70,7 @@ impl VerificationRuntime for ProjectVerificationRuntime {
     fn preview(
         &self,
         network: PublicTonNetwork,
-        address: String,
+        code_hash: String,
     ) -> VerificationFuture<'_, VerificationPreview> {
         let previews = Arc::clone(&self.previews);
         let compilation = Arc::clone(&self.compilation);
@@ -81,7 +81,7 @@ impl VerificationRuntime for ProjectVerificationRuntime {
                 let _guard = guard;
                 let started = Instant::now();
                 let config = ActonConfig::load()?;
-                let status = public_status(network, &address)?;
+                let status = public_status(&code_hash)?;
                 let compiler_version = tolk_compiler::native_tolk_version()?.version;
                 let mut candidates = Vec::new();
                 let mut sources = BTreeMap::new();
@@ -184,7 +184,7 @@ impl VerificationRuntime for ProjectVerificationRuntime {
                 log::info!(
                     target: "acton::verification",
                     "operation=verification_preview target={} duration_ms={} outcome=complete",
-                    address,
+                    code_hash,
                     started.elapsed().as_millis(),
                 );
                 Ok(preview)
@@ -231,7 +231,7 @@ impl VerificationRuntime for ProjectVerificationRuntime {
             if !item.sources.contains_key(&request.contract_id) {
                 return Err(EnvironmentRuntimeError::InvalidRequest {
                     code: "verification_code_mismatch",
-                    message: "Select a project contract whose compiled code matches the deployed contract".to_owned(),
+                    message: "Select a project contract whose compiled code matches the requested code hash".to_owned(),
                 });
             }
 
@@ -453,26 +453,12 @@ fn capture_sources(config: &ActonConfig, path: &Path) -> anyhow::Result<SourceSn
     })
 }
 
-/// Resolve code against the selected network, then ask Acton verifier by hash.
-/// Passing the hash avoids the verifier resolving a Mainnet address on its Testnet RPC.
-fn public_status(network: PublicTonNetwork, address: &str) -> anyhow::Result<VerificationStatus> {
-    let address = TonAddress::from_str(address).context("Enter a valid TON contract address")?;
-    let address = format_ton_address(&address, network == PublicTonNetwork::Testnet);
-    let config = ActonConfig::load()?;
-    let api = TonApiClient::new(ton_network(network), config.custom_networks())?;
-    let account = api
-        .get_account_state(&address)
-        .context("Failed to read the deployed contract")?;
-    anyhow::ensure!(
-        account.status == "active",
-        "The contract is not active in the selected network"
-    );
-    let code = Boc::decode_base64(
-        account
-            .code_boc
-            .context("The deployed contract has no code")?,
-    )?;
-    let code_hash = code.repr_hash().to_string();
+/// The registry publishes code once for all instances and networks using that hash.
+/// A chain lookup is unnecessary and must not change the identity during source review.
+fn public_status(code_hash: &str) -> anyhow::Result<VerificationStatus> {
+    let code_hash = HashBytes::from_str(code_hash)
+        .context("Enter a valid code hash")?
+        .to_string();
     let backend = new_verifier_backend();
     let response = build_verify_http_client()?
         .get(format!("{backend}/api/v1/verification/status"))
@@ -493,7 +479,6 @@ fn public_status(network: PublicTonNetwork, address: &str) -> anyhow::Result<Ver
     super::ensure_ticket_code_hash(&code_hash, &status.code_hash)?;
 
     Ok(VerificationStatus {
-        address,
         verifier_url: format!("{backend}/{code_hash}"),
         code_hash,
         verified: status.verified,
@@ -520,13 +505,6 @@ fn payment_details(quote: &NewVerifierPaymentQuote) -> anyhow::Result<Verificati
         comment: quote.comment.clone(),
         network: PublicTonNetwork::Testnet,
     })
-}
-
-const fn ton_network(network: PublicTonNetwork) -> Network {
-    match network {
-        PublicTonNetwork::Testnet => Network::Testnet,
-        PublicTonNetwork::Mainnet => Network::Mainnet,
-    }
 }
 
 fn expired_preview() -> EnvironmentRuntimeError {
@@ -560,7 +538,6 @@ mod tests {
             preview: VerificationPreview {
                 id: "preview".to_owned(),
                 status: VerificationStatus {
-                    address: format!("0:{}", "11".repeat(32)),
                     code_hash: "22".repeat(32),
                     verified: false,
                     verifier_url: "https://verifier.acton.monster/code-hash".to_owned(),
@@ -621,7 +598,7 @@ mod tests {
                 },
                 InvalidRequest {
                     code: "verification_code_mismatch",
-                    message: "Select a project contract whose compiled code matches the deployed contract",
+                    message: "Select a project contract whose compiled code matches the requested code hash",
                 },
                 Conflict {
                     code: "verification_preview_expired",
