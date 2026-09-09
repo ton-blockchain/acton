@@ -308,7 +308,7 @@ function TransactionDetailsContent({
       : storageDiff.status === "unchanged"
         ? "Intact"
         : "Changed"
-  const hasStorageAbi = targetAbi !== undefined
+  const hasStorageAbi = targetAbi?.storage?.storage_ty_idx !== undefined
   const storageUnavailableLabel = hasStorageAbi
     ? "Storage data not loaded"
     : "Storage data unavailable"

@@ -3,6 +3,7 @@ import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import type {ExtendedContractABI} from "./compilerAbi"
 import {addressKey} from "./compilerAbi"
 import {getBundledCompilerAbiForInterface} from "./compilerAbiCatalog"
+import {normalizeCodeHash} from "../metadata/codeHash"
 import {hasAccountInterface} from "../pages/accountContractTypes"
 import type {ExplorerMetadataRegistry} from "../metadata/types"
 import type {TonClient} from "./client"
@@ -21,6 +22,37 @@ export interface ResolvedCompilerAbis {
   readonly addressToCodeHash: ReadonlyMap<string, string>
   readonly abiByCodeHash: ReadonlyMap<string, ContractABI | undefined>
   readonly abiByAddress: ReadonlyMap<string, ContractABI | undefined>
+}
+
+/** Selects the known public interface only when no exact implementation ABI is available. */
+export async function resolveAccountCompilerAbi(
+  exactAbi: ExtendedContractABI | null | undefined,
+  interfaces: readonly string[],
+): Promise<ExtendedContractABI | undefined> {
+  if (exactAbi) return exactAbi
+
+  const master = hasAccountInterface(interfaces, "jetton_master")
+  const wallet = hasAccountInterface(interfaces, "jetton_wallet")
+  if (master === wallet) return undefined
+
+  return getBundledCompilerAbiForInterface(master ? "jetton_master" : "jetton_wallet")
+}
+
+/** Resolves message ABI for current or historical code without applying today's interface after a code change. */
+export function getResolvedAccountAbi(
+  resolved: ResolvedCompilerAbis,
+  address: string,
+  codeHash?: string,
+): ContractABI | undefined {
+  const key = addressKey(address)
+  const currentCodeHash = resolved.addressToCodeHash.get(key)
+  const selectedCodeHash = codeHash ?? currentCodeHash
+  const exactAbi = selectedCodeHash ? resolved.abiByCodeHash.get(selectedCodeHash) : undefined
+  if (exactAbi) return exactAbi
+
+  return normalizeCodeHash(selectedCodeHash) === normalizeCodeHash(currentCodeHash)
+    ? resolved.abiByAddress.get(key)
+    : undefined
 }
 
 export async function resolveCompilerAbis({
@@ -88,12 +120,7 @@ export async function resolveCompilerAbis({
     const key = addressKey(account.address)
     if (abiByAddress.get(key)) continue
 
-    const interfaces = account.interfaces ?? []
-    const master = hasAccountInterface(interfaces, "jetton_master")
-    const wallet = hasAccountInterface(interfaces, "jetton_wallet")
-    if (master === wallet) continue
-
-    const abi = await getBundledCompilerAbiForInterface(master ? "jetton_master" : "jetton_wallet")
+    const abi = await resolveAccountCompilerAbi(undefined, account.interfaces ?? [])
     if (!shouldContinue()) return undefined
     abiByAddress.set(key, abi?.compiler_abi)
   }

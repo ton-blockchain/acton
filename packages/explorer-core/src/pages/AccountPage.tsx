@@ -9,7 +9,7 @@ import {Cell} from "@ton/core"
 
 import type {AccountHistorySortOrder, TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
-import {getBundledCompilerAbiForInterface} from "../api/compilerAbiCatalog"
+import {resolveAccountCompilerAbi} from "../api/compilerAbiResolver"
 import {sortJettonWalletsForDisplay} from "../api/jettonWallets"
 import {isAddressSuspended} from "../api/suspendedAccounts"
 import type {
@@ -996,11 +996,10 @@ export const AccountPage: FC<AccountPageProps> = ({
 
       try {
         const abis = await metadataRegistry.getCompilerAbis([accountCodeLookupHash])
-        // Interface detection cannot identify storage or implementation-specific operations.
-        // Prefer an exact ABI and use the catalog's public TEP-74 surface only when absent.
-        const abi =
-          abis[accountCodeLookupHash] ??
-          (await getBundledCompilerAbiForInterface(accountAbiInterface))
+        const abi = await resolveAccountCompilerAbi(
+          abis[accountCodeLookupHash],
+          accountAbiInterface ? [accountAbiInterface] : [],
+        )
         if (!isActive) return
         setExtendedContractAbi(abi)
         setCompilerAbiLoading(false)
