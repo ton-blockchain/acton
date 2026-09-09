@@ -896,68 +896,79 @@ const DesktopMoreMenu: FC = () => {
       onOpenChange={setOpen}
       triggerAsChild
       contentClassName={styles.desktopMorePopover}
+      maxWidth="min(572px, calc(100vw - 32px))"
       content={
         <nav className={styles.desktopMoreMenu} aria-label="More explorer navigation">
-          <Link className={styles.desktopMoreItem} to="/tokens" onClick={closeMenu}>
-            <span className={styles.desktopMoreItemCopy}>
-              <span className={styles.desktopMoreItemTitle}>Tokens</span>
-              <span className={styles.desktopMoreItemDescription}>Discover active tokens</span>
-            </span>
-          </Link>
-          <Link className={styles.desktopMoreItem} to={routes.configPath()} onClick={closeMenu}>
-            <span className={styles.desktopMoreItemCopy}>
-              <span className={styles.desktopMoreItemTitle}>Config</span>
-              <span className={styles.desktopMoreItemDescription}>
-                Read protocol parameters and limits
+          <section className={styles.desktopMoreColumn} aria-labelledby="more-explorer-heading">
+            <h2 id="more-explorer-heading" className={styles.desktopMoreHeading}>
+              Explorer
+            </h2>
+            <Link className={styles.desktopMoreItem} to="/tokens" onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>Tokens</span>
+                <span className={styles.desktopMoreItemDescription}>Discover active tokens</span>
               </span>
-            </span>
-          </Link>
-          <Link className={styles.desktopMoreItem} to="/elections" onClick={closeMenu}>
-            <span className={styles.desktopMoreItemCopy}>
-              <span className={styles.desktopMoreItemTitle}>Elections</span>
-              <span className={styles.desktopMoreItemDescription}>
-                Follow validator elections and rounds
+            </Link>
+            <Link className={styles.desktopMoreItem} to={routes.configPath()} onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>Config</span>
+                <span className={styles.desktopMoreItemDescription}>
+                  Read protocol parameters and limits
+                </span>
               </span>
-            </span>
-          </Link>
-          <Link className={styles.desktopMoreItem} to="/faucet" onClick={closeMenu}>
-            <span className={styles.desktopMoreItemCopy}>
-              <span className={styles.desktopMoreItemTitle}>Faucet</span>
-              <span className={styles.desktopMoreItemDescription}>Get GRAM for TON Testnet</span>
-            </span>
-          </Link>
-          <Link className={styles.desktopMoreItem} to="/address-converter" onClick={closeMenu}>
-            <span className={styles.desktopMoreItemCopy}>
-              <span className={styles.desktopMoreItemTitle}>Address Converter</span>
-              <span className={styles.desktopMoreItemDescription}>
-                Convert raw and friendly TON addresses
+            </Link>
+            <Link className={styles.desktopMoreItem} to="/elections" onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>Elections</span>
+                <span className={styles.desktopMoreItemDescription}>
+                  Follow validator elections and rounds
+                </span>
               </span>
-            </span>
-          </Link>
-          <Link className={styles.desktopMoreItem} to="/cell" onClick={closeMenu}>
-            <span className={styles.desktopMoreItemCopy}>
-              <span className={styles.desktopMoreItemTitle}>Cell Inspector</span>
-              <span className={styles.desktopMoreItemDescription}>
-                Inspect and decode TON cells
+            </Link>
+            <Link className={styles.desktopMoreItem} to="/verified" onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>Verified contracts</span>
+                <span className={styles.desktopMoreItemDescription}>
+                  Browse verified on-chain source code
+                </span>
               </span>
-            </span>
-          </Link>
-          <Link className={styles.desktopMoreItem} to="/emulate" onClick={closeMenu}>
-            <span className={styles.desktopMoreItemCopy}>
-              <span className={styles.desktopMoreItemTitle}>Emulator</span>
-              <span className={styles.desktopMoreItemDescription}>
-                Emulate transactions locally
+            </Link>
+          </section>
+          <section className={styles.desktopMoreColumn} aria-labelledby="more-tools-heading">
+            <h2 id="more-tools-heading" className={styles.desktopMoreHeading}>
+              Tools
+            </h2>
+            <Link className={styles.desktopMoreItem} to="/faucet" onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>Faucet</span>
+                <span className={styles.desktopMoreItemDescription}>Get GRAM for TON Testnet</span>
               </span>
-            </span>
-          </Link>
-          <Link className={styles.desktopMoreItem} to="/verified" onClick={closeMenu}>
-            <span className={styles.desktopMoreItemCopy}>
-              <span className={styles.desktopMoreItemTitle}>Verified contracts</span>
-              <span className={styles.desktopMoreItemDescription}>
-                Browse verified on-chain source code
+            </Link>
+            <Link className={styles.desktopMoreItem} to="/address-converter" onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>Address Converter</span>
+                <span className={styles.desktopMoreItemDescription}>
+                  Convert raw and friendly TON addresses
+                </span>
               </span>
-            </span>
-          </Link>
+            </Link>
+            <Link className={styles.desktopMoreItem} to="/cell" onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>Cell Inspector</span>
+                <span className={styles.desktopMoreItemDescription}>
+                  Inspect and decode TON cells
+                </span>
+              </span>
+            </Link>
+            <Link className={styles.desktopMoreItem} to="/emulate" onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>Emulator</span>
+                <span className={styles.desktopMoreItemDescription}>
+                  Emulate transactions locally
+                </span>
+              </span>
+            </Link>
+          </section>
         </nav>
       }
     >
