@@ -9,10 +9,22 @@ status-level = "pass"
 # Retrace hits rate-limited remote APIs, so keep its tests mutually exclusive.
 max-threads = 1
 
+[test-groups.localnet-command-serial]
+# These fixtures share host ports; their in-process mutex cannot coordinate Nextest processes.
+max-threads = 1
+
 [[profile.default.overrides]]
 filter = 'package(ton-retrace)'
 test-group = 'retrace-serial'
 
+[[profile.default.overrides]]
+filter = 'binary(=localnet_command)'
+test-group = 'localnet-command-serial'
+
 [[profile.ci.overrides]]
 filter = 'package(ton-retrace)'
 test-group = 'retrace-serial'
+
+[[profile.ci.overrides]]
+filter = 'binary(=localnet_command)'
+test-group = 'localnet-command-serial'
