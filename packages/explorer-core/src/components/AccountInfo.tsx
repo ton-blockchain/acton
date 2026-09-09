@@ -1,4 +1,3 @@
-import {Link, useLocation} from "react-router"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {Check, Edit2, QrCode, Star} from "lucide-react"
 import {QRCodeSVG} from "qrcode.react"
@@ -29,8 +28,6 @@ import {useNetworkInfo, type ExplorerNetworkId} from "../hooks/useNetworkInfo"
 
 import styles from "./AccountInfo.module.css"
 import {NftImage} from "./NftImage"
-import {AddressFormats} from "./AddressFormats"
-import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {
   TOKEN_IMAGE_SOURCE_KEYS,
   getImageSources,
@@ -128,8 +125,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const {addressFormat, forkNetwork, network} = useNetworkInfo()
   const displayAddress = normalizeAddress(address, addressFormat)
   const bounceableAddress = normalizeAddress(address, {...addressFormat, bounceable: true})
-  const routes = useExplorerRoutePaths()
-  const location = useLocation()
+  const nonBounceableAddress = normalizeAddress(address, {...addressFormat, bounceable: false})
   const rawAddress = toRawAddress(address)
   const qrAddress = toAccountQrAddress(address, state?.status, addressFormat)
 
@@ -283,16 +279,44 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   ) : (
     <AddressQrCode value={qrAddress} />
   )
-  const converterSearch = new URLSearchParams(location.search)
-  converterSearch.set("address", displayAddress)
   const addressFormats = (
     <div className={styles.addressFormats}>
-      <AddressFormats address={address} addressFormat={addressFormat} />
-      {routes.addressConverterPath && (
-        <Link to={{pathname: routes.addressConverterPath, search: converterSearch.toString()}}>
-          Open Address Converter
-        </Link>
-      )}
+      <div className={styles.addressFormatRow}>
+        <span className={styles.addressFormatLabel}>Bounceable</span>
+        <div className={styles.addressFormatValueRow}>
+          <code className={styles.addressFormatValue}>{bounceableAddress}</code>
+          <CopyInlineAction
+            size="compact"
+            value={bounceableAddress}
+            label="Copy bounceable address"
+            copiedLabel="Bounceable address copied"
+          />
+        </div>
+      </div>
+      <div className={styles.addressFormatRow}>
+        <span className={styles.addressFormatLabel}>Non-bounceable</span>
+        <div className={styles.addressFormatValueRow}>
+          <code className={styles.addressFormatValue}>{nonBounceableAddress}</code>
+          <CopyInlineAction
+            size="compact"
+            value={nonBounceableAddress}
+            label="Copy non-bounceable address"
+            copiedLabel="Non-bounceable address copied"
+          />
+        </div>
+      </div>
+      <div className={styles.addressFormatRow}>
+        <span className={styles.addressFormatLabel}>Raw</span>
+        <div className={styles.addressFormatValueRow}>
+          <code className={styles.addressFormatValue}>{rawAddress}</code>
+          <CopyInlineAction
+            size="compact"
+            value={rawAddress}
+            label="Copy raw address"
+            copiedLabel="Raw address copied"
+          />
+        </div>
+      </div>
     </div>
   )
   const nameDetailsContent = (

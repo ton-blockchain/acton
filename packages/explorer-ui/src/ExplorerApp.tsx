@@ -1250,7 +1250,7 @@ export const ExplorerApp: FC = () => {
       <MobileHeaderRouteSync onNavigate={closeMobileHeaderPanels} />
       <ToastProvider>
         <StaticNetworkInfoProvider network={networkConfig}>
-          <ExplorerRoutesProvider basePath="" addressConverterPath="/address-converter">
+          <ExplorerRoutesProvider basePath="">
             <MetadataRegistryProvider registry={metadataRegistry}>
               <AddressBookProvider>
                 <ExplorerDocumentTitle
