@@ -1,0 +1,99 @@
+.container {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 24px 32px 48px;
+  display: grid;
+  gap: 18px;
+}
+
+.workspace {
+  min-width: 0;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+  background: var(--acton-color-surface);
+  overflow: hidden;
+}
+
+.inputPanel {
+  min-width: 0;
+}
+
+.inputError {
+  margin-top: 6px;
+  color: var(--acton-color-danger-text);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.5;
+}
+
+.details {
+  margin: 0;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  gap: 32px;
+}
+
+.details dt {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.5;
+}
+
+.details dd {
+  margin: 6px 0 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+}
+
+.resultHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.resultHeader h1 {
+  margin: 0;
+  font-size: var(--acton-font-size-sm);
+  font-weight: 600;
+}
+
+.empty {
+  padding: 32px 20px;
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 16px 16px 32px;
+  }
+
+  .details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .resultHeader {
+    padding: 16px;
+  }
+}
+
+:global([data-theme="dark"]) .workspace {
+  background: var(--acton-color-surface-raised);
+}
+
+.inputPanel .addressInput {
+  min-height: 56px;
+  padding: 14px 16px;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.workchainName {
+  color: var(--acton-color-text-muted);
+}

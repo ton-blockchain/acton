@@ -66,6 +66,7 @@ import actonScanLogo from "./assets/acton-scan-logo-dark.svg"
 import actonScanTestnetLogo from "./assets/acton-scan-testnet-logo-dark.svg"
 import {DeveloperExplorerBanner} from "./components/DeveloperExplorerBanner"
 import {EXPLORER_NETWORK_QUERY_PARAM, explorerNetworkSearch} from "./explorerNetworkUrl"
+import {AddressConverterPage} from "./pages/AddressConverterPage"
 import {FaucetPage} from "./faucet/FaucetPage"
 import {AbiCatalogPage, AbiDetailsPage} from "./pages/abi-pages"
 import {SourceCatalogPage} from "./pages/SourceCatalogPage"
@@ -925,6 +926,14 @@ const DesktopMoreMenu: FC = () => {
               <span className={styles.desktopMoreItemDescription}>Get GRAM for TON Testnet</span>
             </span>
           </Link>
+          <Link className={styles.desktopMoreItem} to="/address-converter" onClick={closeMenu}>
+            <span className={styles.desktopMoreItemCopy}>
+              <span className={styles.desktopMoreItemTitle}>Address Converter</span>
+              <span className={styles.desktopMoreItemDescription}>
+                Convert raw and friendly TON addresses
+              </span>
+            </span>
+          </Link>
           <Link className={styles.desktopMoreItem} to="/cell" onClick={closeMenu}>
             <span className={styles.desktopMoreItemCopy}>
               <span className={styles.desktopMoreItemTitle}>Cell Inspector</span>
@@ -1241,7 +1250,7 @@ export const ExplorerApp: FC = () => {
       <MobileHeaderRouteSync onNavigate={closeMobileHeaderPanels} />
       <ToastProvider>
         <StaticNetworkInfoProvider network={networkConfig}>
-          <ExplorerRoutesProvider basePath="">
+          <ExplorerRoutesProvider basePath="" addressConverterPath="/address-converter">
             <MetadataRegistryProvider registry={metadataRegistry}>
               <AddressBookProvider>
                 <ExplorerDocumentTitle
@@ -1389,6 +1398,9 @@ export const ExplorerApp: FC = () => {
                               <Link to="/verified" onClick={closeMobileHeaderPanels}>
                                 Verified contracts
                               </Link>
+                              <Link to="/address-converter" onClick={closeMobileHeaderPanels}>
+                                Address Converter
+                              </Link>
                               <Link to="/cell" onClick={closeMobileHeaderPanels}>
                                 Cell Inspector
                               </Link>
@@ -1463,6 +1475,7 @@ export const ExplorerApp: FC = () => {
                         element={<StatisticsPage api={ACTON_VERIFIER_API} />}
                       />
                       <Route path="/verified/:target" element={<VerifiedContractRoute />} />
+                      <Route path="/address-converter" element={<AddressConverterPage />} />
                       <Route path="/cell" element={<CellInspectorExplorerPage />} />
                       <Route path="/emulate" element={<EmulateExplorerPage client={client} />} />
                       <Route path="/favorites" element={<FavoriteAccountsPage client={client} />} />

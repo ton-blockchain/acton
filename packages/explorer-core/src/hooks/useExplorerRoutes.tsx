@@ -16,6 +16,7 @@ interface ExplorerRoutesProviderProps extends ExplorerRouteOverrides {
 
 export const ExplorerRoutesProvider: FC<ExplorerRoutesProviderProps> = ({
   abiPath,
+  addressConverterPath,
   basePath = "/explorer",
   cellPath,
   children,
@@ -30,6 +31,7 @@ export const ExplorerRoutesProvider: FC<ExplorerRoutesProviderProps> = ({
     () =>
       createExplorerRoutes(basePath, addressFormat, localnetBasePath, {
         abiPath,
+        addressConverterPath,
         cellPath,
         contractsPath,
         electionsPath,
@@ -38,6 +40,7 @@ export const ExplorerRoutesProvider: FC<ExplorerRoutesProviderProps> = ({
       }),
     [
       abiPath,
+      addressConverterPath,
       addressFormat,
       basePath,
       cellPath,

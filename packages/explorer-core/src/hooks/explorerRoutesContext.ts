@@ -9,6 +9,7 @@ export interface ExplorerRoutes {
   readonly electionsPath: string
   readonly abiPath: string
   readonly contractsPath?: string
+  readonly addressConverterPath?: string
   readonly cellPath: string
   readonly emulatePath: string
   readonly sourcesPath: string
@@ -22,6 +23,7 @@ export interface ExplorerRoutes {
 }
 
 export interface ExplorerRouteOverrides {
+  readonly addressConverterPath?: string
   readonly abiPath?: string
   readonly cellPath?: string
   readonly contractsPath?: string
@@ -44,6 +46,7 @@ export const createExplorerRoutes = (
 
   return {
     rootPath: path(),
+    addressConverterPath: overrides.addressConverterPath,
     blocksPath: path("/blocks"),
     configPath: seqno => path(seqno === undefined ? "/config" : `/config/${seqno}`),
     electionsPath: overrides.electionsPath ?? path("/elections"),

@@ -19,6 +19,7 @@
     "./api/waitForTraceTransactionHash": "./src/api/waitForTraceTransactionHash.ts",
     "./components/DeveloperAccountList": "./src/components/DeveloperAccountList.tsx",
     "./components/DeveloperTransactionList": "./src/components/DeveloperTransactionList.tsx",
+    "./components/AddressFormats": "./src/components/AddressFormats.tsx",
     "./components/AbiCatalog": "./src/components/AbiCatalog.tsx",
     "./components/ExplorerAddressChip": "./src/components/ExplorerAddressChip.tsx",
     "./components/ExplorerBreadcrumbs": "./src/components/ExplorerBreadcrumbs.tsx",
