@@ -8,6 +8,8 @@ These addresses are not fixtures and their balances or recent history can change
 
 | Address | What to verify | Last checked |
 | --- | --- | --- |
+| [`EQA9S5qRZTa0GcH5VZqDJ_KxtfVvGzYgZtdon7Rhg82zLi-N`](https://actonscan.com/address/EQA9S5qRZTa0GcH5VZqDJ_KxtfVvGzYgZtdon7Rhg82zLi-N?network=mainnet) | Fragment username NFT: Username and both Telegram aliases are shown as external links in the account summary | 2026-09-09 |
+| [`EQCkQlDs452x_vspIKq_PTlUl8B0S427RELr_62Dbro7g3om`](https://actonscan.com/address/EQCkQlDs452x_vspIKq_PTlUl8B0S427RELr_62Dbro7g3om?network=mainnet) | Fragment anonymous number NFT: Number is shown as a Telegram link in the account summary | 2026-09-09 |
 | [`EQAAAFVppd1Pip_zOxJIezgVnOzy7Yn_Mob56acg4MhcCuwi`](https://actonscan.com/address/EQAAAFVppd1Pip_zOxJIezgVnOzy7Yn_Mob56acg4MhcCuwi?network=mainnet) | Standard NftCollection ABI fallback; get_collection_data decodes nextItemIndex = -1 for a non-sequential collection | 2026-09-09 |
 | [`EQAABbDZyUG5vO-lhhpNPMzdHmv5Ub5NILsKgJj_51kZDAQ6`](https://actonscan.com/address/EQAABbDZyUG5vO-lhhpNPMzdHmv5Ub5NILsKgJj_51kZDAQ6?network=mainnet) | Standard NftCollection ABI fallback; get_nft_address_by_index(0) matches the item below, and get_nft_content combines its individual content with the collection URI | 2026-09-09 |
 | [`EQDreUU_JJiOt-5cUX8Q3xFrtOFqQX-ESYXtVeFncgTq0MaJ`](https://actonscan.com/address/EQDreUU_JJiOt-5cUX8Q3xFrtOFqQX-ESYXtVeFncgTq0MaJ?network=mainnet) | Standard NftItem ABI fallback shows five TEP-62 messages; get_nft_data decodes initialization, index, collection, owner and content without assuming a storage layout | 2026-09-09 |

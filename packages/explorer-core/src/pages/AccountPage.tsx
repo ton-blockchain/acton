@@ -1829,6 +1829,11 @@ export const AccountPage: FC<AccountPageProps> = ({
     : undefined
   const nftItemOwnerAddress = currentNftItem?.owner_address
   const nftItemCollectionAddress = currentNftItem?.collection_address
+  const fragmentIdentity = getFragmentNftIdentity(
+    compilerAbi?.contract_name,
+    nftItemName,
+    currentNftItem?.content,
+  )
   const activeMetadataJson = jettonMaster ? jettonMetadataJson : nftItemMetadataJson
   const activeMetadataTitle = jettonMaster ? tokenName : (nftItemName ?? "NFT item")
   const activeMetadataImageSources = jettonMaster
@@ -1918,8 +1923,62 @@ export const AccountPage: FC<AccountPageProps> = ({
       : styles.topSection
     : `${styles.topSection} ${styles.topSectionSingle}`
 
-  const accountInfoDetails =
-    isVestingAccount && vestingData
+  const accountInfoDetails = [
+    ...(fragmentIdentity?.kind === "username"
+      ? [
+          {
+            key: "fragment-username",
+            label: "Username",
+            value: (
+              <a
+                className={styles.accountDetailLink}
+                href={`https://t.me/${fragmentIdentity.handle}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                @{fragmentIdentity.handle}
+              </a>
+            ),
+          },
+          {
+            key: "fragment-username-aliases",
+            label: "Aliases",
+            value: (
+              <div className={styles.accountDetailLinks}>
+                {fragmentIdentity.aliases.map(alias => (
+                  <a
+                    className={styles.accountDetailLink}
+                    href={alias.href}
+                    key={alias.label}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {alias.label}
+                  </a>
+                ))}
+              </div>
+            ),
+          },
+        ]
+      : fragmentIdentity?.kind === "number"
+        ? [
+            {
+              key: "fragment-number",
+              label: "Number",
+              value: (
+                <a
+                  className={styles.accountDetailLink}
+                  href={`https://t.me/${fragmentIdentity.compactNumber}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {fragmentIdentity.displayNumber}
+                </a>
+              ),
+            },
+          ]
+        : []),
+    ...(isVestingAccount && vestingData
       ? [
           {
             key: "vesting-owner",
@@ -1944,21 +2003,23 @@ export const AccountPage: FC<AccountPageProps> = ({
             ),
           },
         ]
-      : multisigOrder
-        ? [
-            {
-              key: "multisig-wallet",
-              label: "Multisig wallet",
-              value: (
-                <ExplorerAddressChip
-                  address={multisigOrder.multisig_address}
-                  onAddressClick={handleSearch}
-                  variant="plain"
-                />
-              ),
-            },
-          ]
-        : undefined
+      : []),
+    ...(multisigOrder
+      ? [
+          {
+            key: "multisig-wallet",
+            label: "Multisig wallet",
+            value: (
+              <ExplorerAddressChip
+                address={multisigOrder.multisig_address}
+                onAddressClick={handleSearch}
+                variant="plain"
+              />
+            ),
+          },
+        ]
+      : []),
+  ]
 
   const multisigTabs = useMemo<readonly AccountDetailsTab[]>(() => {
     if (isMultisigWalletAccount) {
@@ -2424,6 +2485,78 @@ function contentString(
 ): string | undefined {
   const value = content?.[key]
   return typeof value === "string" && value.length > 0 ? value : undefined
+}
+
+interface FragmentLink {
+  readonly label: string
+  readonly href: string
+}
+
+interface FragmentUsernameIdentity {
+  readonly kind: "username"
+  readonly handle: string
+  readonly aliases: readonly FragmentLink[]
+}
+
+interface FragmentNumberIdentity {
+  readonly kind: "number"
+  readonly displayNumber: string
+  readonly compactNumber: string
+}
+
+type FragmentNftIdentity = FragmentUsernameIdentity | FragmentNumberIdentity
+
+/**
+ * Builds the Telegram identity represented by a recognized Fragment NFT
+ *
+ * Contract identity gates this conversion because arbitrary NFT metadata is untrusted and may use
+ * the same name shape without representing a Telegram username or anonymous number
+ */
+function getFragmentNftIdentity(
+  contractName: string | undefined,
+  nftName: string | undefined,
+  content: Record<string, unknown> | undefined,
+): FragmentNftIdentity | undefined {
+  if (contractName === "FragmentUsernameItem") {
+    const domain = contentString(content, "domain")?.trim().toLowerCase()
+    const domainHandle = domain?.endsWith(".t.me") ? domain.slice(0, -".t.me".length) : undefined
+    const nameHandle = nftName?.trim().startsWith("@") ? nftName.trim().slice(1) : undefined
+    const handle = domainHandle || nameHandle
+
+    if (!handle || !/^[a-zA-Z0-9_]+$/.test(handle)) return undefined
+
+    return {
+      kind: "username",
+      handle,
+      aliases: [
+        {label: `${handle}.t.me`, href: `https://${handle}.t.me`},
+        {label: `t.me/${handle}`, href: `https://t.me/${handle}`},
+      ],
+    }
+  }
+
+  if (contractName === "FragmentNumbersItem") {
+    const displayNumber = nftName?.trim()
+    const metadataNumber = displayNumber?.replace(/\s/g, "")
+    const uriNumber = contentString(content, "uri")?.match(/\/number\/(\d+)\.json(?:$|[?#])/i)?.[1]
+    const compactNumber =
+      metadataNumber && /^\+\d+$/.test(metadataNumber)
+        ? metadataNumber
+        : uriNumber
+          ? `+${uriNumber}`
+          : undefined
+
+    if (!compactNumber) return undefined
+
+    return {
+      kind: "number",
+      displayNumber:
+        metadataNumber === compactNumber ? (displayNumber ?? compactNumber) : compactNumber,
+      compactNumber,
+    }
+  }
+
+  return undefined
 }
 
 function getAccountLoadIssue({
