@@ -218,10 +218,10 @@ Configures default output locations for `acton wrapper`.
 |:-------------|:---------|:-----------------|:------------|
 | `output-dir` | `string` | `wrappers-go`    | Directory for generated Go package files. |
 | `package`    | `string` | `wrappers`       | Go package name. |
-| `generator`  | `string` | `tolk-abi-to-go`  | Existing executable on PATH or a project-relative path such as `./bin/tolk-abi-to-go`. |
 
-Acton does not install the generator. See [Go generation](/docs/commands/wrapper#go-generation)
-for pinned installation and local-build guidance.
+Acton bundles its Go generator; only a Go toolchain on PATH is required.
+See [Go generation](/docs/commands/wrapper#go-generation) for toolchain requirements
+and first-use dependency caching. There is no generator executable setting.
 
 Example:
 
@@ -241,7 +241,7 @@ Override rules:
 - For TypeScript wrappers, `--output` has highest priority, then `--output-dir`, then `[contracts.<name>.wrappers.typescript].output-dir`, then `[wrappers.typescript].output-dir`, then the wrapper command's built-in default location.
 - For Tolk test stubs, `--test-output` has highest priority, then `--test-output-dir`, then `[contracts.<name>.wrappers.tolk].test-output-dir`, then `[wrappers.tolk].test-output-dir`, then the wrapper command's built-in default test location.
 - Per-contract `[contracts.<name>.wrappers.tolk].generate-test` overrides `[wrappers.tolk].generate-test`. Both affect only Tolk wrapper generation. `--ts` and `--go` cannot be combined with test-stub generation.
-- Go settings resolve from CLI overrides (`--output-dir`, `--go-package`, `--go-generator`), then `[contracts.<name>.wrappers.go]` for a single contract, then `[wrappers.go]`, then built-in defaults. `--all --go` generates one package and uses project-level settings, ignoring per-contract Go overrides. `--catalog FILE --go` also uses project-level settings when a manifest exists, but does not require a manifest or compile sources. `--output` is not supported for Go.
+- Go settings resolve from CLI overrides (`--output-dir`, `--go-package`), then `[contracts.<name>.wrappers.go]` for a single contract, then `[wrappers.go]`, then built-in defaults. `--all --go` generates one package and uses project-level settings, ignoring per-contract Go overrides. `--catalog FILE --go` also uses project-level settings when a manifest exists, but does not require a manifest or compile sources. `--output` is not supported for Go.
 
 Configured wrapper paths are resolved from project root. CLI paths such as `--output`, `--output-dir`, `--test-output`, and `--test-output-dir` stay relative to the current working directory unless absolute.
 

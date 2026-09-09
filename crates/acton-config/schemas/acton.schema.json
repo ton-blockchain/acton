@@ -390,10 +390,6 @@
       "description": "Default settings for Go wrapper generation",
       "type": "object",
       "properties": {
-        "generator": {
-          "description": "Generator executable name on PATH or project-relative path (default: tolk-abi-to-go)",
-          "type": "string"
-        },
         "output-dir": {
           "description": "Directory where `acton wrapper --go` writes generated Go files (default: wrappers-go)",
           "type": "string"

@@ -65,7 +65,7 @@ pub(super) struct WrapperArgs {
     pub ts: bool,
     #[arg(
         long,
-        help = "Generate Go types, cell codecs, and getter codecs via tolk-abi-to-go",
+        help = "Generate Go types, cell codecs, and getter codecs (requires Go)",
         help_heading = "Go",
         conflicts_with_all = ["ts", "test", "test_output", "test_output_dir", "output"]
     )]
@@ -86,14 +86,6 @@ pub(super) struct WrapperArgs {
         requires = "go"
     )]
     pub go_package: Option<String>,
-    #[arg(
-        long,
-        help = "Go generator executable (default: [wrappers.go].generator or tolk-abi-to-go)",
-        value_name = "PATH",
-        help_heading = "Go",
-        requires = "go"
-    )]
-    pub go_generator: Option<PathBuf>,
 }
 
 #[cfg(test)]
@@ -126,8 +118,6 @@ mod tests {
                 "--go",
                 "--go-package",
                 "codecs",
-                "--go-generator",
-                "./my generator",
                 "--output-dir",
                 "go codecs",
             ],
@@ -145,7 +135,6 @@ mod tests {
             vec!["--ts"],
             vec!["--catalog", "catalog.json"],
             vec!["Counter", "--go-package", "codecs"],
-            vec!["Counter", "--go-generator", "generator"],
             vec!["Counter", "--test-output", "test.tolk"],
             vec!["Counter", "--test-output-dir", "tests"],
         ] {
@@ -198,5 +187,12 @@ mod tests {
             let error = Cli::try_parse_from(std::iter::once("wrapper").chain(args)).unwrap_err();
             assert_eq!(error.kind(), ErrorKind::ArgumentConflict, "{error}");
         }
+    }
+
+    #[test]
+    fn wrapper_cli_has_no_external_generator_override() {
+        let error = Cli::try_parse_from(["wrapper", "Counter", "--go", "--go-generator", "helper"])
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::UnknownArgument);
     }
 }

@@ -508,8 +508,6 @@ pub struct GoWrapperSettings {
     pub output_dir: Option<String>,
     /// Go package name (default: wrappers)
     pub package: Option<String>,
-    /// Generator executable name on PATH or project-relative path (default: tolk-abi-to-go)
-    pub generator: Option<String>,
 }
 
 /// Shared settings for the localnet target and local development services
@@ -2287,7 +2285,6 @@ version = "0.1.0"
 [wrappers.go]
 output-dir = "generated/go"
 package = "codecs"
-generator = "./bin/tolk-abi-to-go"
 
 [contracts.counter]
 src = "counter.tolk"
@@ -2301,7 +2298,6 @@ package = "counter"
         let go = config.wrappers.as_ref().unwrap().go.as_ref().unwrap();
         assert_eq!(go.output_dir.as_deref(), Some("generated/go"));
         assert_eq!(go.package.as_deref(), Some("codecs"));
-        assert_eq!(go.generator.as_deref(), Some("./bin/tolk-abi-to-go"));
         let contract = config
             .get_contract("counter")
             .unwrap()

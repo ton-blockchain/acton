@@ -47,6 +47,26 @@ pub(crate) fn contract_compilation_order(
     dep_graph::build_dependency_graph(&flatten_contracts)
 }
 
+/// Order a set of roots and their transitive dependencies using the build graph.
+/// Other project contracts need not be built.
+pub(crate) fn contract_compilation_order_for_targets(
+    contracts: &BTreeMap<String, ContractConfig>,
+    targets: &[&str],
+) -> anyhow::Result<Vec<String>> {
+    let mut selected = HashSet::new();
+    for &target in targets {
+        selected.insert(target.to_owned());
+        selected.extend(dep_graph::collect_dependencies_for_contract(
+            target, contracts,
+        )?);
+    }
+    let contracts = contracts
+        .iter()
+        .filter(|(id, _)| selected.contains(*id))
+        .collect::<Vec<_>>();
+    dep_graph::build_dependency_graph(&contracts)
+}
+
 pub fn build_cmd(options: BuildCommandOptions) -> anyhow::Result<()> {
     let BuildCommandOptions {
         contract_id,

@@ -2328,7 +2328,6 @@ fn main() {
             go: true,
             catalog,
             go_package,
-            go_generator,
             ..
         }) => go_wrapper_cmd(
             contract_id.as_deref(),
@@ -2336,7 +2335,6 @@ fn main() {
             catalog.as_deref(),
             wrapper_output_dir.as_deref(),
             go_package.as_deref(),
-            go_generator.as_deref(),
         ),
         Commands::Wrapper(WrapperArgs {
             contract_id,
