@@ -26,6 +26,18 @@ let catalogBundlePromise: Promise<CatalogBundle> | undefined
 let catalogByCodeHashPromise: Promise<ReadonlyMap<string, ExtendedContractABI>> | undefined
 let catalogEntriesPromise: Promise<readonly BundledCompilerAbiCatalogEntry[]> | undefined
 
+/** Standard interfaces describe public calls only; they must never imply a code-hash or storage match. */
+export async function getBundledCompilerAbiForInterface(
+  accountInterface: "jetton_master" | "jetton_wallet" | undefined,
+): Promise<ExtendedContractABI | undefined> {
+  if (!accountInterface) return undefined
+
+  const catalogId =
+    accountInterface === "jetton_master" ? "tep74.GenericJettonMaster" : "tep74.GenericJettonWallet"
+  const catalog = await getBundledCompilerAbiCatalog()
+  return catalog.find(entry => entry.catalog_id === catalogId)
+}
+
 export async function getBundledCompilerAbis(
   codeHashes: readonly string[],
 ): Promise<Record<string, ExtendedContractABI | null>> {

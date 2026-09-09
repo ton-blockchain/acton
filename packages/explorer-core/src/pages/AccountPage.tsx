@@ -9,6 +9,7 @@ import {Cell} from "@ton/core"
 
 import type {AccountHistorySortOrder, TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
+import {getBundledCompilerAbiForInterface} from "../api/compilerAbiCatalog"
 import {sortJettonWalletsForDisplay} from "../api/jettonWallets"
 import {isAddressSuspended} from "../api/suspendedAccounts"
 import type {
@@ -370,6 +371,12 @@ export const AccountPage: FC<AccountPageProps> = ({
     accountTokenInfo,
     "jetton_wallet",
   )
+  const accountAbiInterface =
+    isJettonMasterAccount === isJettonWalletAccount
+      ? undefined
+      : isJettonMasterAccount
+        ? "jetton_master"
+        : "jetton_wallet"
   const isNftItemAccount = hasAccountContractHint(accountInterfaces, accountTokenInfo, "nft_item")
   const isNftCollectionAccount = hasAccountContractHint(
     accountInterfaces,
@@ -989,8 +996,13 @@ export const AccountPage: FC<AccountPageProps> = ({
 
       try {
         const abis = await metadataRegistry.getCompilerAbis([accountCodeLookupHash])
+        // Interface detection cannot identify storage or implementation-specific operations.
+        // Prefer an exact ABI and use the catalog's public TEP-74 surface only when absent.
+        const abi =
+          abis[accountCodeLookupHash] ??
+          (await getBundledCompilerAbiForInterface(accountAbiInterface))
         if (!isActive) return
-        setExtendedContractAbi(abis[accountCodeLookupHash] ?? undefined)
+        setExtendedContractAbi(abi)
         setCompilerAbiLoading(false)
       } catch (error) {
         if (!isActive) return
@@ -1004,7 +1016,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     return () => {
       isActive = false
     }
-  }, [accountCodeLookupHash, metadataRegistry])
+  }, [accountCodeLookupHash, accountAbiInterface, metadataRegistry])
 
   useEffect(() => {
     let isActive = true

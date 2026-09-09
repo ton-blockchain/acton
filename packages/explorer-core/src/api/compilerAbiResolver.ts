@@ -2,6 +2,8 @@ import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {ExtendedContractABI} from "./compilerAbi"
 import {addressKey} from "./compilerAbi"
+import {getBundledCompilerAbiForInterface} from "./compilerAbiCatalog"
+import {hasAccountInterface} from "../pages/accountContractTypes"
 import type {ExplorerMetadataRegistry} from "../metadata/types"
 import type {TonClient} from "./client"
 
@@ -78,6 +80,22 @@ export async function resolveCompilerAbis({
   for (const {key} of requestedAddresses) {
     const codeHash = addressToCodeHash.get(key)
     abiByAddress.set(key, codeHash ? abiByCodeHash.get(codeHash) : undefined)
+  }
+
+  // Indexer interfaces belong to account states, not arbitrary uses of the same code hash.
+  // Keep generic ABIs out of abiByCodeHash so they cannot masquerade as exact matches.
+  for (const account of states?.accounts ?? []) {
+    const key = addressKey(account.address)
+    if (abiByAddress.get(key)) continue
+
+    const interfaces = account.interfaces ?? []
+    const master = hasAccountInterface(interfaces, "jetton_master")
+    const wallet = hasAccountInterface(interfaces, "jetton_wallet")
+    if (master === wallet) continue
+
+    const abi = await getBundledCompilerAbiForInterface(master ? "jetton_master" : "jetton_wallet")
+    if (!shouldContinue()) return undefined
+    abiByAddress.set(key, abi?.compiler_abi)
   }
 
   return {

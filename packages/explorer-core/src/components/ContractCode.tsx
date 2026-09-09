@@ -112,11 +112,14 @@ export const ContractCode: FC<ContractCodeProps> = ({
     }
   }, [dataBoc])
   const contracts = useMemo(() => new Map<string, ContractData>(), [])
-  const storageUnavailableMessage = compilerAbi
-    ? dataBoc
-      ? "Storage data could not be decoded with this ABI"
-      : "No storage data available for this account"
-    : "No ABI registered for storage decoding"
+  const storageUnavailableMessage =
+    compilerAbi && compilerAbi.storage?.storage_ty_idx === undefined
+      ? "This ABI describes the public interface only and does not define a storage layout"
+      : compilerAbi
+        ? dataBoc
+          ? "Storage data could not be decoded with this ABI"
+          : "No storage data available for this account"
+        : "No ABI registered for storage decoding"
   const hasVerifiedSource = Boolean(verifiedSource?.verified && verifiedSource.bundle)
   const hasLocalVerifiedSource = verifiedSource?.bundle?.storage_revision === "local"
 

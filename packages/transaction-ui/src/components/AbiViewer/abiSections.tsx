@@ -217,36 +217,36 @@ export function AbiThrownErrorsSection({
   readonly errors: readonly ContractABI["thrown_errors"][number][]
   readonly showSymbolAnchors: boolean
 }) {
+  // Exit code 0 means successful execution, even if emitted from an ABI stub.
+  const thrownErrors = errors.filter(error => error.err_code !== 0)
+  if (thrownErrors.length === 0) return null
+
   return (
-    <AbiSection title="Thrown errors" count={errors.length}>
-      {errors.length > 0 ? (
-        <div className={styles.rows}>
-          {errors.map(error => {
-            const errorName = error.name ?? String(error.err_code)
-            const errorId = abiSymbolAnchorId("error", errorName, String(error.err_code))
-            return (
-              <div
+    <AbiSection title="Thrown errors" count={thrownErrors.length}>
+      <div className={styles.rows}>
+        {thrownErrors.map(error => {
+          const errorName = error.name ?? String(error.err_code)
+          const errorId = abiSymbolAnchorId("error", errorName, String(error.err_code))
+          return (
+            <div
+              id={errorId}
+              key={`${error.err_code}:${error.name ?? error.kind}`}
+              className={`${styles.errorRow} ${showSymbolAnchors ? "" : styles.errorRowNoAnchor}`}
+            >
+              <span className={styles.errorCode}>{error.err_code}</span>
+              <span className={styles.errorName} title={errorName}>
+                {error.name}
+              </span>
+              <span className={styles.muted}>{error.description ?? ""}</span>
+              <AbiSymbolAnchor
+                show={showSymbolAnchors}
                 id={errorId}
-                key={`${error.err_code}:${error.name ?? error.kind}`}
-                className={`${styles.errorRow} ${showSymbolAnchors ? "" : styles.errorRowNoAnchor}`}
-              >
-                <span className={styles.errorCode}>{error.err_code}</span>
-                <span className={styles.errorName} title={errorName}>
-                  {errorName}
-                </span>
-                <span className={styles.muted}>{error.description ?? ""}</span>
-                <AbiSymbolAnchor
-                  show={showSymbolAnchors}
-                  id={errorId}
-                  label={`Link to ${errorName}`}
-                />
-              </div>
-            )
-          })}
-        </div>
-      ) : (
-        <div className={styles.emptyInline}>No thrown errors declared</div>
-      )}
+                label={`Link to ${errorName}`}
+              />
+            </div>
+          )
+        })}
+      </div>
     </AbiSection>
   )
 }
