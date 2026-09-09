@@ -129,10 +129,11 @@ const PAGE_OG_PREVIEWS: Record<PageOgKey, PageOgPreview> = {
     key: "address-converter",
     title: "Address Converter",
     badge: "TON addresses",
-    description: "Raw, bounceable and non-bounceable address formats",
+    description:
+      "Convert TON addresses for wallets and APIs, and check their workchain and testnet flag",
     metadataTitle: "TON Address Converter · actonscan",
     metadataDescription:
-      "Convert TON addresses between raw and friendly formats, check checksums, and inspect address flags on actonscan.",
+      "Convert TON addresses for wallets and APIs, and check their workchain and testnet flag on actonscan.",
   },
   cell: {
     key: "cell",
