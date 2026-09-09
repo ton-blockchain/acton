@@ -21,7 +21,7 @@ fn test_init_create_app_scaffolds_empty_ui_into_app_directory() {
     assert!(app_dir.join("app/src/App.tsx").is_file());
     assert!(app_dir.join("app/src/providers/AppProviders.tsx").is_file());
     assert!(app_dir.join("app/src/styles.css").is_file());
-    assert!(app_dir.join(".prettierignore").is_file());
+    assert!(app_dir.join("biome.jsonc").is_file());
     assert!(app_dir.join(".env.example").is_file());
     assert!(!app_dir.join("wrappers-ts").exists());
     assert!(!app_dir.join("node_modules").exists());

@@ -55,7 +55,9 @@ function getSnapshot(network: Network): StoredCollection[] {
 function setSnapshot(network: Network, next: StoredCollection[]) {
   cache.set(network, next);
   writeToStorage(network, next);
-  subscribers.forEach((cb) => cb());
+  subscribers.forEach((cb) => {
+    cb();
+  });
 }
 
 function subscribe(cb: () => void): () => void {
@@ -70,7 +72,9 @@ if (typeof window !== 'undefined') {
     if (!e.key || !e.key.startsWith('nft-minter:collections:')) return;
     const network = e.key.split(':').pop() as Network;
     cache.set(network, readFromStorage(network));
-    subscribers.forEach((cb) => cb());
+    subscribers.forEach((cb) => {
+      cb();
+    });
   });
 }
 
