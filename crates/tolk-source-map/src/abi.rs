@@ -1,5 +1,7 @@
 use crate::source_map::SourceMap;
-pub use crate::types_kernel::{AliasInstantiation, StructInstantiation, Ty, TyIdx, UnionVariant};
+pub use crate::types_kernel::{
+    ABICustomPackUnpack, AliasInstantiation, StructInstantiation, Ty, TyIdx, UnionVariant,
+};
 use crate::types_kernel::{TyResolver, render_param_ty, render_ty};
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
@@ -55,14 +57,6 @@ pub enum ABIConstValue {
 pub struct ABIOpcode {
     pub prefix_num: u64,
     pub prefix_len: i32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ABICustomPackUnpack {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub pack_to_builder: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub unpack_from_slice: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1277,11 +1271,13 @@ mod tests {
             ty_idx: boxed_nullable_bool_ty_idx,
             struct_name: "Boxed".to_owned(),
             monomorphic_fields_ty_idx: vec![nullable_bool_ty_idx],
+            custom_pack_unpack: None,
         });
         abi.alias_instantiations.push(AliasInstantiation {
             ty_idx: maybe_boxed_bool_ty_idx,
             alias_name: "MaybeBoxed".to_owned(),
             monomorphic_target_ty_idx: boxed_nullable_bool_ty_idx,
+            custom_pack_unpack: None,
         });
         abi.declarations = vec![
             ABIDeclaration::Enum {
