@@ -131,10 +131,10 @@ test-output-dir = "tests/generated/precompiled"
 output-dir = "app/src/wrappers/precompiled"
 ```
 
-The nested `wrappers.tolk` and `wrappers.typescript` tables accept the same
+The nested `wrappers.tolk`, `wrappers.typescript`, and `wrappers.go` tables accept the same
 fields as their project-level counterparts. A field set for a contract
 overrides only that field; omitted fields continue to use the project-level
-value.
+value. Per-contract Go overrides apply only to single-contract generation.
 
 Do not put dependencies on the BoC contract itself: it is already compiled.
 Instead, put `depends = ["Precompiled"]` on the `.tolk` contract that needs the
@@ -203,7 +203,7 @@ Configures default output locations for `acton wrapper`.
 | Field             | Type      | Default | Description                                                           |
 |:------------------|:----------|:--------|:----------------------------------------------------------------------|
 | `output-dir`      | `string`  | -       | Default directory for generated Tolk wrappers.                        |
-| `generate-test`   | `boolean` | `false` | Generate a Tolk test stub by default for non-TypeScript wrapper runs. |
+| `generate-test`   | `boolean` | `false` | Generate a Tolk test stub by default for Tolk wrapper runs. |
 | `test-output-dir` | `string`  | -       | Default directory for generated Tolk test stubs.                      |
 
 ### `[wrappers.typescript]`
@@ -211,6 +211,17 @@ Configures default output locations for `acton wrapper`.
 | Field        | Type     | Default | Description                                          |
 |:-------------|:---------|:--------|:-----------------------------------------------------|
 | `output-dir` | `string` | -       | Default directory for generated TypeScript wrappers. |
+
+### `[wrappers.go]`
+
+| Field        | Type     | Default          | Description |
+|:-------------|:---------|:-----------------|:------------|
+| `output-dir` | `string` | `wrappers-go`    | Directory for generated Go package files. |
+| `package`    | `string` | `wrappers`       | Go package name. |
+| `generator`  | `string` | `tolk-abi-to-go`  | Existing executable on PATH or a project-relative path such as `./bin/tolk-abi-to-go`. |
+
+Acton does not install the generator. See [Go generation](/docs/commands/wrapper#go-generation)
+for pinned installation and local-build guidance.
 
 Example:
 
@@ -229,7 +240,8 @@ Override rules:
 - For Tolk wrappers, `--output` has highest priority, then `--output-dir`, then `[contracts.<name>.wrappers.tolk].output-dir`, then `[wrappers.tolk].output-dir`, then the `@wrappers` mapping when present, then the wrapper command's built-in `wrappers/` location.
 - For TypeScript wrappers, `--output` has highest priority, then `--output-dir`, then `[contracts.<name>.wrappers.typescript].output-dir`, then `[wrappers.typescript].output-dir`, then the wrapper command's built-in default location.
 - For Tolk test stubs, `--test-output` has highest priority, then `--test-output-dir`, then `[contracts.<name>.wrappers.tolk].test-output-dir`, then `[wrappers.tolk].test-output-dir`, then the wrapper command's built-in default test location.
-- Per-contract `[contracts.<name>.wrappers.tolk].generate-test` overrides `[wrappers.tolk].generate-test`. Both affect only non-TypeScript wrapper generation. `acton wrapper --ts` still cannot be combined with test-stub generation.
+- Per-contract `[contracts.<name>.wrappers.tolk].generate-test` overrides `[wrappers.tolk].generate-test`. Both affect only Tolk wrapper generation. `--ts` and `--go` cannot be combined with test-stub generation.
+- Go settings resolve from CLI overrides (`--output-dir`, `--go-package`, `--go-generator`), then `[contracts.<name>.wrappers.go]` for a single contract, then `[wrappers.go]`, then built-in defaults. `--all --go` generates one package and uses project-level settings, ignoring per-contract Go overrides. `--catalog FILE --go` also uses project-level settings when a manifest exists, but does not require a manifest or compile sources. `--output` is not supported for Go.
 
 Configured wrapper paths are resolved from project root. CLI paths such as `--output`, `--output-dir`, `--test-output`, and `--test-output-dir` stay relative to the current working directory unless absolute.
 

@@ -386,6 +386,24 @@
         }
       ]
     },
+    "GoWrapperSettings": {
+      "description": "Default settings for Go wrapper generation",
+      "type": "object",
+      "properties": {
+        "generator": {
+          "description": "Generator executable name on PATH or project-relative path (default: tolk-abi-to-go)",
+          "type": "string"
+        },
+        "output-dir": {
+          "description": "Directory where `acton wrapper --go` writes generated Go files (default: wrappers-go)",
+          "type": "string"
+        },
+        "package": {
+          "description": "Go package name (default: wrappers)",
+          "type": "string"
+        }
+      }
+    },
     "LintConfig": {
       "description": "Linter configuration for the project",
       "type": "object",
@@ -1553,6 +1571,14 @@
       "description": "Default settings for wrapper generation",
       "type": "object",
       "properties": {
+        "go": {
+          "description": "Default settings for Go wrapper generation",
+          "allOf": [
+            {
+              "$ref": "#/definitions/GoWrapperSettings"
+            }
+          ]
+        },
         "tolk": {
           "description": "Default settings for Tolk wrapper generation",
           "allOf": [

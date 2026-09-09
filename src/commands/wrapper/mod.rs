@@ -18,9 +18,96 @@ use tolk_compiler::source_map::Declaration;
 use tolk_compiler::types_kernel::{Ty, TyIdx};
 use tolk_compiler::{CompilerResult, SourceMap};
 
+mod go;
+pub use go::go_wrapper_cmd;
+
 const TYPESCRIPT_WRAPPER_PACKAGE: &str = "@ton/tolk-abi-to-typescript@0.5.0";
 const DEFAULT_TOLK_WRAPPER_DIR: &str = "wrappers";
 const DEFAULT_TYPESCRIPT_WRAPPER_DIR: &str = "wrappers-ts";
+
+fn compile_go_catalog(
+    config: &ActonConfig,
+    contract_id: Option<&str>,
+) -> anyhow::Result<serde_json::Value> {
+    let contracts = if let Some(contract_id) = contract_id {
+        vec![(
+            contract_id,
+            config
+                .get_contract(contract_id)
+                .ok_or_else(|| anyhow!(error_fmt::contract_not_found(config, contract_id)))?,
+        )]
+    } else {
+        config
+            .contracts()
+            .filter(|contracts| !contracts.is_empty())
+            .ok_or_else(|| anyhow!("No contracts defined in Acton.toml"))?
+            .iter()
+            .map(|(id, contract)| (id.as_str(), contract))
+            .collect()
+    };
+    let root = project_root();
+    let mappings = config.mappings();
+    let mut entries = Vec::new();
+    for (id, contract) in contracts {
+        let source = contract.absolute_source_path(root);
+        let precompiled = is_boc_path(&source);
+        let input = if precompiled {
+            let Some(types) = contract.absolute_types_path(root) else {
+                if contract_id.is_none() {
+                    continue;
+                }
+                anyhow::bail!(
+                    "Contract {id} uses a precompiled BoC source, so wrapper generation requires `types = \"path/to/types.tolk\"` in Acton.toml"
+                );
+            };
+            types
+        } else {
+            source.clone()
+        };
+        if !input.is_file() {
+            anyhow::bail!("ABI source file for {id} not found: {}", input.display());
+        }
+        let boc = if precompiled {
+            Some(read_precompiled_boc(&source, &contract.src)?)
+        } else {
+            None
+        };
+        // Go consumes only compiler ABI, not the source-map/type resolution used by Tolk wrappers.
+        let compiler = tolk_compiler::Compiler::new(2)
+            .with_allow_no_entrypoint(precompiled)
+            .with_mappings(&mappings);
+        let result = match compiler.compile(&input, false) {
+            CompilerResult::Success(result) => result,
+            CompilerResult::Error(error) => anyhow::bail!(
+                "Failed to compile {} for Go wrapper generation ({id}): {}",
+                input.display(),
+                error.message
+            ),
+        };
+        let mut abi = result
+            .abi
+            .ok_or_else(|| anyhow!("Compiler did not produce ABI for {id}"))?;
+        if abi.contract_name.is_empty() {
+            abi.contract_name =
+                to_pascal_case(source.file_stem().and_then(|s| s.to_str()).unwrap_or(id));
+        }
+        let code_hash = boc.map_or(result.code_hash_hex, |boc| boc.code_hash.to_string());
+        entries.push(serde_json::json!({
+            "id": id,
+            "displayName": abi.contract_name,
+            "hashes": [code_hash],
+            "knownAddresses": [],
+            "links": [],
+            "compilerAbi": abi,
+        }));
+    }
+    if entries.is_empty() {
+        anyhow::bail!(
+            "No contracts with ABI to generate Go wrappers for; configure `types` for precompiled BoC contracts"
+        );
+    }
+    Ok(serde_json::json!({ "schemaVersion": 1, "contracts": entries }))
+}
 
 struct WrapperModel {
     project_root: PathBuf,

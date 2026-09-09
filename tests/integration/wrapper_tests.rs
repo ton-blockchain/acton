@@ -49,6 +49,394 @@ contract Precompiled {
 ";
 
 #[cfg(unix)]
+mod go {
+    use super::*;
+    use crate::support::project::Project;
+    use std::io::Write;
+    use std::os::unix::fs::PermissionsExt;
+
+    const CATALOG: &str = r#"{"schemaVersion":1,"contracts":[]}"#;
+
+    fn setup_generator(project: &Project) -> String {
+        let bin = project.path().join("bin");
+        fs::create_dir_all(&bin).unwrap();
+        let generator = bin.join("tolk-abi-to-go");
+        fs::write(&generator, include_str!("testdata/fake-go-generator.sh")).unwrap();
+        fs::set_permissions(&generator, fs::Permissions::from_mode(0o755)).unwrap();
+        env::join_paths(
+            std::iter::once(bin).chain(env::split_paths(&env::var_os("PATH").unwrap_or_default())),
+        )
+        .unwrap()
+        .into_string()
+        .unwrap()
+    }
+
+    fn configure(project: &Project, settings: &str) {
+        let mut file = fs::OpenOptions::new()
+            .append(true)
+            .open(project.path().join("Acton.toml"))
+            .unwrap();
+        writeln!(file, "\n{settings}").unwrap();
+    }
+
+    #[test]
+    fn test_go_wrapper_single_defaults() {
+        let project = ProjectBuilder::new("go_wrapper_single")
+            .contract("counter", SIMPLE_CONTRACT)
+            .with_wrappers_tolk_generate_test(true)
+            .build();
+        let path = setup_generator(&project);
+        project
+            .acton()
+            .wrapper("counter")
+            .arg("--go")
+            .env("PATH", &path)
+            .run()
+            .success()
+            .assert_contains("fake Go generator stdout")
+            .assert_stderr_contains("fake Go generator stderr");
+        let dir = project.path().join("wrappers-go");
+        let catalog: Value =
+            serde_json::from_slice(&fs::read(dir.join("input.json")).unwrap()).unwrap();
+        assert_eq!(catalog["schemaVersion"], 1);
+        assert_eq!(catalog["contracts"].as_array().unwrap().len(), 1);
+        assert_eq!(catalog["contracts"][0]["id"], "counter");
+        assert_eq!(
+            catalog["contracts"][0]["compilerAbi"]["contract_name"],
+            "Counter"
+        );
+        assert_eq!(
+            catalog["contracts"][0]["hashes"][0].as_str().unwrap().len(),
+            64
+        );
+        assert_eq!(
+            fs::read_to_string(dir.join("package.txt")).unwrap(),
+            "wrappers\n"
+        );
+        let temporary = fs::read_to_string(dir.join("input-path.txt")).unwrap();
+        assert!(
+            !Path::new(temporary.trim()).exists(),
+            "temporary catalog must be removed"
+        );
+        assert!(!project.path().join("tests/counter.test.tolk").exists());
+        assert!(!project.path().join("wrappers/Counter.gen.tolk").exists());
+    }
+
+    #[test]
+    fn test_go_wrapper_preserves_custom_instantiation_flags() {
+        let project = ProjectBuilder::new("go_wrapper_custom_instantiations")
+            .contract(
+                "custom",
+                r"
+struct Boxed<T> { value: T }
+type Value<T> = T
+
+fun Boxed<uint8>.packToBuilder(self, mutate b: builder) {
+    b.storeUint(self.value, 16);
+}
+fun Boxed<uint8>.unpackFromSlice(mutate s: slice): Boxed<uint8> {
+    return { value: s.loadUint(16) as uint8 };
+}
+fun Value<uint8>.packToBuilder(self, mutate b: builder) {
+    b.storeUint(self, 16);
+}
+fun Value<uint8>.unpackFromSlice(mutate s: slice): Value<uint8> {
+    return s.loadUint(16) as Value<uint8>;
+}
+
+struct Storage {
+    boxed: Boxed<uint8>
+    value: Value<uint8>
+    standardBoxed: Boxed<uint16>
+    standardValue: Value<uint16>
+}
+contract Custom { storage: Storage }
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+",
+            )
+            .build();
+        let path = setup_generator(&project);
+        project
+            .acton()
+            .wrapper("custom")
+            .arg("--go")
+            .env("PATH", &path)
+            .run()
+            .success();
+        let catalog: Value = serde_json::from_slice(
+            &fs::read(project.path().join("wrappers-go/input.json")).unwrap(),
+        )
+        .unwrap();
+        let abi = &catalog["contracts"][0]["compilerAbi"];
+        for (table, name_field, name) in [
+            ("struct_instantiations", "struct_name", "Boxed"),
+            ("alias_instantiations", "alias_name", "Value"),
+        ] {
+            for width in [8, 16] {
+                let inst = abi[table]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|inst| inst[name_field] == format!("{name}<uint{width}>"))
+                    .unwrap_or_else(|| panic!("missing {name}<uint{width}> in {table}: {abi}"));
+                if width == 8 {
+                    assert_eq!(
+                        inst["custom_pack_unpack"],
+                        serde_json::json!({"pack_to_builder": true, "unpack_from_slice": true}),
+                        "{table}"
+                    );
+                } else {
+                    assert!(inst.get("custom_pack_unpack").is_none(), "{table}");
+                }
+            }
+            let decl = abi["declarations"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|decl| decl["name"] == name)
+                .unwrap();
+            assert!(decl.get("custom_pack_unpack").is_none());
+        }
+    }
+
+    #[test]
+    fn test_go_wrapper_catalog_without_project() {
+        let project = ProjectBuilder::new("go_catalog_only")
+            .without_acton_toml()
+            .raw_file("catalog with spaces.json", CATALOG)
+            .build();
+        let path = setup_generator(&project);
+        project
+            .acton()
+            .args([
+                "wrapper",
+                "--catalog",
+                "catalog with spaces.json",
+                "--go",
+                "--output-dir",
+                "go output",
+            ])
+            .current_dir(project.path())
+            .env("PATH", &path)
+            .run()
+            .success();
+        assert_eq!(
+            fs::read_to_string(project.path().join("go output/input.json")).unwrap(),
+            CATALOG
+        );
+        assert!(!project.path().join("Acton.toml").exists());
+        assert!(!project.path().join(".acton").exists());
+        assert!(project.path().join("catalog with spaces.json").exists());
+    }
+
+    #[test]
+    fn test_go_wrapper_config_and_cli_overrides_from_subdirectory() {
+        let project = ProjectBuilder::new("go_wrapper_settings")
+            .contract("counter", SIMPLE_CONTRACT)
+            .raw_file("subdir/catalog.json", CATALOG)
+            .build();
+        setup_generator(&project);
+        let generator = project.path().join("bin/custom generator");
+        fs::rename(project.path().join("bin/tolk-abi-to-go"), &generator).unwrap();
+        configure(
+            &project,
+            r#"
+[wrappers.go]
+output-dir = "configured go"
+package = "configured"
+generator = "./bin/custom generator"
+[contracts.counter.wrappers.go]
+package = "counter"
+"#,
+        );
+        project
+            .acton()
+            .args(["wrapper", "counter", "--go"])
+            .current_dir(project.path().join("subdir"))
+            .run()
+            .success();
+        assert_eq!(
+            fs::read_to_string(project.path().join("configured go/package.txt")).unwrap(),
+            "counter\n"
+        );
+        // Catalog mode uses project defaults, not contract settings, and does not check the source toolchain.
+        configure(&project, "[toolchain]\nacton = \"not-installed\"");
+        project
+            .acton()
+            .args(["wrapper", "--catalog", "catalog.json", "--go"])
+            .current_dir(project.path().join("subdir"))
+            .run()
+            .success();
+        assert_eq!(
+            fs::read_to_string(project.path().join("configured go/package.txt")).unwrap(),
+            "configured\n"
+        );
+        project
+            .acton()
+            .args([
+                "wrapper",
+                "--catalog",
+                "catalog.json",
+                "--go",
+                "--output-dir",
+                "cli go",
+                "--go-package",
+                "overridden",
+                "--go-generator",
+                "../bin/custom generator",
+            ])
+            .current_dir(project.path().join("subdir"))
+            .run()
+            .success();
+        assert_eq!(
+            fs::read_to_string(project.path().join("subdir/cli go/package.txt")).unwrap(),
+            "overridden\n"
+        );
+    }
+
+    #[test]
+    fn test_go_wrapper_all_is_one_catalog_including_boc_types() {
+        let boc = fs::read("tests/integration/testdata/child.boc").unwrap();
+        let hash = Boc::decode(&boc).unwrap().repr_hash().to_string();
+        let project = ProjectBuilder::new("go_wrapper_all")
+            .contract("first", SIMPLE_CONTRACT)
+            .contract("second", SIMPLE_CONTRACT)
+            .contract_from_boc("skipped", vec![0xff])
+            .contract_from_boc_with_types("precompiled", boc, "contracts/interface.tolk")
+            .raw_file("contracts/interface.tolk", PRECOMPILED_TYPES)
+            .build();
+        point_precompiled_contract_to_uppercase_boc(&project);
+        let path = setup_generator(&project);
+        configure(
+            &project,
+            r#"
+[contracts.first.wrappers.go]
+output-dir = "not-used-for-all"
+package = "not_used_for_all"
+generator = "not-used-for-all"
+"#,
+        );
+        project
+            .acton()
+            .args(["wrapper", "--all", "--go"])
+            .current_dir(project.path())
+            .env("PATH", &path)
+            .run()
+            .success();
+        let dir = project.path().join("wrappers-go");
+        let catalog: Value =
+            serde_json::from_slice(&fs::read(dir.join("input.json")).unwrap()).unwrap();
+        let entries = catalog["contracts"].as_array().unwrap();
+        assert_eq!(
+            entries
+                .iter()
+                .map(|entry| entry["id"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            ["first", "precompiled", "second"]
+        );
+        assert_eq!(entries[1]["hashes"][0], hash);
+        assert_eq!(entries[1]["compilerAbi"]["contract_name"], "Precompiled");
+        assert_eq!(
+            fs::read_to_string(dir.join("invocations.txt")).unwrap(),
+            "invocation\n"
+        );
+        project
+            .acton()
+            .wrapper("precompiled")
+            .arg("--go")
+            .env("PATH", &path)
+            .arg("--output-dir")
+            .arg("boc codecs")
+            .run()
+            .success();
+        let single: Value = serde_json::from_slice(
+            &fs::read(project.path().join("boc codecs/input.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(single["contracts"][0], entries[1]);
+    }
+
+    #[test]
+    fn test_go_wrapper_missing_generator_and_failure_output() {
+        let project = ProjectBuilder::new("go_wrapper_errors")
+            .without_acton_toml()
+            .raw_file("catalog.json", CATALOG)
+            .build();
+        let path = setup_generator(&project);
+        project.acton().args(["wrapper", "--catalog", "catalog.json", "--go"])
+            .current_dir(project.path()).env("PATH", "").run().failure()
+            .assert_stderr_contains("go install github.com/toncenter/ton-indexer/ton-index-go/index/acton/cmd/tolk-abi-to-go@<version>")
+            .assert_stderr_contains("pinned revision");
+        project
+            .acton()
+            .args([
+                "wrapper",
+                "--catalog",
+                "catalog.json",
+                "--go",
+                "--go-package",
+                "fail",
+            ])
+            .current_dir(project.path())
+            .env("PATH", &path)
+            .run()
+            .failure()
+            .assert_contains("fake Go generator stdout")
+            .assert_stderr_contains("fake Go generator stderr")
+            .assert_stderr_contains("23");
+        assert!(!project.path().join("wrappers-go").exists());
+    }
+
+    #[test]
+    fn test_go_wrapper_invalid_project_inputs_do_not_run_generator() {
+        let project = ProjectBuilder::new("go_wrapper_bad_inputs")
+            .contract("broken", "this is not Tolk")
+            .contract_from_boc_with_types("precompiled", vec![0xff], "missing.tolk")
+            .contract_from_boc_with_types("no_types", vec![0xff], " ")
+            .build();
+        let path = setup_generator(&project);
+        for (id, message) in [
+            ("absent", "not found"),
+            ("broken", "Failed to compile"),
+            ("precompiled", "ABI source file"),
+            ("no_types", "requires `types"),
+        ] {
+            project
+                .acton()
+                .wrapper(id)
+                .arg("--go")
+                .env("PATH", &path)
+                .run()
+                .failure()
+                .assert_stderr_contains(message);
+        }
+        assert!(!project.path().join("wrappers-go").exists());
+    }
+
+    #[test]
+    fn test_go_wrapper_all_requires_at_least_one_abi() {
+        for project in [
+            ProjectBuilder::new("go_no_contracts").build(),
+            ProjectBuilder::new("go_no_interfaces")
+                .contract_from_boc("bare", vec![0xff])
+                .build(),
+        ] {
+            let path = setup_generator(&project);
+            project
+                .acton()
+                .args(["wrapper", "--all", "--go"])
+                .current_dir(project.path())
+                .env("PATH", &path)
+                .run()
+                .failure()
+                .assert_stderr_contains("No contracts");
+            assert!(!project.path().join("wrappers-go").exists());
+        }
+    }
+}
+
+#[cfg(unix)]
 const FAKE_TYPESCRIPT_GENERATOR: &str = r#"#!/bin/sh
 set -eu
 
