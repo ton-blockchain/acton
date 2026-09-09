@@ -4,6 +4,11 @@ export type AbiDeclaration = Readonly<ContractABI["declarations"][number]>
 
 type AbiEnumMemberWithDescription = Readonly<{readonly description?: string}>
 
+/** Keeps catalog counts and ABI details consistent by excluding successful exit code 0. */
+export function getAbiThrownErrors(errors: readonly ContractABI["thrown_errors"][number][]) {
+  return errors.filter(error => error.err_code !== 0)
+}
+
 export function formatTolkIdentifier(value: string): string {
   if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) {
     return value

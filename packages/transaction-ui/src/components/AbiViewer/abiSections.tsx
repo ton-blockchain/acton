@@ -4,6 +4,7 @@ import {
   formatAbiTyDeclaration,
   formatDeclarationTolk,
   getAbiTyDeclaration,
+  getAbiThrownErrors,
   type AbiDeclaration,
 } from "./abiFormatting"
 import {AbiSection, AbiSymbolAnchor, abiSymbolAnchorId, TolkCode} from "./abiShared"
@@ -217,8 +218,7 @@ export function AbiThrownErrorsSection({
   readonly errors: readonly ContractABI["thrown_errors"][number][]
   readonly showSymbolAnchors: boolean
 }) {
-  // Exit code 0 means successful execution, even if emitted from an ABI stub.
-  const thrownErrors = errors.filter(error => error.err_code !== 0)
+  const thrownErrors = getAbiThrownErrors(errors)
   if (thrownErrors.length === 0) return null
 
   return (
