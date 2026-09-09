@@ -16,6 +16,7 @@ export interface SearchInputItem {
   readonly label: ReactNode
   readonly description?: ReactNode
   readonly icon?: ReactNode
+  readonly iconClassName?: string
   readonly onSelect: () => void
   readonly onRemove?: () => void
   readonly removeLabel?: string
@@ -210,7 +211,10 @@ export function SearchInput({
                     className={`${styles.itemButton} ${item.icon ? styles.itemButtonWithIcon : ""}`}
                   >
                     {item.icon && (
-                      <span className={styles.itemIcon} aria-hidden="true">
+                      <span
+                        className={`${styles.itemIcon} ${item.iconClassName ?? ""}`}
+                        aria-hidden="true"
+                      >
                         {item.icon}
                       </span>
                     )}

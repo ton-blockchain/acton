@@ -1,4 +1,4 @@
-import {getMainnetAddresses, getTestnetAddresses} from "@acton/address-registry"
+import {getMainnetAddresses, getMainnetJettons, getTestnetAddresses} from "@acton/address-registry"
 import {Address} from "@ton/core"
 import {
   createContext,
@@ -37,7 +37,10 @@ interface AddressBookDomainRow {
 
 export interface RegistryNameMatch {
   readonly address: string
+  readonly image?: string
+  readonly kind?: "token"
   readonly name: string
+  readonly symbol?: string
 }
 
 interface AddressBookContextValue {
@@ -74,9 +77,20 @@ export const AddressBookProvider: FC<{
   const metadataRegistry = useMetadataRegistry()
   const {network} = useNetworkInfo()
   const registryAddresses = network.testOnly ? getTestnetAddresses() : getMainnetAddresses()
+  const registryJettons = useMemo(
+    () => (network.testOnly ? [] : getMainnetJettons()),
+    [network.testOnly],
+  )
+  const registrySearchEntries = useMemo<readonly RegistryNameMatch[]>(
+    () => [
+      ...registryAddresses,
+      ...registryJettons.map(jetton => ({...jetton, kind: "token" as const})),
+    ],
+    [registryAddresses, registryJettons],
+  )
   const registryNames = useMemo(
-    () => new Map(registryAddresses.map(({address, name}) => [address, name])),
-    [registryAddresses],
+    () => new Map(registrySearchEntries.map(({address, name}) => [address, name])),
+    [registrySearchEntries],
   )
   const cacheRef = useRef(new Map<string, AddressName>())
   const domainsRef = useRef(new Map<string, string>())
@@ -265,7 +279,7 @@ export const AddressBookProvider: FC<{
   const searchRegistryNames = useCallback(
     (query: string, limit = 6) => {
       const namesByAddress = new Map<string, RegistryNameMatch>()
-      for (const account of registryAddresses) {
+      for (const account of registrySearchEntries) {
         namesByAddress.set(normalizeKey(account.address), account)
       }
       for (const entry of storedAddressNames) {
@@ -273,7 +287,7 @@ export const AddressBookProvider: FC<{
       }
       return searchAddressNames([...namesByAddress.values()], query, limit)
     },
-    [registryAddresses, storedAddressNames],
+    [registrySearchEntries, storedAddressNames],
   )
 
   const value = useMemo(
@@ -346,7 +360,7 @@ export const useAddressNameSources = (address: string): AddressNameSources => {
 }
 
 function normalizeNameQuery(value: string): string {
-  return value.trim().toLocaleLowerCase()
+  return value.trim().toLocaleLowerCase().replaceAll("₮", "t")
 }
 
 export function searchAddressNames(
@@ -362,13 +376,19 @@ export function searchAddressNames(
   return entries
     .map(entry => {
       const normalizedName = normalizeNameQuery(entry.name)
-      if (!normalizedName.includes(normalizedQuery)) {
+      const normalizedSymbol = entry.symbol ? normalizeNameQuery(entry.symbol) : undefined
+      const searchableValues = normalizedSymbol
+        ? [normalizedName, normalizedSymbol]
+        : [normalizedName]
+      if (!searchableValues.some(value => value.includes(normalizedQuery))) {
         return undefined
       }
 
       return {
         entry,
-        score: getNameMatchScore(normalizedName, normalizedQuery),
+        score: Math.min(
+          ...searchableValues.map(value => getNameMatchScore(value, normalizedQuery)),
+        ),
       }
     })
     .filter((entry): entry is {readonly entry: RegistryNameMatch; readonly score: number} =>

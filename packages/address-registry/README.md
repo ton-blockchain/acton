@@ -52,3 +52,19 @@ independent from the source generator. Explicit entries from
 `src/testnet-base.json` take precedence over discovered mainnet entries with equal
 raw addresses. The stable TypeScript binding reads the complete generated registries
 from `src/addresses.ts`.
+
+Explorer token search uses the generated jetton catalog from `ton-assets`. The
+generator validates each master address and keeps the name, symbol, and optional
+image URL used by search. It prefers indexed Toncenter images and falls back to
+the image published by `ton-assets`. Images are loaded lazily only for visible
+results:
+
+```sh
+bun run generate:jettons
+```
+
+Set `TONCENTER_API_KEY` so Toncenter image resolution does not fall back because
+of public rate limits.
+
+The stable TypeScript binding exposes this mainnet catalog through
+`getMainnetJettons()`.

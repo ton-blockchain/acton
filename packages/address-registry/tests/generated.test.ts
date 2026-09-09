@@ -4,6 +4,8 @@ import mainnetJson from "../src/mainnet.json" with {type: "json"}
 import testnetJson from "../src/testnet.json" with {type: "json"}
 import unresolvedConflictsJson from "../src/unresolved-conflicts.json" with {type: "json"}
 import {addresses, getMainnetAddresses, getTestnetAddresses} from "../src/addresses.ts"
+import {getMainnetJettons} from "../src/jettons.ts"
+import jettonsJson from "../src/jettons.json" with {type: "json"}
 
 const RAW_ADDRESS_PATTERN = /^-?\d+:[0-9a-f]{64}$/
 
@@ -33,6 +35,25 @@ test("generated addresses are unique within each network", () => {
       registry.map(({address}) => address).toSorted(),
     )
   }
+})
+
+test("generated jettons match the search registry schema", () => {
+  expect(getMainnetJettons()).toBe(jettonsJson)
+  expect(jettonsJson.length).toBeGreaterThan(0)
+  expect(new Set(jettonsJson.map(({address}) => address)).size).toBe(jettonsJson.length)
+
+  for (const entry of jettonsJson as readonly Record<string, unknown>[]) {
+    expect(Object.keys(entry).toSorted()).toEqual(
+      entry.image === undefined
+        ? ["address", "name", "symbol"]
+        : ["address", "image", "name", "symbol"],
+    )
+    expect(entry.address).toMatch(RAW_ADDRESS_PATTERN)
+    expect(entry.name).not.toBe("")
+    expect(entry.symbol).not.toBe("")
+  }
+
+  expect(jettonsJson.find(entry => entry.symbol === "USD₮")?.image).toBeTruthy()
 })
 
 test("unresolved conflicts match the generated conflict schema", () => {

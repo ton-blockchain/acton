@@ -1,0 +1,24 @@
+.tokenLabel {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--acton-space-1);
+}
+
+.tokenMeta {
+  color: var(--acton-color-text-muted);
+  font-weight: var(--acton-font-weight-normal);
+}
+
+.tokenImage {
+  display: block;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--acton-radius-round);
+  object-fit: cover;
+}
+
+.tokenIcon.tokenIcon {
+  margin-right: var(--acton-space-1);
+  margin-left: var(--acton-space-2);
+}

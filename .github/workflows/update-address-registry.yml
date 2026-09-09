@@ -36,8 +36,12 @@ jobs:
         run: bun ci
 
       - name: Update address registry
+        env:
+          TONCENTER_API_KEY: ${{ secrets.TONCENTER_API_KEY }}
         working-directory: packages/address-registry
-        run: bun run generate
+        run: |
+          : "${TONCENTER_API_KEY:?Toncenter API key is required}"
+          bun run generate
 
       - name: Check for changes
         id: changes
@@ -67,7 +71,7 @@ jobs:
 
           git switch --create "${UPDATE_BRANCH}"
           git add packages/address-registry
-          git commit --message "chore(address-registry): update generated addresses"
+          git commit --message "chore(address-registry): update generated registries"
 
           remote_sha=$(git ls-remote --heads origin "${UPDATE_BRANCH}" | awk '{print $1}')
           if [[ -n "${remote_sha}" ]]; then
@@ -79,7 +83,7 @@ jobs:
 
           body_file="${RUNNER_TEMP}/address-registry-pr.md"
           cat > "${body_file}" <<EOF
-          Updates the generated address registry from its upstream community-maintained sources.
+          Updates the generated address and token registries from their upstream community-maintained sources.
 
           Validation: address registry tests and TypeScript checks passed in the [update workflow](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}).
           EOF
@@ -96,11 +100,11 @@ jobs:
               --repo "${GITHUB_REPOSITORY}" \
               --base master \
               --head "${UPDATE_BRANCH}" \
-              --title "chore(address-registry): update generated addresses" \
+              --title "chore(address-registry): update generated registries" \
               --body-file "${body_file}"
           else
             gh pr edit "${pull_request}" \
               --repo "${GITHUB_REPOSITORY}" \
-              --title "chore(address-registry): update generated addresses" \
+              --title "chore(address-registry): update generated registries" \
               --body-file "${body_file}"
           fi
