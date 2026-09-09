@@ -13,6 +13,7 @@ const previews = [
   {key: "verified-statistics", route: "/verified/statistics"},
   {key: "verified-contract", route: `/verified/${"0".repeat(64)}`},
   {key: "cell", route: "/cell"},
+  {key: "address-converter", route: "/address-converter"},
   {key: "emulate", route: "/emulate"},
   {key: "favorites", route: "/favorites"},
   {key: "suspended", route: "/suspended"},

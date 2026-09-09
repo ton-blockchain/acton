@@ -48,6 +48,7 @@
     "./metadata/environmentRegistry": "./src/metadata/environmentRegistry.ts",
     "./metadata/types": "./src/metadata/types.ts",
     "./metadata/verifierRegistry": "./src/metadata/verifierRegistry.ts",
+    "./pages/AddressConverterPage": "./src/pages/AddressConverterPage.tsx",
     "./pages/AccountPage": "./src/pages/AccountPage.tsx",
     "./pages/TokenCatalogPage": "./src/pages/TokenCatalogPage.tsx",
     "./pages/BlocksPage": "./src/pages/BlocksPage.tsx",

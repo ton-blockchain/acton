@@ -1,4 +1,4 @@
-import {Navigate, Route, Routes, useLocation} from "react-router"
+import {Navigate, Route, Routes, useLocation, useNavigate} from "react-router"
 import {Check, KeyRound, ShieldCheck} from "lucide-react"
 import {Dialog, DialogActions, Input} from "@acton/ui"
 import {createObservabilityClient} from "@acton/localton-ui"
@@ -19,6 +19,9 @@ import type {EnvironmentCapability, StudioEnvironment} from "../studioApi"
 import dashboardStyles from "./dashboard/DashboardPage.module.css"
 import {AccountPage} from "@acton/explorer-core/pages/AccountPage"
 import {BlockDetailsPage, BlocksPage} from "@acton/explorer-core/pages/BlocksPage"
+import {AddressConverterPage} from "@acton/explorer-core/pages/AddressConverterPage"
+import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
+import {networkStudioPath} from "../studioRoutes"
 import {CellInspectorPage} from "@acton/explorer-core/pages/CellInspectorPage"
 import {ConfigPage} from "@acton/explorer-core/pages/ConfigPage"
 import {EmulatePage} from "@acton/explorer-core/pages/EmulatePage"
@@ -73,6 +76,7 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/wallets": "Wallets",
   "/simulator": "Simulator",
   "/cell-inspector": "Cell Inspector",
+  "/address-converter": "Address Converter",
   "/contracts": "Contracts",
   "/contracts/sources": "Sources",
   "/contracts/abi": "ABI",
@@ -106,6 +110,7 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/wallets": "Project wallets available on this network, ready for TON Connect",
   "/simulator": "Build and replay messages against this network",
   "/cell-inspector": "Decode cells and inspect serialized TON data",
+  "/address-converter": "Convert TON addresses and inspect their flags",
   "/contracts": "Track deployed contracts and match them with source artifacts",
   "/contracts/sources": "Manage source artifacts available to contracts on this network",
   "/contracts/abi": "Manage ABI used to decode contract state and messages",
@@ -202,6 +207,8 @@ const AppContent: FC<AppContentProps> = ({
   onShellChange,
 }) => {
   const runtime = useLocalnetRuntime()
+  const explorerRoutes = useExplorerRoutePaths()
+  const navigate = useNavigate()
   const client = runtime.client
   const observabilityClient = useMemo(
     () =>
@@ -774,6 +781,26 @@ const AppContent: FC<AppContentProps> = ({
                   <ExplorerIndexPage client={client} />
                 </DashboardPage>,
               )}
+            />
+            <Route
+              path={path("/address-converter")}
+              element={
+                <DashboardPage embedded>
+                  <AddressConverterPage
+                    onOpenAddress={(address, testOnly) => {
+                      // Raw addresses have no network flag and stay in the current environment.
+                      const target =
+                        testOnly === undefined
+                          ? explorerRoutes.addressPath(address)
+                          : localnetPath(
+                              networkStudioPath(testOnly ? "testnet" : "mainnet"),
+                              `/explorer/address/${encodeURIComponent(address)}`,
+                            )
+                      void navigate(target)
+                    }}
+                  />
+                </DashboardPage>
+              }
             />
             <Route
               path={path("/cell-inspector")}

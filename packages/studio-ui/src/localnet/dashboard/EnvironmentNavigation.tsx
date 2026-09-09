@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from "react"
 import type {FC} from "react"
 import {
   Activity,
+  ArrowRightLeft,
   Archive,
   Binary,
   Box,
@@ -95,6 +96,7 @@ const contractItems: NestedSidebarItem[] = [
 const standaloneItems: SidebarItem[] = [
   {label: "Simulator", icon: Waypoints, path: "/simulator"},
   {label: "Cell Inspector", icon: Binary, path: "/cell-inspector"},
+  {label: "Address Converter", icon: ArrowRightLeft, path: "/address-converter"},
 ]
 
 const environmentItems: SidebarItem[] = [
@@ -225,7 +227,9 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
     environment?.config.kind === "actonSimulatedLocalnet"
       ? formatForkNetworkLabel(forkNetwork)
       : undefined
-  const visibleStandaloneItems = supports(environment, "simulator") ? standaloneItems : []
+  const visibleStandaloneItems = standaloneItems.filter(
+    item => item.path === "/address-converter" || supports(environment, "simulator"),
+  )
   const visibleExplorerItems = explorerItems.filter(
     item => item.path !== "/explorer/elections" || environment?.lifecycle === "external",
   )
