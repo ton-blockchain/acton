@@ -104,9 +104,9 @@ func DecodeOpaqueBOC(text string) (out *cell.Cell, err error) {
 		if d1&7 > 4 {
 			return nil, bad
 		}
-		nd := &nodes[i]
-		nd.raw.IsSpecial = d1&8 != 0
-		nd.raw.LevelMask = cell.LevelMask{Mask: d1 >> 5}
+		current := &nodes[i]
+		current.raw.IsSpecial = d1&8 != 0
+		current.raw.LevelMask = cell.LevelMask{Mask: d1 >> 5}
 		if d1&16 != 0 {
 			// Count significant levels, not the highest level. Non-contiguous
 			// masks are valid; tonutils 1.15.5's BOC parser miscounts these.
@@ -114,20 +114,20 @@ func DecodeOpaqueBOC(text string) (out *cell.Cell, err error) {
 			if p+storedSize > end {
 				return nil, bad
 			}
-			nd.stored = b[p : p+storedSize]
+			current.stored = b[p : p+storedSize]
 			p += storedSize
 		}
 		sz := (int(d2) + 1) / 2
 		if p+sz > end {
 			return nil, bad
 		}
-		nd.raw.Data = b[p : p+sz]
-		nd.raw.BitsSz = uint(sz * 8)
+		current.raw.Data = b[p : p+sz]
+		current.raw.BitsSz = uint(sz * 8)
 		if d2&1 != 0 {
 			if sz == 0 || b[p+sz-1]&127 == 0 {
 				return nil, bad
 			}
-			nd.raw.BitsSz -= uint(bits.TrailingZeros8(b[p+sz-1]) + 1)
+			current.raw.BitsSz -= uint(bits.TrailingZeros8(b[p+sz-1]) + 1)
 		}
 		p += sz
 		for j := 0; j < int(d1&7); j++ {
@@ -135,7 +135,7 @@ func DecodeOpaqueBOC(text string) (out *cell.Cell, err error) {
 			if !ok || p > end || v <= uint64(i) || v >= count {
 				return nil, bad
 			}
-			nd.refs = append(nd.refs, int(v))
+			current.refs = append(current.refs, int(v))
 		}
 		if len(index) != 0 && index[i] != uint64(p-start) {
 			return nil, bad
@@ -147,33 +147,33 @@ func DecodeOpaqueBOC(text string) (out *cell.Cell, err error) {
 	depth := make([]int, len(nodes))
 	cells := make([]*cell.Cell, len(nodes))
 	for i := len(nodes) - 1; i >= 0; i-- {
-		nd := &nodes[i]
-		for _, r := range nd.refs {
+		current := &nodes[i]
+		for _, r := range current.refs {
 			depth[i] = max(depth[i], depth[r]+1)
-			nd.raw.Refs = append(nd.raw.Refs, cells[r])
+			current.raw.Refs = append(current.raw.Refs, cells[r])
 		}
 		if depth[i] > MaxDepth {
 			return nil, errors.New("BOC depth limit exceeded")
 		}
-		if err := validateCellData(nd.raw); err != nil {
+		if err := validateCellData(current.raw); err != nil {
 			return nil, fmt.Errorf("BOC cell %d: %w", i, err)
 		}
 		// Shape, references, masks and embedded depths have been validated. No
 		// untrusted BOC header reaches the dependency's panic-prone parser.
-		c := cell.FromRawUnsafe(nd.raw)
+		c := cell.FromRawUnsafe(current.raw)
 		for level := 0; level <= 3; level++ {
 			if c.Depth(level) > MaxDepth {
 				return nil, errors.New("BOC virtual depth limit exceeded")
 			}
 		}
-		if nd.stored != nil {
+		if current.stored != nil {
 			j := 0
-			num := len(nd.stored) / 34
+			num := len(current.stored) / 34
 			for level := 0; level <= 3; level++ {
-				if level != 0 && nd.raw.LevelMask.Mask&(1<<uint(level-1)) == 0 {
+				if level != 0 && current.raw.LevelMask.Mask&(1<<uint(level-1)) == 0 {
 					continue
 				}
-				if !bytes.Equal(c.Hash(level), nd.stored[j*32:(j+1)*32]) || c.Depth(level) != binary.BigEndian.Uint16(nd.stored[num*32+j*2:]) {
+				if !bytes.Equal(c.Hash(level), current.stored[j*32:(j+1)*32]) || c.Depth(level) != binary.BigEndian.Uint16(current.stored[num*32+j*2:]) {
 					return nil, errors.New("BOC stored hash/depth mismatch")
 				}
 				j++

@@ -73,6 +73,67 @@ func TestConcreteInstantiationHooks(t *testing.T) {
 	}
 }
 
+func TestInstantiationOverridesDeclarationHooks(t *testing.T) {
+	data, err := os.ReadFile("testdata/review-probe.abi.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name        string
+		override    map[string]bool
+		unsupported bool
+	}{
+		{"absent inherits declaration", nil, true},
+		{"false overrides declaration", map[string]bool{"pack_to_builder": false, "unpack_from_slice": false}, false},
+		{"empty object overrides declaration", map[string]bool{}, false},
+		{"pack only remains custom", map[string]bool{"pack_to_builder": true, "unpack_from_slice": false}, true},
+		{"unpack only remains custom", map[string]bool{"pack_to_builder": false, "unpack_from_slice": true}, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var input map[string]any
+			if err := json.Unmarshal(data, &input); err != nil {
+				t.Fatal(err)
+			}
+			input["contract_name"] = "HookOverrides"
+			for _, item := range input["declarations"].([]any) {
+				item.(map[string]any)["custom_pack_unpack"] = map[string]bool{"pack_to_builder": true, "unpack_from_slice": true}
+			}
+			if test.override != nil {
+				for _, table := range []string{"struct_instantiations", "alias_instantiations"} {
+					for _, item := range input[table].([]any) {
+						item.(map[string]any)["custom_pack_unpack"] = test.override
+					}
+				}
+			}
+			modified, err := json.Marshal(input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			a, err := ParseABI(modified)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, idx := range []int{13, 17, 16, 19} {
+				reason := a.support(idx, false, map[string]bool{})
+				if (reason != "") != test.unsupported {
+					t.Fatalf("cell type %d: unsupported=%t, reason=%q", idx, test.unsupported, reason)
+				}
+			}
+			out, err := Generate(modified, Options{SingleABI: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := 0
+			if test.unsupported {
+				want = 2 // Getters that materialize HookBox and HookAlias cells.
+			}
+			if len(out.Diagnostics) != want {
+				t.Fatalf("got %v, want %d disabled getter roots", out.Diagnostics, want)
+			}
+		})
+	}
+}
+
 func remainderABI(t *testing.T) *ABI {
 	t.Helper()
 	yes := true

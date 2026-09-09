@@ -96,8 +96,8 @@ func (a *ABI) declaration(i int) *Declaration {
 }
 
 func (a *ABI) hasCustom(i int) bool {
-	if hook := a.custom[i]; hook != nil && (hook.Pack || hook.Unpack) {
-		return true
+	if hook := a.custom[i]; hook != nil {
+		return hook.Pack || hook.Unpack
 	}
 	d := a.declaration(i)
 	return d != nil && d.Custom != nil && (d.Custom.Pack || d.Custom.Unpack)
