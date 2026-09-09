@@ -8,6 +8,8 @@ These addresses are not fixtures and their balances or recent history can change
 
 | Address | What to verify | Last checked |
 | --- | --- | --- |
+| [`Ef-Ob4ib3dI6SyugRcZHLwLEyhsTz0Uhi9RW-AszqL1xR4D4`](https://actonscan.com/address/Ef-Ob4ib3dI6SyugRcZHLwLEyhsTz0Uhi9RW-AszqL1xR4D4?network=mainnet) | Nominator Pool overview with active validator, stake and income split, minimum stakes, and a Nominators tab with active and pending amounts | 2026-09-09 |
+| [`Ef8eWpCZ7U0WWxCFEnXsae_3GTPnAWyolMp6KkWAWetQcjZj`](https://actonscan.com/address/Ef8eWpCZ7U0WWxCFEnXsae_3GTPnAWyolMp6KkWAWetQcjZj?network=mainnet) | Single Nominator v1.0 overview with version and clickable Owner and Validator addresses returned by `get_roles` | 2026-09-09 |
 | [`EQA9S5qRZTa0GcH5VZqDJ_KxtfVvGzYgZtdon7Rhg82zLi-N`](https://actonscan.com/address/EQA9S5qRZTa0GcH5VZqDJ_KxtfVvGzYgZtdon7Rhg82zLi-N?network=mainnet) | Fragment username NFT: Username and both Telegram aliases are shown as external links in the account summary | 2026-09-09 |
 | [`EQCkQlDs452x_vspIKq_PTlUl8B0S427RELr_62Dbro7g3om`](https://actonscan.com/address/EQCkQlDs452x_vspIKq_PTlUl8B0S427RELr_62Dbro7g3om?network=mainnet) | Fragment anonymous number NFT: Number is shown as a Telegram link in the account summary | 2026-09-09 |
 | [`EQAAAFVppd1Pip_zOxJIezgVnOzy7Yn_Mob56acg4MhcCuwi`](https://actonscan.com/address/EQAAAFVppd1Pip_zOxJIezgVnOzy7Yn_Mob56acg4MhcCuwi?network=mainnet) | Standard NftCollection ABI fallback; get_collection_data decodes nextItemIndex = -1 for a non-sequential collection | 2026-09-09 |

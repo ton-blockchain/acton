@@ -52,6 +52,12 @@ import {NftOverview} from "../components/NftOverview"
 import {SuspendedAccountOverview} from "../components/SuspendedAccountOverview"
 import {VestingOverview} from "../components/VestingOverview"
 import {
+  NominatorPoolNominatorsTab,
+  NominatorPoolOverview,
+  SingleNominatorOverview,
+  type NominatorPoolDetailsState,
+} from "../components/staking-pool-details"
+import {
   NFT_CARD_IMAGE_SOURCE_KEYS,
   NFT_COLLECTION_CARD_IMAGE_SOURCE_KEYS,
   NFT_IMAGE_SOURCE_KEYS,
@@ -228,6 +234,9 @@ export const AccountPage: FC<AccountPageProps> = ({
   const [vestingData, setVestingData] = useState<VestingData | undefined>()
   const [multisigDetails, setMultisigDetails] = useState<MultisigDetailsState>({status: "idle"})
   const [multisigReloadKey, setMultisigReloadKey] = useState(0)
+  const [nominatorPoolDetails, setNominatorPoolDetails] = useState<NominatorPoolDetailsState>({
+    status: "loading",
+  })
   const [hoveredMultisigSignerAddress, setHoveredMultisigSignerAddress] = useState<
     string | undefined
   >()
@@ -341,6 +350,7 @@ export const AccountPage: FC<AccountPageProps> = ({
   )
   useEffect(() => {
     setHoveredMultisigSignerAddress(undefined)
+    setNominatorPoolDetails({status: "loading"})
   }, [accountRequestKey])
   const historyRequestKey = `${accountRequestKey}:${historySortOrder}`
   const activeTab = useMemo<AccountTab>(() => {
@@ -361,6 +371,13 @@ export const AccountPage: FC<AccountPageProps> = ({
     }
   }, [accountState?.code, accountStateV3?.code_hash])
   const compilerAbi = extendedContractAbi?.compiler_abi
+  const isNominatorPoolAccount = compilerAbi?.contract_name === "NominatorPool"
+  const singleNominatorVersion =
+    compilerAbi?.contract_name === "SingleNominatorV10"
+      ? "1.0"
+      : compilerAbi?.contract_name === "SingleNominatorV11"
+        ? "1.1"
+        : undefined
   const isJettonMasterAccount = hasAccountContractHint(
     accountInterfaces,
     accountTokenInfo,
@@ -1915,10 +1932,16 @@ export const AccountPage: FC<AccountPageProps> = ({
       nftCollectionName !== undefined ||
       isScheduleAccount ||
       isMultisigAccount ||
+      isNominatorPoolAccount ||
+      singleNominatorVersion !== undefined ||
       accountSuspended)
 
   const topSectionClassName = hasHeaderContextCard
-    ? isScheduleAccount || isMultisigAccount || accountSuspended
+    ? isScheduleAccount ||
+      isMultisigAccount ||
+      isNominatorPoolAccount ||
+      singleNominatorVersion !== undefined ||
+      accountSuspended
       ? `${styles.topSection} ${styles.topSectionEqual}`
       : styles.topSection
     : `${styles.topSection} ${styles.topSectionSingle}`
@@ -2089,6 +2112,28 @@ export const AccountPage: FC<AccountPageProps> = ({
     isMultisigWalletAccount,
   ])
 
+  const customTabs = useMemo<readonly AccountDetailsTab[]>(
+    () => [
+      ...multisigTabs,
+      ...(isNominatorPoolAccount
+        ? [
+            {
+              id: "nominators",
+              label: "Nominators",
+              icon: <UsersRound size={18} />,
+              content: (
+                <NominatorPoolNominatorsTab
+                  state={nominatorPoolDetails}
+                  onAddressClick={handleSearch}
+                />
+              ),
+            },
+          ]
+        : []),
+    ],
+    [handleSearch, isNominatorPoolAccount, multisigTabs, nominatorPoolDetails],
+  )
+
   return (
     <div className={styles.container}>
       {formattedAddress && (
@@ -2167,6 +2212,22 @@ export const AccountPage: FC<AccountPageProps> = ({
                       onRetry={() => setMultisigReloadKey(key => key + 1)}
                       hoveredSignerAddress={hoveredMultisigSignerAddress}
                       onSignerHoverChange={setHoveredMultisigSignerAddress}
+                    />
+                  )}
+                  {isNominatorPoolAccount && (
+                    <NominatorPoolOverview
+                      address={formattedAddress}
+                      client={client}
+                      onAddressClick={handleSearch}
+                      onStateChange={setNominatorPoolDetails}
+                    />
+                  )}
+                  {singleNominatorVersion !== undefined && (
+                    <SingleNominatorOverview
+                      address={formattedAddress}
+                      client={client}
+                      onAddressClick={handleSearch}
+                      version={singleNominatorVersion}
                     />
                   )}
                   {accountState !== undefined && tokenInfo !== undefined && (
@@ -2286,7 +2347,7 @@ export const AccountPage: FC<AccountPageProps> = ({
             accountLoading={accountLoading}
             showHoldersTab={isJettonMasterAccount}
             showItemsTab={isNftCollectionAccount}
-            customTabs={multisigTabs}
+            customTabs={customTabs}
             client={client}
             onAddressClick={handleSearch}
             onTransactionClick={handleTransactionClick}

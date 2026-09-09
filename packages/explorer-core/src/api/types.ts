@@ -149,6 +149,31 @@ export interface V3MultisigOrdersResponse {
   readonly address_book: Record<string, V3AddressBookRow>
 }
 
+export interface V3NominatorPoolNominator {
+  readonly address: string
+  readonly balance: string
+  readonly pending_balance: string
+}
+
+export interface V3NominatorPool {
+  readonly stake_amount_sent: string
+  readonly validator_amount: string
+  readonly validator_address: string
+  readonly validator_reward_share: number
+  readonly state: number
+  readonly nominators_count: number
+  readonly max_nominators_count: number
+  readonly min_validator_stake: string
+  readonly min_nominator_stake: string
+  readonly active_nominators: readonly V3NominatorPoolNominator[]
+  readonly address_book: Record<string, V3AddressBookRow>
+}
+
+export interface SingleNominatorRoles {
+  readonly ownerAddress: string
+  readonly validatorAddress: string
+}
+
 export interface V3TracesResponse {
   readonly address_book: Record<string, V3AddressBookRow>
   readonly metadata: V3Metadata

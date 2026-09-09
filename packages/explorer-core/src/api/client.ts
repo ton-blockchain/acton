@@ -33,12 +33,14 @@ import type {
   StreamingActionsEvent,
   StreamingTransactionsEvent,
   SourceTraceResponse,
+  SingleNominatorRoles,
   V3Action,
   V3ActionsResponse,
   V3BlocksResponse,
   V3MultisigOrdersResponse,
   V3MultisigWalletsResponse,
   V3Metadata,
+  V3NominatorPool,
   V3RunGetMethodResponse,
   V3RunGetMethodStackEntry,
   V3TransactionDetailsResponse,
@@ -766,6 +768,17 @@ export class TonClient {
     return this.request(url, "Failed to fetch multisig orders")
   }
 
+  /**
+   * Loads the indexed Nominator Pool snapshot used by the pool overview and nominator list.
+   * Toncenter owns stake aggregation and pending-deposit semantics for this endpoint.
+   */
+  async getNominatorPool(address: string): Promise<V3NominatorPool> {
+    const url = this.buildUrl(this.v3BaseUrl, "/staking/nominatorPools/pool")
+    url.searchParams.append("pool", address)
+
+    return this.request(url, "Failed to fetch nominator pool")
+  }
+
   async runGetMethod(
     address: string,
     method: string | number,
@@ -785,6 +798,25 @@ export class TonClient {
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify(body),
     })
+  }
+
+  /**
+   * Resolves the two role addresses stored by a Single Nominator contract.
+   * Both supported versions expose the same get_roles stack shape.
+   */
+  async getSingleNominatorRoles(address: string): Promise<SingleNominatorRoles> {
+    const response = await this.runGetMethod(address, "get_roles")
+    if (response.exit_code !== 0) {
+      throw new Error(`get_roles failed with exit code ${response.exit_code}`)
+    }
+
+    const ownerAddress = this.stackAddress(response.stack[0])
+    const validatorAddress = this.stackAddress(response.stack[1])
+    if (!ownerAddress || !validatorAddress) {
+      throw new Error("get_roles returned an unexpected stack")
+    }
+
+    return {ownerAddress, validatorAddress}
   }
 
   async getJettonWalletData(
@@ -1788,7 +1820,7 @@ export class TonClient {
   }
 
   private stackAddress(entry: V3RunGetMethodStackEntry | undefined): string | undefined {
-    if (entry?.type !== "slice" || typeof entry.value !== "string") {
+    if ((entry?.type !== "cell" && entry?.type !== "slice") || typeof entry.value !== "string") {
       return undefined
     }
 
