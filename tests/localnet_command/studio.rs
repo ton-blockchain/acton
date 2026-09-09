@@ -24,6 +24,12 @@ if {block_start}:
     os.environ['LOCALNET_TEST_BLOCK_START'] = '1'
 with open(root + '/acton-commands', 'a') as output:
     output.write(json.dumps(sys.argv[1:]) + '\n')
+if 'start' in sys.argv[1:] and os.path.exists(root + '/start-exit'):
+    import socket, subprocess
+    result = subprocess.run([binary] + sys.argv[1:])
+    with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as notification:
+        notification.sendto(str(result.returncode).encode(), root + '/start-exit')
+    sys.exit(result.returncode)
 os.execv(binary, [binary] + sys.argv[1:])
 ",
         root = serde_json::to_string(&root.display().to_string()).expect("root"),
@@ -105,6 +111,15 @@ async fn snapshot_complete(runtime: &LocalProcessEnvironmentRuntime, id: &str) {
 
 #[tokio::test]
 async fn studio_reports_docker_recovery_and_restarts_the_same_environment_after_fixing_it() {
+    docker_recovery(false).await;
+}
+
+#[tokio::test]
+async fn studio_reports_docker_recovery_after_the_owner_exits_before_monitoring() {
+    docker_recovery(true).await;
+}
+
+async fn docker_recovery(owner_exits_first: bool) {
     let mut service = Service::start(false).await;
     let independent = service.client().await;
     let executable = executable(service.root.path(), false);
@@ -115,22 +130,71 @@ async fn studio_reports_docker_recovery_and_restarts_the_same_environment_after_
     .expect("project manifest");
     let marker = service.root.path().join("docker-unavailable");
     std::fs::write(&marker, "").expect("Docker is not running");
+    let exit_socket = service.root.path().join("start-exit");
+    let exited = owner_exits_first.then(|| {
+        let socket =
+            std::os::unix::net::UnixDatagram::bind(&exit_socket).expect("owner exit notification");
+        socket
+            .set_read_timeout(Some(Duration::from_secs(20)))
+            .expect("bounded owner exit notification");
+        socket
+    });
     let runtime = studio(service.root.path(), &executable).await;
     let created = runtime
         .create(request("Docker recovery"))
         .await
         .expect("create environment");
+    if let Some(exited) = exited {
+        // This test has a current-thread Tokio runtime. Hold its monitor until
+        // the real child has failed and shut down its control API, without a
+        // timing delay or a mocked status response.
+        let mut status = [0; 16];
+        let length = exited.recv(&mut status).expect("failed owner exits");
+        assert_eq!(&status[..length], b"1", "actual startup must fail");
+        std::fs::remove_file(exit_socket).expect("restart uses the normal owner");
+    }
+    let mut observations = Vec::new();
     let failed = tokio::time::timeout(Duration::from_secs(20), async {
         loop {
             let environment = runtime.get(&created.id).await.expect("environment");
+            let observation = format!("{:?}: {:?}", environment.status, environment.error);
+            if observations.last() != Some(&observation) {
+                observations.push(observation);
+            }
             if environment.status == EnvironmentStatus::Failed {
                 break environment;
             }
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
     })
-    .await
-    .expect("Studio exposes startup failure");
+    .await;
+    let failed = match failed {
+        Ok(failed) => failed,
+        Err(error) => {
+            for location in catalog::list(&service.state())
+                .await
+                .expect("diagnostic catalog")
+            {
+                eprintln!(
+                    "Network {} ({})",
+                    location.network.name,
+                    location.path.display()
+                );
+                for file in ["network.json", "owner.log", "service.log", "startup.log"] {
+                    eprintln!(
+                        "{file}: {}",
+                        std::fs::read_to_string(location.path.join(file))
+                            .unwrap_or_else(|error| error.to_string())
+                    );
+                }
+            }
+            panic!(
+                "Studio exposes startup failure: {error}; observations: {observations:#?}; Acton commands: {}",
+                std::fs::read_to_string(service.root.path().join("acton-commands"))
+                    .unwrap_or_default()
+            );
+        }
+    };
     let error = failed
         .error
         .expect("Studio retains actionable Docker error");
@@ -138,6 +202,29 @@ async fn studio_reports_docker_recovery_and_restarts_the_same_environment_after_
         Docker is not running
         Start Docker Desktop or your Docker Engine service, wait until it is ready, then retry"]]
     .assert_eq(&error.lines().take(2).collect::<Vec<_>>().join("\n"));
+
+    if owner_exits_first {
+        let inspections = || {
+            std::fs::read_to_string(service.root.path().join("acton-commands"))
+                .expect("recorded inspections")
+                .lines()
+                .filter(|line| line.contains("\"status\""))
+                .count()
+        };
+        let before = inspections();
+        tokio::time::timeout(Duration::from_secs(20), async {
+            // The monitor inspects serially. Starting two more inspections
+            // proves a later poll completed after the first Failed observation.
+            while inspections() < before + 2 {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("monitor continues after the owner exits");
+        let retained = runtime.get(&created.id).await.expect("failed environment");
+        assert_eq!(retained.status, EnvironmentStatus::Failed);
+        assert_eq!(retained.error.as_deref(), Some(error.as_str()));
+    }
 
     std::fs::remove_file(marker).expect("Docker is available again");
     let EnvironmentConfig::FullTonNetwork {

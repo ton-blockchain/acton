@@ -157,13 +157,35 @@ impl StudioCliProcess {
 
         assert!(output.status.success());
 
-        // Shutdown progress is user-facing output, so every Studio process test
-        // checks the same snapshot instead of treating stderr as an error channel.
+        // The intermediate progress tick can race with completed shutdown. Keep
+        // the required start/completion messages and all unexpected diagnostics.
         crate::common::assert_ui().eq(
-            String::from_utf8_lossy(&output.stderr).into_owned(),
+            normalize_shutdown_stderr(&String::from_utf8_lossy(&output.stderr)),
             snapbox::file!["../../snapshots/studio/graceful_shutdown.stderr.txt"],
         );
     }
+}
+
+fn normalize_shutdown_stderr(stderr: &str) -> String {
+    stderr
+        .split_inclusive('\n')
+        .filter(|line| line.trim() != "Finishing Studio connections and test processes")
+        .collect()
+}
+
+#[test]
+fn shutdown_snapshot_accepts_optional_progress_without_hiding_errors() {
+    let expected = include_str!("../../snapshots/studio/graceful_shutdown.stderr.txt");
+    let with_progress = expected.replace(
+        "     Stopped",
+        "   Finishing Studio connections and test processes\n     Stopped",
+    );
+    assert_eq!(normalize_shutdown_stderr(expected), expected);
+    assert_eq!(normalize_shutdown_stderr(&with_progress), expected);
+
+    let unexpected =
+        format!("{expected}   Finishing Studio connections and test processes: cleanup failed\n");
+    assert_eq!(normalize_shutdown_stderr(&unexpected), unexpected);
 }
 
 impl Drop for StudioCliProcess {
