@@ -371,17 +371,20 @@ export const AccountPage: FC<AccountPageProps> = ({
     accountTokenInfo,
     "jetton_wallet",
   )
-  const accountAbiInterface =
-    isJettonMasterAccount === isJettonWalletAccount
-      ? undefined
-      : isJettonMasterAccount
-        ? "jetton_master"
-        : "jetton_wallet"
   const isNftItemAccount = hasAccountContractHint(accountInterfaces, accountTokenInfo, "nft_item")
   const isNftCollectionAccount = hasAccountContractHint(
     accountInterfaces,
     accountTokenInfo,
     "nft_collection",
+  )
+  const accountAbiInterfaces = useMemo(
+    () => [
+      ...(isJettonMasterAccount ? ["jetton_master"] : []),
+      ...(isJettonWalletAccount ? ["jetton_wallet"] : []),
+      ...(isNftItemAccount ? ["nft_item"] : []),
+      ...(isNftCollectionAccount ? ["nft_collection"] : []),
+    ],
+    [isJettonMasterAccount, isJettonWalletAccount, isNftItemAccount, isNftCollectionAccount],
   )
   const isMultisigWalletAccount = hasAccountInterface(accountInterfaces, "multisig_v2")
   const isMultisigOrderAccount = hasAccountInterface(accountInterfaces, "multisig_order_v2")
@@ -998,7 +1001,7 @@ export const AccountPage: FC<AccountPageProps> = ({
         const abis = await metadataRegistry.getCompilerAbis([accountCodeLookupHash])
         const abi = await resolveAccountCompilerAbi(
           abis[accountCodeLookupHash],
-          accountAbiInterface ? [accountAbiInterface] : [],
+          accountAbiInterfaces,
         )
         if (!isActive) return
         setExtendedContractAbi(abi)
@@ -1015,7 +1018,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     return () => {
       isActive = false
     }
-  }, [accountCodeLookupHash, accountAbiInterface, metadataRegistry])
+  }, [accountCodeLookupHash, accountAbiInterfaces, metadataRegistry])
 
   useEffect(() => {
     let isActive = true

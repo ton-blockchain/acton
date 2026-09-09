@@ -2,9 +2,12 @@ import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {ExtendedContractABI} from "./compilerAbi"
 import {addressKey} from "./compilerAbi"
-import {getBundledCompilerAbiForInterface} from "./compilerAbiCatalog"
+import {
+  getBundledCompilerAbiForInterface,
+  STANDARD_INTERFACE_CATALOG_IDS,
+} from "./compilerAbiCatalog"
 import {normalizeCodeHash} from "../metadata/codeHash"
-import {hasAccountInterface} from "../pages/accountContractTypes"
+import {hasAccountContractHint} from "../pages/accountContractTypes"
 import type {ExplorerMetadataRegistry} from "../metadata/types"
 import type {TonClient} from "./client"
 
@@ -31,11 +34,13 @@ export async function resolveAccountCompilerAbi(
 ): Promise<ExtendedContractABI | undefined> {
   if (exactAbi) return exactAbi
 
-  const master = hasAccountInterface(interfaces, "jetton_master")
-  const wallet = hasAccountInterface(interfaces, "jetton_wallet")
-  if (master === wallet) return undefined
+  const knownInterfaces = Object.keys(
+    STANDARD_INTERFACE_CATALOG_IDS,
+  ) as (keyof typeof STANDARD_INTERFACE_CATALOG_IDS)[]
+  const matches = knownInterfaces.filter(name => hasAccountContractHint(interfaces, [], name))
+  if (matches.length !== 1) return undefined
 
-  return getBundledCompilerAbiForInterface(master ? "jetton_master" : "jetton_wallet")
+  return getBundledCompilerAbiForInterface(matches[0])
 }
 
 /** Resolves message ABI for current or historical code without applying today's interface after a code change. */

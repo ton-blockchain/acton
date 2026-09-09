@@ -26,14 +26,21 @@ let catalogBundlePromise: Promise<CatalogBundle> | undefined
 let catalogByCodeHashPromise: Promise<ReadonlyMap<string, ExtendedContractABI>> | undefined
 let catalogEntriesPromise: Promise<readonly BundledCompilerAbiCatalogEntry[]> | undefined
 
+/** Public interfaces that can be selected from indexer account classification. */
+export const STANDARD_INTERFACE_CATALOG_IDS = {
+  jetton_master: "tep74.JettonMaster",
+  jetton_wallet: "tep74.JettonWallet",
+  nft_item: "tep62.NftItem",
+  nft_collection: "tep62.NftCollection",
+} as const
+
 /** Standard interfaces describe public calls only; they must never imply a code-hash or storage match. */
 export async function getBundledCompilerAbiForInterface(
-  accountInterface: "jetton_master" | "jetton_wallet" | undefined,
+  accountInterface: keyof typeof STANDARD_INTERFACE_CATALOG_IDS | undefined,
 ): Promise<ExtendedContractABI | undefined> {
   if (!accountInterface) return undefined
 
-  const catalogId =
-    accountInterface === "jetton_master" ? "tep74.JettonMaster" : "tep74.JettonWallet"
+  const catalogId = STANDARD_INTERFACE_CATALOG_IDS[accountInterface]
   const catalog = await getBundledCompilerAbiCatalog()
   return catalog.find(entry => entry.catalog_id === catalogId)
 }
