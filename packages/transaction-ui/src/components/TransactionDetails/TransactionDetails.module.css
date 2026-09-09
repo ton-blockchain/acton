@@ -220,6 +220,11 @@
   gap: 2px;
 }
 
+.sendModeItem {
+  width: min-content;
+  max-width: 100%;
+}
+
 .multiColumnItemTitle {
   font-size: 0.6875rem;
   color: var(--acton-color-text-subtle);

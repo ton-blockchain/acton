@@ -457,7 +457,7 @@ function TransactionDetailsContent({
                 </div>
               </div>
               {sendMode !== undefined && (
-                <div className={styles.multiColumnItem}>
+                <div className={`${styles.multiColumnItem} ${styles.sendModeItem}`}>
                   <div className={styles.multiColumnItemTitle}>Send Mode</div>
                   <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
                     <SendModeViewer mode={sendMode} />
