@@ -33,7 +33,7 @@ export async function getBundledCompilerAbiForInterface(
   if (!accountInterface) return undefined
 
   const catalogId =
-    accountInterface === "jetton_master" ? "tep74.GenericJettonMaster" : "tep74.GenericJettonWallet"
+    accountInterface === "jetton_master" ? "tep74.JettonMaster" : "tep74.JettonWallet"
   const catalog = await getBundledCompilerAbiCatalog()
   return catalog.find(entry => entry.catalog_id === catalogId)
 }

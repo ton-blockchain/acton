@@ -4,23 +4,33 @@ exports[`standard Jetton entries describe public interfaces without storage or i
 [
   {
     "decodedStorage": undefined,
-    "errors": [],
+    "errors": [
+      {
+        "err_code": 0,
+        "kind": "plain_int",
+      },
+    ],
     "hashes": [],
     "methods": [
       "get_jetton_data",
       "get_wallet_address",
     ],
-    "name": "Generic Jetton Master",
+    "name": "Jetton Master",
     "storage": {},
   },
   {
     "decodedStorage": undefined,
-    "errors": [],
+    "errors": [
+      {
+        "err_code": 0,
+        "kind": "plain_int",
+      },
+    ],
     "hashes": [],
     "methods": [
       "get_wallet_data",
     ],
-    "name": "Generic Jetton Wallet",
+    "name": "Jetton Wallet",
     "storage": {},
   },
 ]
@@ -29,8 +39,8 @@ exports[`standard Jetton entries describe public interfaces without storage or i
 exports[`account interface fallback preserves exact ABIs and never registers generic ABIs by hash 1`] = `
 {
   "byAddress": [
-    "GenericJettonMaster",
-    "GenericJettonWallet",
+    "JettonMaster",
+    "JettonWallet",
     "JettonVesting",
     null,
     null,
@@ -57,7 +67,7 @@ exports[`generic wallet decodes standard transfers with null responses and both 
     "name": "JettonTransfer",
     "provenance": {
       "codeHashes": [],
-      "displayName": "Generic Jetton Wallet",
+      "displayName": "Jetton Wallet",
       "source": "compiler-abi",
     },
     "value": {
@@ -143,7 +153,7 @@ exports[`generic wallet decodes standard transfers with null responses and both 
     "name": "JettonTransfer",
     "provenance": {
       "codeHashes": [],
-      "displayName": "Generic Jetton Wallet",
+      "displayName": "Jetton Wallet",
       "source": "compiler-abi",
     },
     "value": {
