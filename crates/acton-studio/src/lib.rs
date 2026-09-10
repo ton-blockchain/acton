@@ -768,11 +768,31 @@ async fn resolve_full_ton_account_imports(
     request: &mut CreateEnvironmentRequest,
 ) -> Result<(), StudioApiError> {
     let CreateEnvironmentConfig::FullTonNetwork {
-        imported_accounts, ..
+        imported_accounts,
+        accounts,
+        startup_wallets,
+        ..
     } = &mut request.config
     else {
         return Ok(());
     };
+
+    // Resolve wallet names before remote imports or Docker work so an invalid
+    // project wallet cannot leave a partially created environment behind.
+    *startup_wallets = state
+        .wallet_runtime
+        .prepare_localnet_accounts(accounts.clone())
+        .await
+        .map_err(|error| {
+            StudioApiError(EnvironmentRuntimeError::InvalidRequest {
+                code: "startup_wallet_invalid",
+                message: error.to_string(),
+            })
+        })?;
+    *accounts = startup_wallets
+        .iter()
+        .map(|wallet| wallet.name.clone())
+        .collect();
 
     resolve_account_imports(state, imported_accounts).await
 }

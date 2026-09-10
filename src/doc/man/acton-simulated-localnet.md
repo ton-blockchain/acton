@@ -53,7 +53,7 @@ origin.
 {{/option}}
 
 {{#option "`--accounts` _name_[,_name_...]_" }}
-Wallet names to auto-fund and deploy on startup.
+Project wallets to initialize and fund with 100 GRAM. Defaults to `[localnet].accounts`.
 {{/option}}
 
 {{#option "`--db-path` _path_" }}

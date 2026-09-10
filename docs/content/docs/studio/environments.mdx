@@ -100,7 +100,7 @@ This keeps debugging reproducible and prevents one experiment from changing anot
 4. Leave **Local port** empty for automatic selection or reserve a specific port.
 5. Choose **Clean network**, **Fork mainnet**, or **Fork testnet**.
 6. For a fork, optionally enter a masterchain block number; empty uses the latest available state.
-7. Select project wallets under **Startup accounts**.
+7. Select project wallets under **Startup accounts** to initialize and fund each with 100 GRAM.
 8. Expand **Network and mining** only when you need rate, latency, interval, or mining overrides.
 9. Select **Create environment**.
 
@@ -110,9 +110,18 @@ environment when a scenario needs a different fork point or bootstrap set.
 ## Create a Full localnet
 
 1. Select **Full localnet** in the create dialog.
-2. Enter a name and choose the validator count from 1 to 7.
-3. Add accounts that must exist in zerostate.
-4. Select **Create environment** and wait for all startup services to become ready.
+2. Enter a name.
+3. Select project wallets under **Startup accounts** to initialize and fund each with 100 GRAM.
+4. Optionally add accounts to import from another environment.
+5. Select **Create environment** and wait for all startup services to become ready.
+
+Startup accounts use the same project wallet names and localnet addresses as Simulated localnet.
+They are ready to send transactions when startup completes. Full localnet includes them in the
+initial chain state. Stopping and restarting the network preserves their balances and transactions.
+
+From the CLI, use `acton full-localnet start --accounts deployer,treasury`. Both localnet commands
+use `[localnet].accounts` when `--accounts` is omitted. For an existing Full localnet, restart it
+without genesis options; a different startup account selection requires a new network.
 
 Each import row contains:
 

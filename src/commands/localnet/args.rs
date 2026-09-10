@@ -132,6 +132,14 @@ pub struct CreateOptions {
         help = "JSON file containing an array of hexadecimal ShardAccount BoCs"
     )]
     pub accounts_file: Option<PathBuf>,
+
+    #[arg(
+        long,
+        value_delimiter = ',',
+        help = "Project wallets to initialize and fund with 100 GRAM (default: [localnet].accounts)",
+        value_name = "NAME[,NAME...]"
+    )]
+    pub accounts: Option<Vec<String>>,
 }
 
 /// Topology mutations follow the network's normal TON election lifecycle.

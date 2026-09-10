@@ -31,6 +31,7 @@ export interface ActonSimulatedLocalnetEnvironmentConfig {
 
 export interface FullTonNetworkEnvironmentConfig {
   readonly kind: "fullTonNetwork"
+  readonly accounts: readonly string[]
   readonly apiV2Port: number
   readonly apiV3Port: number
   readonly adminPort: number
@@ -81,6 +82,7 @@ export interface CreateActonSimulatedLocalnetEnvironmentConfig {
 
 export interface CreateFullTonNetworkEnvironmentConfig {
   readonly kind: "fullTonNetwork"
+  readonly accounts: readonly string[]
   readonly apiV2Port?: number
   readonly apiV3Port?: number
   readonly adminPort?: number

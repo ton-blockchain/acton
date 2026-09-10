@@ -18,6 +18,7 @@ mod fixture_tests;
 mod flags_tests;
 mod fmt_tests;
 mod formatter;
+mod full_localnet_startup_wallets;
 mod fuzz_tests;
 mod hooks_tests;
 mod incremental_tests;

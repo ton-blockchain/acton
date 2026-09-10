@@ -256,6 +256,7 @@ fn full_ton_environment(base_url: &str) -> StudioEnvironment {
             block_time_ms: None,
             election_time_seconds: None,
             imported_accounts: Vec::new(),
+            accounts: Vec::new(),
             nodes: Vec::new(),
         },
         EnvironmentEndpoints {

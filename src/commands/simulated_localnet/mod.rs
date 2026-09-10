@@ -28,7 +28,6 @@ use tycho_types::models::{
     OwnedMessage, StdAddr,
 };
 
-const STARTUP_ACCOUNT_TOPUP_NANOGRAMS: u128 = 100_000_000_000; // 100 GRAM
 const STARTUP_DEPLOY_TRANSFER_NANOGRAMS: u128 = 50_000_000; // 0.05 GRAM
 pub(crate) const LOCALNET_AUTH_TOKEN_ENV: &str = LOCALNET_API_KEY_ENV;
 pub use snapshot::{
@@ -204,7 +203,7 @@ async fn setup_startup_accounts(
                 address.as_str().dimmed(),
             );
         } else {
-            node.faucet(address.clone(), STARTUP_ACCOUNT_TOPUP_NANOGRAMS)
+            node.faucet(address.clone(), wallets::STARTUP_ACCOUNT_BALANCE_NANOGRAMS)
                 .await
                 .with_context(|| format!("Failed to top up wallet '{wallet_name}'"))?;
             if manual_mining {

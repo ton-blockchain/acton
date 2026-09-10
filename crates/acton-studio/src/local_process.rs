@@ -1110,7 +1110,21 @@ async fn resolve_request(
             block_time_ms,
             election_time_seconds,
             mut imported_accounts,
+            accounts,
+            startup_wallets,
         } => {
+            if accounts
+                != startup_wallets
+                    .iter()
+                    .map(|wallet| wallet.name.clone())
+                    .collect::<Vec<_>>()
+            {
+                return Err(EnvironmentRuntimeError::InvalidRequest {
+                    code: "startup_wallet_unresolved",
+                    message: "Startup wallets must be resolved before creating the network"
+                        .to_owned(),
+                });
+            }
             let imported_account_bocs = imported_accounts
                 .iter()
                 .map(|account| {
@@ -1130,6 +1144,7 @@ async fn resolve_request(
                 block_time_ms,
                 election_time_seconds,
                 imported_account_bocs,
+                startup_wallets,
                 ports: acton_localnet::PortOptions {
                     config: config_port,
                     admin: admin_port,

@@ -193,6 +193,7 @@ export function CreateEnvironmentDialog({
               }
             : {
                 kind: "fullTonNetwork",
+                accounts: form.accounts,
                 blockTimeMs: optionalPositiveInteger(
                   form.fullTonBlockTimeMs,
                   "Block time",
@@ -411,6 +412,11 @@ export function CreateEnvironmentDialog({
             </>
           ) : (
             <div className={styles.fullTonFields}>
+              <WalletNamesInput
+                values={form.accounts}
+                walletNames={walletNames}
+                onChange={values => updateForm("accounts", values)}
+              />
               <AccountImportEditor
                 accounts={form.importedAccounts}
                 sources={availableImportSources(importSourceEnvironments)}

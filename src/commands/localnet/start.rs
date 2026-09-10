@@ -16,7 +16,6 @@ pub(super) async fn start(
 
     // Read user input before launching a service so an invalid file cannot leave
     // a background process behind.
-    let request = create_request(&options).await?;
     let networks = catalog::list(root).await?;
     let existing = options.name.as_ref().is_none_or(|name| {
         networks
@@ -31,12 +30,13 @@ pub(super) async fn start(
             options.port_base.is_none()
                 && options.block_time_ms.is_none()
                 && options.election_time_seconds.is_none()
-                && options.accounts_file.is_none(),
+                && options.accounts_file.is_none()
+                && options.accounts.is_none(),
             "Genesis options apply only to new networks; create a new name to change them"
         );
         location
     } else {
-        catalog::create(root, request).await?
+        catalog::create(root, create_request(&options).await?).await?
     };
     let (client, mut owned) = service::connect_or_start(root, location).await?;
     let startup = start_network(&client, json);
@@ -115,6 +115,22 @@ async fn start_network(client: &Client, json: bool) -> anyhow::Result<()> {
 }
 
 pub(super) async fn create_request(options: &CreateOptions) -> anyhow::Result<CreateNetwork> {
+    let config = if acton_config::config::manifest_path().exists() {
+        acton_config::config::ActonConfig::load()?
+    } else {
+        acton_config::config::ActonConfig::default()
+    };
+    let accounts = options
+        .accounts
+        .as_deref()
+        .or_else(|| {
+            config
+                .localnet
+                .as_ref()
+                .and_then(|localnet| localnet.accounts.as_deref())
+        })
+        .unwrap_or_default();
+    let startup_wallets = crate::wallets::prepare_localnet_wallets(&config, accounts)?;
     let imported_account_bocs = match &options.accounts_file {
         Some(path) => serde_json::from_slice(&tokio::fs::read(path).await?)?,
         None => Vec::new(),
@@ -131,5 +147,6 @@ pub(super) async fn create_request(options: &CreateOptions) -> anyhow::Result<Cr
         block_time_ms: options.block_time_ms,
         election_time_seconds: options.election_time_seconds,
         imported_account_bocs,
+        startup_wallets,
     })
 }

@@ -1163,7 +1163,7 @@ pub enum SimulatedLocalnetCommand {
         #[arg(
             long,
             value_delimiter = ',',
-            help = "Wallet names to auto-fund and deploy on startup (default: [localnet].accounts)",
+            help = "Project wallets to initialize and fund with 100 GRAM (default: [localnet].accounts)",
             value_name = "NAME[,NAME...]"
         )]
         accounts: Option<Vec<String>>,

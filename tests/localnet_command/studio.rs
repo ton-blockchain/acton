@@ -51,6 +51,8 @@ fn request(name: &str) -> CreateEnvironmentRequest {
     CreateEnvironmentRequest {
         name: name.to_owned(),
         config: CreateEnvironmentConfig::FullTonNetwork {
+            accounts: Vec::new(),
+            startup_wallets: Vec::new(),
             api_v2_port: None,
             api_v3_port: None,
             admin_port: None,

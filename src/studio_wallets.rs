@@ -12,6 +12,7 @@ use crate::context::Wallet;
 use crate::wallets::open_selected_wallets;
 
 pub(crate) struct ProjectWalletRuntime {
+    config: ActonConfig,
     localnet_wallets: BTreeMap<String, Wallet>,
     mainnet_wallets: BTreeMap<String, Wallet>,
 }
@@ -29,12 +30,14 @@ impl ProjectWalletRuntime {
             .collect::<Vec<_>>();
         if wallet_names.is_empty() {
             return Ok(Self {
+                config: config.clone(),
                 localnet_wallets: BTreeMap::new(),
                 mainnet_wallets: BTreeMap::new(),
             });
         }
 
         Ok(Self {
+            config: config.clone(),
             localnet_wallets: open_selected_wallets(config, &wallet_names, &Network::Localnet)?,
             mainnet_wallets: open_selected_wallets(config, &wallet_names, &Network::Mainnet)?,
         })
@@ -55,6 +58,20 @@ impl ProjectWalletRuntime {
 }
 
 impl WalletRuntime for ProjectWalletRuntime {
+    fn prepare_localnet_accounts(
+        &self,
+        names: Vec<String>,
+    ) -> WalletRuntimeFuture<'_, Vec<acton_localnet::StartupWallet>> {
+        Box::pin(async move {
+            crate::wallets::prepare_localnet_wallets(&self.config, &names).map_err(|error| {
+                WalletRuntimeError::InvalidRequest {
+                    code: "startup_wallet_invalid",
+                    message: error.to_string(),
+                }
+            })
+        })
+    }
+
     fn list(&self, environment: &StudioEnvironment) -> WalletRuntimeFuture<'_, Vec<StudioWallet>> {
         let wallets = self
             .wallets_for(environment)
@@ -119,6 +136,7 @@ mod tests {
     #[test]
     fn environments_use_wallets_with_their_global_id() {
         let runtime = ProjectWalletRuntime {
+            config: ActonConfig::default(),
             localnet_wallets: BTreeMap::new(),
             mainnet_wallets: BTreeMap::new(),
         };
@@ -154,6 +172,7 @@ mod tests {
                 block_time_ms: None,
                 election_time_seconds: None,
                 imported_accounts: Vec::new(),
+                accounts: Vec::new(),
                 nodes: Vec::new(),
             },
             EnvironmentEndpoints::default(),

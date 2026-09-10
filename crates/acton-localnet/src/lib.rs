@@ -23,7 +23,7 @@ pub use model::{
     ApiHealth, ApiHealthStatus, CreateNetwork, DockerContainer, Endpoints, Network, NetworkConfig,
     NetworkHealth, NetworkHealthSample, NetworkHealthStatus, NetworkPorts, NetworkState, Node,
     Operation, OperationProgress, OperationStatus, OperationStep, PortOptions, ServiceHealth,
-    ServiceHealthStatus, Snapshot, StartupTimings, Status,
+    ServiceHealthStatus, Snapshot, StartupTimings, StartupWallet, Status,
 };
 pub use network_config::UpdateNetworkConfig;
 pub use runtime::Runtime;

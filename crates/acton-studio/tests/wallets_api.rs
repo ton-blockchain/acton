@@ -54,6 +54,7 @@ impl TestEnvironmentRuntime {
                 block_time_ms: None,
                 election_time_seconds: None,
                 imported_accounts: Vec::new(),
+                accounts: Vec::new(),
                 nodes: Vec::new(),
             },
             EnvironmentEndpoints {
@@ -144,6 +145,18 @@ impl EnvironmentRuntime for TestEnvironmentRuntime {
 struct TestWalletRuntime;
 
 impl WalletRuntime for TestWalletRuntime {
+    fn prepare_localnet_accounts(
+        &self,
+        names: Vec<String>,
+    ) -> WalletRuntimeFuture<'_, Vec<acton_localnet::StartupWallet>> {
+        Box::pin(async move {
+            match names.into_iter().next() {
+                Some(wallet_name) => Err(WalletRuntimeError::NotFound { wallet_name }),
+                None => Ok(Vec::new()),
+            }
+        })
+    }
+
     fn list(&self, _environment: &StudioEnvironment) -> WalletRuntimeFuture<'_, Vec<StudioWallet>> {
         Box::pin(async {
             Ok(vec![StudioWallet {

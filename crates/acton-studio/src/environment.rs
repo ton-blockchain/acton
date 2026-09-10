@@ -109,6 +109,12 @@ pub enum CreateEnvironmentConfig {
         election_time_seconds: Option<u32>,
         #[serde(default)]
         imported_accounts: Vec<FullTonAccountImport>,
+        #[serde(default)]
+        accounts: Vec<String>,
+        /// Resolved by the wallet runtime, never accepted from HTTP clients.
+        #[serde(skip)]
+        #[schema(ignore)]
+        startup_wallets: Vec<acton_localnet::StartupWallet>,
     },
 }
 
@@ -232,6 +238,8 @@ pub enum EnvironmentConfig {
         #[serde(skip_serializing_if = "Option::is_none")]
         election_time_seconds: Option<u32>,
         imported_accounts: Vec<FullTonAccountImport>,
+        #[serde(default)]
+        accounts: Vec<String>,
         nodes: Vec<FullTonNode>,
     },
     RemoteTonNetwork {

@@ -20,6 +20,18 @@ pub struct CreateNetwork {
     pub election_time_seconds: Option<u32>,
     #[serde(default)]
     pub imported_account_bocs: Vec<String>,
+    #[serde(default)]
+    pub startup_wallets: Vec<StartupWallet>,
+}
+
+/// A project wallet resolved before network creation.
+///
+/// Only its public initial state and balance are persisted; restarts reuse it without accessing keys.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct StartupWallet {
+    pub name: String,
+    pub shard_account_boc_hex: String,
 }
 
 /// Optional host bindings for applications with independently configured endpoints.
@@ -69,6 +81,8 @@ pub struct NetworkConfig {
     pub block_time_ms: Option<u32>,
     pub election_time_seconds: Option<u32>,
     pub imported_account_bocs: Vec<String>,
+    #[serde(default)]
+    pub startup_wallets: Vec<StartupWallet>,
 }
 
 /// Host endpoints remain assigned while an environment is stopped. Availability

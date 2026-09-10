@@ -44,7 +44,8 @@ SUBCOMMANDS
               virtual-clock origin.
 
           --accounts name[,name…]_
-              Wallet names to auto-fund and deploy on startup.
+              Project wallets to initialize and fund with 100 GRAM. Defaults to
+              [localnet].accounts.
 
           --db-path path
               Path to a SQLite database for persistent node state. Defaults to
