@@ -753,10 +753,11 @@ package = "not_used_for_all"
             "module example.com/caller\n\ngo {}\n",
             env!("ACTON_ABI_GO_VERSION")
         );
-        let mut catalog: Value = serde_json::from_str(include_str!(
-            "../../crates/acton-abi-catalog/data/data-abis.json"
-        ))
-        .unwrap();
+        // Read at run time: include_str! would compile the whole 4.9 MB bundle
+        // into the test binary only for the one entry kept below.
+        let bundle = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("crates/acton-abi-catalog/data/data-abis.json");
+        let mut catalog: Value = serde_json::from_slice(&fs::read(&bundle).unwrap()).unwrap();
         catalog["contracts"].as_array_mut().unwrap().truncate(1);
         let project = ProjectBuilder::new("go_bundled_e2e")
             .contract("first", PRECOMPILED_RUNTIME_CONTRACT)
