@@ -4,8 +4,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"math/big"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -452,7 +454,7 @@ func TestAdversarialResourceLimits(t *testing.T) {
 	}
 	key, value := IntegerCodec(20, false, false), IntegerCodec(8, false, false)
 	dict := MapCodec(&key, &value, 20)
-	if _, err := dict.Decode(wrapped.EndCell()); err == nil || !strings.Contains(err.Error(), "limit") {
+	if _, err := dict.Decode(wrapped.EndCell()); !errors.Is(err, ErrBudget) {
 		t.Fatal("dictionary expansion was not bounded", err)
 	}
 
@@ -549,4 +551,62 @@ func FuzzNativeDecode(f *testing.F) {
 			_, _ = codec.Decode(root)
 		}
 	})
+}
+
+// TestSharedBudgetBoundsABatch pins the amplification that makes a per-call
+// budget insufficient for a batch: a dictionary whose cells are almost entirely
+// shared costs a hundred bytes of input and produces tens of kilobytes of
+// output, so an attacker pays nothing to make the server work. A Context shared
+// across the batch stops that after a bounded amount of total work, whatever
+// the batch size.
+func TestSharedBudgetBoundsABatch(t *testing.T) {
+	key, value := IntegerCodec(32, false, false), IntegerCodec(64, false, false)
+	dict := MapCodec(&key, &value, 32)
+	entries := make([]any, 2000)
+	for i := range entries {
+		entries[i] = map[string]any{"key": strconv.Itoa(i), "value": "12345678901234"}
+	}
+	bomb, err := dict.Encode(entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := len(bomb.ToBOC())
+	decoded, err := dict.Decode(bomb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	output, err := json.Marshal(decoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Guards the property, not today's exact figures: ~111 bytes in, ~79 KB out.
+	if ratio := len(output) / input; ratio < 100 {
+		t.Fatalf("expected a large expansion to guard against, got %d bytes -> %d (%dx)", input, len(output), ratio)
+	}
+
+	// Each decode on its own budget succeeds however many times it is repeated:
+	// nothing bounds a batch.
+	for i := 0; i < 50; i++ {
+		if _, err := dict.Decode(bomb); err != nil {
+			t.Fatalf("per-call budget refused repeat %d: %v", i, err)
+		}
+	}
+
+	// One budget shared across the batch stops it instead.
+	ctx := NewBudget(4*MaxItems, 4*MaxBOCBytes)
+	done := 0
+	for i := 0; i < 50; i++ {
+		if _, err := dict.DecodeWith(ctx, bomb); err != nil {
+			if !errors.Is(err, ErrBudget) {
+				t.Fatalf("unexpected failure after %d decodes: %v", done, err)
+			}
+			break
+		}
+		done++
+	}
+	if done == 0 || done >= 50 {
+		t.Fatalf("shared budget did not bound the batch: %d of 50 decodes ran", done)
+	}
+	t.Logf("%d bytes in -> %d bytes out (%dx); shared budget allowed %d of 50 decodes",
+		input, len(output), len(output)/input, done)
 }

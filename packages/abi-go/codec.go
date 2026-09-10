@@ -23,11 +23,47 @@ type Codec struct {
 	Width      int
 }
 
-type Context struct{ depth, items, bytes int }
+// A Context is a decode/encode work budget. Decode and Encode give every call a
+// fresh one, so a single value is bounded by MaxItems and MaxBOCBytes. Share one
+// Context across calls with DecodeWith to bound a whole batch instead of each
+// item in it: work accumulates, and the batch stops when the budget runs out.
+// The zero value carries the per-call defaults.
+type Context struct{ depth, items, bytes, maxItems, maxBytes int }
 
+// NewBudget returns a Context allowing items codec steps and bytes of decoded
+// data in total. Values below the per-call defaults are raised to them, so a
+// budget can bound a batch but never make a single value stricter than Decode.
+func NewBudget(items, bytes int) *Context {
+	return &Context{maxItems: max(items, MaxItems), maxBytes: max(bytes, MaxBOCBytes)}
+}
+
+// ErrBudget reports that a Context ran out of work budget. A caller sharing one
+// Context across a batch uses it to tell an exhausted batch from bad input.
+var ErrBudget = errors.New("codec work budget exceeded")
+
+// Used reports the work charged to this budget so far: codec steps and bytes of
+// decoded data. A caller sharing one Context across a batch uses it to report or
+// log how close a request came to its ceiling.
+func (c *Context) Used() (items, bytes int) { return c.items, c.bytes }
+
+func (c *Context) itemLimit() int {
+	if c.maxItems > 0 {
+		return c.maxItems
+	}
+	return MaxItems
+}
+func (c *Context) byteLimit() int {
+	if c.maxBytes > 0 {
+		return c.maxBytes
+	}
+	return MaxBOCBytes
+}
 func (c *Context) enter() error {
-	if c.depth >= MaxDepth || c.items >= MaxItems {
-		return errors.New("codec depth/items limit exceeded")
+	if c.depth >= MaxDepth {
+		return errors.New("codec depth limit exceeded")
+	}
+	if c.items >= c.itemLimit() {
+		return ErrBudget
 	}
 	c.depth++
 	c.items++
@@ -36,8 +72,8 @@ func (c *Context) enter() error {
 func (c *Context) leave() { c.depth-- }
 func (c *Context) data(n int) error {
 	c.bytes += n
-	if c.bytes > MaxBOCBytes {
-		return errors.New("codec data limit exceeded")
+	if c.bytes > c.byteLimit() {
+		return ErrBudget
 	}
 	return nil
 }
@@ -151,11 +187,21 @@ func (c *Codec) encode(ctx *Context, v any) (*cell.Cell, error) {
 	return withCellLevels(b.EndCell())
 }
 func (c *Codec) Decode(root *cell.Cell) (v any, err error) {
+	return c.DecodeWith(&Context{}, root)
+}
+
+// DecodeWith charges the decode against ctx instead of a fresh per-call budget,
+// so one Context shared across a batch bounds the batch's total work. A nil ctx
+// behaves like Decode. Exhaustion reports ErrBudget.
+func (c *Codec) DecodeWith(ctx *Context, root *cell.Cell) (v any, err error) {
 	defer catchPanic(&err)
+	if ctx == nil {
+		ctx = &Context{}
+	}
 	if err = validateCell(root); err != nil {
 		return nil, err
 	}
-	return c.decode(&Context{}, root)
+	return c.decode(ctx, root)
 }
 func (c *Codec) Encode(v any) (root *cell.Cell, err error) {
 	defer catchPanic(&err)
@@ -169,7 +215,7 @@ func (c *Codec) Encode(v any) (root *cell.Cell, err error) {
 func NewBinding(info TypeInfo, c *Codec, unsupported string) *Binding {
 	b := &Binding{Type: info, Unsupported: unsupported}
 	if unsupported == "" {
-		b.Decode, b.Encode = c.Decode, c.Encode
+		b.Decode, b.DecodeWith, b.Encode = c.Decode, c.DecodeWith, c.Encode
 	}
 	return b
 }

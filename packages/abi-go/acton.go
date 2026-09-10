@@ -46,7 +46,10 @@ type Binding struct {
 	Type        TypeInfo                      `json:"type"`
 	Unsupported string                        `json:"unsupported,omitempty"`
 	Decode      func(*cell.Cell) (any, error) `json:"-"`
-	Encode      func(any) (*cell.Cell, error) `json:"-"`
+	// DecodeWith is Decode against a caller-supplied budget, so a batch of
+	// decodes can be bounded in total. See Context.
+	DecodeWith func(*Context, *cell.Cell) (any, error) `json:"-"`
+	Encode     func(any) (*cell.Cell, error)           `json:"-"`
 }
 type Contract struct {
 	ID                string               `json:"id"`
