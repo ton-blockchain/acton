@@ -567,6 +567,19 @@ func EnumCodec(encoded *Codec, members []string) Codec {
 		}
 		return x.String(), nil
 	}
+	// Writes must accept exactly what reads do, or Encode produces a cell this
+	// same codec refuses to Decode.
+	write := c.Write
+	c.Write = func(ctx *Context, b *cell.Builder, v any) error {
+		x, err := Integer(v)
+		if err != nil {
+			return err
+		}
+		if !allowed[x.String()] {
+			return errors.New("invalid enum member")
+		}
+		return write(ctx, b, v)
+	}
 	integer := IntegerCodec(0, true, false)
 	c.ReadStack, c.WriteStack = integer.ReadStack, integer.WriteStack
 	return c

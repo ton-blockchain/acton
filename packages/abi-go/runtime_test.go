@@ -394,6 +394,33 @@ func TestRecursiveLimitAndEnum(t *testing.T) {
 	if _, err := e.Decode(mustEncode(t, &u, "2")); err == nil {
 		t.Fatal("invalid enum member accepted")
 	}
+	// Writes must reject exactly what reads reject: 2 fits the 8-bit encoding
+	// but is not a member, so encoding it would build a cell this codec cannot
+	// decode.
+	if _, err := e.Encode("2"); err == nil {
+		t.Fatal("encoded a non-member the same codec refuses to decode")
+	}
+}
+
+func TestStructFieldTagOptionsAreNotPartOfTheName(t *testing.T) {
+	type payload struct {
+		Amount  string `json:"amount,omitempty"`
+		Ignored string `json:"-"`
+		Bare    string
+	}
+	fields, err := object(payload{Amount: "7", Ignored: "x", Bare: "y"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := fields["amount"]; !ok {
+		t.Fatalf("tag options leaked into the field name: %v", fields)
+	}
+	if _, ok := fields["Ignored"]; ok {
+		t.Fatal("json:\"-\" field was encoded")
+	}
+	if _, ok := fields["Bare"]; !ok {
+		t.Fatal("untagged field lost its Go name")
+	}
 }
 
 func TestAdversarialResourceLimits(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/xssnick/tonutils-go/tvm/cell"
 )
@@ -226,7 +227,9 @@ func object(v any) (map[string]any, error) {
 			if !r.Field(i).CanInterface() {
 				continue
 			}
-			name := f.Tag.Get("json")
+			// The tag carries options after the name: json:"amount,omitempty"
+			// must key as "amount", which is what StructCodec looks up.
+			name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
 			if name == "-" {
 				continue
 			}
