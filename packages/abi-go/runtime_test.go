@@ -96,6 +96,19 @@ func TestIntegerVectors(t *testing.T) {
 	}
 }
 
+func TestBooleanEnumHasNoGuessedStackMapping(t *testing.T) {
+	c := BoolEnumCodec([]bool{false, true})
+	for _, v := range []any{false, true, "0", "1", "-1"} {
+		if _, err := c.WriteStack(&Context{}, v); err == nil || !strings.Contains(err.Error(), "boolean-backed enum stack representation") {
+			t.Fatalf("guessed enum stack encoding for %#v: %v", v, err)
+		}
+		r := &StackReader{Values: []StackValue{{Type: "int", Value: v}}}
+		if _, err := c.ReadStack(&Context{}, r); err == nil || !strings.Contains(err.Error(), "boolean-backed enum stack representation") {
+			t.Fatalf("guessed enum stack decoding for %#v: %v", v, err)
+		}
+	}
+}
+
 func TestAddressBitsString(t *testing.T) {
 	a := AddressCodec("addressOpt")
 	root := roundTrip(t, &a, nil)

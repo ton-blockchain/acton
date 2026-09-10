@@ -87,7 +87,12 @@ func (a *ABI) defaultExpr(raw json.RawMessage, target, depth int) (string, error
 			return "", err
 		}
 		switch t.Kind {
-		case "int", "intN", "uintN", "varintN", "varuintN", "coins", "EnumRef":
+		case "EnumRef":
+			if a.boolEnum(target) {
+				return "", errors.New("integer default for boolean-backed enum has no verified boolean mapping")
+			}
+			return strconv.Quote(n.String()), nil
+		case "int", "intN", "uintN", "varintN", "varuintN", "coins":
 			return strconv.Quote(n.String()), nil
 		}
 		return "", errors.New("integer default type mismatch")
@@ -99,7 +104,7 @@ func (a *ABI) defaultExpr(raw json.RawMessage, target, depth int) (string, error
 		if err := json.Unmarshal(v.V, &b); err != nil {
 			return "", err
 		}
-		if t.Kind != "bool" {
+		if t.Kind != "bool" && !a.boolEnum(target) {
 			return "", errors.New("bool default type mismatch")
 		}
 		return strconv.FormatBool(b), nil

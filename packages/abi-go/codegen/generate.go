@@ -282,6 +282,36 @@ func stringSlice(items []string) string {
 }
 func codecRef(i int) string { return fmt.Sprintf("&codecs[%d]", i) }
 
+// boolEnum recognizes the cell encoding only. An encoded_as type does not
+// establish how boolean member strings map to integer enum values on the stack.
+func (a *ABI) boolEnum(i int) bool {
+	if a.Types[i].Kind != "EnumRef" {
+		return false
+	}
+	idx := a.declaration(i).Encoded
+	for depth := 0; depth < 128; depth++ {
+		if a.Types[idx].Kind != "AliasRef" {
+			return a.Types[idx].Kind == "bool"
+		}
+		idx = a.targets[idx]
+	}
+	return false
+}
+
+func (a *ABI) enumValue(i int, value string) (string, error) {
+	if a.boolEnum(i) {
+		if value != "false" && value != "true" {
+			return "", fmt.Errorf("expected boolean enum member value false or true, got %q", value)
+		}
+		return value, nil
+	}
+	x, err := acton.Integer(value)
+	if err != nil {
+		return "", err
+	}
+	return x.String(), nil
+}
+
 func generateContract(a *ABI, entry ContractInput, pkg, ns string) ([]byte, []Diagnostic, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%spackage %s\nimport (\"encoding/json\"; acton %q)\n", Header, pkg, importPath)
@@ -307,18 +337,25 @@ func generateContract(a *ABI, entry ContractInput, pkg, ns string) ([]byte, []Di
 		case "AliasRef":
 			fmt.Fprintf(&b, "type %s = %s\n", name, goType(a, a.targets[i], ns, map[int]bool{i: true}))
 		case "EnumRef":
-			fmt.Fprintf(&b, "type %s string\n", name)
+			base := "string"
+			if a.boolEnum(i) {
+				base = "bool"
+			}
+			fmt.Fprintf(&b, "type %s %s\n", name, base)
 			seen := map[string]bool{}
 			for j, m := range a.declaration(i).Members {
 				if m.Name == "" || seen[m.Name] {
 					return nil, nil, errors.New("duplicate/empty enum member")
 				}
 				seen[m.Name] = true
-				x, err := acton.Integer(m.Value)
+				value, err := a.enumValue(i, m.Value)
 				if err != nil {
-					return nil, nil, fmt.Errorf("enum %s: %w", name, err)
+					return nil, nil, fmt.Errorf("enum %s member %s: %w", t.Enum, m.Name, err)
 				}
-				fmt.Fprintf(&b, "const %s%sM%d %s = %q\n", name, identifier(m.Name), j, name, x.String())
+				if base == "string" {
+					value = strconv.Quote(value)
+				}
+				fmt.Fprintf(&b, "const %s%sM%d %s = %s\n", name, identifier(m.Name), j, name, value)
 			}
 		}
 	}
@@ -417,6 +454,11 @@ func goStackType(a *ABI, i int, ns string, seen map[int]bool) string {
 	switch t.Kind {
 	case "StructRef":
 		return "*" + typeName(a, i, ns) + "Stack"
+	case "EnumRef":
+		if a.boolEnum(i) {
+			return "any" // No verified stack representation for these cell-only enum values.
+		}
+		return goType(a, i, ns, map[int]bool{})
 	case "AliasRef":
 		return goStackType(a, a.targets[i], ns, seen)
 	case "nullable":
@@ -481,11 +523,14 @@ func codecExpr(a *ABI, i int) (string, error) {
 	case "EnumRef":
 		members := []string{}
 		for _, m := range a.declaration(i).Members {
-			x, err := acton.Integer(m.Value)
+			value, err := a.enumValue(i, m.Value)
 			if err != nil {
 				return "", err
 			}
-			members = append(members, x.String())
+			members = append(members, value)
+		}
+		if a.boolEnum(i) {
+			return fmt.Sprintf("acton.BoolEnumCodec([]bool{%s})", strings.Join(members, ",")), nil
 		}
 		return fmt.Sprintf("acton.EnumCodec(%s,%s)", codecRef(a.declaration(i).Encoded), stringSlice(members)), nil
 	case "tensor", "shapedTuple":

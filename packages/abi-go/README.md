@@ -125,8 +125,8 @@ Message direction keys are exactly `incoming_messages`, `incoming_external`,
 
 ## Value Format
 
-- All Tolk integers and enum values decode to **decimal strings**, including
-  small integers, coins and signed variable integers. Encoding also accepts Go
+- All Tolk integers and integer-backed enum values decode to **decimal strings**,
+  including small integers, coins and signed variable integers. Encoding also accepts Go
   integers, `json.Number`, and `big.Int`/`*big.Int`, without mutating the input.
   Floating-point Tolk integers are rejected rather than rounded.
   Getter encoding and decoding enforce only the signed 257-bit TVM range;
@@ -134,6 +134,14 @@ Message direction keys are exactly `incoming_messages`, `incoming_external`,
   variable-integer bounds remain enforced for cell serialization.
 - Booleans are JSON booleans. TVM true is encoded as `-1`; decoding treats any
   valid nonzero TVM integer as true.
+- Boolean-backed enum ABI cell values are JSON booleans (`false`/`true`), encoded
+  as one bit. Their generated cell types and constants are named Go booleans.
+  Direct enum getter values are **unsupported**, including through aliases,
+  nullable values, arrays and structs: the ABI's boolean member strings do not
+  specify an integer enum stack mapping. Such methods retain `Unsupported`
+  metadata with nil callbacks and `any` for the unresolved stack type.
+  `Cell<Enum>` getter payloads use the verified boolean cell representation and
+  remain supported. Ordinary Tolk `bool` getter behavior above is unaffected.
 - Structs are objects with original field names. No discriminator is added to
   plain structs. Native Go structs with matching JSON tags can also be encoded.
 - Tensors and shaped tuples are JSON arrays. Their TVM layouts differ:
@@ -179,8 +187,10 @@ declaration name and `T<unique_type_index>`. Generic instantiations therefore
 cannot collide with each other or with the generic declaration.
 
 Struct fields append `F<field_index>` and preserve their exact original JSON tag.
-Enums are string-backed named types with decimal-string constants suffixed
-`M<member_index>`. Aliases are Go aliases where representable. Compound types use
+Integer-backed enums are string-backed named types with decimal-string constants;
+boolean-backed cell enums use named bool types with boolean constants. Enum
+constants are suffixed `M<member_index>`. Aliases are Go aliases where representable.
+Compound types use
 arrays, pointers, `acton.Bits`, `acton.MapEntry` and `acton.UnionValue`; otherwise
 they use `any`. Pointer struct references support recursive cell payloads.
 
@@ -221,6 +231,11 @@ representation-preserving casts are handled. Unsupported method defaults disable
 that method explicitly. Unsupported struct-field defaults error when that field
 is omitted; callers can provide the field explicitly. Runtime encoding still
 checks ranges and types of supported defaults.
+
+Boolean-backed enum cell fields accept boolean defaults (including aliases and
+representation-preserving boolean casts). Integer-to-boolean enum default
+conversions are explicitly rejected; no mapping from `0`, `1` or `-1` is guessed.
+Boolean-enum getter defaults do not enable an otherwise unsupported stack root.
 
 Each call enforces 128 levels of codec/cell/stack nesting, 16,384 traversed values,
 4,096 BOC cells and a 1 MiB data budget. Arrays have the TVM limit of 255 elements.
@@ -267,6 +282,10 @@ CGO_ENABLED=0 GOPROXY=off GOSUMDB=off go vet ./...
 ```
 
 No test fetches catalog data or requires the indexer or a compiler checkout.
+
+The [boolean-enum regression fixture](codegen/testdata/bool-enum.md) documents the
+synthetic ABI used by Acton's Rust unpacker tests, independent one-bit cell
+goldens, TypeScript runtime observations and the explicit stack limitation.
 
 ## License
 

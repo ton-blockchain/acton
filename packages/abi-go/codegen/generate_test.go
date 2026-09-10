@@ -56,11 +56,16 @@ func TestGenerateCompileAndRun(t *testing.T) {
 			t.Fatalf("runtime ABI parser in %s", name)
 		}
 	}
+	testGeneratedPackage(t, out, "testdata/native_test.go.txt")
+}
+
+func testGeneratedPackage(t *testing.T, out *Output, testFixture string) {
+	t.Helper()
 	dir := t.TempDir()
-	if err = out.Write(dir, false); err != nil {
+	if err := out.Write(dir, false); err != nil {
 		t.Fatal(err)
 	}
-	if err = out.Write(dir, true); err != nil {
+	if err := out.Write(dir, true); err != nil {
 		t.Fatal(err)
 	}
 	wd, err := os.Getwd()
@@ -72,7 +77,7 @@ func TestGenerateCompileAndRun(t *testing.T) {
 	if err = os.WriteFile(filepath.Join(dir, "go.mod"), []byte(gomod), 0644); err != nil {
 		t.Fatal(err)
 	}
-	testSource, err := os.ReadFile("testdata/native_test.go.txt")
+	testSource, err := os.ReadFile(testFixture)
 	if err != nil {
 		t.Fatal(err)
 	}

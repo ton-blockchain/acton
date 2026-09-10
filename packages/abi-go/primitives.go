@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/bits"
+	"reflect"
 	"strings"
 	"unicode/utf8"
 
@@ -510,6 +511,39 @@ func UnitCodec(null bool) Codec {
 		}
 		return []StackValue{}, nil
 	}
+	return c
+}
+
+// BoolEnumCodec supports the one-bit cell form found in boolean-backed enum
+// ABIs. It deliberately has no boolean-to-integer enum stack conversion: that
+// mapping is not specified by these ABIs or supported by the current compiler.
+func BoolEnumCodec(members []bool) Codec {
+	c := BoolCodec()
+	read, write := c.Read, c.Write
+	allowed := map[bool]bool{}
+	for _, v := range members {
+		allowed[v] = true
+	}
+	c.Read = func(ctx *Context, s *cell.Slice) (any, error) {
+		v, err := read(ctx, s)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed[v.(bool)] {
+			return nil, errors.New("invalid enum member")
+		}
+		return v, nil
+	}
+	c.Write = func(ctx *Context, b *cell.Builder, v any) error {
+		// Generated enum constants are named Go booleans.
+		r := reflect.ValueOf(v)
+		if !r.IsValid() || r.Kind() != reflect.Bool {
+			return errors.New("expected bool enum value")
+		}
+		return write(ctx, b, r.Bool())
+	}
+	unsupported := UnsupportedCodec("boolean-backed enum stack representation is not specified by the compiler ABI")
+	c.ReadStack, c.WriteStack = unsupported.ReadStack, unsupported.WriteStack
 	return c
 }
 

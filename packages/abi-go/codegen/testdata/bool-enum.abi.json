@@ -1,0 +1,46 @@
+{
+  "abi_schema_version": "1.3",
+  "contract_name": "BoolEnumProbe",
+  "unique_types": [
+    {"kind":"bool"},
+    {"kind":"EnumRef","enum_name":"Toggle"},
+    {"kind":"StructRef","struct_name":"State"},
+    {"kind":"cellOf","inner_ty_idx":2},
+    {"kind":"AliasRef","alias_name":"Switch"},
+    {"kind":"nullable","inner_ty_idx":4},
+    {"kind":"arrayOf","inner_ty_idx":4},
+    {"kind":"tensor","items_ty_idx":[1,0]},
+    {"kind":"uintN","n":8},
+    {"kind":"AliasRef","alias_name":"BoolStorage"},
+    {"kind":"EnumRef","enum_name":"Indirect"},
+    {"kind":"EnumRef","enum_name":"TrueOnly"},
+    {"kind":"cellOf","inner_ty_idx":1}
+  ],
+  "declarations": [
+    {"kind":"enum","name":"Toggle","ty_idx":1,"encoded_as_ty_idx":0,"members":[{"name":"Off","value":"false"},{"name":"On","value":"true"}]},
+    {"kind":"struct","name":"State","ty_idx":2,"fields":[
+      {"name":"off","ty_idx":1,"default_value":{"kind":"bool","v":false}},
+      {"name":"on","ty_idx":4,"default_value":{"kind":"castTo","cast_to_ty_idx":4,"inner":{"kind":"bool","v":true}}}
+    ]},
+    {"kind":"alias","name":"Switch","ty_idx":4,"target_ty_idx":1},
+    {"kind":"alias","name":"BoolStorage","ty_idx":9,"target_ty_idx":0},
+    {"kind":"enum","name":"Indirect","ty_idx":10,"encoded_as_ty_idx":9,"members":[{"name":"Off","value":"false"},{"name":"On","value":"true"}]},
+    {"kind":"enum","name":"TrueOnly","ty_idx":11,"encoded_as_ty_idx":0,"members":[{"name":"On","value":"true"}]}
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "get_methods": [
+    {"name":"direct","tvm_method_id":100001,"parameters":[{"name":"v","ty_idx":1}],"return_ty_idx":1},
+    {"name":"default_on","tvm_method_id":100002,"parameters":[{"name":"v","ty_idx":1,"default_value":{"kind":"castTo","cast_to_ty_idx":1,"inner":{"kind":"bool","v":true}}}],"return_ty_idx":1},
+    {"name":"default_off","tvm_method_id":100003,"parameters":[{"name":"v","ty_idx":1,"default_value":{"kind":"bool","v":false}}],"return_ty_idx":1},
+    {"name":"nested","tvm_method_id":100004,"parameters":[{"name":"v","ty_idx":5}],"return_ty_idx":6},
+    {"name":"ordinary","tvm_method_id":100005,"parameters":[{"name":"v","ty_idx":0,"default_value":{"kind":"bool","v":true}}],"return_ty_idx":0},
+    {"name":"typed_cell","tvm_method_id":100006,"parameters":[{"name":"v","ty_idx":12}],"return_ty_idx":12},
+    {"name":"state_cell","tvm_method_id":100007,"parameters":[{"name":"v","ty_idx":3}],"return_ty_idx":3}
+  ],
+  "storage": {"storage_ty_idx":2},
+  "incoming_messages": [{"body_ty_idx":1},{"body_ty_idx":10},{"body_ty_idx":11}],
+  "incoming_external": [{"body_ty_idx":5},{"body_ty_idx":6}],
+  "outgoing_messages": [],
+  "emitted_events": []
+}

@@ -461,6 +461,9 @@ func (a *ABI) checkSupport(i int, stack bool, seen map[string]bool, budget *int)
 		}
 		return child(a.targets[i], stack)
 	case "EnumRef":
+		if stack && a.boolEnum(i) {
+			return "boolean-backed enum stack representation is not specified by the compiler ABI"
+		}
 		if !stack {
 			return child(a.declaration(i).Encoded, false)
 		}
