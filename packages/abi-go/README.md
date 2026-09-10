@@ -20,8 +20,6 @@ go run ./cmd/tolk-abi-to-go --catalog FILE --output-dir DIR --package catalog
 go run ./cmd/tolk-abi-to-go --catalog FILE --output-dir DIR --package catalog --snapshot
 go run ./cmd/tolk-abi-to-go --abi FILE --output-dir DIR --package catalog
 go run ./cmd/tolk-abi-to-go --catalog FILE --output-dir DIR --package catalog --check
-CGO_ENABLED=0 go test ./...
-CGO_ENABLED=0 go vet ./...
 ```
 
 The CLI's canonical package path is
@@ -68,8 +66,7 @@ does not need `--snapshot`.
 `--check` never writes. It fails on missing, modified or stale generated files.
 Normal generation atomically replaces each changed file, and removes stale files
 carrying this generator's exact header. Unrelated files are preserved; overwriting
-a non-generated file is an error. The operation is atomic per file, not across
-the entire directory. Do not run competing generators in the same output directory.
+a non-generated file is an error.
 
 Programmatic use imports
 `github.com/ton-blockchain/acton/packages/abi-go/codegen`:
@@ -91,11 +88,8 @@ func ByCodeHash(string) []*acton.Contract
 ```
 
 Contracts are sorted by ID; hashes are normalized, deduplicated and sorted.
-`ByCodeHash` normalizes hex or base64 and preserves multiple matching contracts.
-Neither generation nor lookup chooses an arbitrary winner for ambiguous hashes.
-Lookup maps are initialized once; requests do not scan `Contracts`. Hash lookup
-returns a copy of the result slice. Pointed-to metadata remains shared and
-immutable by convention. Codec closures have no request-shared mutable state.
+`ByCodeHash` normalizes hex or base64 and returns a copy of every matching
+contract: neither generation nor lookup picks a winner for an ambiguous hash.
 
 ## Facade
 
@@ -179,113 +173,17 @@ tuple values are arrays of `StackValue`. Integers are decimal strings. Stack
 arrays are in declared order, not reversed. Wide nullable/union tags and padding
 are checked against compiler metadata, never inferred from client field types.
 
-## Generated Types
-
-Contract namespaces are `C<SanitizedID>_<first16hexOfSHA256ID>`. Hash collisions
-are checked before writing. Struct, enum and alias names append their sanitized
-declaration name and `T<unique_type_index>`. Generic instantiations therefore
-cannot collide with each other or with the generic declaration.
-
-Struct fields append `F<field_index>` and preserve their exact original JSON tag.
-Integer-backed enums are string-backed named types with decimal-string constants;
-boolean-backed cell enums use named bool types with boolean constants. Enum
-constants are suffixed `M<member_index>`. Aliases are Go aliases where representable.
-Compound types use
-arrays, pointers, `acton.Bits`, `acton.MapEntry` and `acton.UnionValue`; otherwise
-they use `any`. Pointer struct references support recursive cell payloads.
-
-Every struct also has a `Stack` version using **declared** field types. Its cell
-version honors `client_ty_idx`. Getter argument/result definitions are named
-`<Namespace><Method>G<method_index>Args` and `...Result`; they use stack types,
-except that typed-cell payloads use their cell types. These definitions describe
-the JSON-safe values. The public callable bindings deliberately retain the
-uniform map/`any` facade; decoding returns JSON-safe maps rather than pointers
-to generated Go structs.
-
-## Support And Limits
-
-Native codecs cover fixed/signed/variable integers, coins, booleans, addresses,
-bits, strings, raw/typed refs, nullable values, tensors/shaped tuples, arrays,
-Lisp lists, fixed-bit-key dictionaries, structs, enums, aliases and unions.
-Array writing uses compiler maximum-size chunking, with continuation refs before
-element refs. Reading accepts any valid compiler chunk occupancy. Lisp lists
-use the stdlib's reversed snake representation, also storing the tail ref first.
-Enum cell decoding validates membership, matching the compiler.
-
-Custom pack/unpack hooks have only flags in the ABI, not executable bodies.
-Flags on both declarations and concrete struct/alias instantiations are checked.
-Cell roots depending on them are unsupported; plain getter structs can still work
-because hooks do not alter their declared stack layout. `int` is getter-only.
-`slice` and `builder` have getter codecs but no inferred cell decoder. Callable,
-unknown, unresolved generic types, ambiguous union prefixes, missing wide stack
-metadata and non-fixed dictionary keys are explicitly unsupported.
-
-Capability analysis rejects a remainder followed by another consuming field,
-including remainders reached through aliases, structs, tuples, nullables or union
-branches. Reference and dictionary boundaries contain the remainder effect;
-zero-size trailing fields are allowed. The remainder codec itself is unchanged.
-
-Method defaults are compiled to Go factories. Exact integers, booleans, strings,
-addresses, nulls, bits slices, tensors/shaped tuples, objects, and supported
-representation-preserving casts are handled. Unsupported method defaults disable
-that method explicitly. Unsupported struct-field defaults error when that field
-is omitted; callers can provide the field explicitly. Runtime encoding still
-checks ranges and types of supported defaults.
-
-Boolean-backed enum cell fields accept boolean defaults (including aliases and
-representation-preserving boolean casts). Integer-to-boolean enum default
-conversions are explicitly rejected; no mapping from `0`, `1` or `-1` is guessed.
-Boolean-enum getter defaults do not enable an otherwise unsupported stack root.
-
-Each call enforces 128 levels of codec/cell/stack nesting, 16,384 traversed values,
-4,096 BOC cells and a 1 MiB data budget. Arrays have the TVM limit of 255 elements.
-Bounded dictionary traversal handles shared DAGs without exponential expansion.
-BOC headers and counts are validated **before** constructing dependency cells.
-Complete, forward-reference, single-root BOCs with standard magic are accepted;
-CRC, index tables and validated stored hashes/levels are supported. Opaque parsing
-checks exotic descriptors, level masks, embedded proof hashes/depths and pruned
-virtual depths. Absent cells, unknown exotic types and multi-root BOCs are
-rejected. These limits can reject otherwise valid large TON values.
-`DecodeBOC` additionally requires an ordinary root; typed decoding rejects any
-attempt to interpret exotic payloads. `DecodeOpaqueBOC` does not resolve a library
-or authenticate a proof against a trusted chain root. A library-reference cell's
-`Hash()` is its representation hash; its embedded library ID is the separate
-256-bit value after the 8-bit library tag.
-Malformed inputs return errors; dependency panic paths are contained at public
-codec boundaries. No `Must` operations are used by this implementation.
-
-## References And Tests
-
-The schema follows Acton's `crates/tolk-source-map/src/abi.rs` and
-`types_kernel.rs`. Cell layouts follow the checked-in compiler's
-`tolk/pack-unpack-serializers.cpp`, with Lisp lists following
-`crypto/smartcont/tolk-stdlib/lisp-lists.tolk`. The installed
-`@ton/tolk-abi-to-typescript/dist` is a secondary stack/runtime reference.
-The compiler is authoritative where that runtime differs, notably Lisp ref
-ordering, enum validation, and the getter string cell representation.
-TON's [Start Here](https://docs.ton.org/start-here) provides the cell/BOC and
-getter terminology; no network or external compiler is needed by this code.
-
-Tests include fixed bit vectors, signed varint boundaries, `int257` minimum and
-input immutability, optional addresses, explicit/implicit unions, strict typed
-refs, compiler array chunking, inline dictionaries, malformed labels, getter
-boxing/tags/defaults, schema failures, deterministic output, check-mode behavior,
-and fuzz targets for BOC/native decode. A generated two-contract package is
-compiled and executed in a temporary module with CGO disabled, using a local
-replacement for this module and network module lookups disabled. After populating
-the dependency cache, the entire suite can run offline:
+## Testing
 
 ```sh
 go mod tidy
 CGO_ENABLED=0 GOPROXY=off GOSUMDB=off go test ./...
-CGO_ENABLED=0 GOPROXY=off GOSUMDB=off go vet ./...
 ```
 
-No test fetches catalog data or requires the indexer or a compiler checkout.
-
-The [boolean-enum regression fixture](codegen/testdata/bool-enum.md) documents the
-synthetic ABI used by Acton's Rust unpacker tests, independent one-bit cell
-goldens, TypeScript runtime observations and the explicit stack limitation.
+No test fetches catalog data or needs the indexer or a compiler checkout. Two
+fixtures document the ABI shapes they pin:
+[boolean enums](codegen/testdata/bool-enum.md) and
+[generic serialization hooks](codegen/testdata/review-probe.md).
 
 ## License
 
