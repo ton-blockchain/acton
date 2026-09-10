@@ -208,6 +208,7 @@
 
 .stepIcon {
   position: relative;
+  box-sizing: content-box;
   z-index: 1;
   display: inline-flex;
   width: 24px;

@@ -1,6 +1,6 @@
 import {describe, expect, test} from "bun:test"
 
-import {solveFaucetChallenge} from "../src/faucet/faucetPow"
+import {solveFaucetChallenge} from "../src/faucetPow"
 
 describe("faucet proof of work", () => {
   test("returns a nonce found by the WASM chunk scanner", () => {

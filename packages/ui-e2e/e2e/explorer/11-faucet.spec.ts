@@ -8,7 +8,7 @@ const DEVICE_UID = "12345678-1234-1234-1234-123456789abc"
 const ADDRESS_HISTORY_KEY = "actonscanFaucetAddressHistory"
 const REQUEST_HISTORY_KEY = "actonscanFaucetRequestHistory"
 const SESSION_KEY = "actonscanFaucetSession"
-const AUTH_STATUS_URL = "https://faucet.acton.monster/auth/status"
+const AUTH_STATUS_URL = "https://faucet.ton.org/auth/status"
 
 test.describe("Testnet faucet", () => {
   test.beforeEach(async ({page}) => {
@@ -211,7 +211,7 @@ test.describe("Testnet faucet", () => {
       value: token,
     })
     await page.unroute(AUTH_STATUS_URL)
-    await page.route("https://faucet.acton.monster/**", async route => {
+    await page.route("https://faucet.ton.org/**", async route => {
       const request = route.request()
       const origin = request.headers().origin ?? "*"
       if (request.method() === "OPTIONS") {
@@ -266,7 +266,7 @@ test.describe("Testnet faucet", () => {
 
   test("exchanges a GitHub grant and restores the higher tier session", async ({page}) => {
     await page.unroute(AUTH_STATUS_URL)
-    await page.route("https://faucet.acton.monster/**", async route => {
+    await page.route("https://faucet.ton.org/**", async route => {
       const request = route.request()
       const origin = request.headers().origin ?? "*"
       if (request.method() === "OPTIONS") {
@@ -323,7 +323,7 @@ test.describe("Testnet faucet", () => {
   test("does not retain a token from a malformed GitHub grant response", async ({page}) => {
     const token = "opaque-session-token-with-enough-entropy"
     await page.unroute(AUTH_STATUS_URL)
-    await page.route("https://faucet.acton.monster/**", async route => {
+    await page.route("https://faucet.ton.org/**", async route => {
       const request = route.request()
       const origin = request.headers().origin ?? "*"
       if (request.method() === "OPTIONS") {
@@ -371,7 +371,7 @@ test.describe("Testnet faucet", () => {
         body: JSON.stringify(authStatus(true)),
       })
     })
-    await page.route("https://faucet.acton.monster/auth/github/start?**", async route => {
+    await page.route("https://faucet.ton.org/auth/github/start?**", async route => {
       const callbackUrl = new URL("/faucet#github_error=access_denied", page.url()).toString()
       await route.fulfill({
         status: 302,
@@ -418,7 +418,7 @@ test.describe("Testnet faucet", () => {
       value: token,
     })
     await page.unroute(AUTH_STATUS_URL)
-    await page.route("https://faucet.acton.monster/**", async route => {
+    await page.route("https://faucet.ton.org/**", async route => {
       const request = route.request()
       const origin = request.headers().origin ?? "*"
       if (request.method() === "OPTIONS") {
@@ -470,7 +470,7 @@ test.describe("Testnet faucet", () => {
 
   test("rejects mainnet-friendly addresses before requesting a challenge", async ({page}) => {
     let faucetRequests = 0
-    await page.route("https://faucet.acton.monster/**", async route => {
+    await page.route("https://faucet.ton.org/**", async route => {
       const path = new URL(route.request().url()).pathname
       if (path === "/challenge" || path === "/claim") {
         faucetRequests += 1
@@ -515,7 +515,7 @@ test.describe("Testnet faucet", () => {
         body: JSON.stringify({balance: balanceRequests === 1 ? "0" : "1000000000"}),
       })
     })
-    await page.route("https://faucet.acton.monster/**", async route => {
+    await page.route("https://faucet.ton.org/**", async route => {
       const request = route.request()
       const requestOrigin = request.headers().origin ?? "*"
       if (request.method() === "OPTIONS") {

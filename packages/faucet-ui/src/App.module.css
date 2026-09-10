@@ -1,0 +1,169 @@
+.appShell {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+}
+
+.header {
+  min-height: 52px;
+  padding: 0 28px;
+}
+
+.headerInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  width: 100%;
+  max-width: 1136px;
+  min-height: 51px;
+  margin-inline: auto;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-md);
+  font-weight: 850;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.brand svg {
+  display: block;
+  flex: 0 0 auto;
+  color: var(--acton-color-primary);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.github {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 38px;
+  min-height: 38px;
+  padding: 0;
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--acton-color-surface-raised) 64%, transparent);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
+  transition:
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
+}
+
+.github:hover {
+  color: var(--acton-color-text);
+  background: color-mix(in srgb, var(--acton-color-surface-hover) 82%, transparent);
+}
+
+.github:focus-visible,
+.brand:focus-visible,
+.footer a:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.actions [data-theme-toggle] {
+  margin-left: 0;
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 5px;
+  border-color: var(--acton-color-border-control);
+  background: color-mix(in srgb, var(--acton-color-surface-raised) 64%, transparent);
+}
+
+.actions [data-theme-toggle] svg {
+  width: 26px;
+  height: 26px;
+  padding: 6px;
+}
+
+.main {
+  flex: 1;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 18px;
+  width: 100%;
+  margin-inline: auto;
+  padding: 18px 24px 28px;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1;
+}
+
+.footer a {
+  color: var(--acton-color-text-muted);
+  transition: color var(--acton-duration-fast);
+}
+
+.footerCredit {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.footerLinks {
+  display: inline-flex;
+  align-items: center;
+  gap: inherit;
+}
+
+.footerBrand {
+  color: var(--acton-color-text);
+}
+
+.footerBy {
+  font-size: var(--acton-font-size-xs);
+}
+
+.footer .footerCreditLink {
+  color: var(--acton-color-accent);
+}
+
+.footer a:hover {
+  color: var(--acton-color-text);
+}
+
+.footer .footerCreditLink:hover {
+  color: var(--acton-color-accent);
+}
+
+@media (max-width: 640px) {
+  .header {
+    padding: 0 16px;
+  }
+
+  .headerInner {
+    gap: 8px 12px;
+    padding: 8px 0;
+  }
+
+  .actions {
+    gap: 6px;
+  }
+}
+
+@media (max-width: 768px) {
+  .footer {
+    gap: 12px;
+    padding-inline: 16px;
+    padding-bottom: 16px;
+  }
+}

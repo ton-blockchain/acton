@@ -2,9 +2,10 @@
   "compilerOptions": {
     "target": "ESNext",
     "useDefineForClassFields": true,
-    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "allowJs": false,
     "skipLibCheck": true,
+    "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
@@ -13,12 +14,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx",
-    "paths": {
-      "@acton/transaction-ui": ["../transaction-ui/src/index.ts"],
-      "@tasm-spec/*": ["../../crates/tasm-core/spec/*"]
-    },
-    "types": ["vite/client", "node"]
+    "jsx": "react-jsx"
   },
-  "include": ["src", "functions", "../explorer-core/src", "../verifier-ui/src", "../faucet-ui/src"]
+  "include": ["src"]
 }

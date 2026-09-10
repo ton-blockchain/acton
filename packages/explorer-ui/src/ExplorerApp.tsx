@@ -1,3 +1,4 @@
+import {FaucetPage} from "@acton/faucet-ui"
 import {Checkbox, Input, Popover, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
 import {
   createVerifierApi,
@@ -67,7 +68,6 @@ import actonScanTestnetLogo from "./assets/acton-scan-testnet-logo-dark.svg"
 import {DeveloperExplorerBanner} from "./components/DeveloperExplorerBanner"
 import {EXPLORER_NETWORK_QUERY_PARAM, explorerNetworkSearch} from "./explorerNetworkUrl"
 import {AddressConverterPage} from "./pages/AddressConverterPage"
-import {FaucetPage} from "./faucet/FaucetPage"
 import {AbiCatalogPage, AbiDetailsPage} from "./pages/abi-pages"
 import {SourceCatalogPage} from "./pages/SourceCatalogPage"
 import {ValidatorsPage} from "./pages/ValidatorsPage"

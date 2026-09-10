@@ -23,7 +23,6 @@ import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC} from "react"
 import {Link, useSearchParams} from "react-router"
 
-import type {TonClient} from "@acton/explorer-core/api/client"
 import {
   clearFaucetSession,
   disconnectFaucetSession,
@@ -65,11 +64,15 @@ type FaucetPhase =
   | "cancelled"
   | "error"
 
+export interface FaucetBalanceClient {
+  getAddressInformation(address: string): Promise<{readonly balance: string}>
+}
+
 export interface FaucetPageProps {
-  readonly isTestnetSelected: boolean
-  readonly selectedNetworkLabel: string
-  readonly testnetClient: TonClient
-  readonly onSwitchToTestnet: () => void
+  readonly isTestnetSelected?: boolean
+  readonly selectedNetworkLabel?: string
+  readonly testnetClient: FaucetBalanceClient
+  readonly onSwitchToTestnet?: () => void
   readonly githubAuthEnabled?: boolean
   readonly faucetBaseUrl?: string
   readonly addressPath?: (address: string) => string
@@ -112,7 +115,7 @@ const STEPS: readonly {
   {
     phase: "waiting",
     label: "Confirm balance",
-    detail: "Actonscan watches Testnet for the incoming transfer",
+    detail: "Watch Testnet for the incoming transfer",
   },
 ]
 
@@ -153,7 +156,7 @@ function addressErrorToast(error: unknown): {readonly title: string; readonly de
 }
 
 export const FaucetPage: FC<FaucetPageProps> = props => {
-  const {isTestnetSelected, selectedNetworkLabel, testnetClient} = props
+  const {isTestnetSelected = true, selectedNetworkLabel = "Testnet", testnetClient} = props
   const githubAuthEnabled = props.githubAuthEnabled ?? true
   const {dismissToast, showToast, updateToast} = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -309,7 +312,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
       searchParams.get("network") ?? (isTestnetSelected ? "testnet" : "mainnet"),
     )
     setAuthBusy(true)
-    globalThis.location.assign(githubAuthorizationUrl())
+    globalThis.location.assign(githubAuthorizationUrl(props.faucetBaseUrl))
   }
 
   const handleDisconnectGitHub = async () => {
@@ -317,7 +320,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
 
     setAuthBusy(true)
     try {
-      await disconnectFaucetSession()
+      await disconnectFaucetSession(undefined, props.faucetBaseUrl)
       setGitHubSession(undefined)
       showToast({
         variant: "info",
@@ -728,7 +731,10 @@ function solveChallengeInWorker(
   })
 }
 
-async function getTestnetBalance(client: TonClient, address: string): Promise<bigint | undefined> {
+async function getTestnetBalance(
+  client: FaucetBalanceClient,
+  address: string,
+): Promise<bigint | undefined> {
   try {
     return BigInt((await client.getAddressInformation(address)).balance)
   } catch {
@@ -737,7 +743,7 @@ async function getTestnetBalance(client: TonClient, address: string): Promise<bi
 }
 
 async function waitForBalanceIncrease(
-  client: TonClient,
+  client: FaucetBalanceClient,
   address: string,
   balanceBefore: bigint | undefined,
   signal: AbortSignal,
@@ -978,7 +984,9 @@ async function initializeFaucetAuth(
   }
 
   try {
-    const session = grant ? await exchangeGitHubGrant(grant) : await requestFaucetSession()
+    const session = grant
+      ? await exchangeGitHubGrant(grant, undefined, faucetBaseUrl)
+      : await requestFaucetSession(undefined, faucetBaseUrl)
     return {status, session}
   } catch (sessionError) {
     return {status, sessionError}

@@ -9,6 +9,7 @@ const explorerUiPort = Number(process.env.ACTON_UI_E2E_EXPLORER_UI_PORT ?? 14_30
 const tonConnectDappPort = Number(process.env.ACTON_UI_E2E_TONCONNECT_DAPP_PORT ?? 14_308)
 const tonConnectBridgePort = Number(process.env.ACTON_UI_E2E_TONCONNECT_BRIDGE_PORT ?? 14_309)
 const studioUiPort = Number(process.env.ACTON_UI_E2E_STUDIO_UI_PORT ?? 14_310)
+const faucetUiPort = Number(process.env.ACTON_UI_E2E_FAUCET_UI_PORT ?? 14_311)
 const tonConnectBridgeUrl = `http://127.0.0.1:${tonConnectBridgePort}/bridge`
 const actonBinary = process.env.ACTON_E2E_BIN ?? path.join(repositoryRoot, "target/debug/acton")
 const studioProjectRoot = path.join(repositoryRoot, "packages/ui-e2e/fixtures/studio-project")
@@ -38,6 +39,15 @@ export default defineConfig({
   },
   projects: [
     {
+      name: "faucet-desktop",
+      testMatch: /faucet\/.*\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        baseURL: `http://127.0.0.1:${faucetUiPort}`,
+        viewport: {width: 1440, height: 1000},
+      },
+    },
+    {
       name: "explorer-desktop",
       testMatch: /explorer\/.*\.spec\.ts/,
       use: {
@@ -57,6 +67,13 @@ export default defineConfig({
     },
   ],
   webServer: [
+    {
+      command: `bun run build && bun run preview --port ${faucetUiPort}`,
+      cwd: path.join(repositoryRoot, "packages/faucet-ui"),
+      port: faucetUiPort,
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
     {
       command: "bun run packages/ui-e2e/fixtures/localnet/start.ts",
       cwd: repositoryRoot,

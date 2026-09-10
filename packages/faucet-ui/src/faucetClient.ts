@@ -104,8 +104,8 @@ export async function requestFaucetAuthStatus(
   }
 }
 
-export function githubAuthorizationUrl(): string {
-  const url = new URL("auth/github/start", faucetBaseUrl())
+export function githubAuthorizationUrl(baseUrl?: string): string {
+  const url = new URL("auth/github/start", faucetBaseUrl(baseUrl))
   url.searchParams.set("device_uid", faucetDeviceUid())
   return url.toString()
 }
@@ -113,11 +113,12 @@ export function githubAuthorizationUrl(): string {
 export async function exchangeGitHubGrant(
   grant: string,
   signal?: AbortSignal,
+  baseUrl?: string,
 ): Promise<FaucetSession> {
   const payload = await faucetRequest<FaucetSessionResponse>(
     "auth/exchange",
     {grant},
-    {signal, authorized: false},
+    {signal, authorized: false, baseUrl},
   )
   if (typeof payload.token !== "string" || payload.token.length < 32) {
     throw new Error("Faucet returned an invalid GitHub session token")
@@ -129,11 +130,12 @@ export async function exchangeGitHubGrant(
 
 export async function requestFaucetSession(
   signal?: AbortSignal,
+  baseUrl?: string,
 ): Promise<FaucetSession | undefined> {
   if (!readFaucetSessionToken()) return undefined
 
   try {
-    const payload = await faucetGet<FaucetSessionResponse>("auth/session", signal)
+    const payload = await faucetGet<FaucetSessionResponse>("auth/session", signal, true, baseUrl)
     return parseFaucetSession(payload)
   } catch (error) {
     if (error instanceof FaucetRequestError && error.status === 401) {
@@ -144,10 +146,13 @@ export async function requestFaucetSession(
   }
 }
 
-export async function disconnectFaucetSession(signal?: AbortSignal): Promise<void> {
+export async function disconnectFaucetSession(
+  signal?: AbortSignal,
+  baseUrl?: string,
+): Promise<void> {
   try {
     if (readFaucetSessionToken()) {
-      await faucetFetch("auth/session", {method: "DELETE", signal})
+      await faucetFetch("auth/session", {method: "DELETE", signal, baseUrl})
     }
   } catch (error) {
     if (!(error instanceof FaucetRequestError && error.status === 401)) {
