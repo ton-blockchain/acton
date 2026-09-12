@@ -1809,7 +1809,18 @@ async fn monitor_full_ton_network(
             let previous = environment.details.read().await.status;
             let child_status = child_exit_status(&environment).await;
             match driver.network().await {
-                Ok(network) => {
+                Ok(mut network) => {
+                    // Offline inspection can report Stopped with the retained
+                    // startup error after the failed owner closes its API. Keep
+                    // that failure visible across polls, but let a live retry
+                    // retain its Starting intent until it accepts the request.
+                    if network.status == acton_localnet::Status::Stopped
+                        && network.error.is_some()
+                        && (previous == EnvironmentStatus::Failed
+                            || matches!(&child_status, Ok(Some(status)) if !status.success()))
+                    {
+                        network.status = acton_localnet::Status::Failed;
+                    }
                     // A freshly launched CLI publishes its service before accepting
                     // start. Keep Studio's pending intent visible through that gap.
                     let pending_start = previous == EnvironmentStatus::Starting
@@ -1956,6 +1967,8 @@ async fn run_project_artifact_coordinator(runtime: &Arc<LocalProcessRuntimeInner
         if fingerprint_is_stable
             && !state.is_current_fingerprint(&fingerprint)
             && failed_build_fingerprint.as_ref() != Some(&fingerprint)
+            // Standalone Studio has public targets but no project to build yet.
+            && runtime.workspace_root.join("Acton.toml").is_file()
             && has_artifact_publication_target(runtime).await
         {
             match runtime.artifact_synchronizer.build_and_store().await {

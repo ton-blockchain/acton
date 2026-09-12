@@ -24,7 +24,7 @@ use acton::commands::test::{mutation, test_cmd};
 use acton::commands::up::up_cmd;
 use acton::commands::verify::verify_cmd;
 use acton::commands::wallet::{WalletCommand, wallet_cmd};
-use acton::commands::wrapper::wrapper_cmd;
+use acton::commands::wrapper::{go_wrapper_cmd, wrapper_cmd};
 use acton::paths;
 use acton_config::color::OwoColorize;
 use acton_config::color::{ColorMode, init_color_mode};
@@ -59,6 +59,10 @@ use std::str::FromStr;
 use std::{env, fs, process};
 use tasm_core::printer::FormatOptions;
 use tolk_compiler::SourceMap;
+use wrapper_args::WrapperArgs;
+
+#[path = "acton/wrapper_args.rs"]
+mod wrapper_args;
 
 #[derive(Parser)]
 #[command(
@@ -535,68 +539,7 @@ enum Commands {
         about = "Generate contract wrappers and test stubs",
         after_help = detailed_help_pointer("wrapper")
     )]
-    Wrapper {
-        #[arg(
-            help = "Contract name to generate wrappers for",
-            value_name = "CONTRACT_NAME",
-            required_unless_present = "all",
-            conflicts_with = "all",
-            add = ArgValueCompleter::new(complete_contracts)
-        )]
-        contract_id: Option<String>,
-        #[arg(
-            long,
-            help = "Generate wrappers for every contract defined in Acton.toml",
-            conflicts_with_all = ["output", "test_output"],
-        )]
-        all: bool,
-        #[arg(
-            long,
-            short,
-            help = "Output path for generated wrapper file",
-            conflicts_with = "output_dir"
-        )]
-        output: Option<String>,
-        #[arg(
-            long,
-            help = "Output directory for generated wrapper file",
-            value_name = "DIR",
-            conflicts_with = "output"
-        )]
-        output_dir: Option<String>,
-
-        #[arg(
-            long,
-            short,
-            help = "Generate a stub test file for contract",
-            default_value = "false",
-            help_heading = "Tests"
-        )]
-        test: bool,
-        #[arg(
-            long,
-            help = "Output path for test file",
-            help_heading = "Tests",
-            requires = "test"
-        )]
-        test_output: Option<String>,
-        #[arg(
-            long,
-            help = "Output directory for generated test file",
-            value_name = "DIR",
-            help_heading = "Tests",
-            conflicts_with = "test_output",
-            requires = "test"
-        )]
-        test_output_dir: Option<String>,
-        #[arg(
-            long,
-            help = "Generate a TypeScript wrapper via gen-typescript-from-tolk",
-            help_heading = "TypeScript",
-            conflicts_with_all = ["test", "test_output", "test_output_dir"]
-        )]
-        ts: bool,
-    },
+    Wrapper(WrapperArgs),
     #[command(
         about = "Run a standalone Tolk script file",
         after_help = detailed_help_pointer("script")
@@ -2248,7 +2191,22 @@ fn main() {
             debug,
             debug_port,
         } => retrace_cmd(hash, net, verbose, logs_dir, contract, debug, debug_port),
-        Commands::Wrapper {
+        Commands::Wrapper(WrapperArgs {
+            contract_id,
+            all,
+            output_dir: wrapper_output_dir,
+            go: true,
+            catalog,
+            go_package,
+            ..
+        }) => go_wrapper_cmd(
+            contract_id.as_deref(),
+            all,
+            catalog.as_deref(),
+            wrapper_output_dir.as_deref(),
+            go_package.as_deref(),
+        ),
+        Commands::Wrapper(WrapperArgs {
             contract_id,
             all,
             output: wrapper_output,
@@ -2257,7 +2215,8 @@ fn main() {
             test_output_dir,
             test,
             ts,
-        } => wrapper_cmd(
+            ..
+        }) => wrapper_cmd(
             contract_id.as_deref(),
             all,
             wrapper_output,
@@ -2787,6 +2746,10 @@ const fn command_checks_toolchain_version(command: &Commands) -> bool {
                 | Commands::Doctor
                 | Commands::Studio { .. }
                 | Commands::FullLocalnet { .. }
+                | Commands::Wrapper(WrapperArgs {
+                    catalog: Some(_),
+                    ..
+                })
         )
 }
 

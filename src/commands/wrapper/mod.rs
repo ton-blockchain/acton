@@ -7,7 +7,7 @@ use acton_config::config::{ActonConfig, project_root};
 use anyhow::{Context, anyhow};
 use heck::ToLowerCamelCase;
 use serde::Serialize;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -18,9 +18,163 @@ use tolk_compiler::source_map::Declaration;
 use tolk_compiler::types_kernel::{Ty, TyIdx};
 use tolk_compiler::{CompilerResult, SourceMap};
 
+mod go;
+pub use go::go_wrapper_cmd;
+
 const TYPESCRIPT_WRAPPER_PACKAGE: &str = "@ton/tolk-abi-to-typescript@0.5.0";
 const DEFAULT_TOLK_WRAPPER_DIR: &str = "wrappers";
 const DEFAULT_TYPESCRIPT_WRAPPER_DIR: &str = "wrappers-ts";
+
+fn compile_go_catalog(
+    config: &ActonConfig,
+    contract_id: Option<&str>,
+) -> anyhow::Result<serde_json::Value> {
+    use crate::commands::build::{
+        contract_compilation_order_for_targets, generate_dependency_files, resolve_build_output_dir,
+    };
+
+    let contracts = if let Some(contract_id) = contract_id {
+        vec![(
+            contract_id,
+            config
+                .get_contract(contract_id)
+                .ok_or_else(|| anyhow!(error_fmt::contract_not_found(config, contract_id)))?,
+        )]
+    } else {
+        config
+            .contracts()
+            .filter(|contracts| !contracts.is_empty())
+            .ok_or_else(|| anyhow!("No contracts defined in Acton.toml"))?
+            .iter()
+            .map(|(id, contract)| (id.as_str(), contract))
+            .collect()
+    };
+    let root = project_root();
+    let mut selected = BTreeMap::new();
+    for (id, contract) in contracts {
+        if is_boc_path(&contract.absolute_source_path(root))
+            && contract.absolute_types_path(root).is_none()
+        {
+            if contract_id.is_none() {
+                continue;
+            }
+            anyhow::bail!(
+                "Contract {id} uses a precompiled BoC source, so wrapper generation requires `types = \"path/to/types.tolk\"` in Acton.toml"
+            );
+        }
+        selected.insert(id, contract);
+    }
+    if selected.is_empty() {
+        anyhow::bail!(
+            "No contracts with ABI to generate Go wrappers for; configure `types` for precompiled BoC contracts"
+        );
+    }
+    let targets = selected.keys().copied().collect::<Vec<_>>();
+    let order = contract_compilation_order_for_targets(
+        config
+            .contracts()
+            .ok_or_else(|| anyhow!("No contracts defined in Acton.toml"))?,
+        &targets,
+    )?;
+    crate::stdlib::ensure_latest(root)?;
+    tolk_compiler::prime_debug_cp0()?;
+    let gen_dir = resolve_build_output_dir(
+        None,
+        config
+            .build
+            .as_ref()
+            .and_then(|build| build.gen_dir.clone()),
+        "gen",
+        root,
+    );
+    let with_debug_marks = config
+        .build
+        .as_ref()
+        .and_then(|build| build.output_sources.as_deref())
+        .is_some_and(|path| !path.is_empty());
+    let mappings = config.mappings();
+    let mut compiled_contracts = HashMap::new();
+    let mut entries = BTreeMap::new();
+    for id in order {
+        let contract = config
+            .get_contract(&id)
+            .ok_or_else(|| anyhow!("Contract {id} not found"))?;
+        // Use the normal build's dependency helpers, including custom output paths,
+        // function names and library_ref handling. Recompile the closure in order
+        // on every invocation so a prior build cannot supply stale embedded code.
+        generate_dependency_files(
+            &id,
+            contract,
+            &compiled_contracts,
+            &BTreeMap::new(),
+            config,
+            &gen_dir,
+            root,
+        )?;
+        let source = contract.absolute_source_path(root);
+        let precompiled = is_boc_path(&source);
+        let input = if precompiled {
+            let Some(types) = contract.absolute_types_path(root) else {
+                // A dependency may be a bare BoC even though selected catalog roots
+                // require an interface. Its real code is still needed by its parent.
+                let boc = read_precompiled_boc(&source, &contract.src)?;
+                compiled_contracts.insert(id, boc.code_boc64);
+                continue;
+            };
+            types
+        } else {
+            source.clone()
+        };
+        if !input.is_file() {
+            anyhow::bail!("ABI source file for {id} not found: {}", input.display());
+        }
+        let boc = if precompiled {
+            Some(read_precompiled_boc(&source, &contract.src)?)
+        } else {
+            None
+        };
+        // Go consumes only compiler ABI, not the source-map/type resolution used by Tolk wrappers.
+        let compiler = tolk_compiler::Compiler::new(2)
+            .with_allow_no_entrypoint(precompiled)
+            .with_mappings(&mappings);
+        let result = match compiler.compile(&input, !precompiled && with_debug_marks) {
+            CompilerResult::Success(result) => result,
+            CompilerResult::Error(error) => anyhow::bail!(
+                "Failed to compile {} for Go wrapper generation ({id}): {}",
+                input.display(),
+                error.message
+            ),
+        };
+        let (code_boc64, code_hash) = match boc {
+            Some(boc) => (boc.code_boc64, boc.code_hash.to_string()),
+            None => (result.code_boc64, result.code_hash_hex),
+        };
+        compiled_contracts.insert(id.clone(), code_boc64);
+        if !selected.contains_key(id.as_str()) {
+            continue;
+        }
+        let mut abi = result
+            .abi
+            .ok_or_else(|| anyhow!("Compiler did not produce ABI for {id}"))?;
+        if abi.contract_name.is_empty() {
+            abi.contract_name =
+                to_pascal_case(source.file_stem().and_then(|s| s.to_str()).unwrap_or(&id));
+        }
+        entries.insert(
+            id.clone(),
+            serde_json::json!({
+                "id": id,
+                "displayName": abi.contract_name,
+                "hashes": [code_hash],
+                "knownAddresses": [],
+                "links": [],
+                "compilerAbi": abi,
+            }),
+        );
+    }
+    let entries = entries.into_values().collect::<Vec<_>>();
+    Ok(serde_json::json!({ "schemaVersion": 1, "contracts": entries }))
+}
 
 struct WrapperModel {
     project_root: PathBuf,

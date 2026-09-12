@@ -1,0 +1,32 @@
+{
+  "abi_schema_version":"1.0",
+  "contract_name":"",
+  "unique_types":[
+    {"kind":"void"},{"kind":"int"},{"kind":"slice"},{"kind":"cell"},
+    {"kind":"builder"},{"kind":"bool"},{"kind":"coins"},{"kind":"address"},
+    {"kind":"intN","n":32},{"kind":"uintN","n":32},{"kind":"intN","n":64},{"kind":"uintN","n":64},
+    {"kind":"uintN","n":8},
+    {"kind":"StructRef","struct_name":"HookBox","type_args_ty_idx":[12]},
+    {"kind":"genericT","name_t":"T"},
+    {"kind":"StructRef","struct_name":"HookBox","type_args_ty_idx":[14]},
+    {"kind":"cellOf","inner_ty_idx":13},
+    {"kind":"AliasRef","alias_name":"HookAlias","type_args_ty_idx":[12]},
+    {"kind":"AliasRef","alias_name":"HookAlias","type_args_ty_idx":[14]},
+    {"kind":"cellOf","inner_ty_idx":17},
+    {"kind":"mapKV","key_ty_idx":12,"value_ty_idx":2}
+  ],
+  "struct_instantiations":[{"ty_idx":13,"struct_name":"HookBox<uint8>","monomorphic_fields_ty_idx":[12]}],
+  "alias_instantiations":[{"ty_idx":17,"alias_name":"HookAlias<uint8>","monomorphic_target_ty_idx":12}],
+  "declarations":[
+    {"kind":"struct","name":"HookBox","ty_idx":15,"type_params":["T"],"fields":[{"name":"value","ty_idx":14}]},
+    {"kind":"alias","name":"HookAlias","ty_idx":18,"target_ty_idx":14,"type_params":["T"]}
+  ],
+  "incoming_messages":[],"incoming_external":[],"outgoing_messages":[],"emitted_events":[],"storage":{},
+  "get_methods":[
+    {"tvm_method_id":103058,"name":"get_box","parameters":[],"return_ty_idx":16},
+    {"tvm_method_id":109248,"name":"get_alias","parameters":[],"return_ty_idx":19},
+    {"tvm_method_id":110694,"name":"increment","parameters":[{"name":"v","ty_idx":12}],"return_ty_idx":12},
+    {"tvm_method_id":122815,"name":"map_slice","parameters":[{"name":"v","ty_idx":20}],"return_ty_idx":20}
+  ],
+  "thrown_errors":[],"compiler_name":"tolk","compiler_version":"1.4.2"
+}

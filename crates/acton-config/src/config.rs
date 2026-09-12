@@ -476,6 +476,8 @@ pub struct WrappersConfig {
     pub tolk: Option<TolkWrapperSettings>,
     /// Default settings for TypeScript wrapper generation
     pub typescript: Option<TypescriptWrapperSettings>,
+    /// Default settings for Go wrapper generation
+    pub go: Option<GoWrapperSettings>,
 }
 
 /// Default settings for Tolk wrapper generation
@@ -496,6 +498,16 @@ pub struct TolkWrapperSettings {
 pub struct TypescriptWrapperSettings {
     /// Directory where `acton wrapper --ts` writes generated TypeScript wrappers by default
     pub output_dir: Option<String>,
+}
+
+/// Default settings for Go wrapper generation
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct GoWrapperSettings {
+    /// Directory where `acton wrapper --go` writes generated Go files (default: wrappers-go)
+    pub output_dir: Option<String>,
+    /// Go package name (default: wrappers)
+    pub package: Option<String>,
 }
 
 /// Shared settings for the localnet target and local development services
@@ -2259,6 +2271,45 @@ output-dir = "./wrappers-ts"
             config.typescript_wrapper_output_dir(),
             Some("./wrappers-ts")
         );
+    }
+
+    #[test]
+    fn test_wrappers_go_settings_roundtrip() {
+        let config: ActonConfig = toml::from_str(
+            r#"
+[package]
+name = "go-wrappers"
+description = "Go wrapper settings"
+version = "0.1.0"
+
+[wrappers.go]
+output-dir = "generated/go"
+package = "codecs"
+
+[contracts.counter]
+src = "counter.tolk"
+[contracts.counter.wrappers.go]
+package = "counter"
+"#,
+        )
+        .unwrap();
+        let serialized = toml::to_string(&config).unwrap();
+        let config: ActonConfig = toml::from_str(&serialized).unwrap();
+        let go = config.wrappers.as_ref().unwrap().go.as_ref().unwrap();
+        assert_eq!(go.output_dir.as_deref(), Some("generated/go"));
+        assert_eq!(go.package.as_deref(), Some("codecs"));
+        let contract = config
+            .get_contract("counter")
+            .unwrap()
+            .wrappers
+            .as_ref()
+            .unwrap()
+            .go
+            .as_ref()
+            .unwrap();
+        assert_eq!(contract.package.as_deref(), Some("counter"));
+        assert!(contract.output_dir.is_none());
+        assert!(ActonConfig::default().wrappers.is_none());
     }
 
     #[test]

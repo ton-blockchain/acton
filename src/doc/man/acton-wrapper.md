@@ -2,13 +2,15 @@
 
 ## Name
 
-acton-wrapper --- Generate Tolk or TypeScript wrappers for a contract
+acton-wrapper --- Generate Tolk, TypeScript, or Go wrappers for contracts
 
 ## Synopsis
 
 `acton wrapper` [_options_] _contract-name_
 
 `acton wrapper` [_options_] `--all`
+
+`acton wrapper --catalog` _file_ `--go` [_options_]
 
 ## Description
 
@@ -23,8 +25,13 @@ or from a configured `types` interface file. In practice, the contract header is
 the source of truth for typed storage accessors, incoming message helpers, and
 generated get-method bindings.
 
-The command can also generate a stub test file or emit a TypeScript wrapper for
-frontend and tooling integrations.
+The command can also generate a Tolk stub test file, a TypeScript wrapper for
+frontend integrations, or Go types, cell codecs, and getter stack codecs.
+
+With `--catalog FILE --go`, the command reads an existing ABI catalog without
+compiling contract sources. This mode does not require `Acton.toml` or Tolk compilation.
+All Go wrapper modes require a Go toolchain on `PATH`.
+When a manifest is available, its project-level Go wrapper settings are used.
 
 For `.tolk` contracts, `acton wrapper` compiles the selected source directly.
 For precompiled `.boc` contracts, it reads code from the BoC and compiles the
@@ -38,24 +45,26 @@ configured `types` interface file. A prior `acton build` run is not required.
 
 {{#option "_contract-name_" }}
 Contract name from `Acton.toml` to generate the wrapper for. Required unless
-`--all` is given.
+`--all` or `--catalog` is given. These three selections are mutually exclusive.
 {{/option}}
 
 {{#option "`--all`" }}
 Generate wrappers for every contract defined in `Acton.toml`.
 
-Conflicts with _contract-name_, `--output`, and `--test-output` (which
+Conflicts with _contract-name_, `--catalog`, `--output`, and `--test-output` (which
 designate a single output file).
 {{/option}}
 
 {{#option "`-o`, `--output` _path_" }}
 Write the generated wrapper to an exact path.
 
-Conflicts with `--output-dir` and `--all`.
+Conflicts with `--output-dir`, `--all`, and `--go`. Go generation writes multiple
+files; use `--output-dir` instead.
 {{/option}}
 
 {{#option "`--output-dir` _dir_" }}
 Write the generated wrapper to a directory and let Acton choose the file name.
+For Go, write the generated package files to this directory.
 
 Conflicts with `--output`.
 {{/option}}
@@ -96,7 +105,31 @@ Conflicts with `--test-output`.
 {{#option "`--ts`" }}
 Generate a TypeScript wrapper through `@ton/tolk-abi-to-typescript@0.5.0`.
 
-Conflicts with test stub generation.
+Conflicts with `--go` and test stub generation.
+{{/option}}
+
+{{/options}}
+
+### Go Options
+
+{{#options}}
+
+{{#option "`--go`" }}
+Generate Go types, cell codecs, and getter codecs using Acton's bundled generator.
+Requires a Go toolchain on `PATH`; no separate generator installation is needed.
+
+Conflicts with `--ts`, `--output`, `--test`, `--test-output`, and `--test-output-dir`.
+Configured Tolk test-stub defaults do not apply to Go generation.
+{{/option}}
+
+{{#option "`--catalog` _file_" }}
+Read a `schemaVersion: 1` ABI catalog instead of compiling project contracts.
+Requires `--go`. Conflicts with _contract-name_ and `--all`.
+{{/option}}
+
+{{#option "`--go-package` _name_" }}
+Override the Go package name. Defaults to `[wrappers.go].package`, or `wrappers`.
+Requires `--go`.
 {{/option}}
 
 {{/options}}
@@ -112,6 +145,8 @@ Conflicts with test stub generation.
 ## ABI Requirements
 
 Wrapper generation depends on the contract ABI exposed by the Tolk compiler.
+The following helpers describe Tolk and TypeScript wrappers; Go generates codecs
+rather than deployment or RPC clients.
 
 - `storage: ...` enables typed storage helpers such as `fromStorage`
 - `incomingMessages: ...` enables `send{Message}` helpers
@@ -141,6 +176,9 @@ test-output-dir = "tests"
 
 [wrappers.typescript]
 output-dir = "wrappers-ts"
+[wrappers.go]
+output-dir = "wrappers-go"
+package = "wrappers"
 ```
 
 Each contract can override the same settings without changing the defaults for
@@ -160,7 +198,12 @@ then `[contracts.<name>.wrappers.*]`, then `[wrappers.*]`, and finally the
 wrapper command defaults. An omitted per-contract field inherits the
 project-wide value. An explicit per-contract `generate-test = false` overrides
 a project-wide `true`. With `--all`, Acton resolves these settings separately
-for every contract.
+for every contract for Tolk and TypeScript. Go `--all` produces one package and
+uses only project-level settings and CLI overrides, not per-contract settings.
+Single-contract Go runs also honor `[contracts.<name>.wrappers.go]` overrides.
+
+Configured Go output directories are project-root-relative. CLI `--output-dir`
+and `--catalog` paths are relative to the original current working directory.
 
 For a precompiled `.boc` contract, configure `types` next to `src` so wrapper
 generation can read ABI from the Tolk interface file:
@@ -175,11 +218,47 @@ Do not put dependencies on the BoC contract itself: it is already compiled.
 Instead, put `depends = ["Precompiled"]` on the `.tolk` contract that needs the
 BoC code.
 
+## Go Generation
+
+Acton ships its own Go generator sources from `packages/abi-go` inside the Acton
+binary. Install Go from https://go.dev/dl/ and ensure `go` is on `PATH`. Use a Go
+version meeting the bundled module's `go.mod` requirement; an execution failure
+reports the required version. No separate helper installation is needed.
+
+For each invocation, Acton extracts the bundled module to a temporary directory
+and runs `go run -mod=readonly -trimpath ./cmd/tolk-abi-to-go` there with
+`CGO_ENABLED=0` and `GOWORK=off`. Caller `GOFLAGS`, including saved Go environment
+defaults, are ignored for this private module; proxy, cache, and toolchain settings
+are retained. The directory is removed afterward, including when Go fails. No
+checkout or helper source download is needed. The Go toolchain uses its standard
+module and build caches; first use may download pinned dependencies from the
+bundled `go.mod` and `go.sum`, including `tonutils-go`. Offline use requires those
+dependencies and a compatible Go toolchain to be cached already.
+The source archive includes the module's original license notice. `-trimpath`
+allows compiled generator packages to be reused across temporary extraction paths.
+
+Generated files import `github.com/ton-blockchain/acton/packages/abi-go` (package
+`acton`). This Acton-owned runtime does not require CGO or Toncenter modules. Add
+it at a compatible pinned revision to the consuming Go project. Acton does not
+read or modify the caller's `go.mod`, `go.sum`, or Go workspace to run its generator.
+
+Project generation passes one temporary catalog containing the selected contract
+IDs, code hashes, and compiler ABIs to the generator. `--all` compiles every
+eligible ABI before invoking it once, so one contract cannot overwrite another's
+registry. Precompiled BoCs without `types` are skipped by `--all`; an explicitly
+selected BoC requires `types`. An empty eligible selection is an error.
+
+Treat the output directory as one generated package. To combine contracts, use
+`--all` or a catalog rather than repeated single-contract runs into the same
+directory. The generator owns filenames and replacement of generated artifacts.
+Its stdout, stderr (including unsupported-codec diagnostics), and failures are
+propagated. Unsupported ABI roots may remain metadata-only; inspect diagnostics.
+
 ## Exit Status
 
 - `0`: Wrapper generation completed successfully.
 - `1`: The contract could not be found or compiled, ABI data was missing, the
-  TypeScript generator could not run, or an output file could not be written.
+  generator could not run, or an output file could not be written.
 
 ## Examples
 
@@ -221,6 +300,19 @@ BoC code.
    acton wrapper --all
    acton wrapper --all --ts
    acton wrapper --all --output-dir wrappers/generated
+   ```
+
+7. Generate Go codecs for one contract or the entire project:
+
+   ```bash
+   acton wrapper Counter --go
+   acton wrapper --all --go --output-dir internal/contracts --go-package contracts
+   ```
+
+8. Generate Go codecs from a catalog without an Acton project:
+
+   ```bash
+   acton wrapper --catalog data-abis.json --go --output-dir generated --go-package catalog
    ```
 
 ## See Also

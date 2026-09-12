@@ -36,6 +36,8 @@ mod studio;
 
 // Independent temporary projects share the host port space. Serialize fixtures
 // until their mock APIs are gone; each scenario can still run several services.
+// This mutex covers cargo test's threads only. Nextest uses one process per test,
+// so .config/nextest.toml also assigns this binary to localnet-command-serial.
 static FIXTURE_PORTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 struct Service {

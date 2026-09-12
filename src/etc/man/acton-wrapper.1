@@ -4,11 +4,13 @@
 .ad l
 .ss \n[.ss] 0
 .SH "NAME"
-acton\-wrapper \[em] Generate Tolk or TypeScript wrappers for a contract
+acton\-wrapper \[em] Generate Tolk, TypeScript, or Go wrappers for contracts
 .SH "SYNOPSIS"
 \fBacton wrapper\fR [\fIoptions\fR] \fIcontract\-name\fR
 .sp
 \fBacton wrapper\fR [\fIoptions\fR] \fB\-\-all\fR
+.sp
+\fBacton wrapper \-\-catalog\fR \fIfile\fR \fB\-\-go\fR [\fIoptions\fR]
 .SH "DESCRIPTION"
 Generate a wrapper for the contract identified by \fB_contract\-name_\fR from
 \fBActon.toml\fR\&.
@@ -21,8 +23,13 @@ or from a configured \fBtypes\fR interface file. In practice, the contract heade
 the source of truth for typed storage accessors, incoming message helpers, and
 generated get\-method bindings.
 .sp
-The command can also generate a stub test file or emit a TypeScript wrapper for
-frontend and tooling integrations.
+The command can also generate a Tolk stub test file, a TypeScript wrapper for
+frontend integrations, or Go types, cell codecs, and getter stack codecs.
+.sp
+With \fB\-\-catalog FILE \-\-go\fR, the command reads an existing ABI catalog without
+compiling contract sources. This mode does not require \fBActon.toml\fR or Tolk compilation.
+All Go wrapper modes require a Go toolchain on \fBPATH\fR\&.
+When a manifest is available, its project\-level Go wrapper settings are used.
 .sp
 For \fB\&.tolk\fR contracts, \fBacton wrapper\fR compiles the selected source directly.
 For precompiled \fB\&.boc\fR contracts, it reads code from the BoC and compiles the
@@ -33,14 +40,14 @@ configured \fBtypes\fR interface file. A prior \fBacton build\fR run is not requ
 \fIcontract\-name\fR
 .RS 4
 Contract name from \fBActon.toml\fR to generate the wrapper for. Required unless
-\fB\-\-all\fR is given.
+\fB\-\-all\fR or \fB\-\-catalog\fR is given. These three selections are mutually exclusive.
 .RE
 .sp
 \fB\-\-all\fR
 .RS 4
 Generate wrappers for every contract defined in \fBActon.toml\fR\&.
 .sp
-Conflicts with \fIcontract\-name\fR, \fB\-\-output\fR, and \fB\-\-test\-output\fR (which
+Conflicts with \fIcontract\-name\fR, \fB\-\-catalog\fR, \fB\-\-output\fR, and \fB\-\-test\-output\fR (which
 designate a single output file).
 .RE
 .sp
@@ -48,12 +55,14 @@ designate a single output file).
 .RS 4
 Write the generated wrapper to an exact path.
 .sp
-Conflicts with \fB\-\-output\-dir\fR and \fB\-\-all\fR\&.
+Conflicts with \fB\-\-output\-dir\fR, \fB\-\-all\fR, and \fB\-\-go\fR\&. Go generation writes multiple
+files; use \fB\-\-output\-dir\fR instead.
 .RE
 .sp
 \fB\-\-output\-dir\fR \fIdir\fR
 .RS 4
 Write the generated wrapper to a directory and let Acton choose the file name.
+For Go, write the generated package files to this directory.
 .sp
 Conflicts with \fB\-\-output\fR\&.
 .RE
@@ -88,7 +97,29 @@ Conflicts with \fB\-\-test\-output\fR\&.
 .RS 4
 Generate a TypeScript wrapper through \fB@ton/tolk\-abi\-to\-typescript@0.5.0\fR\&.
 .sp
-Conflicts with test stub generation.
+Conflicts with \fB\-\-go\fR and test stub generation.
+.RE
+.SS "Go Options"
+.sp
+\fB\-\-go\fR
+.RS 4
+Generate Go types, cell codecs, and getter codecs using Acton\[cq]s bundled generator.
+Requires a Go toolchain on \fBPATH\fR; no separate generator installation is needed.
+.sp
+Conflicts with \fB\-\-ts\fR, \fB\-\-output\fR, \fB\-\-test\fR, \fB\-\-test\-output\fR, and \fB\-\-test\-output\-dir\fR\&.
+Configured Tolk test\-stub defaults do not apply to Go generation.
+.RE
+.sp
+\fB\-\-catalog\fR \fIfile\fR
+.RS 4
+Read a \fBschemaVersion: 1\fR ABI catalog instead of compiling project contracts.
+Requires \fB\-\-go\fR\&. Conflicts with \fIcontract\-name\fR and \fB\-\-all\fR\&.
+.RE
+.sp
+\fB\-\-go\-package\fR \fIname\fR
+.RS 4
+Override the Go package name. Defaults to \fB[wrappers.go].package\fR, or \fBwrappers\fR\&.
+Requires \fB\-\-go\fR\&.
 .RE
 .SS "Display Options"
 .sp
@@ -117,6 +148,8 @@ This conflicts with \fB\-\-manifest\-path\fR\&.
 .RE
 .SH "ABI REQUIREMENTS"
 Wrapper generation depends on the contract ABI exposed by the Tolk compiler.
+The following helpers describe Tolk and TypeScript wrappers; Go generates codecs
+rather than deployment or RPC clients.
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fBstorage: ...\fR enables typed storage helpers such as \fBfromStorage\fR
@@ -159,6 +192,9 @@ test\-output\-dir = "tests"
 
 [wrappers.typescript]
 output\-dir = "wrappers\-ts"
+[wrappers.go]
+output\-dir = "wrappers\-go"
+package = "wrappers"
 .fi
 .RE
 .sp
@@ -181,7 +217,12 @@ then \fB[contracts.<name>.wrappers.*]\fR, then \fB[wrappers.*]\fR, and finally t
 wrapper command defaults. An omitted per\-contract field inherits the
 project\-wide value. An explicit per\-contract \fBgenerate\-test = false\fR overrides
 a project\-wide \fBtrue\fR\&. With \fB\-\-all\fR, Acton resolves these settings separately
-for every contract.
+for every contract for Tolk and TypeScript. Go \fB\-\-all\fR produces one package and
+uses only project\-level settings and CLI overrides, not per\-contract settings.
+Single\-contract Go runs also honor \fB[contracts.<name>.wrappers.go]\fR overrides.
+.sp
+Configured Go output directories are project\-root\-relative. CLI \fB\-\-output\-dir\fR
+and \fB\-\-catalog\fR paths are relative to the original current working directory.
 .sp
 For a precompiled \fB\&.boc\fR contract, configure \fBtypes\fR next to \fBsrc\fR so wrapper
 generation can read ABI from the Tolk interface file:
@@ -197,6 +238,40 @@ types = "contracts/Precompiled.types.tolk"
 Do not put dependencies on the BoC contract itself: it is already compiled.
 Instead, put \fBdepends = ["Precompiled"]\fR on the \fB\&.tolk\fR contract that needs the
 BoC code.
+.SH "GO GENERATION"
+Acton ships its own Go generator sources from \fBpackages/abi\-go\fR inside the Acton
+binary. Install Go from https://go.dev/dl/ and ensure \fBgo\fR is on \fBPATH\fR\&. Use a Go
+version meeting the bundled module\[cq]s \fBgo.mod\fR requirement; an execution failure
+reports the required version. No separate helper installation is needed.
+.sp
+For each invocation, Acton extracts the bundled module to a temporary directory
+and runs \fBgo run \-mod=readonly \-trimpath ./cmd/tolk\-abi\-to\-go\fR there with
+\fBCGO_ENABLED=0\fR and \fBGOWORK=off\fR\&. Caller \fBGOFLAGS\fR, including saved Go environment
+defaults, are ignored for this private module; proxy, cache, and toolchain settings
+are retained. The directory is removed afterward, including when Go fails. No
+checkout or helper source download is needed. The Go toolchain uses its standard
+module and build caches; first use may download pinned dependencies from the
+bundled \fBgo.mod\fR and \fBgo.sum\fR, including \fBtonutils\-go\fR\&. Offline use requires those
+dependencies and a compatible Go toolchain to be cached already.
+The source archive includes the module\[cq]s original license notice. \fB\-trimpath\fR
+allows compiled generator packages to be reused across temporary extraction paths.
+.sp
+Generated files import \fBgithub.com/ton\-blockchain/acton/packages/abi\-go\fR (package
+\fBacton\fR). This Acton\-owned runtime does not require CGO or Toncenter modules. Add
+it at a compatible pinned revision to the consuming Go project. Acton does not
+read or modify the caller\[cq]s \fBgo.mod\fR, \fBgo.sum\fR, or Go workspace to run its generator.
+.sp
+Project generation passes one temporary catalog containing the selected contract
+IDs, code hashes, and compiler ABIs to the generator. \fB\-\-all\fR compiles every
+eligible ABI before invoking it once, so one contract cannot overwrite another\[cq]s
+registry. Precompiled BoCs without \fBtypes\fR are skipped by \fB\-\-all\fR; an explicitly
+selected BoC requires \fBtypes\fR\&. An empty eligible selection is an error.
+.sp
+Treat the output directory as one generated package. To combine contracts, use
+\fB\-\-all\fR or a catalog rather than repeated single\-contract runs into the same
+directory. The generator owns filenames and replacement of generated artifacts.
+Its stdout, stderr (including unsupported\-codec diagnostics), and failures are
+propagated. Unsupported ABI roots may remain metadata\-only; inspect diagnostics.
 .SH "EXIT STATUS"
 .sp
 .RS 4
@@ -205,7 +280,7 @@ BoC code.
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB1\fR: The contract could not be found or compiled, ABI data was missing, the
-TypeScript generator could not run, or an output file could not be written.
+generator could not run, or an output file could not be written.
 .RE
 .SH "EXAMPLES"
 .sp
@@ -269,6 +344,27 @@ acton wrapper Counter \-\-ts \-\-output\-dir app/src/wrappers\-ts
 acton wrapper \-\-all
 acton wrapper \-\-all \-\-ts
 acton wrapper \-\-all \-\-output\-dir wrappers/generated
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'Generate Go codecs for one contract or the entire project:
+.sp
+.RS 4
+.nf
+acton wrapper Counter \-\-go
+acton wrapper \-\-all \-\-go \-\-output\-dir internal/contracts \-\-go\-package contracts
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 8.\h'+01'Generate Go codecs from a catalog without an Acton project:
+.sp
+.RS 4
+.nf
+acton wrapper \-\-catalog data\-abis.json \-\-go \-\-output\-dir generated \-\-go\-package catalog
 .fi
 .RE
 .RE
