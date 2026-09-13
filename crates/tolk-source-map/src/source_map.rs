@@ -2,10 +2,11 @@
 // Symbol types contain type declarations and function metadata; debug marks map
 // IR variables and stack positions back to the original Tolk source.
 
-use crate::abi::ABICustomPackUnpack;
 use crate::debug_marks_dict::DebugMarksDict;
 use crate::source_location::SourceLocation;
-use crate::types_kernel::{AliasInstantiation, StructInstantiation, Ty, TyIdx, TyResolver};
+use crate::types_kernel::{
+    ABICustomPackUnpack, AliasInstantiation, StructInstantiation, Ty, TyIdx, TyResolver,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -238,6 +239,22 @@ impl SourceMap {
             .find(|inst| inst.ty_idx == ty_idx)
             .map(|inst| inst.monomorphic_target_ty_idx)
             .or_else(|| Some(self.get_alias(alias_name).target_ty_idx))
+    }
+
+    pub(crate) fn instantiation_custom_pack_unpack(
+        &self,
+        ty_idx: TyIdx,
+    ) -> Option<&ABICustomPackUnpack> {
+        self.struct_instantiations
+            .iter()
+            .find(|inst| inst.ty_idx == ty_idx)
+            .and_then(|inst| inst.custom_pack_unpack.as_ref())
+            .or_else(|| {
+                self.alias_instantiations
+                    .iter()
+                    .find(|inst| inst.ty_idx == ty_idx)
+                    .and_then(|inst| inst.custom_pack_unpack.as_ref())
+            })
     }
 
     #[must_use]

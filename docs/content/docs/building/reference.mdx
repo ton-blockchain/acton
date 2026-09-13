@@ -130,20 +130,27 @@ Available fields:
 | Field                              | Type    | Default | Description                                                          |
 |------------------------------------|---------|---------|----------------------------------------------------------------------|
 | `[wrappers.tolk].output-dir`       | string  | -       | Default directory for generated Tolk wrappers                        |
-| `[wrappers.tolk].generate-test`    | boolean | `false` | Generate a Tolk test stub by default for non-TypeScript wrapper runs |
+| `[wrappers.tolk].generate-test`    | boolean | `false` | Generate a Tolk test stub by default for Tolk wrapper runs |
 | `[wrappers.tolk].test-output-dir`  | string  | -       | Default directory for generated Tolk test stubs                      |
 | `[wrappers.typescript].output-dir` | string  | -       | Default directory for generated TypeScript wrappers                  |
+| `[wrappers.go].output-dir` | string | `wrappers-go` | Directory for generated Go package files |
+| `[wrappers.go].package` | string | `wrappers` | Go package name |
 
 Override rules:
 
 - Tolk wrapper path: `--output` -> `--output-dir` -> `[contracts.<name>.wrappers.tolk].output-dir` -> `[wrappers.tolk].output-dir` -> `@wrappers` mapping -> wrapper command built-in default.
 - TypeScript wrapper path: `--output` -> `--output-dir` -> `[contracts.<name>.wrappers.typescript].output-dir` -> `[wrappers.typescript].output-dir` -> wrapper command built-in default.
 - Test stub path: `--test-output` -> `--test-output-dir` -> `[contracts.<name>.wrappers.tolk].test-output-dir` -> `[wrappers.tolk].test-output-dir` -> wrapper command built-in default.
-- `[contracts.<name>.wrappers.tolk].generate-test` overrides `[wrappers.tolk].generate-test`. Both only affect non-TypeScript runs. `acton wrapper --ts` still rejects test-stub options.
+- `[contracts.<name>.wrappers.tolk].generate-test` overrides `[wrappers.tolk].generate-test`. Both only affect Tolk runs. `--ts` and `--go` reject test-stub options.
+- Go settings: CLI `--output-dir` and `--go-package` override per-contract settings for a single contract, then project-level settings, then defaults. Go does not support `--output`.
 
 The same fields are available below each contract's `wrappers` table. Missing
 per-contract fields inherit their project-level values. `acton wrapper --all`
-resolves the effective settings separately for every contract.
+resolves the effective settings separately for every contract in Tolk and TypeScript.
+Go `--all` instead produces one package using project-level settings, ignoring
+per-contract overrides. `--catalog FILE --go` reads an ABI catalog without compiling
+sources or requiring a manifest. See [Go generation](/docs/commands/wrapper#go-generation)
+for Go toolchain requirements, bundled generation, and runtime dependencies.
 
 Configured wrapper paths are project-root-relative. CLI paths such as `--output`, `--output-dir`, `--test-output`, and `--test-output-dir` remain cwd-relative unless absolute.
 
@@ -171,7 +178,7 @@ output-dir = "generated/my-contract"
 | `types`        | string | No       | Tolk interface file used to produce ABI for a precompiled `.boc` contract                                          |
 | `output`       | string | No       | Optional path where the compiled binary `.boc` file should be saved in addition to the normal JSON build artifact  |
 | `depends`      | array  | No       | Array of contract dependencies. Can be simple strings or detailed dependency objects                               |
-| `wrappers`     | table  | No       | Per-contract `tolk` and `typescript` overrides for the project-level wrapper settings                              |
+| `wrappers`     | table  | No       | Per-contract `tolk`, `typescript`, and `go` overrides for the project-level wrapper settings                              |
 
 #### Contract names
 
@@ -183,7 +190,7 @@ The `[contracts.ID]` in `Acton.toml` is used:
 - To generate the function name (e.g., `Counter` → `counterCompiledCode()`)
 - In console messages and web UI, unless overridden by optional `display-name` in `Acton.toml`
 
-Generated wrapper filenames are based on the source file stem normalized to PascalCase. With the conventional `src = "contracts/Counter.tolk"`, that produces `wrappers/Counter.gen.tolk` and `wrappers-ts/Counter.gen.ts`.
+Generated Tolk and TypeScript wrapper filenames are based on the source file stem normalized to PascalCase. With the conventional `src = "contracts/Counter.tolk"`, that produces `wrappers/Counter.gen.tolk` and `wrappers-ts/Counter.gen.ts`. Go filenames are managed by Acton's bundled generator and its registry uses the configured contract IDs.
 
 Contract IDs should use PascalCase, e.g., `JettonWallet`, `NftCollection`.
 

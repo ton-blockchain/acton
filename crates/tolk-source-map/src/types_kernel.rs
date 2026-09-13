@@ -118,6 +118,8 @@ pub struct StructInstantiation {
     pub ty_idx: TyIdx,
     pub struct_name: String,
     pub monomorphic_fields_ty_idx: Vec<TyIdx>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_pack_unpack: Option<ABICustomPackUnpack>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
@@ -125,6 +127,16 @@ pub struct AliasInstantiation {
     pub ty_idx: TyIdx,
     pub alias_name: String,
     pub monomorphic_target_ty_idx: TyIdx,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_pack_unpack: Option<ABICustomPackUnpack>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ABICustomPackUnpack {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pack_to_builder: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unpack_from_slice: Option<bool>,
 }
 
 pub trait TyResolver {
@@ -304,6 +316,74 @@ pub fn calc_width_on_stack<R: TyResolver + ?Sized>(symbols: &R, ty_idx: TyIdx) -
             // - map<K, V> is TVM DICT or NULL
             // etc.
             1
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::abi::ContractABI;
+    use crate::source_map::{SourceMap, SymbolTypesJson};
+    use serde_json::json;
+
+    #[test]
+    fn instantiation_custom_flags_roundtrip_in_abi_and_symbol_types() {
+        for custom in [
+            None,
+            Some(json!({})),
+            Some(json!({"pack_to_builder": true})),
+            Some(json!({"unpack_from_slice": true})),
+            Some(json!({"pack_to_builder": true, "unpack_from_slice": true})),
+            Some(json!({"pack_to_builder": false, "unpack_from_slice": false})),
+            Some(json!({"pack_to_builder": true, "unpack_from_slice": false})),
+            Some(json!({"pack_to_builder": false, "unpack_from_slice": true})),
+        ] {
+            let mut struct_inst = json!({
+                "ty_idx": 1,
+                "struct_name": "Boxed<uint8>",
+                "monomorphic_fields_ty_idx": [0]
+            });
+            let mut alias_inst = json!({
+                "ty_idx": 2,
+                "alias_name": "Value<uint8>",
+                "monomorphic_target_ty_idx": 0
+            });
+            if let Some(custom) = custom {
+                struct_inst["custom_pack_unpack"] = custom.clone();
+                alias_inst["custom_pack_unpack"] = custom;
+            }
+            let mut input = serde_json::to_value(ContractABI::default()).unwrap();
+            input["unique_types"] = json!([
+                {"kind": "uintN", "n": 8},
+                {"kind": "StructRef", "struct_name": "Boxed", "type_args_ty_idx": [0]},
+                {"kind": "AliasRef", "alias_name": "Value", "type_args_ty_idx": [0]}
+            ]);
+            input["struct_instantiations"] = json!([struct_inst]);
+            input["alias_instantiations"] = json!([alias_inst]);
+            input["files"] = json!([]);
+            input["functions"] = json!([]);
+
+            let abi: ContractABI = serde_json::from_value(input.clone()).unwrap();
+            let symbols: SymbolTypesJson = serde_json::from_value(input.clone()).unwrap();
+            let source_map = SourceMap::from_parts(symbols.clone(), vec![], Default::default());
+            for output in [
+                serde_json::to_value(&abi).unwrap(),
+                serde_json::to_value(symbols).unwrap(),
+                serde_json::to_value(source_map).unwrap(),
+            ] {
+                assert_eq!(
+                    output["struct_instantiations"],
+                    input["struct_instantiations"]
+                );
+                assert_eq!(
+                    output["alias_instantiations"],
+                    input["alias_instantiations"]
+                );
+            }
+            let decoded: ContractABI =
+                serde_json::from_str(&serde_json::to_string(&abi).unwrap()).unwrap();
+            assert_eq!(decoded.struct_instantiations, abi.struct_instantiations);
+            assert_eq!(decoded.alias_instantiations, abi.alias_instantiations);
         }
     }
 }

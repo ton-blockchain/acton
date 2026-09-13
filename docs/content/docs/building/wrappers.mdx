@@ -149,6 +149,38 @@ This writes a `Counter.gen.ts` wrapper to `wrappers-ts/` by default.
 
 See the [dApps development guide](/docs/dapps) for working with TypeScript wrappers.
 
+## Generate Go codecs
+
+Acton includes its own Go generator. With a [Go toolchain](https://go.dev/dl/)
+on PATH, run:
+
+```bash
+acton wrapper Counter --go
+acton wrapper --all --go --output-dir internal/contracts --go-package contracts
+acton wrapper --catalog data-abis.json --go --output-dir generated \
+  --go-package catalog
+```
+
+Go generation emits types, cell codecs, getter stack codecs, and a shared registry.
+It does not generate deployment clients or Tolk test stubs. The default output is
+`wrappers-go/`, package `wrappers`. Use `--output-dir`, not `--output`.
+
+`--all --go` compiles all eligible ABIs into one temporary catalog and generates a
+single package. `--catalog FILE --go` skips compilation and works without
+`Acton.toml`. Do not combine multiple contracts by repeatedly generating single
+contracts into the same output directory; use `--all` or a catalog instead.
+
+The generator's Go sources are bundled in the Acton binary and run from a temporary
+module with `go run -mod=readonly -trimpath`, `CGO_ENABLED=0`, and `GOWORK=off`.
+Caller `GOFLAGS` and saved build-flag defaults are ignored. Your `go.mod` and
+workspace are not modified. Standard Go caches are reused; first use may download
+pinned dependencies such as `tonutils-go`.
+
+Generated files use the public, CGO-free
+`github.com/ton-blockchain/acton/packages/abi-go` runtime (package `acton`).
+See [Go generation](/docs/commands/wrapper#go-generation) for toolchain requirements,
+runtime dependencies, and unsupported-codec diagnostics.
+
 ## Configure wrapper defaults
 
 Set per-project defaults in `Acton.toml`:
@@ -161,6 +193,10 @@ test-output-dir = "tests"
 
 [wrappers.typescript]
 output-dir = "wrappers-ts"
+
+[wrappers.go]
+output-dir = "wrappers-go"
+package = "wrappers"
 ```
 
 Override any of these fields for one contract by nesting the same tables under
@@ -178,7 +214,9 @@ output-dir = "app/src/wrappers/counter"
 Acton resolves each field independently, so omitted per-contract fields inherit
 the project defaults. CLI output and test options still have the highest
 priority. `acton wrapper --all` applies the resulting settings separately to
-each contract.
+each contract for Tolk and TypeScript. `--all --go` generates one package using
+project-level Go settings and CLI overrides; per-contract Go settings apply only
+to single-contract generation.
 
 See the [build reference](/docs/building/reference#wrappers-section) for all available fields.
 

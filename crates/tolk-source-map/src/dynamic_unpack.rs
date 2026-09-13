@@ -75,9 +75,18 @@ pub trait UnpackSchema: TyResolver {
     fn enum_decl_info(&self, target_name: &str) -> Option<SchemaEnumDecl<'_>>;
     fn struct_fields_for(&self, ty_idx: TyIdx) -> Option<Vec<SchemaField>>;
     fn alias_target_for(&self, ty_idx: TyIdx) -> Option<SchemaAliasTarget>;
+
+    /// Concrete instantiations can override the declaration's serialization hooks.
+    fn instantiation_custom_pack_unpack(&self, _ty_idx: TyIdx) -> Option<&ABICustomPackUnpack> {
+        None
+    }
 }
 
 impl UnpackSchema for SourceMap {
+    fn instantiation_custom_pack_unpack(&self, ty_idx: TyIdx) -> Option<&ABICustomPackUnpack> {
+        SourceMap::instantiation_custom_pack_unpack(self, ty_idx)
+    }
+
     fn struct_decl_info(&self, target_name: &str) -> Option<SchemaStructDecl<'_>> {
         self.declarations().iter().find_map(|decl| match decl {
             Declaration::Struct(struct_decl) if struct_decl.name == target_name => {
@@ -146,6 +155,19 @@ impl UnpackSchema for SourceMap {
 }
 
 impl UnpackSchema for ContractABI {
+    fn instantiation_custom_pack_unpack(&self, ty_idx: TyIdx) -> Option<&ABICustomPackUnpack> {
+        self.struct_instantiations
+            .iter()
+            .find(|inst| inst.ty_idx == ty_idx)
+            .and_then(|inst| inst.custom_pack_unpack.as_ref())
+            .or_else(|| {
+                self.alias_instantiations
+                    .iter()
+                    .find(|inst| inst.ty_idx == ty_idx)
+                    .and_then(|inst| inst.custom_pack_unpack.as_ref())
+            })
+    }
+
     fn struct_decl_info(&self, target_name: &str) -> Option<SchemaStructDecl<'_>> {
         self.declarations.iter().find_map(|decl| match decl {
             ABIDeclaration::Struct {
@@ -394,7 +416,12 @@ fn unpack_struct<S: UnpackSchema + ?Sized>(
     let decl = symbols
         .struct_decl_info(struct_name)
         .ok_or_else(|| anyhow!("struct {struct_name} referenced by type was not found"))?;
-    ensure_standard_unpack_layout(struct_name, decl.custom_pack_unpack)?;
+    ensure_standard_unpack_layout(
+        struct_name,
+        symbols
+            .instantiation_custom_pack_unpack(ty_idx)
+            .or(decl.custom_pack_unpack),
+    )?;
 
     if let Some(prefix) = decl.prefix {
         check_prefix(data, prefix.prefix_num, prefix.prefix_len, struct_name)?;
@@ -425,12 +452,15 @@ fn unpack_alias<S: UnpackSchema + ?Sized>(
     let decl = symbols
         .alias_decl_info(alias_name)
         .ok_or_else(|| anyhow!("alias {alias_name} referenced by type was not found"))?;
-    if uses_custom_unpack(decl.custom_pack_unpack)
+    let custom_pack_unpack = symbols
+        .instantiation_custom_pack_unpack(ty_idx)
+        .or(decl.custom_pack_unpack);
+    if uses_custom_unpack(custom_pack_unpack)
         && let Some(value) = unpack_builtin_custom_alias(data, alias_name)?
     {
         return Ok(value);
     }
-    ensure_standard_unpack_layout(alias_name, decl.custom_pack_unpack)?;
+    ensure_standard_unpack_layout(alias_name, custom_pack_unpack)?;
     let target = symbols
         .alias_target_for(ty_idx)
         .ok_or_else(|| anyhow!("failed to resolve target for alias {alias_name}"))?;
@@ -710,7 +740,12 @@ fn map_key_bit_len<S: UnpackSchema + ?Sized>(symbols: &S, ty_idx: TyIdx) -> anyh
             let decl = symbols
                 .alias_decl_info(alias_name)
                 .ok_or_else(|| anyhow!("alias {alias_name} referenced by type was not found"))?;
-            ensure_standard_unpack_layout(alias_name, decl.custom_pack_unpack)?;
+            ensure_standard_unpack_layout(
+                alias_name,
+                symbols
+                    .instantiation_custom_pack_unpack(ty_idx)
+                    .or(decl.custom_pack_unpack),
+            )?;
             let target = symbols
                 .alias_target_for(ty_idx)
                 .ok_or_else(|| anyhow!("failed to resolve target for alias {alias_name}"))?;
@@ -960,6 +995,117 @@ mod tests {
         ABICustomPackUnpack {
             pack_to_builder: Some(true),
             unpack_from_slice: Some(true),
+        }
+    }
+
+    #[test]
+    fn custom_instantiation_unpack_flags_apply_to_abi_and_source_map() {
+        use serde_json::json;
+
+        let mut input = serde_json::to_value(empty_abi()).unwrap();
+        input["files"] = json!([]);
+        input["functions"] = json!([]);
+        input["unique_types"] = json!([
+            {"kind": "genericT", "name_t": "T"},
+            {"kind": "uintN", "n": 8},
+            {"kind": "StructRef", "struct_name": "Boxed", "type_args_ty_idx": [0]},
+            {"kind": "StructRef", "struct_name": "Boxed", "type_args_ty_idx": [1]},
+            {"kind": "AliasRef", "alias_name": "Value", "type_args_ty_idx": [0]},
+            {"kind": "AliasRef", "alias_name": "Value", "type_args_ty_idx": [1]},
+            {"kind": "mapKV", "key_ty_idx": 5, "value_ty_idx": 1},
+            {"kind": "bool"},
+            {"kind": "StructRef", "struct_name": "Boxed", "type_args_ty_idx": [7]},
+            {"kind": "AliasRef", "alias_name": "Value", "type_args_ty_idx": [7]}
+        ]);
+        input["declarations"] = json!([
+            {
+                "kind": "struct", "name": "Boxed", "ty_idx": 2,
+                "type_params": ["T"], "ident_loc": [0, 0, 0, 0, 0],
+                "fields": [{"name": "value", "ty_idx": 0}]
+            },
+            {
+                "kind": "alias", "name": "Value", "ty_idx": 4,
+                "type_params": ["T"], "ident_loc": [0, 0, 0, 0, 0], "target_ty_idx": 0
+            }
+        ]);
+        input["struct_instantiations"] = json!([
+            {"ty_idx": 8, "struct_name": "Boxed<bool>", "monomorphic_fields_ty_idx": [7]},
+            {"ty_idx": 3, "struct_name": "Boxed<uint8>", "monomorphic_fields_ty_idx": [1]}
+        ]);
+        input["alias_instantiations"] = json!([
+            {"ty_idx": 9, "alias_name": "Value<bool>", "monomorphic_target_ty_idx": 7},
+            {"ty_idx": 5, "alias_name": "Value<uint8>", "monomorphic_target_ty_idx": 1}
+        ]);
+
+        for (declaration_flags, instantiation_flags, rejects_unpack) in [
+            (json!(null), json!({"unpack_from_slice": true}), true),
+            (
+                json!(null),
+                json!({"pack_to_builder": true, "unpack_from_slice": true}),
+                true,
+            ),
+            (json!(null), json!({"pack_to_builder": true}), false),
+            (json!(null), json!({"unpack_from_slice": false}), false),
+            (json!({"unpack_from_slice": true}), json!(null), true),
+            (
+                json!({"unpack_from_slice": true}),
+                json!({"unpack_from_slice": false}),
+                false,
+            ),
+        ] {
+            for decl in input["declarations"].as_array_mut().unwrap() {
+                decl["custom_pack_unpack"] = declaration_flags.clone();
+            }
+            for table in ["struct_instantiations", "alias_instantiations"] {
+                input[table][1]["custom_pack_unpack"] = instantiation_flags.clone();
+            }
+            let abi: ContractABI = serde_json::from_value(input.clone()).unwrap();
+            let source_map: SourceMap = serde_json::from_value(input.clone()).unwrap();
+            let mut builder = CellBuilder::new();
+            builder.store_uint(42, 8).unwrap();
+            let cell = builder.build().unwrap();
+
+            for symbols in [&abi as &dyn UnpackSchema, &source_map as &dyn UnpackSchema] {
+                for (ty_idx, name) in [(3, "Boxed"), (5, "Value")] {
+                    let mut slice = cell.as_slice_allow_exotic();
+                    let result = unpack_from_slice(&mut slice, symbols, ty_idx);
+                    if rejects_unpack {
+                        assert_eq!(
+                            result.unwrap_err().to_string(),
+                            format!("cannot decode {name} because it uses custom pack/unpack")
+                        );
+                        assert_eq!(slice.size_bits(), 8, "rejection must not consume data");
+                    } else {
+                        result.unwrap();
+                        assert_eq!(slice.size_bits(), 0);
+                    }
+                }
+
+                // Map keys must reject custom alias layouts even for an empty dictionary.
+                let mut slice = cell.as_slice_allow_exotic();
+                let result = unpack_from_slice(&mut slice, symbols, 6);
+                if rejects_unpack {
+                    assert!(
+                        result
+                            .unwrap_err()
+                            .to_string()
+                            .contains("custom pack/unpack")
+                    );
+                } else {
+                    assert!(
+                        matches!(result.unwrap(), UnpackedValue::Map(entries) if entries.is_empty())
+                    );
+                }
+
+                // Hooks on one specialization must not leak to another with the same name.
+                if declaration_flags.is_null() {
+                    for ty_idx in [8, 9] {
+                        let mut slice = cell.as_slice_allow_exotic();
+                        unpack_from_slice(&mut slice, symbols, ty_idx).unwrap();
+                        assert_eq!(slice.size_bits(), 7);
+                    }
+                }
+            }
         }
     }
 
@@ -1313,6 +1459,7 @@ mod tests {
             ty_idx: boxed_uint_ty_idx,
             struct_name: "Boxed".to_owned(),
             monomorphic_fields_ty_idx: vec![value_ty_idx],
+            custom_pack_unpack: None,
         });
         abi.declarations = vec![ABIDeclaration::Struct {
             name: "Boxed".to_owned(),
@@ -1926,6 +2073,7 @@ mod tests {
             ty_idx: concrete_box_ty_idx,
             struct_name: "Box".to_owned(),
             monomorphic_fields_ty_idx: vec![concrete_union_ty_idx],
+            custom_pack_unpack: None,
         });
         abi.declarations = vec![ABIDeclaration::Struct {
             name: "Box".to_owned(),
@@ -2059,6 +2207,7 @@ mod tests {
             ty_idx: concrete_alias_ty_idx,
             alias_name: "Choice".to_owned(),
             monomorphic_target_ty_idx: concrete_union_ty_idx,
+            custom_pack_unpack: None,
         });
         abi.declarations = vec![ABIDeclaration::Alias {
             name: "Choice".to_owned(),

@@ -1,0 +1,153 @@
+package catalog
+
+import (
+	"bytes"
+	"encoding/json"
+	"strings"
+	"testing"
+
+	acton "github.com/ton-blockchain/acton/packages/abi-go"
+)
+
+type toggle = CBoolEnum_e9337cdcd0974cbcToggleT1
+type state = CBoolEnum_e9337cdcd0974cbcStateT2
+
+const off toggle = CBoolEnum_e9337cdcd0974cbcToggleT1OffM0
+const on toggle = CBoolEnum_e9337cdcd0974cbcToggleT1OnM1
+
+// Compile-time checks for the generated boolean field and Cell<T> getter types.
+var _ CBoolEnum_e9337cdcd0974cbcTypedCellG5Result = on
+var _ = CBoolEnum_e9337cdcd0974cbcTypedCellG5Args{VF0: on}
+var _ = state{OffF0: off, OnF1: on}
+
+func method(t *testing.T, c *acton.Contract, name string) *acton.GetMethod {
+	t.Helper()
+	for i := range c.GetMethods {
+		if c.GetMethods[i].Name == name {
+			return &c.GetMethods[i]
+		}
+	}
+	t.Fatal(name)
+	return nil
+}
+
+func TestBooleanEnumGeneratedBindings(t *testing.T) {
+	c, other := ByID("bool-enum"), ByID("unrelated")
+	if len(Contracts) != 2 || c == nil || other == nil {
+		t.Fatal("boolean enum lost a catalog entry")
+	}
+	for _, tc := range []struct {
+		value toggle
+		boc   string
+	}{
+		{off, "te6cckEBAQEAAwAAAUD20kA0"},
+		{on, "te6cckEBAQEAAwAAAcCO6ba2"},
+	} {
+		golden, err := acton.DecodeBOC(tc.boc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, idx := range []int{0, 1} {
+			binding := c.Messages["incoming_messages"][idx]
+			if binding.Unsupported != "" {
+				t.Fatal(binding.Unsupported)
+			}
+			root, err := binding.Encode(tc.value)
+			if err != nil || !bytes.Equal(root.Hash(), golden.Hash()) {
+				t.Fatalf("boolean enum cell golden: %v", err)
+			}
+			decoded, err := binding.Decode(golden)
+			if err != nil || decoded != bool(tc.value) {
+				t.Fatalf("boolean enum JSON value: %#v %v", decoded, err)
+			}
+		}
+		m := method(t, c, "typed_cell")
+		if m.Unsupported != "" {
+			t.Fatal(m.Unsupported)
+		}
+		stack, err := m.EncodeArgs(map[string]any{"v": tc.value})
+		if err != nil || len(stack) != 1 || stack[0].Type != "cell" {
+			t.Fatalf("typed-cell getter encode: %+v %v", stack, err)
+		}
+		got, err := acton.DecodeBOC(stack[0].Value.(string))
+		if err != nil || !bytes.Equal(got.Hash(), golden.Hash()) {
+			t.Fatalf("typed-cell getter golden: %v", err)
+		}
+		decoded, err := m.DecodeResult([]acton.StackValue{{Type: "cell", Value: tc.boc}})
+		if err != nil || decoded != bool(tc.value) {
+			t.Fatalf("typed-cell getter decode: %#v %v", decoded, err)
+		}
+	}
+	for _, bad := range []any{"false", "true", "0", "-1", 0, 1, nil} {
+		if _, err := c.Messages["incoming_messages"][0].Encode(bad); err == nil {
+			t.Fatalf("accepted nonboolean cell value %#v", bad)
+		}
+	}
+	falseCell, err := acton.DecodeBOC("te6cckEBAQEAAwAAAUD20kA0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Messages["incoming_messages"][2].Decode(falseCell); err == nil {
+		t.Fatal("decoded undeclared boolean enum member")
+	}
+	for _, name := range []string{"direct", "default_on", "default_off", "nested"} {
+		m := method(t, c, name)
+		if !strings.Contains(m.Unsupported, "boolean-backed enum stack representation") || m.EncodeArgs != nil || m.DecodeResult != nil {
+			t.Fatalf("guessed stack representation: %+v", m)
+		}
+	}
+	for _, input := range []any{map[string]any{}, state{OffF0: off, OnF1: on}} {
+		root, err := c.Storage.Encode(input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Default state is exactly bits 01, with no enum tags or references.
+		s := root.BeginParse()
+		bits, err := s.LoadUInt(2)
+		if err != nil || bits != 1 || s.BitsLeft() != 0 || s.RefsNum() != 0 {
+			t.Fatalf("boolean enum defaults: %d %v", bits, err)
+		}
+		decoded, err := c.Storage.Decode(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := json.Marshal(decoded)
+		if err != nil || string(data) != `{"off":false,"on":true}` {
+			t.Fatalf("boolean enum state JSON: %s %v", data, err)
+		}
+	}
+	m := method(t, c, "state_cell")
+	stack, err := m.EncodeArgs(map[string]any{"v": map[string]any{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := m.DecodeResult(stack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(decoded)
+	if err != nil || string(data) != `{"off":false,"on":true}` {
+		t.Fatalf("typed-cell struct defaults: %s %v", data, err)
+	}
+	// Ordinary bool getters still use TVM -1; unrelated integer defaults stay numeric.
+	for _, tc := range []struct {
+		contract   *acton.Contract
+		name, want string
+	}{
+		{c, "ordinary", "-1"}, {other, "identity", "7"},
+	} {
+		m := method(t, tc.contract, tc.name)
+		stack, err := m.EncodeArgs(nil)
+		if err != nil || len(stack) != 1 || stack[0].Type != "int" || stack[0].Value != tc.want {
+			t.Fatalf("unrelated getter/default: %+v %v", stack, err)
+		}
+	}
+	root, err := other.Storage.Encode("42")
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err = other.Storage.Decode(root)
+	if err != nil || decoded != "42" {
+		t.Fatalf("unrelated contract: %#v %v", decoded, err)
+	}
+}

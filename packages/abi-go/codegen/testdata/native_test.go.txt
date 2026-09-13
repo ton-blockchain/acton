@@ -1,0 +1,178 @@
+package catalog
+
+import (
+	"encoding/base64"
+	"encoding/json"
+	acton "github.com/ton-blockchain/acton/packages/abi-go"
+	"github.com/xssnick/tonutils-go/tvm/cell"
+	"strings"
+	"testing"
+)
+
+func same(t *testing.T, a, b any) {
+	t.Helper()
+	x, e := json.Marshal(a)
+	if e != nil {
+		t.Fatal(e)
+	}
+	y, e := json.Marshal(b)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if string(x) != string(y) {
+		t.Fatalf("got %s want %s", x, y)
+	}
+}
+func method(t *testing.T, c *acton.Contract, name string) *acton.GetMethod {
+	t.Helper()
+	for i := range c.GetMethods {
+		if c.GetMethods[i].Name == name {
+			return &c.GetMethods[i]
+		}
+	}
+	t.Fatal(name)
+	return nil
+}
+func TestGeneratedNativeBindings(t *testing.T) {
+	c := ByID("vector/a")
+	if c == nil || len(Contracts) != 2 || Revision == "" {
+		t.Fatal("missing catalog")
+	}
+	if len(ByCodeHash(strings.Repeat("AB", 32))) != 2 {
+		t.Fatal("lost ambiguous hash")
+	}
+	// Lookups use indexes initialized once, not a request-time catalog scan.
+	all := Contracts
+	Contracts = nil
+	if ByID("vector/a") != c || len(ByCodeHash(strings.Repeat("ab", 32))) != 2 {
+		t.Fatal("lookup scans Contracts")
+	}
+	Contracts = all
+	matched := ByCodeHash(strings.Repeat("ab", 32))
+	matched[0] = nil
+	if ByCodeHash(strings.Repeat("ab", 32))[0] == nil {
+		t.Fatal("caller mutated shared hash index")
+	}
+	point := map[string]any{"x": "-2", "y": "123"}
+	storage := map[string]any{"id": "9", "owner": nil, "balance": "456", "signed": "-129", "tagged": acton.UnionValue{Type: "MsgA", Value: map[string]any{"counter": "11"}}, "ref": point, "table": []acton.MapEntry{{Key: "9", Value: point}}}
+	root, err := c.Storage.Encode(storage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := acton.DecodeStorage(c, base64.StdEncoding.EncodeToString(root.ToBOC()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	same(t, got, storage)
+	deploy := map[string]any{"owner": nil}
+	root, err = c.DeploymentStorage.Encode(deploy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err = acton.DecodeStorage(c, base64.StdEncoding.EncodeToString(root.ToBOC()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	same(t, got, deploy)
+	msg := acton.UnionValue{Type: "MsgB", Value: map[string]any{"ok": true}}
+	binding := c.Messages["incoming_messages"][0]
+	root, err = binding.Encode(msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := acton.DecodeMessage(c, "incoming_messages", base64.StdEncoding.EncodeToString(root.ToBOC()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	same(t, decoded.Value, msg)
+	viewCell := map[string]any{"raw": point, "flags": "-1"}
+	viewBinding := c.Messages["incoming_external"][0]
+	root, err = viewBinding.Encode(viewCell)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err = viewBinding.Decode(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	same(t, got, viewCell)
+	if c.Messages["incoming_external"][1].Unsupported == "" || c.Messages["incoming_external"][2].Unsupported == "" {
+		t.Fatal("missing cell diagnostics")
+	}
+	b := cell.BeginCell()
+	if err = b.StoreUInt(7, 8); err != nil {
+		t.Fatal(err)
+	}
+	raw := base64.StdEncoding.EncodeToString(b.EndCell().ToBOC())
+	values := map[string]any{
+		"view":    map[string]any{"raw": raw, "flags": "9999999999999999999999999999999999999999"},
+		"complex": []any{point, msg, nil},
+		"shaped":  []any{point, "999"},
+		"string":  "native snake", "map": []acton.MapEntry{{Key: "4", Value: point}},
+		"array": []any{point, point, point, point}, "wide": point, "hook": map[string]any{"value": "1"},
+		"wide_array": []any{[]any{point, "9"}, []any{point, "10"}},
+		"union_null": acton.UnionValue{Type: "Point", Value: point}, "lisp": []any{point, point},
+	}
+	for name, v := range values {
+		t.Run(name, func(t *testing.T) {
+			m := method(t, c, name)
+			if m.Unsupported != "" {
+				t.Fatal(m.Unsupported)
+			}
+			stack, e := m.EncodeArgs(map[string]any{"v": v})
+			if e != nil {
+				t.Fatal(e)
+			}
+			out, e := m.DecodeResult(stack)
+			if e != nil {
+				t.Fatal(e)
+			}
+			same(t, out, v)
+			if _, e = m.DecodeResult(append(stack, acton.StackValue{Type: "null"})); e == nil {
+				t.Fatal("trailing stack accepted")
+			}
+		})
+	}
+	for name, want := range map[string]any{"counter": "42", "string": "hello", "wide": nil, "point_default": point} {
+		m := method(t, c, name)
+		stack, e := m.EncodeArgs(nil)
+		if e != nil {
+			t.Fatal(e)
+		}
+		out, e := m.DecodeResult(stack)
+		if e != nil {
+			t.Fatal(e)
+		}
+		same(t, out, want)
+	}
+	for _, name := range []string{"hook_cell", "unknown"} {
+		m := method(t, c, name)
+		if m.Unsupported == "" || m.EncodeArgs != nil || m.DecodeResult != nil {
+			t.Fatal("unsupported method not explicit", name)
+		}
+	}
+	m := method(t, c, "union_null")
+	stack, e := m.EncodeArgs(map[string]any{"v": nil})
+	if e != nil {
+		t.Fatal(e)
+	}
+	out, e := m.DecodeResult(stack)
+	if e != nil || out != nil {
+		t.Fatal(out, e)
+	}
+	for i, want := range []any{map[string]any{"item": "42"}, "42", acton.UnionValue{Type: "bool", Value: true}, nil} {
+		binding := c.Messages["emitted_events"][i]
+		root, e := binding.Encode(want)
+		if e != nil {
+			t.Fatal(e)
+		}
+		got, e := binding.Decode(root)
+		if e != nil {
+			t.Fatal(e)
+		}
+		same(t, got, want)
+	}
+	if _, e = json.Marshal(c); e != nil {
+		t.Fatal("facade metadata must marshal", e)
+	}
+}
