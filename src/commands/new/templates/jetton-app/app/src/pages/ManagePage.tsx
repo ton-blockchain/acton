@@ -142,13 +142,12 @@ export function ManagePage({
     }
   }, [contractAddr, network]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Reload only when the network changes; address changes are handled via the input.
   useEffect(() => {
     if (contractAddr.trim()) {
       onAddressChange(contractAddr.trim());
       loadJettonInfo();
     }
-    // Reload only when the network changes; address changes are handled via the input.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [network]);
 
   const isAdmin =

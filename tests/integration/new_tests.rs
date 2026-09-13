@@ -903,7 +903,7 @@ fn test_new_empty_project_with_app_flag() {
     assert!(project_dir.join("app/src/App.tsx").exists());
     assert!(project_dir.join("app/src/styles.css").exists());
     assert!(project_dir.join("components.json").exists());
-    assert!(project_dir.join(".prettierignore").exists());
+    assert!(project_dir.join("biome.jsonc").exists());
     assert!(project_dir.join("contracts/src/Empty.tolk").exists());
     assert!(
         project_dir
@@ -1017,7 +1017,7 @@ fn test_new_counter_project_with_app_flag() {
             .join("contracts/wrappers/Counter.gen.tolk")
             .exists()
     );
-    assert!(project_dir.join(".prettierrc").exists());
+    assert!(project_dir.join("biome.jsonc").exists());
 }
 
 #[test]
@@ -1102,7 +1102,7 @@ fn test_new_w5_extension_project_with_app_flag() {
             .join("contracts/scripts/utils/common.tolk")
             .exists()
     );
-    assert!(project_dir.join(".prettierrc").exists());
+    assert!(project_dir.join("biome.jsonc").exists());
 }
 
 #[test]
@@ -2081,8 +2081,8 @@ fn test_new_counter_app_project_supports_npm_scripts() {
         "counter app template must expose npm run lint"
     );
     assert!(
-        package_uses_eslint(&package_json),
-        "counter app template must depend on ESLint"
+        package_uses_biome(&package_json),
+        "counter app template must depend on Biome"
     );
 
     let cache_path = project_dir.join(".npm-cache");
@@ -2193,29 +2193,25 @@ fn create_app_project(workspace: &Project, project_dir: &Path, template: &str) {
 }
 
 #[cfg(unix)]
-fn package_uses_eslint(package_json: &JsonValue) -> bool {
-    let has_eslint_dependency = ["dependencies", "devDependencies"].iter().any(|section| {
-        package_json
-            .get(section)
-            .and_then(JsonValue::as_object)
-            .is_some_and(|deps| {
-                deps.keys()
-                    .any(|name| name == "eslint" || name.contains("eslint"))
-            })
-    });
+fn package_uses_biome(package_json: &JsonValue) -> bool {
+    let dependency_sections = ["dependencies", "devDependencies"]
+        .iter()
+        .filter_map(|section| package_json.get(section).and_then(JsonValue::as_object));
+    let has_biome_dependency = dependency_sections
+        .clone()
+        .any(|deps| deps.contains_key("@biomejs/biome"));
+    let has_eslint_dependency = dependency_sections
+        .clone()
+        .any(|deps| deps.keys().any(|name| name.contains("eslint")));
 
-    let has_eslint_script = package_json
+    let lint_uses_biome = package_json
         .get("scripts")
         .and_then(JsonValue::as_object)
-        .is_some_and(|scripts| {
-            scripts.values().any(|script| {
-                script
-                    .as_str()
-                    .is_some_and(|script| script.contains("eslint"))
-            })
-        });
+        .and_then(|scripts| scripts.get("lint"))
+        .and_then(JsonValue::as_str)
+        .is_some_and(|script| script.contains("biome"));
 
-    has_eslint_dependency || has_eslint_script
+    has_biome_dependency && !has_eslint_dependency && lint_uses_biome
 }
 
 #[cfg(unix)]
@@ -2261,8 +2257,8 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
         "{template} app template must expose npm run lint"
     );
     assert!(
-        package_uses_eslint(&package_json),
-        "{template} app template must depend on ESLint"
+        package_uses_biome(&package_json),
+        "{template} app template must depend on Biome"
     );
     let lint_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "lint"]);
     assert!(
@@ -2395,10 +2391,8 @@ fn test_new_w5_extension_app_template_matches_contract_app_tooling_files() {
         ".github/workflows/contracts.yml",
         ".github/workflows/dapp.yml",
         ".npmrc",
-        ".prettierignore",
-        ".prettierrc",
         "components.json",
-        "eslint.config.js",
+        "biome.jsonc",
         "package-lock.json",
         "tsconfig.json",
         "vite.config.ts",

@@ -63,6 +63,7 @@ export function DeployBatch({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Reset the index when the selected collection changes, even when its next index is the same.
   useEffect(() => {
     setStartIdxStr(String(nextIndex));
   }, [selectedCollectionId, nextIndex]);

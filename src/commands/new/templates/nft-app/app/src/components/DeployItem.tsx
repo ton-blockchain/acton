@@ -62,6 +62,7 @@ export function DeployItem({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Reset the fields when the selected collection changes, even when its next index is the same.
   useEffect(() => {
     setItemIndex(String(nextIndex));
     setContent(`item-${nextIndex}.json`);

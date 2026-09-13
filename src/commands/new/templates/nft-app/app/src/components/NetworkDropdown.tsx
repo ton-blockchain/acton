@@ -11,7 +11,7 @@ import type { Network } from '../lib/router';
 
 function StatusDot({ network }: { network: 'mainnet' | 'testnet' }) {
   return (
-    <svg className="size-2 fill-current" viewBox="0 0 8 8">
+    <svg aria-hidden="true" className="size-2 fill-current" viewBox="0 0 8 8">
       <circle
         cx="4"
         cy="4"
