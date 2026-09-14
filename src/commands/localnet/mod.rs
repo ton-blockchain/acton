@@ -90,36 +90,57 @@ async fn run(args: LocalnetArgs) -> anyhow::Result<()> {
         _ => {}
     }
 
-    // Stop/delete may need to clean up a network whose service is already gone.
-    // Any temporary owner is scoped to this directory and is always reaped.
-    let (client, owned) = if matches!(
-        args.command,
-        LocalnetCommand::Stop { .. }
-            | LocalnetCommand::Delete { .. }
-            | LocalnetCommand::Shutdown { .. }
-    ) {
-        service::connect_or_start(&root, location).await?
-    } else {
-        (Client::connect(&location.path).await.with_context(|| format!(
-            "Network {:?} has no running service; run `acton full-localnet start {:?}` or `acton full-localnet serve {:?}`",
-            location.network.name, location.network.name, location.network.name
-        ))?, None)
-    };
     let close_service = matches!(
         args.command,
         LocalnetCommand::Stop { .. }
             | LocalnetCommand::Delete { .. }
             | LocalnetCommand::Shutdown { .. }
     );
-    let result = execute(&client, args.command, args.json).await;
+
+    // Register SIGTERM before discovery and retain it until we can reap any owned child.
+    let shutdown = service::shutdown_signal();
+    tokio::pin!(shutdown);
+
+    // Snapshots also work while the network is stopped. Reuse an existing service
+    // or own a temporary one, without starting the network's Docker containers.
+    let needs_service = close_service || matches!(args.command, LocalnetCommand::Snapshot { .. });
+    let (client, owned) = if needs_service {
+        service::connect_or_start(&root, location).await?
+    } else {
+        let client = Client::connect(&location.path).await.with_context(|| {
+            format!(
+                "Network {:?} has no running service; run `acton full-localnet start {:?}`",
+                location.network.name, location.network.name
+            )
+        })?;
+
+        (client, None)
+    };
+
+    let (result, interrupted) = tokio::select! {
+        result = execute(&client, args.command, args.json) => (result, false),
+        _ = &mut shutdown => (Ok(()), true),
+    };
+
     if let Some(mut child) = owned {
-        let cleanup =
-            output::shutdown(args.json, true, service::stop_owned(&client, &mut child)).await;
+        let cleanup = if close_service || interrupted {
+            output::shutdown(args.json, true, service::stop_owned(&client, &mut child)).await
+        } else {
+            service::stop_owned(&client, &mut child).await
+        };
+
+        if let Err(error) = &cleanup
+            && result.is_err()
+        {
+            eprintln!("Graceful cleanup also failed: {error}");
+        }
+
         result?;
         return cleanup;
     }
+
     result?;
-    if close_service {
+    if close_service && !interrupted {
         output::shutdown(args.json, true, async {
             client.shutdown().await.map_err(Into::into)
         })

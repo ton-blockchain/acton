@@ -1,5 +1,6 @@
 use axum::{
     Json,
+    extract::multipart::MultipartError,
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -36,6 +37,16 @@ impl ApiError {
         }
     }
 
+    pub const fn payload_too_large(message: String) -> Self {
+        Self {
+            status: StatusCode::PAYLOAD_TOO_LARGE,
+            message,
+            expose_message: true,
+            public_fallback: INTERNAL_ERROR_MESSAGE,
+            payment_retryable: false,
+        }
+    }
+
     const fn hidden_bad_gateway(message: String) -> Self {
         Self {
             status: StatusCode::BAD_GATEWAY,
@@ -44,6 +55,10 @@ impl ApiError {
             public_fallback: INTERNAL_ERROR_MESSAGE,
             payment_retryable: false,
         }
+    }
+
+    pub(crate) const fn internal(message: String) -> Self {
+        Self::hidden_bad_gateway(message)
     }
 
     const fn retryable_source_storage(message: String) -> Self {
@@ -124,6 +139,18 @@ impl From<VerificationError> for ApiError {
     }
 }
 
+impl From<MultipartError> for ApiError {
+    fn from(err: MultipartError) -> Self {
+        let status = err.status();
+        let message = err.body_text();
+        if status == StatusCode::PAYLOAD_TOO_LARGE {
+            Self::payload_too_large(message)
+        } else {
+            Self::bad_request(message)
+        }
+    }
+}
+
 impl From<CompilerError> for ApiError {
     fn from(err: CompilerError) -> Self {
         match err {
@@ -174,6 +201,7 @@ fn source_storage_error_is_payment_retryable(err: &SourceStorageError) -> bool {
             command.starts_with("git push ")
         }
         SourceStorageError::MissingConfig(_)
+        | SourceStorageError::InvalidCodeHash
         | SourceStorageError::InvalidPath { .. }
         | SourceStorageError::ReadFileUtf8 { .. }
         | SourceStorageError::SerializeManifest(_)

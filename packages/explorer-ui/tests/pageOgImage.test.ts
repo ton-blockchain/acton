@@ -15,6 +15,7 @@ describe("pageOgPreviewForPath", () => {
     ["/verified", "verified"],
     ["/verified/92bf1e3962a54b88", "verified-contract"],
     ["/cell", "cell"],
+    ["/address-converter", "address-converter"],
     ["/emulate", "emulate"],
     ["/favorites", "favorites"],
     ["/suspended", "suspended"],

@@ -3,7 +3,7 @@
   "root": false,
   "extends": "//",
   "files": {
-    "includes": ["**", "!src/faucet/wasm"]
+    "includes": ["**"]
   },
   "linter": {
     "rules": {

@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {ChangeEvent, DragEvent, FC, FormEvent, JSX} from "react"
-import {AbiPanel, type AbiTab} from "@acton/transaction-ui/abi"
+import {AbiPanel, getAbiThrownErrors, type AbiTab} from "@acton/transaction-ui/abi"
 import {
   InlineAction,
   InlineActions,
@@ -685,7 +685,7 @@ function abiStats(entry: ExtendedContractABI): {
       abi.outgoing_messages.length +
       abi.emitted_events.length,
     declarations: abi.declarations.length,
-    errors: abi.thrown_errors.length,
+    errors: getAbiThrownErrors(abi.thrown_errors).length,
   }
 }
 

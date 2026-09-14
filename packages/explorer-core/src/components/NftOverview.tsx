@@ -17,10 +17,8 @@ interface NftItemOverviewProps extends NftOverviewBaseProps {
   readonly kind: "item"
   readonly ownerAddress?: string
   readonly collectionAddress?: string
-  readonly collectionName?: string
   readonly index: string
   readonly onMetadataClick: () => void
-  readonly onNsfw?: () => void
 }
 
 interface NftCollectionOverviewProps extends NftOverviewBaseProps {
@@ -82,9 +80,7 @@ export const NftOverview: FC<NftOverviewProps> = props => (
           alt={props.name}
           className={styles.image}
           blurredClassName={styles.blurredImage}
-          collectionName={props.kind === "item" ? props.collectionName : props.name}
           blurred={props.isScam}
-          onNsfw={props.kind === "item" ? props.onNsfw : undefined}
         />
         {props.isScam && <span className={styles.scamLabel}>SCAM</span>}
       </div>

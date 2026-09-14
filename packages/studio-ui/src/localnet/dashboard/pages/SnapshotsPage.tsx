@@ -19,7 +19,7 @@ import {
   NumberValue,
   useToast,
 } from "@acton/ui"
-import {Archive, RotateCcw, Trash2} from "lucide-react"
+import {Archive, Download, RotateCcw, Trash2, TriangleAlert, Upload} from "lucide-react"
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 
@@ -27,8 +27,10 @@ import {EnvironmentStartupProgress} from "../../../components/EnvironmentStartup
 import {
   createStudioEnvironmentSnapshot,
   deleteStudioEnvironmentSnapshot,
+  downloadStudioEnvironmentSnapshot,
   fetchStudioEnvironmentSnapshotOperation,
   fetchStudioEnvironmentSnapshots,
+  importStudioEnvironmentSnapshot,
   restoreStudioEnvironmentSnapshot,
 } from "../../../studioApi"
 import type {
@@ -72,6 +74,8 @@ interface Phase {
 
 export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment, onActionsChange}) => {
   const {showToast, updateToast} = useToast()
+  const simulated = environment.config.kind === "actonSimulatedLocalnet"
+  const fileInput = useRef<HTMLInputElement>(null)
   const [snapshots, setSnapshots] = useState<readonly EnvironmentSnapshot[]>([])
   const [operation, setOperation] = useState<EnvironmentSnapshotOperation | null>(null)
   const [loading, setLoading] = useState(true)
@@ -83,9 +87,9 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment, onActionsCha
   const [deletingId, setDeletingId] = useState<string>()
   const [now, setNow] = useState(Date.now())
   const operationWasActive = useRef(false)
+  const operationToast = useRef<string | undefined>(undefined)
   const mutationRevision = useRef(0)
   const refreshList = useRef(true)
-  const listPending = useRef(false)
   const listErrorShown = useRef(false)
   const pollErrorShown = useRef(false)
   const failedOperationShown = useRef<string | undefined>(undefined)
@@ -95,8 +99,6 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment, onActionsCha
 
   const loadSnapshots = useCallback(
     async (signal?: AbortSignal) => {
-      if (listPending.current) return
-      listPending.current = true
       const revision = mutationRevision.current
       try {
         const result = await fetchStudioEnvironmentSnapshots(environment.id, signal)
@@ -118,7 +120,6 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment, onActionsCha
           listErrorShown.current = true
         }
       } finally {
-        listPending.current = false
         if (!signal?.aborted) setLoading(false)
       }
     },
@@ -167,7 +168,6 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment, onActionsCha
       }
     }
 
-    void loadSnapshots(controller.signal)
     void poll()
     const timer = setInterval(() => void poll(), active ? 1000 : 3000)
 
@@ -177,25 +177,102 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment, onActionsCha
     }
   }, [active, environment.id, loadSnapshots, showToast])
 
+  const importSnapshot = useCallback(
+    async (file: File) => {
+      if (active || submitting || !operationLoaded) return
+
+      setSubmitting(true)
+      mutationRevision.current += 1
+
+      try {
+        await importStudioEnvironmentSnapshot(environment.id, file)
+        refreshList.current = true
+        await loadSnapshots()
+        showToast({
+          variant: "success",
+          title: "Snapshot imported",
+          description: "The snapshot is saved and available to restore",
+        })
+      } catch (error) {
+        showToast({
+          variant: "error",
+          title: "Snapshot not imported",
+          description: errorMessage(error, "The snapshot could not be imported"),
+        })
+      } finally {
+        setSubmitting(false)
+      }
+    },
+    [active, environment.id, loadSnapshots, operationLoaded, showToast, submitting],
+  )
+
+  const downloadSnapshot = async (snapshot: EnvironmentSnapshot) => {
+    try {
+      const blob = await downloadStudioEnvironmentSnapshot(environment.id, snapshot.id)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `${snapshot.id}.json`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Snapshot not downloaded",
+        description: errorMessage(error, "The snapshot could not be downloaded"),
+      })
+    }
+  }
+
   const actions = useMemo(
     () => (
-      <Button
-        variant="outline"
-        size="sm"
-        leadingIcon={<Archive size={16} />}
-        disabled={!operationLoaded || active || submitting}
-        onClick={() => setDialog({kind: "create"})}
-      >
-        Create snapshot
-      </Button>
+      <>
+        {simulated ? (
+          <Button
+            variant="outline"
+            size="sm"
+            leadingIcon={<Upload size={16} />}
+            disabled={!operationLoaded || active || submitting}
+            onClick={() => fileInput.current?.click()}
+          >
+            Import snapshot
+          </Button>
+        ) : undefined}
+        <Button
+          variant="primary"
+          size="sm"
+          leadingIcon={<Archive size={16} />}
+          disabled={!operationLoaded || active || submitting}
+          onClick={() => {
+            setSnapshotName(nextSnapshotName(snapshots))
+            setDialog({kind: "create"})
+          }}
+        >
+          Create snapshot
+        </Button>
+      </>
     ),
-    [active, operationLoaded, submitting],
+    [active, operationLoaded, simulated, snapshots, submitting],
   )
 
   useEffect(() => {
     onActionsChange(actions)
     return () => onActionsChange(undefined)
   }, [actions, onActionsChange])
+
+  useEffect(
+    () => () => {
+      if (operationToast.current) {
+        updateToast(operationToast.current, {
+          variant: "info",
+          title: "Snapshot operation continues in the background",
+          durationMs: 4000,
+        })
+        operationToast.current = undefined
+      }
+    },
+    [updateToast],
+  )
 
   useEffect(() => {
     if (!active) return
@@ -208,27 +285,40 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment, onActionsCha
     if (operationWasActive.current && operation?.phase === "completed") {
       mutationRevision.current += 1
       refreshList.current = true
-      void loadSnapshots()
-      showToast({
-        variant: "success",
-        title: operation.kind === "create" ? "Snapshot created" : "Snapshot restored",
-        description:
-          operation.kind === "create"
-            ? "The archive is ready"
-            : "The environment is available again",
+      void loadSnapshots().then(() => {
+        const message = {
+          variant: "success" as const,
+          title: operation.kind === "create" ? "Snapshot created" : "Snapshot restored",
+          durationMs: 4000,
+        }
+
+        if (operationToast.current) {
+          updateToast(operationToast.current, message)
+          operationToast.current = undefined
+        } else {
+          showToast(message)
+        }
       })
     }
     if (operation?.phase === "failed" && failedOperationShown.current !== operation.startedAt) {
       failedOperationShown.current = operation.startedAt
       refreshList.current = true
-      showToast({
+      const message = {
         variant: "error",
         title: operation.kind === "create" ? "Snapshot not created" : "Snapshot not restored",
         description: operation.error ?? "The snapshot operation failed",
-      })
+        durationMs: 8000,
+      } as const
+
+      if (operationToast.current) {
+        updateToast(operationToast.current, message)
+        operationToast.current = undefined
+      } else {
+        showToast(message)
+      }
     }
     operationWasActive.current = active
-  }, [active, loadSnapshots, operation, showToast])
+  }, [active, loadSnapshots, operation, showToast, updateToast])
 
   const submitDialog = useCallback(async () => {
     if (!dialog || submitting || active || !operationLoaded) return
@@ -242,9 +332,9 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment, onActionsCha
       variant: "loading",
       title:
         dialog.kind === "create"
-          ? "Starting snapshot creation"
+          ? "Creating snapshot"
           : dialog.kind === "restore"
-            ? "Starting snapshot restore"
+            ? "Restoring snapshot"
             : "Deleting snapshot",
       description: snapshot ? snapshotLabel(snapshot) : snapshotName.trim() || environment.name,
       durationMs: 0,
@@ -252,23 +342,15 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment, onActionsCha
     setSubmitting(true)
     try {
       if (dialog.kind === "create") {
-        const name = snapshotName.trim()
-        setOperation(await createStudioEnvironmentSnapshot(environment.id, name || undefined))
+        const name = snapshotName.trim() || nextSnapshotName(snapshots)
+        setOperation(await createStudioEnvironmentSnapshot(environment.id, name))
         setSnapshotName("")
-        updateToast(toastId, {
-          variant: "info",
-          title: "Snapshot creation started",
-          description: "Progress is available on this page",
-          durationMs: 4000,
-        })
+        operationWasActive.current = true
+        operationToast.current = toastId
       } else if (dialog.kind === "restore") {
         setOperation(await restoreStudioEnvironmentSnapshot(environment.id, dialog.snapshot.id))
-        updateToast(toastId, {
-          variant: "info",
-          title: "Snapshot restore started",
-          description: "Progress is available on this page",
-          durationMs: 4000,
-        })
+        operationWasActive.current = true
+        operationToast.current = toastId
       } else {
         setDeletingId(dialog.snapshot.id)
         await deleteStudioEnvironmentSnapshot(environment.id, dialog.snapshot.id)
@@ -307,25 +389,43 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment, onActionsCha
     loadSnapshots,
     showToast,
     snapshotName,
+    snapshots,
     submitting,
     updateToast,
   ])
 
   return (
     <section className={`${pageStyles.settingsSection} ${styles.page}`}>
-      <div className={`${pageStyles.settingsNotice} ${styles.notice}`}>
-        <Archive size={17} aria-hidden="true" />
-        <div>
-          <strong>Snapshots can be large</strong>
-          <span>
-            Creation pauses all nodes and can take several minutes. Restore replaces the saved nodes
-            and rebuilds the index before the environment is available again
-          </span>
+      {simulated ? (
+        <input
+          ref={fileInput}
+          type="file"
+          accept="application/json,.json"
+          aria-label="Import snapshot file"
+          hidden
+          onChange={event => {
+            const file = event.target.files?.[0]
+            event.target.value = ""
+            if (file) void importSnapshot(file)
+          }}
+        />
+      ) : (
+        <div className={`${pageStyles.settingsNotice} ${styles.notice}`}>
+          <Archive size={17} aria-hidden="true" />
+          <div>
+            <strong>Snapshots can be large</strong>
+            <span>
+              Creation pauses all nodes and can take several minutes. Restore replaces the saved
+              nodes and rebuilds the index before the environment is available again
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className={styles.panel} aria-busy={loading}>
-        {active && operation ? <OperationProgress operation={operation} now={now} /> : undefined}
+        {!simulated && active && operation ? (
+          <OperationProgress operation={operation} now={now} />
+        ) : undefined}
 
         <div className={styles.tableWrap}>
           <DataTableTable aria-label="Saved snapshots">
@@ -334,8 +434,12 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment, onActionsCha
                 <DataTableHeaderCell columnWidth="26%">Snapshot</DataTableHeaderCell>
                 <DataTableHeaderCell columnWidth="24%">Created</DataTableHeaderCell>
                 <DataTableHeaderCell columnWidth="10%">Block</DataTableHeaderCell>
-                <DataTableHeaderCell columnWidth="14%">Archive</DataTableHeaderCell>
-                <DataTableHeaderCell columnWidth="14%">State</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="14%">
+                  {simulated ? "Size" : "Archive"}
+                </DataTableHeaderCell>
+                {simulated ? undefined : (
+                  <DataTableHeaderCell columnWidth="14%">State</DataTableHeaderCell>
+                )}
                 <DataTableHeaderCell align="right" columnWidth="9rem">
                   Actions
                 </DataTableHeaderCell>
@@ -344,14 +448,22 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment, onActionsCha
             <DataTableBody>
               {loading ? (
                 <DataTableSkeletonRows
-                  alignments={["left", "left", "left", "left", "left", "right"]}
-                  columns={6}
+                  alignments={
+                    simulated
+                      ? ["left", "left", "left", "left", "right"]
+                      : ["left", "left", "left", "left", "left", "right"]
+                  }
+                  columns={simulated ? 5 : 6}
                   rowKeyPrefix="snapshot-row-skeleton"
                   rows={4}
-                  widths={["14rem", "12rem", "5rem", "5rem", "5rem", "7rem"]}
+                  widths={
+                    simulated
+                      ? ["14rem", "12rem", "5rem", "5rem", "7rem"]
+                      : ["14rem", "12rem", "5rem", "5rem", "5rem", "7rem"]
+                  }
                 />
               ) : snapshots.length === 0 ? (
-                <DataTableEmpty colSpan={6}>
+                <DataTableEmpty colSpan={simulated ? 5 : 6}>
                   <EmptyState
                     icon={<Archive size={20} aria-hidden="true" />}
                     title={loadError ? "Saved snapshots" : "No snapshots yet"}
@@ -382,13 +494,22 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment, onActionsCha
                       <NumberValue value={snapshot.masterchainSeqno} />
                     </DataTableCell>
                     <DataTableCell tone="muted" mono>
-                      <ByteSize value={snapshot.archiveSizeBytes} />
+                      <ByteSize value={snapshot.sizeBytes} />
                     </DataTableCell>
-                    <DataTableCell tone="muted" mono>
-                      <ByteSize value={snapshot.stateSizeBytes} />
-                    </DataTableCell>
+                    {simulated ? undefined : (
+                      <DataTableCell tone="muted" mono>
+                        <ByteSize value={snapshot.stateSizeBytes} />
+                      </DataTableCell>
+                    )}
                     <DataTableCell align="right">
                       <span className={styles.actions}>
+                        {simulated ? (
+                          <InlineAction
+                            label={`Download ${snapshotLabel(snapshot)}`}
+                            icon={<Download />}
+                            onClick={() => void downloadSnapshot(snapshot)}
+                          />
+                        ) : undefined}
                         <InlineAction
                           label="Restore snapshot"
                           icon={<RotateCcw />}
@@ -416,6 +537,7 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment, onActionsCha
       </div>
 
       <SnapshotDialog
+        simulated={simulated}
         state={dialog}
         name={snapshotName}
         loading={submitting}
@@ -482,6 +604,7 @@ const OperationProgress: FC<{
 }
 
 interface SnapshotDialogProps {
+  readonly simulated: boolean
   readonly state: DialogState | undefined
   readonly name: string
   readonly loading: boolean
@@ -491,6 +614,7 @@ interface SnapshotDialogProps {
 }
 
 const SnapshotDialog: FC<SnapshotDialogProps> = ({
+  simulated,
   state,
   name,
   loading,
@@ -506,11 +630,13 @@ const SnapshotDialog: FC<SnapshotDialogProps> = ({
         : `Delete ${snapshotLabel(state.snapshot)}`
     : "Snapshot"
   const description =
-    state?.kind === "restore"
-      ? "Studio will stop the environment, replace its chain state, rebuild the index, and start the environment again. This can take several minutes"
-      : state?.kind === "delete"
-        ? "This permanently deletes the snapshot archive"
-        : "If the environment is running, Studio will stop it, create a compressed archive, and start it again. This can take several minutes"
+    state?.kind === "delete"
+      ? "This permanently deletes the saved snapshot"
+      : state?.kind === "restore"
+        ? "Restore the network state from this snapshot"
+        : simulated
+          ? "Save accounts, transactions, pending messages, and virtual time"
+          : "Save accounts, block history, and the chain state of all network nodes"
 
   return (
     <Dialog
@@ -520,9 +646,20 @@ const SnapshotDialog: FC<SnapshotDialogProps> = ({
       }}
       title={title}
       description={description}
+      className={styles.dialog}
       busy={loading}
       maxWidth="30rem"
     >
+      {!simulated && state?.kind !== "delete" ? (
+        <div className={styles.warning} role="alert">
+          <TriangleAlert size={18} aria-hidden="true" />
+          <span>
+            {state?.kind === "restore"
+              ? "Studio will stop the environment, restore the saved state, rebuild the index, and start it again. This can take several minutes"
+              : "Studio will pause the running environment while saving the snapshot, then start it again. This can take several minutes"}
+          </span>
+        </div>
+      ) : undefined}
       {state?.kind === "create" ? (
         <Input
           label="Name"
@@ -532,7 +669,7 @@ const SnapshotDialog: FC<SnapshotDialogProps> = ({
           onChange={event => onNameChange(event.target.value)}
         />
       ) : undefined}
-      <DialogActions className={styles.dialogActions}>
+      <DialogActions className={state?.kind === "create" ? styles.dialogActions : undefined}>
         <Button variant="secondary" onClick={onClose}>
           {loading ? "Close" : "Cancel"}
         </Button>
@@ -553,7 +690,16 @@ const SnapshotDialog: FC<SnapshotDialogProps> = ({
 }
 
 function snapshotLabel(snapshot: EnvironmentSnapshot): string {
-  return snapshot.name ?? snapshot.id
+  return snapshot.name ?? "Snapshot"
+}
+
+function nextSnapshotName(snapshots: readonly EnvironmentSnapshot[]): string {
+  const lastNumber = snapshots.reduce((latest, snapshot) => {
+    const number = /^Snapshot (\d+)$/.exec(snapshot.name ?? "")?.[1]
+    return Math.max(latest, number ? Number(number) : 0)
+  }, 0)
+
+  return `Snapshot ${lastNumber + 1}`
 }
 
 function operationDetail(phase: EnvironmentSnapshotOperationPhase): string {
@@ -564,6 +710,8 @@ function operationDetail(phase: EnvironmentSnapshotOperationPhase): string {
       return "Waiting for network processes to stop"
     case "creatingArchive":
       return "Compressing the persistent chain state"
+    case "savingState":
+      return "Saving the network state to JSON"
     case "restoringState":
       return "Replacing the persistent chain state"
     case "resettingIndexer":

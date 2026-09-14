@@ -1,6 +1,7 @@
 import {Code2, ExternalLink, X} from "lucide-react"
 import {useState} from "react"
 import {Tooltip} from "@acton/ui"
+import {useNetworkInfo} from "@acton/explorer-core/hooks/useNetworkInfo"
 
 import styles from "./DeveloperExplorerBanner.module.css"
 
@@ -15,6 +16,7 @@ const isDismissed = (): boolean => {
 }
 
 export function DeveloperExplorerBanner() {
+  const {network} = useNetworkInfo()
   const [visible, setVisible] = useState(() => !isDismissed())
 
   if (!visible) {
@@ -45,7 +47,12 @@ export function DeveloperExplorerBanner() {
             ·
           </span>
           <span className={styles.publicExplorerPrompt}>Looking for a public TON explorer?</span>
-          <a className={styles.link} href="https://tonscan.org" target="_blank" rel="noreferrer">
+          <a
+            className={styles.link}
+            href={network.id === "mainnet" ? "https://tonscan.org" : "https://testnet.tonscan.org"}
+            target="_blank"
+            rel="noreferrer"
+          >
             Visit Tonscan
             <ExternalLink size={13} aria-hidden="true" />
           </a>

@@ -1,1 +1,0 @@
-Error: --tonconnect cannot be used with --new; the new verifier does not require wallet approval

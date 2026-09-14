@@ -19,9 +19,15 @@ export async function compileFunc(input) {
     return { status: "compile_error", error: result.message };
   }
 
+  const usedSourcePaths = new Set(targets);
+  for (const source of result.snapshot) {
+    usedSourcePaths.add(normalizeSourcePath(source.filename));
+  }
+
   return {
     status: "ok",
     code_hash: bocBase64CodeHashHex(result.codeBoc),
+    used_source_paths: [...usedSourcePaths].sort(),
   };
 }
 

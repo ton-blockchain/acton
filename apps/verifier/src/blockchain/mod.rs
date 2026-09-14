@@ -5,6 +5,7 @@ use base64::{
 };
 use reqwest::{Client, RequestBuilder, StatusCode, header::USER_AGENT};
 use serde::Deserialize;
+use std::time::Duration;
 use thiserror::Error;
 
 use crate::config::Config;
@@ -49,6 +50,7 @@ impl ToncenterClient {
 
     fn account_states_request(&self, address: &str) -> RequestBuilder {
         self.toncenter_request("/api/v3/accountStates")
+            .timeout(Duration::from_secs(30))
             .query(&[("address", address), ("include_boc", "false")])
     }
 
@@ -84,10 +86,17 @@ impl BlockchainClient for ToncenterClient {
         let account_states =
             serde_json::from_str::<AccountStatesResponse>(&body).map_err(BlockchainError::Json)?;
 
-        Ok(account_states
+        let code_hash = account_states
             .accounts
             .into_iter()
-            .find_map(|account| non_empty_text(account.code_hash)))
+            .find_map(|account| non_empty_text(account.code_hash));
+        if code_hash
+            .as_deref()
+            .is_some_and(|hash| !is_valid_code_hash(hash))
+        {
+            return Err(BlockchainError::InvalidCodeHash);
+        }
+        Ok(code_hash)
     }
 }
 
@@ -146,6 +155,8 @@ fn bytes_to_lower_hex(bytes: &[u8]) -> String {
 
 #[derive(Debug, Error)]
 pub enum BlockchainError {
+    #[error("toncenter returned an invalid code hash")]
+    InvalidCodeHash,
     #[error("toncenter transport error: {0}")]
     Transport(reqwest::Error),
     #[error("toncenter API error: status={status}, body={body}")]
@@ -174,7 +185,9 @@ struct AccountState {
 mod tests {
     use reqwest::header::USER_AGENT;
 
-    use super::{ToncenterClient, normalize_code_hash, user_agent};
+    use super::{
+        BlockchainClient, BlockchainError, ToncenterClient, normalize_code_hash, user_agent,
+    };
 
     #[test]
     fn toncenter_request_has_user_agent() {
@@ -184,6 +197,7 @@ mod tests {
             panic!("Toncenter request should be valid");
         };
         let expected_user_agent = user_agent();
+        assert_eq!(request.timeout(), Some(&std::time::Duration::from_secs(30)));
 
         assert_eq!(
             request
@@ -192,6 +206,40 @@ mod tests {
                 .and_then(|value| value.to_str().ok()),
             Some(expected_user_agent.as_str())
         );
+    }
+
+    #[tokio::test]
+    async fn account_lookup_rejects_malformed_hashes_and_normalizes_valid_ones() {
+        use axum::{Json, Router, routing::get};
+        for (hash, expected) in [
+            ("../unexpected", None),
+            (
+                "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=",
+                Some("a".repeat(64)),
+            ),
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("listener");
+            let address = listener.local_addr().expect("address");
+            let router =
+                Router::new().route(
+                    "/api/v3/accountStates",
+                    get(move || async move {
+                        Json(serde_json::json!({"accounts": [{"code_hash": hash}]}))
+                    }),
+                );
+            let server = tokio::spawn(async move { axum::serve(listener, router).await });
+            let result = ToncenterClient::new(format!("http://{address}"), None)
+                .get_code_hash("0:account")
+                .await;
+            server.abort();
+            if let Some(expected) = expected {
+                assert_eq!(result.expect("valid hash"), Some(expected));
+            } else {
+                assert!(matches!(result, Err(BlockchainError::InvalidCodeHash)));
+            }
+        }
     }
 
     #[test]

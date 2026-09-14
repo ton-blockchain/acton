@@ -19,10 +19,16 @@ test.describe("Explorer shell", () => {
 
   test("renders the landing page and primary navigation", async ({page}) => {
     const primaryNavigation = page.getByRole("navigation", {name: "Explorer navigation"})
-    await expect(primaryNavigation.getByRole("link", {name: "Blocks"})).toBeVisible()
-    await expect(primaryNavigation.getByRole("link", {name: "ABI"})).toBeVisible()
-    await expect(primaryNavigation.getByRole("link", {name: "Sources"})).toBeVisible()
-    await expect(primaryNavigation.getByRole("link", {name: "Emulate"})).toHaveCount(0)
+    await expect(primaryNavigation).toMatchAriaSnapshot(`
+      - navigation "Explorer navigation":
+        - link "Blocks":
+          - /url: /blocks
+        - link "Elections":
+          - /url: /elections
+        - link "Config":
+          - /url: /config
+        - button "Open more navigation"
+    `)
     await expect(page.getByRole("button", {name: "Mainnet"})).toBeVisible()
 
     const developerTools = page.getByRole("navigation", {name: "Developer tools"})
@@ -33,6 +39,14 @@ test.describe("Explorer shell", () => {
     await expect(developerTools.getByRole("link", {name: /Cell Inspector/})).toHaveAttribute(
       "href",
       "/cell",
+    )
+
+    await page.getByRole("button", {name: "Open more navigation"}).click()
+    const moreNavigation = page.getByRole("navigation", {name: "More explorer navigation"})
+    await expect(moreNavigation.getByRole("link", {name: /^ABI /})).toHaveAttribute("href", "/abi")
+    await expect(moreNavigation.getByRole("link", {name: /^Sources /})).toHaveAttribute(
+      "href",
+      "/sources",
     )
   })
 

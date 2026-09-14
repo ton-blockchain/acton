@@ -137,14 +137,24 @@ layout disabled unless `--app` is passed explicitly.
 <CommandOption>
 <CommandOptionTitle>
 
-`--hooks`
+`--hooks[=`_hook_`]`
 
 </CommandOptionTitle>
 
-Create and install the default project-local Git hooks.
+Create and install a project-local Git hook with `acton check` and `acton fmt --check`.
+
+<CommandOptionMeta label="Possible values">
+
+`pre-push`, `pre-commit`
+
+</CommandOptionMeta>
+
+`--hooks` creates `.githooks/pre-push`. Use `--hooks=pre-commit` to run checks
+before each commit. An explicit value must use `=`.
 
 If `git` is available and `--hooks` is not provided, interactive mode offers
-this choice after you opt into advanced options. Non-interactive mode leaves
+the choices `pre-push`, `pre-commit`, and no hooks after you opt into advanced
+options. The selector defaults to `pre-push`. Non-interactive mode leaves
 hooks disabled unless `--hooks` is passed explicitly.
 
 </CommandOption>
@@ -349,7 +359,7 @@ If you opt into advanced options, Acton can then prompt for:
 
 - description
 - license
-- whether to install the default Git hooks when `git` is available
+- Git hooks: `pre-push` (default), `pre-commit`, or no hooks, when `git` is available
 - whether to include `AGENTS.md`
 
 If you skip advanced options, Acton keeps the default description `A TON
@@ -381,7 +391,7 @@ Depending on the selected template and options, Acton may also generate:
 - `[scripts]` aliases such as `deploy-emulation`, `deploy-testnet`, and
   template-specific management aliases in `Acton.toml`
 - frontend files for `--app`
-- `.githooks/pre-commit` for `--hooks`
+- `.githooks/pre-push` for `--hooks`, or `.githooks/pre-commit` for `--hooks=pre-commit`
 - `AGENTS.md` for `--agents`
 
 ## TypeScript App Layout

@@ -52,6 +52,10 @@
   padding-top: 14px;
 }
 
+.inputHeader {
+  padding: 14px var(--cell-inspector-panel-padding) 0;
+}
+
 .fieldLabel {
   color: var(--acton-color-text);
   font-size: var(--acton-font-size-xs);
@@ -105,11 +109,21 @@
   color: var(--acton-color-text-subtle);
 }
 
+.optionsDisclosure {
+  margin: 4px var(--cell-inspector-panel-padding) 0;
+}
+
+.optionsDisclosureContent {
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 var(--cell-inspector-panel-padding);
+}
+
 .optionsGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  padding: 16px var(--cell-inspector-panel-padding) 0;
+  padding-top: 8px;
 }
 
 .numberInput {
@@ -124,7 +138,7 @@
 }
 
 .strictOption {
-  margin: 14px var(--cell-inspector-panel-padding) 0;
+  margin-top: 14px;
 }
 
 .customTlbSection {
@@ -132,7 +146,6 @@
   flex-direction: column;
   gap: 0;
   margin-top: 14px;
-  padding: 0 var(--cell-inspector-panel-padding) var(--cell-inspector-panel-padding);
 }
 
 .customTlbSection .textareaField {

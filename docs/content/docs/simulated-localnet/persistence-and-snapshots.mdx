@@ -1,16 +1,10 @@
 ---
-title: "Persistence, State Files, and Checkpoints"
-description: "Persist local node state with SQLite, portable JSON state files, or in-memory checkpoints"
+title: "Persistence and Snapshots"
+description: "Keep local chain state across runs and save persistent JSON snapshots for repeatable scenarios"
 ---
 
-The local node supports three state workflows:
-
-- Persistent SQLite database (`--db-path` or `[localnet].db-path`)
-- Portable JSON state files (`localnet state`, `--load-state`, or `--dump-state`)
-- Named in-memory checkpoints (`localnet checkpoint`)
-
-JSON state files are direct exports of local node state. They are intended for
-the same Acton version that produced them.
+SQLite keeps committed chain state across runs. Snapshots save explicit restore
+points as JSON files, including volatile state such as pending messages and virtual time.
 
 ## Persistent SQLite State
 
@@ -38,79 +32,41 @@ verified sources. Account keys include the workchain, so basechain and
 masterchain addresses cannot collide.
 
 Queued but unmined messages, pending time overrides, address aliases, and
-derived token/NFT caches belong to the running process. Use a JSON state file
-or checkpoint when those runtime details must be carried over exactly.
+derived token/NFT caches belong to the running process. Create a snapshot of the running node when those runtime details must be carried over exactly.
 
-## JSON State Files
+## Saved snapshots
 
-Dump or load the state of a running localnet directly:
-
-```bash
-acton simulated-localnet state dump states/localnet.json
-acton simulated-localnet state load states/localnet.json
-```
-
-`state load` replaces the current live state and clears all in-memory
-checkpoints. The CLI reads and writes the file itself; the localnet server only
-receives the JSON bytes. State and checkpoint imports validate their block
-history, CAS hashes, config, account references, transactions, messages, and
-queue references before replacing live or SQLite state.
-
-State and checkpoint exports are written through a temporary file in the same
-directory and atomically moved into place, so a failed write does not truncate
-an existing export.
-
-You can also load state during startup:
-
-Load state before startup:
+Create a snapshot, then use its returned ID to restore or export it:
 
 ```bash
-acton simulated-localnet start --load-state snapshots/localnet.json
+acton simulated-localnet snapshot create before-upgrade
+acton simulated-localnet snapshot list --json
+acton simulated-localnet snapshot restore <SNAPSHOT_ID>
+acton simulated-localnet snapshot export <SNAPSHOT_ID> --out snapshots/before-upgrade.json
+acton simulated-localnet snapshot import snapshots/before-upgrade.json --name imported
+acton simulated-localnet snapshot delete <SNAPSHOT_ID>
 ```
 
-Dump state on graceful shutdown:
+Each snapshot is an immutable JSON file. Saving or restoring runs in the same queue
+as mining and other state changes, so the process stays running.
 
-```bash
-acton simulated-localnet start --dump-state snapshots/localnet.json
-```
+Import validates the file and saves it under a new ID. It does not change the running
+state. Export downloads the selected saved file. Pass `--force` to replace an existing
+output file. Failed writes cannot truncate an existing export or publish a partial snapshot.
 
-You can combine both to evolve a portable local chain state file between sessions:
+With a database, snapshots live in a sibling directory: `localnet.sqlite` uses
+`localnet.snapshots/`. Without a database, the default is
+`.acton/simulated-localnet/<port>/snapshots/` under the project root. Use
+`--snapshots-dir <path>` at startup to choose another location.
 
-```bash
-acton simulated-localnet start \
-  --load-state snapshots/localnet.json \
-  --dump-state snapshots/localnet.json
-```
+Snapshots survive node restarts. Use the same directory on the next run to access them.
+The snapshot format is intended for the same Acton version and fork network that
+produced it. Imports validate history, CAS hashes, config, accounts, transactions,
+messages, and queue references before publishing a file.
 
-<Callout>
-  `--load-state` cannot be used when a database path comes from either `--db-path` or
-  `[localnet].db-path`.
-</Callout>
+## Snapshot contents
 
-## Checkpoints
-
-Checkpoints are fast, named restore points kept in the running localnet process:
-
-```bash
-acton simulated-localnet checkpoint create before-upgrade
-acton simulated-localnet checkpoint list
-acton simulated-localnet checkpoint restore before-upgrade
-acton simulated-localnet checkpoint delete before-upgrade
-acton simulated-localnet checkpoint clear
-```
-
-Restoring a checkpoint is non-destructive: the checkpoint and checkpoints made
-after it remain available. Checkpoints disappear when the localnet process
-stops unless you export them:
-
-```bash
-acton simulated-localnet checkpoint export before-upgrade --out states/before-upgrade.json
-acton simulated-localnet checkpoint import states/before-upgrade.json --name before-upgrade
-```
-
-## What a JSON State File Contains
-
-A JSON state file stores enough local node state to resume the same local chain
+A snapshot stores enough local node state to resume the same local chain
 view later. The state document includes:
 
 - global chain state such as head seqno, logical time, queue policy, and config hash
@@ -124,20 +80,15 @@ view later. The state document includes:
 - pending internal/external message pools
 
 This is broader than just account balances or contract storage. A restored
-state file can also bring back explorer-oriented metadata and local admin state.
+snapshot can also bring back explorer-oriented metadata and local admin state.
 
-## Compatibility Notes
+## Studio
 
-- state files are not backward-compatible across schema changes
-- JSON state files and SQLite persistence are separate workflows; `--load-state`
-  cannot be combined with a database path from either CLI or `Acton.toml`
-- when you use `--dump-state`, the state file is written on graceful shutdown
+Open **Snapshots** in a simulated environment to create, restore, delete, import, or
+download snapshots. The page uses the same workflow as Full localnet. Simulated
+snapshots use JSON files and do not stop a running environment.
 
-## Choosing a Strategy
-
-| Use case                               | Recommended mode           |
-| -------------------------------------- | -------------------------- |
-| Stable long-lived local environment    | `--db-path`                |
-| Portable, shareable local state        | `localnet state dump/load` |
-| Repeated restore points in one process | `localnet checkpoint`      |
-| Fast ad-hoc experimentation            | in-memory (no flags)       |
+Listing, importing, downloading, and deleting also work while the environment is
+stopped. Creation from a stopped environment saves its persisted SQLite state;
+volatile data is available only when capturing a running node. Restoring a stopped
+environment starts it so the restored state is ready to use.

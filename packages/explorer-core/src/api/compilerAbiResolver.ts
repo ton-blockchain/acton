@@ -2,6 +2,12 @@ import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {ExtendedContractABI} from "./compilerAbi"
 import {addressKey} from "./compilerAbi"
+import {
+  getBundledCompilerAbiForInterface,
+  STANDARD_INTERFACE_CATALOG_IDS,
+} from "./compilerAbiCatalog"
+import {normalizeCodeHash} from "../metadata/codeHash"
+import {hasAccountContractHint} from "../pages/accountContractTypes"
 import type {ExplorerMetadataRegistry} from "../metadata/types"
 import type {TonClient} from "./client"
 
@@ -19,6 +25,39 @@ export interface ResolvedCompilerAbis {
   readonly addressToCodeHash: ReadonlyMap<string, string>
   readonly abiByCodeHash: ReadonlyMap<string, ContractABI | undefined>
   readonly abiByAddress: ReadonlyMap<string, ContractABI | undefined>
+}
+
+/** Selects the known public interface only when no exact implementation ABI is available. */
+export async function resolveAccountCompilerAbi(
+  exactAbi: ExtendedContractABI | null | undefined,
+  interfaces: readonly string[],
+): Promise<ExtendedContractABI | undefined> {
+  if (exactAbi) return exactAbi
+
+  const knownInterfaces = Object.keys(
+    STANDARD_INTERFACE_CATALOG_IDS,
+  ) as (keyof typeof STANDARD_INTERFACE_CATALOG_IDS)[]
+  const matches = knownInterfaces.filter(name => hasAccountContractHint(interfaces, [], name))
+  if (matches.length !== 1) return undefined
+
+  return getBundledCompilerAbiForInterface(matches[0])
+}
+
+/** Resolves message ABI for current or historical code without applying today's interface after a code change. */
+export function getResolvedAccountAbi(
+  resolved: ResolvedCompilerAbis,
+  address: string,
+  codeHash?: string,
+): ContractABI | undefined {
+  const key = addressKey(address)
+  const currentCodeHash = resolved.addressToCodeHash.get(key)
+  const selectedCodeHash = codeHash ?? currentCodeHash
+  const exactAbi = selectedCodeHash ? resolved.abiByCodeHash.get(selectedCodeHash) : undefined
+  if (exactAbi) return exactAbi
+
+  return normalizeCodeHash(selectedCodeHash) === normalizeCodeHash(currentCodeHash)
+    ? resolved.abiByAddress.get(key)
+    : undefined
 }
 
 export async function resolveCompilerAbis({
@@ -78,6 +117,17 @@ export async function resolveCompilerAbis({
   for (const {key} of requestedAddresses) {
     const codeHash = addressToCodeHash.get(key)
     abiByAddress.set(key, codeHash ? abiByCodeHash.get(codeHash) : undefined)
+  }
+
+  // Indexer interfaces belong to account states, not arbitrary uses of the same code hash.
+  // Keep generic ABIs out of abiByCodeHash so they cannot masquerade as exact matches.
+  for (const account of states?.accounts ?? []) {
+    const key = addressKey(account.address)
+    if (abiByAddress.get(key)) continue
+
+    const abi = await resolveAccountCompilerAbi(undefined, account.interfaces ?? [])
+    if (!shouldContinue()) return undefined
+    abiByAddress.set(key, abi?.compiler_abi)
   }
 
   return {

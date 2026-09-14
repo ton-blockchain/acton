@@ -17,6 +17,7 @@ const environment: StudioEnvironment = {
     observabilityPort: 18_007,
     nodes: [],
     importedAccounts: [],
+    accounts: [],
   },
   capabilities: ["snapshots"],
   endpoints: {},
@@ -26,12 +27,9 @@ const environment: StudioEnvironment = {
 const snapshot = {
   id: "snapshot-test",
   name: "Baseline",
-  formatVersion: 3,
   createdAt: 1_788_752_600,
-  archiveSizeBytes: 42,
+  sizeBytes: 42,
   stateSizeBytes: 80,
-  stateSchemaVersion: 4,
-  tonRelease: "test",
   masterchainSeqno: 42,
 }
 
@@ -73,7 +71,9 @@ test("reload discovers progress even when inventory fails and recovers the list"
   )
 
   await page.goto("/virtual-environments/environment-1/snapshots")
-  await expect(page.getByText("Creating snapshot", {exact: true})).toBeVisible()
+  await expect(
+    page.locator("main").last().getByText("Creating snapshot", {exact: true}),
+  ).toBeVisible()
   await expect(page.getByRole("button", {name: "Create snapshot", exact: true})).toBeDisabled()
   await expect(
     page
@@ -83,7 +83,9 @@ test("reload discovers progress even when inventory fails and recovers the list"
   await expect(page.locator("main").last().getByText("Inventory is busy")).toHaveCount(0)
 
   await page.reload()
-  await expect(page.getByText("Creating snapshot", {exact: true})).toBeVisible()
+  await expect(
+    page.locator("main").last().getByText("Creating snapshot", {exact: true}),
+  ).toBeVisible()
   complete = true
   await expect(page.getByText(snapshot.name, {exact: true})).toBeVisible()
   await expect(page.getByRole("button", {name: "Create snapshot", exact: true})).toBeEnabled()
@@ -116,7 +118,9 @@ test("progress polling recovers after its initial request fails", async ({page})
   ).toBeVisible()
   await expect(page.getByRole("button", {name: "Create snapshot", exact: true})).toBeDisabled()
   available = true
-  await expect(page.getByText("Restoring snapshot", {exact: true})).toBeVisible()
+  await expect(
+    page.locator("main").last().getByText("Restoring snapshot", {exact: true}),
+  ).toBeVisible()
 })
 
 test("an older poll cannot replace a newly accepted snapshot operation", async ({page}) => {
@@ -159,10 +163,87 @@ test("an older poll cannot replace a newly accepted snapshot operation", async (
   await dialog.getByRole("button", {name: "Create snapshot", exact: true}).click()
   await expect.poll(() => Boolean(finishPoll)).toBe(true)
   finishPost?.()
-  await expect(page.getByText("Creating snapshot", {exact: true})).toBeVisible()
+  await expect(
+    page.locator("main").last().getByText("Creating snapshot", {exact: true}),
+  ).toBeVisible()
   finishPoll?.()
   // The closing dialog changes its title before its exit animation removes it.
   await expect(page.getByRole("dialog")).toHaveCount(0)
   await expect(page.getByRole("button", {name: "Create snapshot", exact: true})).toBeDisabled()
-  await expect(page.getByText("Creating snapshot", {exact: true})).toBeVisible()
+  await expect(
+    page.locator("main").last().getByText("Creating snapshot", {exact: true}),
+  ).toBeVisible()
 })
+
+for (const simulated of [false, true]) {
+  test(`${simulated ? "Simulated" : "Full"} snapshot dialogs use sequential names and update the list before success`, async ({
+    page,
+  }) => {
+    const selected: StudioEnvironment = simulated
+      ? {
+          ...environment,
+          config: {
+            kind: "actonSimulatedLocalnet",
+            port: 5411,
+            accounts: [],
+            noMining: true,
+            mineEmptyBlocks: false,
+          },
+        }
+      : environment
+    let saved = [{...snapshot, name: "Snapshot 1"}]
+    let operation: EnvironmentSnapshotOperation | null = null
+    let releaseList: (() => void) | undefined
+
+    await page.route("**/api/v1/environments", route => route.fulfill({json: [selected]}))
+    await page.route("**/snapshot-operation", route => route.fulfill({json: operation}))
+    await page.route("**/api/v1/environments/environment-1/snapshots", async route => {
+      if (route.request().method() === "POST") {
+        const name = route.request().postDataJSON().name
+        saved = [...saved, {...snapshot, id: "snapshot-new", name}]
+        operation = {
+          kind: "create",
+          phase: "completed",
+          startedAt: new Date().toISOString(),
+          snapshotId: "snapshot-new",
+          snapshotName: name,
+        }
+
+        return route.fulfill({json: operation})
+      }
+
+      if (saved.length > 1) {
+        await new Promise<void>(resolve => {
+          releaseList = resolve
+        })
+      }
+
+      await route.fulfill({json: saved})
+    })
+
+    await page.goto("/virtual-environments/environment-1/snapshots")
+    await page.getByRole("button", {name: "Create snapshot", exact: true}).click()
+    const dialog = page.getByRole("dialog")
+    await expect(dialog.getByRole("textbox", {name: "Name"})).toHaveValue("Snapshot 2")
+    await expect(dialog.getByText(/^Save accounts/)).toBeVisible()
+    await expect(dialog.getByRole("alert")).toHaveCount(simulated ? 0 : 1)
+
+    await dialog.getByRole("button", {name: "Create snapshot", exact: true}).click()
+    await expect.poll(() => Boolean(releaseList)).toBe(true)
+    await expect(page.getByText("Snapshot created", {exact: true})).toHaveCount(0)
+    releaseList?.()
+
+    await expect(page.getByText("Snapshot created", {exact: true})).toBeVisible()
+    await expect(page.getByRole("row").filter({hasText: "Snapshot 2"})).toBeVisible()
+    if (simulated) await expect(page.getByText("Stop network", {exact: true})).toHaveCount(0)
+
+    await page.getByRole("button", {name: "Restore snapshot", exact: true}).first().click()
+    await expect(dialog.getByText("Restore the network state from this snapshot")).toBeVisible()
+    await expect(dialog.getByRole("alert")).toHaveCount(simulated ? 0 : 1)
+    await dialog.getByRole("button", {name: "Cancel", exact: true}).click()
+
+    await page.getByRole("button", {name: "Delete Snapshot 1", exact: true}).click()
+    await expect(dialog.getByRole("alert")).toHaveCount(0)
+    await expect(dialog.getByText("This permanently deletes the saved snapshot")).toBeVisible()
+  })
+}

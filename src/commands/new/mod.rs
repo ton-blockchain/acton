@@ -1,6 +1,6 @@
 use crate::build_info;
 use crate::commands::common::{shell_quote, symlink_global_libraries, symlink_global_wallets};
-use crate::commands::hooks::scaffold_and_install_default_hooks;
+use crate::commands::hooks::{GitHook, scaffold_and_install_default_hooks, select_git_hook};
 use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
@@ -51,7 +51,7 @@ pub fn new_cmd(
     template: Option<ProjectTemplate>,
     license: Option<String>,
     app: bool,
-    hooks: bool,
+    hooks: Option<GitHook>,
     agents: bool,
     overwrite: bool,
     templates: bool,
@@ -132,12 +132,12 @@ pub fn new_cmd(
         git_available,
         description.is_none(),
         license.is_none(),
-        hooks,
+        hooks.is_some(),
         agents,
     )?;
     let description = resolve_description(description, configure_advanced)?;
     let license = resolve_license(license, configure_advanced)?;
-    let include_hooks = resolve_include_hooks(hooks, git_available, configure_advanced)?;
+    let hook = resolve_git_hook(hooks, git_available, configure_advanced)?;
     let include_agents = resolve_include_agents(agents, configure_advanced)?;
     let scaffold = template::project_scaffold(template, include_app).ok_or_else(|| {
         anyhow!(
@@ -255,8 +255,8 @@ pub fn new_cmd(
 
     if git_available {
         initialize_git_repository()?;
-        if include_hooks {
-            scaffold_and_install_default_hooks(Path::new("."))?;
+        if let Some(hook) = hook {
+            scaffold_and_install_default_hooks(Path::new("."), hook)?;
         }
         stage_git_repository()?;
     } else {
@@ -285,8 +285,8 @@ pub fn new_cmd(
             "included".cyan()
         );
     }
-    if include_hooks {
-        println!("  {} {}", "Git hooks:".bright_black(), "installed".cyan());
+    if let Some(hook) = hook {
+        println!("  {} {}", "Git hooks:".bright_black(), hook.as_str().cyan());
     }
     if include_agents {
         println!("  {} {}", "AGENTS.md:".bright_black(), "included".cyan());
@@ -422,30 +422,27 @@ fn resolve_license(license: Option<String>, configure_advanced: bool) -> anyhow:
     }
 }
 
-fn resolve_include_hooks(
-    hooks: bool,
+fn resolve_git_hook(
+    hook: Option<GitHook>,
     git_available: bool,
     configure_advanced: bool,
-) -> anyhow::Result<bool> {
-    if hooks {
+) -> anyhow::Result<Option<GitHook>> {
+    if hook.is_some() {
         if !git_available {
             anyhow::bail!("Git hooks require the `git` command to be available in PATH");
         }
 
-        return Ok(true);
+        return Ok(hook);
     }
 
     if !git_available {
-        return Ok(false);
+        return Ok(None);
     }
 
     if configure_advanced {
-        Confirm::new("Set up Git hooks to run checks before each commit?")
-            .with_default(false)
-            .prompt()
-            .map_err(Into::into)
+        select_git_hook(true)
     } else {
-        Ok(false)
+        Ok(None)
     }
 }
 

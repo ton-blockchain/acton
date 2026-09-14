@@ -1,0 +1,38 @@
+{
+  "code_hash": {
+    "body": {
+      "error": "duplicate multipart field: code_hash"
+    },
+    "status": 400
+  },
+  "compile_params": {
+    "body": {
+      "error": "duplicate multipart field: compile_params"
+    },
+    "status": 400
+  },
+  "language": {
+    "body": {
+      "error": "duplicate multipart field: language"
+    },
+    "status": 400
+  },
+  "sources": {
+    "body": {
+      "error": "duplicate multipart field: sources"
+    },
+    "status": 400
+  },
+  "too_many_files": {
+    "body": {
+      "error": "at most 256 source files may be uploaded"
+    },
+    "status": 400
+  },
+  "tx_hash": {
+    "body": {
+      "error": "duplicate multipart field: tx_hash"
+    },
+    "status": 400
+  }
+}

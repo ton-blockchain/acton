@@ -6,7 +6,6 @@
   "author": "TON Core",
   "type": "module",
   "exports": {
-    "./faucet/FaucetPage": "./src/faucet/FaucetPage.tsx",
     "./pages/ValidatorsPage": "./src/pages/ValidatorsPage.tsx"
   },
   "main": "index.js",
@@ -24,6 +23,7 @@
   },
   "dependencies": {
     "@acton/explorer-core": "workspace:*",
+    "@acton/faucet-ui": "workspace:*",
     "@acton/localton-ui": "workspace:*",
     "@acton/transaction-ui": "workspace:*",
     "@acton/ui": "workspace:*",

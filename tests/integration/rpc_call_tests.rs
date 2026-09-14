@@ -337,8 +337,8 @@ fn test_rpc_call_uses_verifier_abi_and_cache() {
         spawn_toncenter_v2_mock_with_capture(toncenter_responses);
     let (verifier_url, verifier_handle, verifier_captured) = spawn_verifier_mock(vec![
         VerifierMockResponse {
-            status: 200,
-            body: serde_json::json!({ "items": [] }).to_string(),
+            status: 404,
+            body: serde_json::json!({ "error": "ABI was not found" }).to_string(),
             headers: vec![],
         },
         abi_response(&code_hash, &abi),
@@ -350,9 +350,10 @@ fn test_rpc_call_uses_verifier_abi_and_cache() {
     ]);
     let verifier_backend = format!("  {verifier_url}/  ");
     append_custom_network(project.path(), "mock", &format!("{toncenter_url}/api/v2"));
-    let cache_path = project
-        .path()
-        .join(format!("build/cache/verifier-abi/{code_hash}.json"));
+    let backend_hash = <sha2::Sha256 as sha2::Digest>::digest(verifier_url.as_bytes());
+    let cache_path = project.path().join(format!(
+        "build/cache/verifier-abi/{backend_hash:x}/{code_hash}.json"
+    ));
 
     let rpc_call = || {
         project
@@ -365,7 +366,7 @@ fn test_rpc_call_uses_verifier_abi_and_cache() {
             .arg("--net")
             .arg("custom:mock")
             .arg("--json")
-            .env("ACTON_NEW_VERIFY_BACKEND", &verifier_backend)
+            .env("ACTON_VERIFY_BACKEND", &verifier_backend)
             .env("ACTON_LOG_DIR", &log_dir)
             .run()
             .success()

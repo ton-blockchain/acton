@@ -13,7 +13,8 @@ fn server() -> StudioServer {
     StudioServer::new(
         StudioServerConfig::new("test-version").with_workspace(
             StudioWorkspace::new("counter", "/private/workspaces/counter")
-                .with_wallet_names(vec!["deployer".to_owned(), "treasury".to_owned()]),
+                .with_wallet_names(vec!["deployer".to_owned(), "treasury".to_owned()])
+                .with_default_startup_accounts(vec!["treasury".to_owned()]),
         ),
     )
 }
@@ -36,7 +37,7 @@ async fn info_contract_does_not_expose_host_paths_or_deployment_mode() {
     let actual = format!("status: {status}\nbody: {}", String::from_utf8_lossy(&body));
 
     expect![[r#"status: 200 OK
-body: {"protocolVersion":1,"serverVersion":"test-version","workspace":{"name":"counter","walletNames":["deployer","treasury"]}}"#]]
+body: {"protocolVersion":1,"serverVersion":"test-version","workspace":{"name":"counter","walletNames":["deployer","treasury"],"defaultStartupAccounts":["treasury"]}}"#]]
     .assert_eq(&actual);
 }
 
@@ -143,7 +144,7 @@ async fn openapi_contract_lists_every_studio_operation_and_resolves_schema_refer
         openapi: 3.1.0
         title: Acton Studio API
         version: 1.0.0
-        operations: 71
+        operations: 72
         DELETE /api/v1/environments/{environment_id}
         DELETE /api/v1/environments/{environment_id}/nodes/{node_id}
         DELETE /api/v1/environments/{environment_id}/snapshots/{snapshot_id}
@@ -164,6 +165,7 @@ async fn openapi_contract_lists_every_studio_operation_and_resolves_schema_refer
         GET /api/v1/environments/{environment_id}/rpc/{path}
         GET /api/v1/environments/{environment_id}/snapshot-operation
         GET /api/v1/environments/{environment_id}/snapshots
+        GET /api/v1/environments/{environment_id}/startup
         GET /api/v1/environments/{environment_id}/wallets
         GET /api/v1/health
         GET /api/v1/info
@@ -215,7 +217,7 @@ async fn openapi_contract_lists_every_studio_operation_and_resolves_schema_refer
         POST /api/v1/testnet-faucet/challenge
         POST /api/v1/testnet-faucet/claim
         PUT /api/v1/environments/{environment_id}/network/activity
-        schemas: 99
+        schemas: 101
         missing schema references: none"]]
     .assert_eq(&actual);
 }

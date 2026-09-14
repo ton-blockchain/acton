@@ -34,7 +34,10 @@ export function WalletMessageEditor({
 }: WalletMessageEditorProps) {
   const signatureDescriptionId = useId()
   const currentValue = useRef(editorProps.value)
-  currentValue.current = editorProps.value
+
+  useEffect(() => {
+    currentValue.current = editorProps.value
+  }, [editorProps.value])
 
   function changeParameter(name: string, value: unknown) {
     // Automatic field requests may resolve in the same render batch; merge them without losing siblings.
@@ -125,9 +128,12 @@ function WalletParameterInput({
   const {showToast} = useToast()
   const [loading, setLoading] = useState(false)
   const latest = useRef({field, fetchParameter})
-  latest.current = {field, fetchParameter}
   const requestId = useRef(0)
   const edited = useRef(false)
+
+  useEffect(() => {
+    latest.current = {field, fetchParameter}
+  }, [field, fetchParameter])
 
   useEffect(
     () => () => {

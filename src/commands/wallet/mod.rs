@@ -90,8 +90,14 @@ struct ResolvedAirdropWallet {
 }
 
 enum AirdropTarget {
-    Testnet { faucet_url: String },
-    Localnet { port: u16, amount_grams: f64 },
+    Testnet {
+        faucet_url: String,
+    },
+    Localnet {
+        api_v2_url: reqwest::Url,
+        faucet_url: reqwest::Url,
+        amount_grams: f64,
+    },
 }
 
 impl AirdropTarget {
@@ -109,7 +115,6 @@ const DEFAULT_POW_MAX_SOLVE_TTL_SECONDS: u64 = 60;
 const DEFAULT_POW_MAX_NONCE_ATTEMPTS: u64 = 1_000_000_000;
 const CHALLENGE_VERSION: [u32; 1] = [1];
 const DEFAULT_FAUCET_URL: &str = "https://faucet.ton.org/";
-const DEFAULT_LOCALNET_PORT: u16 = 5411;
 const LOCALNET_WALLET_AIRDROP_AMOUNT_GRAMS: f64 = 100.0;
 const AIRDROP_BALANCE_WAIT_ATTEMPTS: usize = 10;
 const AIRDROP_BALANCE_WAIT_INTERVAL: Duration = Duration::from_secs(2);
@@ -421,9 +426,11 @@ fn perform_airdrop_for_wallet(
         AirdropTarget::Testnet { faucet_url } => {
             perform_testnet_airdrop(wallet.address, faucet_url, json)
         }
-        AirdropTarget::Localnet { port, amount_grams } => {
-            perform_localnet_airdrop(wallet.address, amount_grams, port)
-        }
+        AirdropTarget::Localnet {
+            api_v2_url,
+            faucet_url,
+            amount_grams,
+        } => perform_localnet_airdrop(wallet.address, amount_grams, &api_v2_url, &faucet_url),
     }
 }
 
@@ -439,18 +446,49 @@ fn resolve_airdrop_target(
             if faucet_url.is_some() {
                 anyhow::bail!("--faucet-url can only be used with --net testnet");
             }
-            let port = ActonConfig::load()
-                .ok()
-                .and_then(|config| config.localnet)
-                .and_then(|localnet| localnet.port)
-                .unwrap_or(DEFAULT_LOCALNET_PORT);
+
+            let config = ActonConfig::load()?;
+            let (api_v2_url, faucet_url) = localnet_airdrop_urls(&config)?;
 
             Ok(AirdropTarget::Localnet {
-                port,
+                api_v2_url,
+                faucet_url,
                 amount_grams: LOCALNET_WALLET_AIRDROP_AMOUNT_GRAMS,
             })
         }
     }
+}
+
+/// Resolves both localnet requests from the configured V2 endpoint.
+///
+/// Studio exposes every environment through one `/rpc` prefix, so removing the
+/// terminal `/api/v2` selects that environment's control API for both simulated
+/// and Full localnets. Direct simulated-localnet URLs follow the same layout.
+fn localnet_airdrop_urls(config: &ActonConfig) -> anyhow::Result<(reqwest::Url, reqwest::Url)> {
+    let networks = config.custom_networks();
+    let api_v2 = networks
+        .get("localnet")
+        .context("Localnet API v2 URL is unavailable")?
+        .v2_url
+        .as_ref();
+    let mut api_v2_url = reqwest::Url::parse(api_v2)
+        .with_context(|| format!("Invalid localnet API v2 URL: {api_v2}"))?;
+    if !matches!(api_v2_url.scheme(), "http" | "https") {
+        anyhow::bail!("Localnet API v2 URL scheme must be http or https");
+    }
+    if api_v2_url.query().is_some() || api_v2_url.fragment().is_some() {
+        anyhow::bail!("Localnet API v2 URL must not contain query parameters or fragments");
+    }
+
+    let api_path = api_v2_url.path().trim_end_matches('/').to_owned();
+    let control_path = api_path
+        .strip_suffix("/api/v2")
+        .with_context(|| format!("Localnet API v2 URL must end with /api/v2: {api_v2_url}"))?;
+    let mut faucet_url = api_v2_url.clone();
+    faucet_url.set_path(&format!("{control_path}/acton_fundAccount"));
+    api_v2_url.set_path(&api_path);
+
+    Ok((api_v2_url, faucet_url))
 }
 
 fn perform_testnet_airdrop(
@@ -588,7 +626,8 @@ fn perform_testnet_airdrop(
 fn perform_localnet_airdrop(
     address: String,
     amount_grams: f64,
-    port: u16,
+    api_v2_url: &reqwest::Url,
+    faucet_url: &reqwest::Url,
 ) -> anyhow::Result<AirdropResult> {
     let client = crate::http::blocking_client_builder()
         .connect_timeout(Duration::from_secs(10))
@@ -599,17 +638,15 @@ fn perform_localnet_airdrop(
     let amount_nanograms = (amount_grams * 1_000_000_000.0) as u128;
     let auth_token = commands::simulated_localnet::resolve_localnet_auth_token(None);
     let initial_balance =
-        fetch_localnet_account_balance(&client, port, &address, auth_token.as_deref());
-    let request = client
-        .post(format!("http://127.0.0.1:{port}/acton_fundAccount"))
-        .json(&serde_json::json!({
-            "address": address,
-            "amount": amount_nanograms,
-        }));
+        fetch_localnet_account_balance(&client, api_v2_url, &address, auth_token.as_deref());
+    let request = client.post(faucet_url.clone()).json(&serde_json::json!({
+        "address": address,
+        "amount": amount_nanograms,
+    }));
     let response = with_localnet_blocking_auth(request, auth_token.as_deref())
         .send()
         .context(
-            "Failed to send request to localnet faucet. Make sure `acton simulated-localnet start` is running",
+            "Failed to send request to the configured localnet faucet. Make sure the localnet environment is running",
         )?;
 
     if response.status().is_success() {
@@ -630,7 +667,7 @@ fn perform_localnet_airdrop(
                 .saturating_add(amount_nanograms);
             wait_for_localnet_airdrop_balance(
                 &client,
-                port,
+                api_v2_url,
                 &address,
                 expected_balance,
                 auth_token.as_deref(),
@@ -659,15 +696,16 @@ fn perform_localnet_airdrop(
 
 fn fetch_localnet_account_balance(
     client: &reqwest::blocking::Client,
-    port: u16,
+    api_v2_url: &reqwest::Url,
     address: &str,
     auth_token: Option<&str>,
 ) -> anyhow::Result<u128> {
-    let request = client
-        .get(format!(
-            "http://127.0.0.1:{port}/api/v2/getAddressInformation"
-        ))
-        .query(&[("address", address)]);
+    let mut balance_url = api_v2_url.clone();
+    balance_url.set_path(&format!(
+        "{}/getAddressInformation",
+        api_v2_url.path().trim_end_matches('/')
+    ));
+    let request = client.get(balance_url).query(&[("address", address)]);
     let response: serde_json::Value = with_localnet_blocking_auth(request, auth_token)
         .send()
         .context("Failed to query localnet account balance")?
@@ -684,14 +722,15 @@ fn fetch_localnet_account_balance(
 
 fn wait_for_localnet_airdrop_balance(
     client: &reqwest::blocking::Client,
-    port: u16,
+    api_v2_url: &reqwest::Url,
     address: &str,
     expected_balance: u128,
     auth_token: Option<&str>,
 ) -> anyhow::Result<()> {
     let deadline = Instant::now() + Duration::from_secs(12);
     loop {
-        if fetch_localnet_account_balance(client, port, address, auth_token).unwrap_or_default()
+        if fetch_localnet_account_balance(client, api_v2_url, address, auth_token)
+            .unwrap_or_default()
             >= expected_balance
         {
             return Ok(());

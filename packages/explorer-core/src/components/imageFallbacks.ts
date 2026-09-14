@@ -5,6 +5,19 @@ const TOKEN_PLACEHOLDER_SVG =
 
 export const TOKEN_PLACEHOLDER_IMAGE = `data:image/svg+xml,${encodeURIComponent(TOKEN_PLACEHOLDER_SVG)}`
 
+const NFT_PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
+  <path fill="#92939d" fill-opacity=".08" d="M0 0h256v256H0z"/>
+  <g stroke="#92939d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path opacity=".3" d="M88 164h-4a12 12 0 0 1-12-12V84a12 12 0 0 1 12-12h68a12 12 0 0 1 12 12v4"/>
+    <rect x="92" y="92" width="92" height="92" rx="12"/>
+    <circle cx="118" cy="118" r="6"/>
+    <path d="m104 164 22-24 14 14 12-14 20 24"/>
+  </g>
+</svg>`
+
+/** Shared local artwork for missing or unavailable NFT images, independent of token branding. */
+export const NFT_PLACEHOLDER_IMAGE = `data:image/svg+xml,${encodeURIComponent(NFT_PLACEHOLDER_SVG)}`
+
 export const TOKEN_IMAGE_SOURCE_KEYS = [
   "_image_small",
   "_image_medium",
@@ -40,7 +53,10 @@ export const NFT_COLLECTION_CARD_IMAGE_SOURCE_KEYS = [
 
 export function deduplicateImageSources(sources: readonly string[]): string[] {
   return sources.filter(
-    (source, index) => source !== TOKEN_PLACEHOLDER_IMAGE && sources.indexOf(source) === index,
+    (source, index) =>
+      source !== TOKEN_PLACEHOLDER_IMAGE &&
+      source !== NFT_PLACEHOLDER_IMAGE &&
+      sources.indexOf(source) === index,
   )
 }
 
@@ -58,6 +74,29 @@ export function getImageSources(
   return sources
 }
 
+/**
+ * Uses explicit TON DNS metadata for domain artwork, keeping the original images as fallbacks.
+ * NFT names alone are not DNS identifiers; callers still own content safety filtering.
+ */
+export function getNftImageSources(
+  content: Record<string, unknown> | undefined,
+  keys: readonly string[] = NFT_IMAGE_SOURCE_KEYS,
+): string[] {
+  const sources = getImageSources(content, keys)
+  const extra = content?.extra
+  const domain =
+    content?.domain ??
+    (extra && typeof extra === "object" && "domain" in extra ? extra.domain : undefined)
+  const label = typeof domain === "string" ? /^([a-z0-9-]+)\.ton$/i.exec(domain)?.[1] : undefined
+
+  return label
+    ? deduplicateImageSources([
+        `https://dns-image.mytonwallet.org/img?d=${encodeURIComponent(label.toLowerCase())}`,
+        ...sources,
+      ])
+    : sources
+}
+
 export function getPrimaryImageSource(
   content: Record<string, unknown> | undefined,
   keys?: readonly string[],
@@ -68,14 +107,15 @@ export function getPrimaryImageSource(
 export function replaceBrokenImageWithFallback(
   event: SyntheticEvent<HTMLImageElement>,
   sources: readonly string[],
+  placeholder = TOKEN_PLACEHOLDER_IMAGE,
 ) {
   const image = event.currentTarget
   const currentSource = image.getAttribute("src")
-  if (currentSource === TOKEN_PLACEHOLDER_IMAGE) {
+  if (currentSource === placeholder) {
     return
   }
 
-  const candidates = [...deduplicateImageSources(sources), TOKEN_PLACEHOLDER_IMAGE]
+  const candidates = [...deduplicateImageSources(sources), placeholder]
   const currentIndex = currentSource ? candidates.indexOf(currentSource) : -1
   const nextSource = candidates
     .slice(currentIndex >= 0 ? currentIndex + 1 : 0)

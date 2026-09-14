@@ -240,10 +240,23 @@ fn test_wrapper_generation_without_test_stub() {
 }
 
 #[test]
-fn test_wrapper_generation_keeps_source_file_stem_for_wrapper_name() {
-    let project = ProjectBuilder::new("wrapper_file_stem_name")
-        .contract(
-            "configured_file",
+fn test_wrapper_generation_uses_configured_name() {
+    let project = ProjectBuilder::new("wrapper_configured_name")
+        .without_acton_toml()
+        .raw_file(
+            "Acton.toml",
+            r#"[package]
+name = "wrapper-configured-name"
+description = "Wrapper identity comes from project configuration"
+version = "0.1.0"
+
+[contracts.configured_id]
+display-name = "Friendly wallet"
+src = "contracts/contract.tolk"
+"#,
+        )
+        .raw_file(
+            "contracts/contract.tolk",
             r"
                 struct (0x00000001) Ping {}
 
@@ -259,20 +272,208 @@ fn test_wrapper_generation_keeps_source_file_stem_for_wrapper_name() {
 
     project
         .acton()
-        .wrapper("configured_file")
+        .wrapper("configured_id")
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/wrapper/test_wrapper_generation_keeps_source_file_stem_for_wrapper_name/output.txt",
+            "integration/snapshots/wrapper/test_wrapper_generation_uses_configured_name/output.txt",
         )
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/ConfiguredFile.gen.tolk")
+                .join("wrappers/FriendlyWallet.gen.tolk")
                 .to_str()
                 .expect(""),
-            "integration/snapshots/wrapper/test_wrapper_generation_keeps_source_file_stem_for_wrapper_name/wrapper.tolk.txt",
+            "integration/snapshots/wrapper/test_wrapper_generation_uses_configured_name/wrapper.tolk.txt",
         );
+}
+
+#[test]
+fn test_wrapper_all_with_identical_source_filenames() {
+    // Regression for #1100: separate entrypoints named contract.tolk must coexist in one test.
+    let project = ProjectBuilder::new("wrapper_identical_filenames")
+        .without_acton_toml()
+        .raw_file(
+            "Acton.toml",
+            r#"[package]
+name = "wrapper-identical-filenames"
+description = "Wrappers use display names or contract IDs instead of filenames"
+version = "0.1.0"
+
+[contracts.first_id]
+display-name = "First Wallet"
+src = "contracts/first/contract.tolk"
+
+[contracts.second_id]
+src = "contracts/second/contract.tolk"
+
+[contracts.third_id]
+display-name = ""
+src = "contracts/third/contract.tolk"
+
+[import-mappings]
+acton = ".acton"
+"#,
+        )
+        .raw_file(
+            "contracts/first/contract.tolk",
+            &format!("{SIMPLE_CONTRACT}\nget fun firstValue(): int {{ return 1; }}"),
+        )
+        .raw_file(
+            "contracts/second/contract.tolk",
+            &format!("{SIMPLE_CONTRACT}\nget fun secondValue(): int {{ return 2; }}"),
+        )
+        .raw_file(
+            "contracts/third/contract.tolk",
+            &format!("{SIMPLE_CONTRACT}\nget fun thirdValue(): int {{ return 3; }}"),
+        )
+        .raw_file(
+            "tests/combined.test.tolk",
+            r#"import "../wrappers/FirstWallet.gen"
+import "../wrappers/SecondId.gen"
+import "../wrappers/ThirdId.gen"
+
+get fun `test wrappers build distinct contracts`() {
+    val first = FirstWallet.fromStorage();
+    val second = SecondId.fromStorage();
+    val third = ThirdId.fromStorage();
+    assert(first.address != second.address, 101);
+    assert(second.address != third.address, 102);
+    assert(first.address != third.address, 103);
+}
+"#,
+        )
+        .build();
+
+    let output = project
+        .acton()
+        .arg("wrapper")
+        .arg("--all")
+        .current_dir(project.path())
+        .run()
+        .success();
+    output.assert_snapshot_matches(
+        "integration/snapshots/wrapper/test_wrapper_all_with_identical_source_filenames/output.txt",
+    );
+    for name in ["FirstWallet", "SecondId", "ThirdId"] {
+        output.assert_file_snapshot_matches(
+            project
+                .path()
+                .join(format!("wrappers/{name}.gen.tolk"))
+                .to_str()
+                .expect("wrapper path"),
+            &format!(
+                "integration/snapshots/wrapper/test_wrapper_all_with_identical_source_filenames/{name}.tolk.txt"
+            ),
+        );
+    }
+
+    project.acton().test().run().success().assert_snapshot_matches(
+        "integration/snapshots/wrapper/test_wrapper_all_with_identical_source_filenames/test-output.txt",
+    );
+}
+
+#[test]
+fn test_wrapper_all_rejects_conflicting_names_before_writing() {
+    for (case, second_name, third_name) in [
+        ("normalized", "shared_name", "shared-name"),
+        ("case_insensitive", "SharedName", "SHAREDNAME"),
+    ] {
+        for typescript in [false, true] {
+            let wrapper_path = if typescript {
+                "wrappers-ts/First.gen.ts"
+            } else {
+                "wrappers/First.gen.tolk"
+            };
+            let project = ProjectBuilder::new(&format!("wrapper_collision_{case}_{typescript}"))
+                .without_acton_toml()
+                .raw_file(
+                    "Acton.toml",
+                    &format!(
+                        r#"[package]
+name = "wrapper-collision"
+description = "Reject the whole batch before overwriting any wrapper"
+version = "0.1.0"
+
+[contracts.first]
+src = "contracts/contract.tolk"
+
+[contracts.second]
+display-name = "{second_name}"
+src = "contracts/contract.tolk"
+
+[contracts.third]
+display-name = "{third_name}"
+src = "contracts/contract.tolk"
+"#,
+                    ),
+                )
+                .raw_file("contracts/contract.tolk", SIMPLE_CONTRACT)
+                .raw_file(wrapper_path, "// Existing wrapper must remain unchanged\n")
+                .build();
+
+            let output = project
+                .acton()
+                .arg("wrapper")
+                .arg("--all")
+                .arg(if typescript { "--ts" } else { "--test" })
+                .current_dir(project.path())
+                .color_mode(acton_config::color::ColorMode::Always)
+                .run()
+                .failure();
+            output
+                .assert_snapshot_matches(
+                    "integration/snapshots/wrapper/test_wrapper_all_rejects_conflicting_names_before_writing/output.txt",
+                )
+                .assert_stderr_snapshot_matches(&format!(
+                    "integration/snapshots/wrapper/test_wrapper_all_rejects_conflicting_names_before_writing/{case}-stderr.txt"
+                ))
+                .assert_stderr_svg_snapshot_matches(&format!(
+                    "integration/snapshots/wrapper/test_wrapper_all_rejects_conflicting_names_before_writing/{case}-stderr.term.svg"
+                ))
+                .assert_file_snapshot_matches(
+                    project.path().join(wrapper_path).to_str().expect("wrapper path"),
+                    "integration/snapshots/wrapper/test_wrapper_all_rejects_conflicting_names_before_writing/existing-wrapper.txt",
+                );
+        }
+    }
+}
+
+#[test]
+fn test_wrapper_generation_rejects_invalid_names() {
+    for (case, name) in [
+        ("path", "../outside"),
+        ("numeric", "123-wallet"),
+        ("punctuation", "!!!"),
+    ] {
+        let project = ProjectBuilder::new(&format!("wrapper_invalid_name_{case}"))
+            .without_acton_toml()
+            .raw_file(
+                "Acton.toml",
+                &format!(
+                    r#"[package]
+name = "wrapper-invalid-name"
+description = "Display names must produce valid wrapper identifiers"
+version = "0.1.0"
+
+[contracts.configured_id]
+display-name = "{name}"
+src = "contracts/contract.tolk"
+"#
+                ),
+            )
+            .raw_file("contracts/contract.tolk", SIMPLE_CONTRACT)
+            .build();
+
+        project
+            .acton()
+            .wrapper("configured_id")
+            .run()
+            .failure()
+            .assert_stderr_snapshot_matches(&format!(
+                "integration/snapshots/wrapper/test_wrapper_generation_rejects_invalid_names/{case}-stderr.txt"
+            ));
+    }
 }
 
 #[test]
@@ -789,6 +990,55 @@ fn test_wrapper_generation_test_output_dir_flag() {
             .path()
             .join("generated-tests/my_contract.test.tolk")
             .exists()
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_wrapper_generation_typescript_uses_configured_name() {
+    let project = ProjectBuilder::new("wrapper_typescript_configured_name")
+        .without_acton_toml()
+        .raw_file(
+            "Acton.toml",
+            r#"[package]
+name = "wrapper-typescript-configured-name"
+description = "The TypeScript class and filename use the configured wrapper name"
+version = "0.1.0"
+
+[contracts.configured_id]
+display-name = "Friendly wallet"
+src = "contracts/contract.tolk"
+"#,
+        )
+        .raw_file(
+            "contracts/contract.tolk",
+            &format!(
+                "contract DifferentHeader {{ description: \"Different ABI name\" }}\n{SIMPLE_CONTRACT}"
+            ),
+        )
+        .raw_file("bin/npx", FAKE_TYPESCRIPT_GENERATOR)
+        .build();
+    let (capture_path, path_env) = setup_fake_typescript_generator(project.path());
+
+    project
+        .acton()
+        .wrapper("configured_id")
+        .generate_typescript_wrapper()
+        .env("PATH", &path_env)
+        .env("ACTON_TS_WRAPPER_CAPTURE", capture_path.to_str().expect("capture path"))
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/wrapper/test_wrapper_generation_typescript_uses_configured_name/output.txt",
+        );
+
+    let abi_json: Value = serde_json::from_str(&fs::read_to_string(capture_path).unwrap()).unwrap();
+    crate::common::assertion().eq(
+        abi_json["contract_name"].to_string(),
+        snapbox::Data::read_from(
+            Path::new("tests/integration/snapshots/wrapper/test_wrapper_generation_typescript_uses_configured_name/contract-name.txt"),
+            None,
+        ),
     );
 }
 

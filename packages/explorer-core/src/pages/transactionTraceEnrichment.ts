@@ -11,7 +11,7 @@ import {Address} from "@ton/core"
 
 import type {TonClient} from "../api/client"
 import {addressKey} from "../api/compilerAbi"
-import {resolveCompilerAbis} from "../api/compilerAbiResolver"
+import {getResolvedAccountAbi, resolveCompilerAbis} from "../api/compilerAbiResolver"
 import type {V3Action, V3Metadata, V3Transaction} from "../api/types"
 import {buildActionValueFlowMovements} from "../api/valueFlowActions"
 import {formatAddress as formatDisplayAddress, normalizeAddress} from "../components/utils"
@@ -114,8 +114,8 @@ export async function enrichTraceTransactions({
     if (tx.address && contractCodeHash) {
       traceCodeHashByAddress.set(addressKey(tx.address.toString()), contractCodeHash)
     }
-    tx.contractAbi = contractCodeHash
-      ? (abiByCodeHash.get(contractCodeHash) ?? undefined)
+    tx.contractAbi = tx.address
+      ? getResolvedAccountAbi(resolvedAbis, tx.address.toString(), contractCodeHash)
       : undefined
     tx.parsedStorageBefore = decodeStorageDataCell(
       sourceTx?.account_state_before?.data_boc,
@@ -133,9 +133,11 @@ export async function enrichTraceTransactions({
       const letter = fmt.formatContractLetter(index)
       const displayAddr = normalizeAddress(addr, addressFormat)
       const customName = await fetchName(addr)
-      const addressCodeHash =
-        traceCodeHashByAddress.get(addressKey(addr)) ?? addressToCodeHash.get(addressKey(addr))
-      const abi = addressCodeHash ? abiByCodeHash.get(addressCodeHash) : undefined
+      const abi = getResolvedAccountAbi(
+        resolvedAbis,
+        addr,
+        traceCodeHashByAddress.get(addressKey(addr)),
+      )
       contracts.set(addr, {
         displayName: customName || formatDisplayAddress(displayAddr, true, addressFormat),
         address: Address.parse(addr),

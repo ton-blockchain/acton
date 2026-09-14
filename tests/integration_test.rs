@@ -33,6 +33,7 @@ const MANUAL_COMMANDS: &[&str] = &[
     "wallet",
     "rpc",
     "simulated-localnet",
+    "full-localnet",
     "doc",
     "ls",
     "up",

@@ -4,8 +4,4 @@ out/
 .vscode-test/
 e2e/out/
 
-# Yarn artifacts
-yarn-error.log
-.yarn/
-
 *.vsix

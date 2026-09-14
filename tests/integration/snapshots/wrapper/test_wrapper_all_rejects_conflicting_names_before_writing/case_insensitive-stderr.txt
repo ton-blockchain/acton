@@ -1,0 +1,4 @@
+Error: Contracts second and third have conflicting wrapper name SHAREDNAME
+
+Set distinct display-name values in Acton.toml
+Wrapper names must differ after PascalCase conversion, ignoring case

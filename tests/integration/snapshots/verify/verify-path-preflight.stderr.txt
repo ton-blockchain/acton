@@ -1,0 +1,1 @@
+Error: Source path is not supported by TON verifier: contracts/my contract.tolk. Use relative paths up to 128 ASCII characters with letters, numbers, '.', '_' and '-'; '.git' and the root 'output' directory are reserved

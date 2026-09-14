@@ -1,0 +1,17 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling First Wallet
+    Finished in [TIME]
+   Compiling second_id
+    Finished in [TIME]
+   Compiling third_id
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/combined.test.tolk (1 test)
+  ✓ wrappers build distinct contracts [TIME]
+
+ ✓ 1 passed in 1 file

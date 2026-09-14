@@ -64,7 +64,7 @@
     "prompt": {
       "patterns": [
         {
-          "match": "^(\\s*)(\\$)(\\s+)((?:acton|cd|git|cargo|yarn|npm|bun)\\b)(.*)$",
+          "match": "^(\\s*)(\\$)(\\s+)((?:acton|cd|git|cargo|npm|bun)\\b)(.*)$",
           "captures": {
             "2": {
               "name": "comment.line.acton-cli"
@@ -544,7 +544,7 @@
     "commands": {
       "patterns": [
         {
-          "match": "\\b(?:acton|cd|git|cargo|yarn|npm|bun)\\b",
+          "match": "\\b(?:acton|cd|git|cargo|npm|bun)\\b",
           "name": "entity.name.function.acton-cli"
         },
         {

@@ -4,6 +4,7 @@ import type {Cell} from "@ton/core"
 
 import {parseBlockTlb} from "./blockParser"
 import {tryParseCustomTlb} from "./customTlb"
+import {parseDomainCell} from "./domain-parsers"
 import {decodeCellInput} from "./inputNormalization"
 import {confidence, type CellParseResult, type ParserWarning} from "./model"
 import {describeCellForest} from "./rawCellTree"
@@ -27,7 +28,7 @@ export interface CellInspectorParseOptions {
 }
 
 export type CellInspectorParseResult = CellParseResult & {
-  readonly abiValue?: ParsedValue
+  readonly parsedValue?: ParsedValue
   readonly selectedRootBocHex?: string
   readonly bocHex?: string
   readonly bocBase64?: string
@@ -240,7 +241,7 @@ export function parseCell(
         status: warnings.length > 0 ? "partial" : "success",
         parser: "abi-registry",
         data: toSerializable(decodedAbi.value),
-        abiValue: decodedAbi.value,
+        parsedValue: decodedAbi.value,
         provenance: {
           engine: "abi-registry",
           label: label ? `${label} · ${decodedAbi.name}` : decodedAbi.name,
@@ -270,6 +271,25 @@ export function parseCell(
 
   const customResult = parseCustomTlb()
   if (customResult) return customResult
+
+  const domain = parseDomainCell(selectedRoot)
+  if (domain) {
+    return {
+      status: "success",
+      parser: "domain-parser",
+      data: toSerializable(domain.data),
+      parsedValue: domain.parsedValue,
+      provenance: {
+        engine: "domain-parser",
+        label: domain.label,
+        source: "ton-domain",
+        confidence: confidence(domain.confidence.score, domain.confidence.reasons),
+        details: domain.details,
+      },
+      warnings: accumulatedWarnings,
+      ...shared,
+    }
+  }
 
   const block = parseBlockTlb(selectedRoot, {strict: options.strict})
   if (block) {

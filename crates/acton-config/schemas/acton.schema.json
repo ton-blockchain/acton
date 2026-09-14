@@ -130,6 +130,10 @@
           "description": "Directory where per-contract ABI JSON files are saved",
           "type": "string"
         },
+        "output-boc": {
+          "description": "Optional directory for additional `BoC` exports; relative paths resolve from the project root.",
+          "type": "string"
+        },
         "output-fift": {
           "description": "Directory where per-contract compiled Fift files are saved",
           "type": "string"
@@ -1079,7 +1083,7 @@
             "type": "string"
           }
         },
-        "block-interval-ms": {
+        "block-time-ms": {
           "description": "Localnet block production interval in milliseconds",
           "type": "integer",
           "format": "uint64",

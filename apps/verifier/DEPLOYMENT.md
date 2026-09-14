@@ -22,7 +22,7 @@ The verifier stores verified source bundles in Git under the configured
 `source_repository.storage_root`, which defaults to `sources`:
 
 ```text
-sources/{code_hash}/
+sources/{first_two_code_hash_characters}/{remaining_code_hash_characters}/
 ```
 
 Each bundle contains:
@@ -118,9 +118,11 @@ VERIFIER_LOG_LEVEL=info
 VERIFIER_API_KEY=
 VERIFIER_TONCENTER_BASE_URL=https://testnet.toncenter.com
 VERIFIER_TONCENTER_API_KEY=
+VERIFIER_COMPILER_MAX_CONCURRENT_COMPILATIONS=1
 VERIFIER_PAYMENT_ADDRESS="0:<64-hex-character-testnet-wallet-address>"
 VERIFIER_PAYMENT_MIN_AMOUNT_NANO=500000000
 VERIFIER_PAYMENT_LEDGER_PATH=/var/lib/verifier/payment-ledger/payment-ledger.sqlite3
+VERIFIER_UPLOAD_MAX_REQUEST_BYTES=524288
 
 SOURCE_REPOSITORY_URL=git@github.com:i582/test-verify-repo.git
 SOURCE_REPOSITORY_STORAGE_ROOT=sources
@@ -135,6 +137,11 @@ VERIFIER_REGISTRY_INDEX_PATH=/var/lib/verifier/registry-index/registry-index.sql
 
 `VERIFIER_API_KEY` protects the optional `verified_at` field on
 `POST /api/v1/verify`; clients pass it in the `X-Verifier-Key` header.
+
+`VERIFIER_UPLOAD_MAX_REQUEST_BYTES` is expressed in bytes, limits the complete
+multipart body, and defaults to 512 KiB. When nginx proxies the verifier,
+configure `client_max_body_size` slightly above the verifier request limit to
+allow for multipart framing overhead.
 
 The payment verifier supports only TON testnet. `VERIFIER_PAYMENT_ADDRESS` must
 use the raw basechain form `0:<64 hex characters>`. The minimum amount is in
@@ -186,6 +193,7 @@ services:
   verifier:
     image: ghcr.io/ton-blockchain/verifier:latest
     restart: unless-stopped
+    stop_grace_period: 3m
     ports:
       - "3000:3000"
     env_file:
@@ -245,12 +253,24 @@ During startup recovery, `/healthz` returns `503` with this response:
 ```
 
 The server scans the complete payment-wallet history before it becomes ready.
-It marks every funded protocol payment as consumed. It also preserves all
-known replay records. A failed scan retries with an exponential delay.
+It preserves consumed payments, releases interrupted processing claims for
+retry, imports previously unseen funded protocol payments as retryable, and
+marks payments referenced by published source manifests as consumed. A failed
+scan retries with an exponential delay.
 
 One payment permits at most three verification claims. The limit includes a
 claim that resumes after an expired processing lease. Later claims fail as
 used without another TON Center request.
+
+Compiler stdin, output and execution share the configured timeout (ten seconds
+by default). At most one compilation runs at a time by default; configure
+`VERIFIER_COMPILER_MAX_CONCURRENT_COMPILATIONS` to allow more, or set it to `-1`
+to disable the concurrency limit. Worker output is capped at 16 MiB for stdout
+and 64 KiB for stderr.
+Git commands time out after 60 seconds and do not accept interactive credentials.
+Keep container memory/process limits and reverse-proxy rate limits enabled.
+The Compose configuration gives active verification tasks up to three minutes
+to finish after `SIGTERM`; interrupted work is recovered on the next startup.
 
 ## Systemd Wrapper
 
@@ -420,9 +440,10 @@ source of truth. If the index volume is lost, the service rebuilds it from the
 Git source repository.
 
 The payment ledger is also derived state. If this volume is lost, the service
-rebuilds it from TON testnet history and marks all funded protocol payments as
-used. Keeping or backing up this volume does not skip the full startup history
-scan.
+rebuilds it from TON testnet history. Funded protocol payments remain claimable
+unless a published source manifest references them; referenced payments are
+restored as consumed. Keeping or backing up this volume does not skip the full
+startup history scan.
 
 The Docker `source-repo` volume is a local clone. The remote Git repository is
 the authoritative source storage after every successful push.

@@ -266,7 +266,7 @@ export function StudioNavigation({
                                 >
                                   <span className={styles.navItemMain}>
                                     <Globe2 size={18} aria-hidden="true" />
-                                    <span>Networks</span>
+                                    <span>Real networks</span>
                                   </span>
                                   <ChevronRight
                                     className={`${styles.networkNavChevron} ${
@@ -284,7 +284,10 @@ export function StudioNavigation({
                                   aria-hidden={!networksOpen}
                                 >
                                   <div className={styles.environmentNavClip}>
-                                    <ul className={styles.environmentNavList} aria-label="Networks">
+                                    <ul
+                                      className={styles.environmentNavList}
+                                      aria-label="Real networks"
+                                    >
                                       {networks.map(network => (
                                         <li key={network.id}>
                                           <button

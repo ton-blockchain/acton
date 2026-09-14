@@ -15,6 +15,7 @@
     "verify",
     "library",
     "!simulated-localnet",
+    "!full-localnet",
     "retrace",
     "run",
     "compile",

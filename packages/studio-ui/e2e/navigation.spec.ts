@@ -15,7 +15,7 @@ const environment: StudioEnvironment = {
     noMining: false,
     mineEmptyBlocks: false,
   },
-  capabilities: ["explorer"],
+  capabilities: ["contracts", "explorer"],
   endpoints: {},
   network: {
     id: "local",
@@ -49,10 +49,10 @@ test.beforeEach(async ({page}) => {
   })
 })
 
-test("keeps Networks collapsed until requested", async ({page}) => {
+test("keeps real networks collapsed until requested", async ({page}) => {
   await page.goto("/virtual-environments")
 
-  const toggle = page.getByRole("button", {name: "Networks", exact: true})
+  const toggle = page.getByRole("button", {name: "Real networks", exact: true})
   const disclosure = page.locator("#studio-networks-navigation")
   await expect(toggle).toHaveAttribute("aria-expanded", "false")
   await expect(disclosure).toHaveAttribute("aria-hidden", "true")
@@ -70,4 +70,14 @@ test("shows Favorites in the environment Explorer menu", async ({page}) => {
   await navigation.getByRole("button", {name: "Favorites", exact: true}).click()
 
   await expect(page).toHaveURL(/\/virtual-environments\/environment-1\/explorer\/favorites$/)
+})
+
+test("shows only page-specific environment header actions", async ({page}) => {
+  await page.goto("/virtual-environments/environment-1/explorer")
+
+  await expect(page.getByRole("button", {name: "Copy RPC endpoint"})).toHaveCount(0)
+
+  await page.goto("/virtual-environments/environment-1/contracts")
+
+  await expect(page.getByRole("button", {name: "Add contract"})).toBeVisible()
 })

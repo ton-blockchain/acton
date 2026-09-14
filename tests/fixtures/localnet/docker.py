@@ -112,6 +112,14 @@ if 'compose' in args:
 elif 'run' in args and 'snapshot' in args:
     # Cold archives use a standalone container with only the selected volumes.
     action = args[args.index('snapshot') + 1]
+    if action == 'create' and (root / 'hold-snapshot').exists():
+        (root / 'snapshot-entered').touch()
+        deadline = time.monotonic() + 15
+        while (root / 'hold-snapshot').exists():
+            if time.monotonic() > deadline:
+                raise SystemExit('Test did not release snapshot creation')
+            time.sleep(0.02)
+
     snapshot = {'formatVersion': 2, 'id': 'snapshot-1', 'name': 'checkpoint',
                 'createdAt': 1, 'archiveSizeBytes': 100, 'stateSizeBytes': 200,
                 'stateSchemaVersion': 1, 'tonRelease': 'fixture', 'masterchainSeqno': 10}

@@ -1,4 +1,5 @@
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
+import {formatOpcode} from "@acton/ui"
 import {useEffect, useMemo, useState} from "react"
 
 import type {TonClient} from "../api/client"
@@ -124,6 +125,26 @@ export function collectTransactionListAddresses(
     collectMessageAddresses(addresses, displayedOutgoingMessage)
   }
 
+  return [...addresses]
+}
+
+/**
+ * Selects ABI lookups for opcode labels in the message list. Messages without a
+ * valid opcode still need address names, but cannot use compiler ABI metadata.
+ * Unlike account history, the message list can display every outgoing message.
+ */
+export function collectTransactionListAbiAddresses(
+  transactions: readonly V3TransactionListItem[],
+): string[] {
+  const addresses = new Set<string>()
+  for (const transaction of transactions) {
+    for (const message of [transaction.in_msg, ...transaction.out_msgs]) {
+      if (formatOpcode(message?.opcode) === undefined) continue
+
+      addresses.add(transaction.account)
+      collectMessageAddresses(addresses, message)
+    }
+  }
   return [...addresses]
 }
 

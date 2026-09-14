@@ -19,7 +19,7 @@ import {
 import {Download, Info, Star, Trash2, TriangleAlert, Upload} from "lucide-react"
 
 import type {TonClient} from "../api/client"
-import {loadJettonWalletsWithMasters, sortJettonWalletsByAmount} from "../api/jettonWallets"
+import {loadJettonWalletsWithMasters, sortJettonWalletsForDisplay} from "../api/jettonWallets"
 import type {JettonWallet} from "../api/types"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
@@ -196,7 +196,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
           }
         }
         for (const [address, tokenWallets] of Object.entries(nextTokensByAddress)) {
-          nextTokensByAddress[address] = sortJettonWalletsByAmount(tokenWallets)
+          nextTokensByAddress[address] = sortJettonWalletsForDisplay(tokenWallets)
         }
         setTokensByAddress(nextTokensByAddress)
       } else {

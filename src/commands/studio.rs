@@ -166,7 +166,14 @@ fn configured_project() -> anyhow::Result<Option<(StudioWorkspace, ProjectWallet
         .map(|(name, _)| name.clone())
         .collect();
     let workspace = StudioWorkspace::new(config.package.name.clone(), configured_project_root())
-        .with_wallet_names(wallet_names);
+        .with_wallet_names(wallet_names)
+        .with_default_startup_accounts(
+            config
+                .localnet
+                .as_ref()
+                .and_then(|localnet| localnet.accounts.clone())
+                .unwrap_or_default(),
+        );
     let wallet_runtime = ProjectWalletRuntime::new(&config)?;
     Ok(Some((workspace, wallet_runtime)))
 }

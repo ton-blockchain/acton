@@ -21,7 +21,7 @@ import {ExplorerAddressChip} from "@acton/explorer-core/components/ExplorerAddre
 import {NftImage} from "@acton/explorer-core/components/NftImage"
 import {
   NFT_IMAGE_SOURCE_KEYS,
-  getImageSources,
+  getNftImageSources,
 } from "@acton/explorer-core/components/imageFallbacks"
 import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
 import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
@@ -42,13 +42,12 @@ interface NftsState {
 export const NftsPage: FC<NftsPageProps> = ({client}) => {
   const navigate = useNavigate()
   const routes = useExplorerRoutePaths()
-  const [hiddenAddresses, setHiddenAddresses] = useState<ReadonlySet<string>>(() => new Set())
   const [nftsState, setNftsState] = useState<NftsState>({
     items: [],
     isLoading: true,
   })
   const showLoadingSkeleton = useDelayedLoadingVisibility(nftsState.isLoading, 500)
-  const visibleItems = nftsState.items.filter(item => !hiddenAddresses.has(item.address))
+  const visibleItems = nftsState.items.filter(item => item.is_nsfw !== true)
   const allItemsHidden = nftsState.items.length > 0 && visibleItems.length === 0
 
   useEffect(() => {
@@ -142,7 +141,7 @@ export const NftsPage: FC<NftsPageProps> = ({client}) => {
               ) : (
                 visibleItems.map(item => {
                   const name = contentString(item.content, "name") || "NFT Item"
-                  const imageSources = getImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
+                  const imageSources = getNftImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
                   const collectionName =
                     contentString(item.collection?.collection_content, "name") || "Standalone"
                   const href = routes.addressPath(item.address)
@@ -171,11 +170,7 @@ export const NftsPage: FC<NftsPageProps> = ({client}) => {
                               alt=""
                               className={styles.assetTableImage}
                               blurredClassName={styles.blurredAssetImage}
-                              collectionName={collectionName}
                               blurred={item.is_scam === true}
-                              onNsfw={() => {
-                                setHiddenAddresses(current => new Set(current).add(item.address))
-                              }}
                             />
                           </span>
                           <strong className={styles.assetTableName}>{name}</strong>

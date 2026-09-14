@@ -1,4 +1,6 @@
-import {AddressChip, Button, Dialog, DialogActions} from "@acton/ui"
+import {Button, Dialog, DialogActions} from "@acton/ui"
+import {ExplorerAddressChip} from "@acton/explorer-core/components/ExplorerAddressChip"
+import {toRawAddress} from "@acton/explorer-core/components/utils"
 import {Check, ChevronDown, Globe2, WalletCards} from "lucide-react"
 import {useEffect, useState} from "react"
 import type {FC, ReactNode} from "react"
@@ -225,7 +227,12 @@ const WalletIdentity: FC<{readonly wallet: TonConnectWalletOption}> = ({wallet})
       </span>
       <span className={styles.walletMeta}>
         <span className={styles.walletAddress}>
-          <AddressChip address={wallet.address} copyable={false} variant="plain" />
+          <ExplorerAddressChip
+            address={toRawAddress(wallet.address)}
+            copyable={false}
+            resolveName={false}
+            variant="plain"
+          />
         </span>
         <span className={styles.walletNetwork}>{wallet.network}</span>
       </span>

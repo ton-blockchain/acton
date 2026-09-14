@@ -47,14 +47,14 @@ function toRedirectMode(url: URL): RequestRedirect {
   return "manual"
 }
 
-function checkLocalhostPort(url: URL): ExternalLinkResult {
+function checkLoopbackPort(url: URL): ExternalLinkResult {
   if (url.port === "5173") {
     return {success: true}
   }
 
   return {
     success: false,
-    message: `port ${url.port} is not allowed for localhost`,
+    message: `port ${url.port} is not allowed for loopback URLs`,
   }
 }
 
@@ -67,8 +67,8 @@ function formatRedirectLocation(baseUrl: URL, location: string): string {
 }
 
 async function checkExternalUrl(url: URL): Promise<ExternalLinkResult> {
-  if (url.hostname === "localhost") {
-    return checkLocalhostPort(url)
+  if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+    return checkLoopbackPort(url)
   }
 
   const redirectMode = toRedirectMode(url)

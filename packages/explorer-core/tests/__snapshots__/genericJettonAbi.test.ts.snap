@@ -1,0 +1,230 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`standard Jetton entries describe public interfaces without storage or implementation errors 1`] = `
+[
+  {
+    "decodedStorage": undefined,
+    "errors": [
+      {
+        "err_code": 0,
+        "kind": "plain_int",
+      },
+    ],
+    "hashes": [],
+    "methods": [
+      "get_jetton_data",
+      "get_wallet_address",
+    ],
+    "name": "Jetton Master",
+    "storage": {},
+  },
+  {
+    "decodedStorage": undefined,
+    "errors": [
+      {
+        "err_code": 0,
+        "kind": "plain_int",
+      },
+    ],
+    "hashes": [],
+    "methods": [
+      "get_wallet_data",
+    ],
+    "name": "Jetton Wallet",
+    "storage": {},
+  },
+]
+`;
+
+exports[`account interface fallback preserves exact ABIs and never registers generic ABIs by hash 1`] = `
+{
+  "byAddress": [
+    "JettonMaster",
+    "JettonWallet",
+    "JettonVesting",
+    null,
+    null,
+  ],
+  "genericByHash": [
+    null,
+    null,
+  ],
+}
+`;
+
+exports[`generic wallet decodes standard transfers with null responses and both forward payload encodings 1`] = `
+[
+  {
+    "category": "message",
+    "consumption": {
+      "complete": true,
+      "initialBits": 559,
+      "initialRefs": 0,
+      "remainingBits": 0,
+      "remainingRefs": 0,
+    },
+    "direction": "incoming-internal",
+    "name": "JettonTransfer",
+    "provenance": {
+      "codeHashes": [],
+      "displayName": "Jetton Wallet",
+      "source": "compiler-abi",
+    },
+    "value": {
+      "entries": [
+        {
+          "key": "queryId",
+          "value": {
+            "kind": "scalar",
+            "typeName": "uint64",
+            "value": "42",
+          },
+        },
+        {
+          "key": "amount",
+          "value": {
+            "kind": "scalar",
+            "typeName": "coins",
+            "value": "123456789",
+          },
+        },
+        {
+          "key": "destination",
+          "value": {
+            "kind": "address",
+            "value": "EQABAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAc3j",
+          },
+        },
+        {
+          "key": "responseDestination",
+          "value": {
+            "kind": "scalar",
+            "typeName": "any_address",
+            "value": "none",
+          },
+        },
+        {
+          "key": "customPayload",
+          "value": {
+            "kind": "null",
+          },
+        },
+        {
+          "key": "forwardTonAmount",
+          "value": {
+            "kind": "scalar",
+            "typeName": "coins",
+            "value": "1",
+          },
+        },
+        {
+          "key": "forwardPayload",
+          "value": {
+            "entries": [
+              {
+                "key": "payload",
+                "value": {
+                  "kind": "scalar",
+                  "rawValue": "b5ee9c72010101010014000024000000005445502d3734206578616d706c65",
+                  "typeName": "Slice",
+                  "value": "Slice(b5ee9c720101010100140000…6d706c65)",
+                },
+              },
+            ],
+            "kind": "object",
+            "typeName": "JettonInlinePayload",
+          },
+        },
+      ],
+      "kind": "object",
+      "typeName": "JettonTransfer",
+    },
+  },
+  {
+    "category": "message",
+    "consumption": {
+      "complete": true,
+      "initialBits": 415,
+      "initialRefs": 1,
+      "remainingBits": 0,
+      "remainingRefs": 0,
+    },
+    "direction": "incoming-internal",
+    "name": "JettonTransfer",
+    "provenance": {
+      "codeHashes": [],
+      "displayName": "Jetton Wallet",
+      "source": "compiler-abi",
+    },
+    "value": {
+      "entries": [
+        {
+          "key": "queryId",
+          "value": {
+            "kind": "scalar",
+            "typeName": "uint64",
+            "value": "42",
+          },
+        },
+        {
+          "key": "amount",
+          "value": {
+            "kind": "scalar",
+            "typeName": "coins",
+            "value": "123456789",
+          },
+        },
+        {
+          "key": "destination",
+          "value": {
+            "kind": "address",
+            "value": "EQABAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAc3j",
+          },
+        },
+        {
+          "key": "responseDestination",
+          "value": {
+            "kind": "scalar",
+            "typeName": "any_address",
+            "value": "none",
+          },
+        },
+        {
+          "key": "customPayload",
+          "value": {
+            "kind": "null",
+          },
+        },
+        {
+          "key": "forwardTonAmount",
+          "value": {
+            "kind": "scalar",
+            "typeName": "coins",
+            "value": "1",
+          },
+        },
+        {
+          "key": "forwardPayload",
+          "value": {
+            "entries": [
+              {
+                "key": "payload",
+                "value": {
+                  "kind": "scalar",
+                  "rawValue": "b5ee9c72010101010014000024000000005445502d3734206578616d706c65",
+                  "typeName": "Cell",
+                  "value": "Cell(b5ee9c720101010100140000…6d706c65)",
+                },
+              },
+            ],
+            "kind": "object",
+            "typeName": "JettonReferencedPayload",
+          },
+        },
+      ],
+      "kind": "object",
+      "typeName": "JettonTransfer",
+    },
+  },
+]
+`;

@@ -20,6 +20,19 @@ Generate a wrapper for the contract identified by `_contract-name_` from
 Use `--all` to generate wrappers for every contract defined in `Acton.toml`
 without picking a single one.
 
+The wrapper type and default file name use the contract's `display-name` from
+`Acton.toml`. If it is absent or empty, they use the contract ID instead.
+Acton converts this name to PascalCase, treating spaces, underscores, and hyphens
+as word separators. The source file name does not affect the wrapper name.
+For example, `display-name = "First Wallet"` produces `FirstWallet.gen.tolk`
+with a `FirstWallet` structure, or `FirstWallet.gen.ts` with a `FirstWallet` class.
+The resulting name must start with an ASCII letter and contain only ASCII letters
+and digits. Acton reports an error if the name is invalid.
+
+With `--all`, Acton checks for conflicting wrapper names before writing any files.
+Names must remain distinct after PascalCase conversion, ignoring letter case.
+This also prevents overwrites on case-insensitive filesystems.
+
 Wrapper generation uses ABI emitted by the Tolk compiler from the contract source
 or from a configured `types` interface file. In practice, the contract header is
 the source of truth for typed storage accessors, incoming message helpers, and

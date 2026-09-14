@@ -1,0 +1,208 @@
+{
+  "create": {
+    "current": {
+      "ok": true,
+      "result": {
+        "block_seqno": 1,
+        "has_created_at": true,
+        "has_id": true,
+        "has_size": true,
+        "name": "current"
+      }
+    },
+    "list": {
+      "ok": true,
+      "result": [
+        {
+          "block_seqno": 1,
+          "has_created_at": true,
+          "has_id": true,
+          "has_size": true,
+          "name": "current"
+        },
+        {
+          "block_seqno": 2,
+          "has_created_at": true,
+          "has_id": true,
+          "has_size": true,
+          "name": "newer"
+        },
+        {
+          "block_seqno": 1,
+          "has_created_at": true,
+          "has_id": true,
+          "has_size": true,
+          "name": "older"
+        }
+      ]
+    },
+    "newer": {
+      "ok": true,
+      "result": {
+        "block_seqno": 2,
+        "has_created_at": true,
+        "has_id": true,
+        "has_size": true,
+        "name": "newer"
+      }
+    },
+    "older": {
+      "ok": true,
+      "result": {
+        "block_seqno": 1,
+        "has_created_at": true,
+        "has_id": true,
+        "has_size": true,
+        "name": "older"
+      }
+    }
+  },
+  "mutate_after_snapshot": {
+    "balance_after_mine": "1000000000",
+    "faucet_block_used_pending_timestamp": true,
+    "fund_ok": true,
+    "increase_later_ok": true,
+    "mine_ok": true,
+    "set_next_ok": true
+  },
+  "persistent_db_after_restart": {
+    "balance": "0",
+    "block_2_removed": true,
+    "pending_timestamp_restored": true,
+    "restored_saved_state": {
+      "ok": true,
+      "result": {
+        "block_seqno": 1,
+        "has_created_at": true,
+        "has_id": true,
+        "has_size": true,
+        "name": "current"
+      }
+    },
+    "saved_files_survived": {
+      "ok": true,
+      "result": [
+        {
+          "block_seqno": 1,
+          "has_created_at": true,
+          "has_id": true,
+          "has_size": true,
+          "name": "current"
+        },
+        {
+          "block_seqno": 1,
+          "has_created_at": true,
+          "has_id": true,
+          "has_size": true,
+          "name": "older"
+        }
+      ]
+    },
+    "seqno": 1
+  },
+  "restore_current": {
+    "balance_after_empty_mine": "0",
+    "balance_after_restore": "0",
+    "empty_mine_used_restored_timestamp": true,
+    "pending_timestamp_restored": true,
+    "response": {
+      "ok": true,
+      "result": {
+        "block_seqno": 1,
+        "has_created_at": true,
+        "has_id": true,
+        "has_size": true,
+        "name": "current"
+      }
+    },
+    "seqno_after_restore": 1,
+    "time_offset_rolled_back": true
+  },
+  "snapshot_management": {
+    "deleted_newer": {
+      "ok": true,
+      "result": null
+    },
+    "list_after_delete": {
+      "ok": true,
+      "result": [
+        {
+          "block_seqno": 1,
+          "has_created_at": true,
+          "has_id": true,
+          "has_size": true,
+          "name": "current"
+        },
+        {
+          "block_seqno": 1,
+          "has_created_at": true,
+          "has_id": true,
+          "has_size": true,
+          "name": "older"
+        }
+      ]
+    }
+  },
+  "snapshots_are_non_destructive": {
+    "balance_after_newer_restore": "1000000000",
+    "balance_after_restore_older": "0",
+    "current_restores_again": {
+      "ok": true,
+      "result": {
+        "block_seqno": 1,
+        "has_created_at": true,
+        "has_id": true,
+        "has_size": true,
+        "name": "current"
+      }
+    },
+    "list_after_current_restore": {
+      "ok": true,
+      "result": [
+        {
+          "block_seqno": 1,
+          "has_created_at": true,
+          "has_id": true,
+          "has_size": true,
+          "name": "current"
+        },
+        {
+          "block_seqno": 2,
+          "has_created_at": true,
+          "has_id": true,
+          "has_size": true,
+          "name": "newer"
+        },
+        {
+          "block_seqno": 1,
+          "has_created_at": true,
+          "has_id": true,
+          "has_size": true,
+          "name": "older"
+        }
+      ]
+    },
+    "newer_still_restores": {
+      "ok": true,
+      "result": {
+        "block_seqno": 2,
+        "has_created_at": true,
+        "has_id": true,
+        "has_size": true,
+        "name": "newer"
+      }
+    },
+    "older_still_restores": {
+      "ok": true,
+      "result": {
+        "block_seqno": 1,
+        "has_created_at": true,
+        "has_id": true,
+        "has_size": true,
+        "name": "older"
+      }
+    },
+    "pending_timestamp_after_restore_older": null,
+    "seqno_after_restore_older": 1
+  }
+}

@@ -89,7 +89,7 @@ pub enum CreateEnvironmentConfig {
         accounts: Vec<String>,
         rate_limit: Option<u32>,
         response_delay_ms: Option<u64>,
-        block_interval_ms: Option<u64>,
+        block_time_ms: Option<u64>,
         #[serde(default)]
         no_mining: bool,
         #[serde(default)]
@@ -109,6 +109,12 @@ pub enum CreateEnvironmentConfig {
         election_time_seconds: Option<u32>,
         #[serde(default)]
         imported_accounts: Vec<FullTonAccountImport>,
+        #[serde(default)]
+        accounts: Vec<String>,
+        /// Resolved by the wallet runtime, never accepted from HTTP clients.
+        #[serde(skip)]
+        #[schema(ignore)]
+        startup_wallets: Vec<acton_localnet::StartupWallet>,
     },
 }
 
@@ -125,7 +131,44 @@ pub struct CreateEnvironmentSnapshotRequest {
     pub name: Option<String>,
 }
 
-pub use acton_localnet::Snapshot as EnvironmentSnapshot;
+/// Snapshot inventory shared by both runtimes; compression details belong only to archives.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentSnapshot {
+    pub id: String,
+    pub name: Option<String>,
+    pub created_at: u64,
+    pub size_bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state_size_bytes: Option<u64>,
+    pub masterchain_seqno: Option<u32>,
+}
+
+impl From<acton_localnet::Snapshot> for EnvironmentSnapshot {
+    fn from(snapshot: acton_localnet::Snapshot) -> Self {
+        Self {
+            id: snapshot.id,
+            name: snapshot.name,
+            created_at: snapshot.created_at,
+            size_bytes: snapshot.archive_size_bytes,
+            state_size_bytes: Some(snapshot.state_size_bytes),
+            masterchain_seqno: snapshot.masterchain_seqno,
+        }
+    }
+}
+
+impl From<ton_localnet::snapshots::Snapshot> for EnvironmentSnapshot {
+    fn from(snapshot: ton_localnet::snapshots::Snapshot) -> Self {
+        Self {
+            id: snapshot.id,
+            name: snapshot.name,
+            created_at: snapshot.created_at,
+            size_bytes: snapshot.size_bytes,
+            state_size_bytes: None,
+            masterchain_seqno: Some(snapshot.block_seqno),
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -140,6 +183,7 @@ pub enum EnvironmentSnapshotOperationPhase {
     Preparing,
     Stopping,
     CreatingArchive,
+    SavingState,
     RestoringState,
     ResettingIndexer,
     Starting,
@@ -215,7 +259,7 @@ pub enum EnvironmentConfig {
         accounts: Vec<String>,
         rate_limit: Option<u32>,
         response_delay_ms: Option<u64>,
-        block_interval_ms: Option<u64>,
+        block_time_ms: Option<u64>,
         no_mining: bool,
         mine_empty_blocks: bool,
     },
@@ -232,6 +276,8 @@ pub enum EnvironmentConfig {
         #[serde(skip_serializing_if = "Option::is_none")]
         election_time_seconds: Option<u32>,
         imported_accounts: Vec<FullTonAccountImport>,
+        #[serde(default)]
+        accounts: Vec<String>,
         nodes: Vec<FullTonNode>,
     },
     RemoteTonNetwork {
@@ -265,7 +311,6 @@ pub enum EnvironmentCapability {
     Mining,
     TimeTravel,
     Snapshots,
-    Checkpoints,
     Observability,
     Health,
 }
@@ -415,7 +460,7 @@ impl EnvironmentConfig {
                 EnvironmentCapability::ApiCalls,
                 EnvironmentCapability::Mining,
                 EnvironmentCapability::TimeTravel,
-                EnvironmentCapability::Checkpoints,
+                EnvironmentCapability::Snapshots,
             ],
             Self::FullTonNetwork { .. } => vec![
                 EnvironmentCapability::ApiV2,
@@ -800,6 +845,25 @@ pub trait EnvironmentRuntime: Send + Sync {
         _environment_id: &str,
         _snapshot_id: &str,
     ) -> EnvironmentRuntimeFuture<'_, ()> {
+        snapshots_unavailable()
+    }
+
+    /// Imports a saved file into the inventory without replacing the current environment state.
+    fn import_snapshot(
+        &self,
+        _environment_id: &str,
+        _name: Option<String>,
+        _json: Vec<u8>,
+    ) -> EnvironmentRuntimeFuture<'_, EnvironmentSnapshot> {
+        snapshots_unavailable()
+    }
+
+    /// Exports the selected saved snapshot rather than capturing the current live state.
+    fn export_snapshot(
+        &self,
+        _environment_id: &str,
+        _snapshot_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, Vec<u8>> {
         snapshots_unavailable()
     }
 

@@ -48,7 +48,7 @@ pub(crate) fn run(args: UbicloudCleanupArgs) -> Result<()> {
         .map(to_actions_cache_entry)
         .collect();
 
-    run_cache_cleanup(cleanup, cache_entries, |entry| {
+    run_cache_cleanup("Ubicloud", cleanup, cache_entries, |entry| {
         ubicloud.delete_github_cache_entry(&project, &installation, &repository, &entry.id)
     })
 }

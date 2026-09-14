@@ -1,0 +1,3 @@
+   Generated wrappers/FirstWallet.gen.tolk
+   Generated wrappers/SecondId.gen.tolk
+   Generated wrappers/ThirdId.gen.tolk

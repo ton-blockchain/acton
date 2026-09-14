@@ -53,13 +53,14 @@ export async function compileTact(input) {
   return {
     status: "ok",
     code_hash: bocBase64CodeHashHex(verificationResult.package.code),
+    used_source_paths: [normalizeSourcePath(pkgSource.path)],
     generated_sources: generated,
   };
 }
 
 function tactPkgSource(input) {
   const pkgSource = input.sources
-    .filter((source) => normalizeSourcePath(source.path).endsWith(".pkg"))
+    .filter((source) => normalizeSourcePath(source.path).toLowerCase().endsWith(".pkg"))
     .sort(
       (left, right) =>
         left.path.split("/").length - right.path.split("/").length,

@@ -3,18 +3,67 @@ use clap::Subcommand;
 use inquire::Select;
 use path_absolutize::Absolutize;
 use std::fs;
+use std::io::{IsTerminal, stdin, stdout};
 use std::path::{Path, PathBuf};
 use std::process::Output;
 
 const DEFAULT_HOOKS_PATH: &str = ".githooks";
 const GIT_HOOKS_PATH_KEY: &str = "core.hooksPath";
-const PRE_COMMIT_HOOK_FILE: &str = "pre-commit";
-const DEFAULT_PRE_COMMIT_HOOK: &str = include_str!("templates/.githooks/pre-commit");
+const DEFAULT_HOOK: &str = include_str!("templates/checks.sh");
 const HOOKS_UNINSTALL_HINT: &str = "Run `acton hooks uninstall` first.";
 const HOOKS_NEW_HINT: &str = "Run `acton hooks new` first.";
 const HOOKS_REPO_REQUIRED_MESSAGE: &str =
     "Git hooks can only be managed in a project root containing .git. Run `git init` first.";
 
+/// When Git runs project checks. Choose `pre-push` to check changes before sharing
+/// them while allowing intermediate commits, or `pre-commit` to check each commit.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, clap::ValueEnum)]
+pub enum GitHook {
+    #[default]
+    PrePush,
+    PreCommit,
+}
+
+impl GitHook {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::PrePush => "pre-push",
+            Self::PreCommit => "pre-commit",
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct GitHookSelectItem(Option<GitHook>);
+
+impl std::fmt::Display for GitHookSelectItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self.0 {
+            Some(GitHook::PrePush) => "pre-push    Run checks before each push (recommended)",
+            Some(GitHook::PreCommit) => "pre-commit  Run checks before each commit",
+            None => "none        Do not install Git hooks",
+        })
+    }
+}
+
+/// Shares the hook selection between project creation and standalone scaffolding.
+/// Only project creation offers opting out of hooks altogether.
+pub(crate) fn select_git_hook(allow_none: bool) -> anyhow::Result<Option<GitHook>> {
+    let mut options = vec![
+        GitHookSelectItem(Some(GitHook::PrePush)),
+        GitHookSelectItem(Some(GitHook::PreCommit)),
+    ];
+    if allow_none {
+        options.push(GitHookSelectItem(None));
+    }
+
+    Ok(Select::new("Git hooks:", options)
+        .with_starting_cursor(0)
+        .prompt()?
+        .0)
+}
+
+/// Chooses the initial contents independently of when Git runs the hook.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, clap::ValueEnum)]
 pub enum HooksTemplate {
     Empty,
@@ -31,8 +80,8 @@ impl HooksTemplate {
 
     const fn description(self) -> &'static str {
         match self {
-            Self::Empty => "Create .githooks with an empty pre-commit hook",
-            Self::Default => "Create .githooks with a starter pre-commit hook",
+            Self::Empty => "Create an empty hook",
+            Self::Default => "Run acton check and acton fmt --check",
         }
     }
 }
@@ -56,6 +105,8 @@ impl std::fmt::Display for HooksTemplateSelectItem {
 pub enum HooksCommand {
     #[command(about = "Create a project hook scaffold")]
     New {
+        #[arg(long, value_enum, help = "When to run checks (default: pre-push)")]
+        hook: Option<GitHook>,
         #[arg(long, value_enum, help = "Hooks scaffold to create")]
         template: Option<HooksTemplate>,
     },
@@ -69,14 +120,14 @@ pub enum HooksCommand {
 
 pub fn hooks_cmd(command: HooksCommand) -> anyhow::Result<()> {
     match command {
-        HooksCommand::New { template } => hooks_new_cmd(template),
+        HooksCommand::New { hook, template } => hooks_new_cmd(hook, template),
         HooksCommand::Install => hooks_install_cmd(),
         HooksCommand::Status => hooks_status_cmd(),
         HooksCommand::Uninstall => hooks_uninstall_cmd(),
     }
 }
 
-fn hooks_new_cmd(template: Option<HooksTemplate>) -> anyhow::Result<()> {
+fn hooks_new_cmd(hook: Option<GitHook>, template: Option<HooksTemplate>) -> anyhow::Result<()> {
     ensure_local_git_repository_at(
         configured_project_root(),
         "Hooks scaffold can only be created in a project root containing .git. Run `git init` first.",
@@ -88,10 +139,10 @@ fn hooks_new_cmd(template: Option<HooksTemplate>) -> anyhow::Result<()> {
         );
     }
 
-    if let Some(pre_commit_path) = scaffold_pre_commit_path_at(configured_project_root()) {
+    if let Some(hook_path) = existing_scaffold_hook_path_at(configured_project_root()) {
         anyhow::bail!(
-            "Found existing pre-commit hook at {}. Delete it before running `acton hooks new`.",
-            pre_commit_path.display()
+            "Found existing hook at {}. Delete it before running `acton hooks new`.",
+            hook_path.display()
         );
     }
 
@@ -101,9 +152,18 @@ fn hooks_new_cmd(template: Option<HooksTemplate>) -> anyhow::Result<()> {
         );
     }
 
+    let interactive = stdin().is_terminal() && stdout().is_terminal();
+    let hook = if let Some(hook) = hook {
+        hook
+    } else if interactive {
+        select_git_hook(false)?.unwrap_or_default()
+    } else {
+        GitHook::default()
+    };
+
     let template = if let Some(template) = template {
         template
-    } else {
+    } else if interactive {
         Select::new(
             "Hooks template:",
             vec![
@@ -114,11 +174,16 @@ fn hooks_new_cmd(template: Option<HooksTemplate>) -> anyhow::Result<()> {
         .with_starting_cursor(0)
         .prompt()?
         .0
+    } else {
+        HooksTemplate::Default
     };
 
-    create_hooks_scaffold_at(configured_project_root(), template)?;
+    create_hooks_scaffold_at(configured_project_root(), hook, template)?;
 
-    println!("Created {template} hooks scaffold in {DEFAULT_HOOKS_PATH}");
+    println!(
+        "Created {template} {} hook in {DEFAULT_HOOKS_PATH}",
+        hook.as_str()
+    );
     println!("Run `acton hooks install` to enable it.");
     Ok(())
 }
@@ -127,13 +192,11 @@ fn hooks_dir_at(project_root: &Path) -> PathBuf {
     project_root.join(DEFAULT_HOOKS_PATH)
 }
 
-fn scaffold_pre_commit_path_at(project_root: &Path) -> Option<PathBuf> {
-    let pre_commit_path = hooks_dir_at(project_root).join(PRE_COMMIT_HOOK_FILE);
-    if pre_commit_path.exists() {
-        Some(pre_commit_path)
-    } else {
-        None
-    }
+fn existing_scaffold_hook_path_at(project_root: &Path) -> Option<PathBuf> {
+    [GitHook::PrePush, GitHook::PreCommit]
+        .into_iter()
+        .map(|hook| hooks_dir_at(project_root).join(hook.as_str()))
+        .find(|path| path.exists())
 }
 
 fn has_local_git_repository_at(project_root: &Path) -> bool {
@@ -170,33 +233,27 @@ fn hooks_path_matches_default_at(project_root: &Path, hooks_path: &str) -> anyho
         == resolve_hooks_path_at(project_root, Path::new(DEFAULT_HOOKS_PATH))?)
 }
 
-fn create_hooks_scaffold_at(project_root: &Path, template: HooksTemplate) -> anyhow::Result<()> {
+fn create_hooks_scaffold_at(
+    project_root: &Path,
+    hook: GitHook,
+    template: HooksTemplate,
+) -> anyhow::Result<()> {
     let hooks_dir = hooks_dir_at(project_root);
-
     fs::create_dir_all(&hooks_dir)?;
 
-    match template {
-        HooksTemplate::Empty => {
-            write_pre_commit_hook(&hooks_dir, "")?;
-        }
-        HooksTemplate::Default => {
-            write_pre_commit_hook(&hooks_dir, DEFAULT_PRE_COMMIT_HOOK)?;
-        }
-    }
-
-    Ok(())
-}
-
-fn write_pre_commit_hook(hooks_dir: &Path, contents: &str) -> anyhow::Result<()> {
-    let pre_commit_path = hooks_dir.join(PRE_COMMIT_HOOK_FILE);
-    fs::write(&pre_commit_path, contents)?;
+    let contents = match template {
+        HooksTemplate::Empty => "",
+        HooksTemplate::Default => DEFAULT_HOOK,
+    };
+    let hook_path = hooks_dir.join(hook.as_str());
+    fs::write(&hook_path, contents)?;
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut permissions = fs::metadata(&pre_commit_path)?.permissions();
+        let mut permissions = fs::metadata(&hook_path)?.permissions();
         permissions.set_mode(0o755);
-        fs::set_permissions(pre_commit_path, permissions)?;
+        fs::set_permissions(hook_path, permissions)?;
     }
 
     Ok(())
@@ -323,7 +380,12 @@ fn hooks_uninstall_cmd() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn scaffold_and_install_default_hooks(project_root: &Path) -> anyhow::Result<()> {
+/// Creates the selected hook and enables it for a newly generated project.
+/// Existing hook files and local Git hook configuration are never overwritten.
+pub fn scaffold_and_install_default_hooks(
+    project_root: &Path,
+    hook: GitHook,
+) -> anyhow::Result<()> {
     ensure_local_git_repository_at(project_root, HOOKS_REPO_REQUIRED_MESSAGE)?;
 
     if let Some(hooks_path) = local_hooks_path_at(project_root)? {
@@ -336,10 +398,10 @@ pub fn scaffold_and_install_default_hooks(project_root: &Path) -> anyhow::Result
         );
     }
 
-    if let Some(pre_commit_path) = scaffold_pre_commit_path_at(project_root) {
+    if let Some(hook_path) = existing_scaffold_hook_path_at(project_root) {
         anyhow::bail!(
-            "Found existing pre-commit hook at {}. Delete it before enabling default hooks.",
-            pre_commit_path.display()
+            "Found existing hook at {}. Delete it before enabling default hooks.",
+            hook_path.display()
         );
     }
 
@@ -349,7 +411,7 @@ pub fn scaffold_and_install_default_hooks(project_root: &Path) -> anyhow::Result
         );
     }
 
-    create_hooks_scaffold_at(project_root, HooksTemplate::Default)?;
+    create_hooks_scaffold_at(project_root, hook, HooksTemplate::Default)?;
 
     let output = git_config_output_at(project_root, &[GIT_HOOKS_PATH_KEY, DEFAULT_HOOKS_PATH])?;
     if !output.status.success() {

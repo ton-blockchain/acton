@@ -3,10 +3,11 @@
 `ui-state.json` is the canonical state for localnet and explorer visual tests. Start it with:
 
 ```sh
-acton simulated-localnet start --port 15411 --load-state packages/ui-e2e/fixtures/localnet/ui-state.json --no-mining
+bun run packages/ui-e2e/fixtures/localnet/start.ts
 ```
 
-The node runs with mining disabled so timestamps and block contents stay stable. Scenarios that
+The script imports the fixture as a saved snapshot, restores it, and signals readiness. The
+node runs with mining disabled so timestamps and block contents stay stable. Scenarios that
 change state must use a worker-local copy/node or revert to the canonical snapshot before capture.
 
 Parallel Playwright scenarios delay and then forward the real API request in the owning page, so

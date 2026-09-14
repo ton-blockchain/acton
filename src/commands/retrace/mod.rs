@@ -2,7 +2,7 @@ use crate::commands::common::error_fmt;
 use crate::formatter::FormatterContext;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
-use acton_config::config::{ActonConfig, project_root as configured_project_root};
+use acton_config::config::{ActonConfig, manifest_path, project_root as configured_project_root};
 use acton_debug::replayer::TolkReplayer;
 use acton_debug::serve_single_replayer_dap;
 use anyhow::{Context, anyhow};
@@ -12,7 +12,7 @@ use std::str::FromStr;
 use ton_retrace::{ComputeInfo, Network, retrace};
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
-use tycho_types::models::{IntAddr, OutAction, RelaxedMsgInfo};
+use tycho_types::models::{IntAddr, OutAction, RelaxedMsgInfo, TickTock, TxInfo};
 
 struct ContractTraceArtifacts {
     code_cell: Cell,
@@ -60,9 +60,16 @@ pub fn retrace_cmd(
         vec![Network::Mainnet, Network::Testnet]
     };
 
+    let config = if manifest_path().exists() {
+        ActonConfig::load_manifest()?
+    } else {
+        ActonConfig::default()
+    };
+    let custom_networks = config.custom_networks();
+
     let mut last_error = None;
     for network in networks {
-        let retrace_future = retrace(network.clone(), &hash, HashMap::new());
+        let retrace_future = retrace(network.clone(), &hash, HashMap::new(), &custom_networks);
         match rt.block_on(retrace_future) {
             Ok(result) => {
                 if let Some(logs_dir) = &logs_dir {
@@ -133,16 +140,14 @@ fn print_retrace_result(
         ComputeInfo::Skipped => false,
     };
 
+    let tx_info = tx.raw.load_info().ok();
+    let action_phase = match &tx_info {
+        Some(TxInfo::Ordinary(info)) => info.action_phase.as_ref(),
+        Some(TxInfo::TickTock(info)) => info.action_phase.as_ref(),
+        None => None,
+    };
     let (action_success, action_exit_code) =
-        if let Ok(tycho_types::models::TxInfo::Ordinary(desc)) = tx.raw.load_info() {
-            if let Some(action) = &desc.action_phase {
-                (action.success, action.result_code)
-            } else {
-                (true, 0)
-            }
-        } else {
-            (true, 0)
-        };
+        action_phase.map_or((true, 0), |action| (action.success, action.result_code));
 
     let is_success = compute_success && action_success;
 
@@ -190,7 +195,13 @@ fn print_retrace_result(
         "Account:".dimmed(),
         format_address(result.in_msg.contract.clone()).cyan()
     );
-    if let Some(sender) = &result.in_msg.sender {
+    if let Some(TxInfo::TickTock(info)) = tx_info {
+        let kind = match info.kind {
+            TickTock::Tick => "Tick",
+            TickTock::Tock => "Tock",
+        };
+        println!("  {:<15} {}", "Type:".dimmed(), kind);
+    } else if let Some(sender) = &result.in_msg.sender {
         println!(
             "  {:<15} {}",
             "Sender:".dimmed(),

@@ -52,7 +52,7 @@ export const SettingsPage: FC<SettingsPageProps> = ({
   const hasMining = runtimeAvailable && supports(environment, "mining")
   const [miningMode, setMiningMode] = useState<LocalnetMiningMode>()
   const [autoMining, setAutoMining] = useState<boolean>()
-  const [blockIntervalMs, setBlockIntervalMs] = useState<number>()
+  const [blockTimeMs, setBlockTimeMs] = useState<number>()
   const [rateLimitRps, setRateLimitRps] = useState<number | null>()
   const [environmentName, setEnvironmentName] = useState(environment?.name ?? "")
   const [responseDelay, setResponseDelay] = useState("")
@@ -103,7 +103,7 @@ export const SettingsPage: FC<SettingsPageProps> = ({
     if (!hasControlApi) {
       setMiningMode(undefined)
       setAutoMining(undefined)
-      setBlockIntervalMs(undefined)
+      setBlockTimeMs(undefined)
       setRateLimitRps(undefined)
       setResponseDelay("")
       setLoadError(undefined)
@@ -117,7 +117,7 @@ export const SettingsPage: FC<SettingsPageProps> = ({
       const nodeInfo = await client.getNodeInfo()
       setMiningMode(nodeInfo.mining_mode)
       setAutoMining(nodeInfo.auto_mining)
-      setBlockIntervalMs(nodeInfo.block_interval_ms)
+      setBlockTimeMs(nodeInfo.block_time_ms)
       setRateLimitRps(nodeInfo.rate_limit_rps)
       setResponseDelay((nodeInfo.network_conditions?.response_delay_ms ?? 0).toString())
     } catch (error) {
@@ -454,26 +454,6 @@ export const SettingsPage: FC<SettingsPageProps> = ({
               />
             </>
           ) : undefined}
-
-          {localnetConfig && supports(environment, "wallets") ? (
-            <div className={styles.settingsRow}>
-              <div className={styles.settingsRowCopy}>
-                <strong>Startup accounts</strong>
-                <span>Wallets available as soon as this environment starts</span>
-              </div>
-              <div className={styles.settingsBadges}>
-                {localnetConfig.accounts.length > 0 ? (
-                  localnetConfig.accounts.map(account => (
-                    <span key={account} className={styles.settingsBadge}>
-                      {account}
-                    </span>
-                  ))
-                ) : (
-                  <span className={styles.settingsValueMuted}>None</span>
-                )}
-              </div>
-            </div>
-          ) : undefined}
         </div>
       </section>
 
@@ -501,17 +481,17 @@ export const SettingsPage: FC<SettingsPageProps> = ({
             />
 
             <SettingsValueRow
-              label="Block interval"
+              label="Block time"
               description="Time between automatic block creation attempts"
               value={
                 isLoading ? (
                   "Loading"
                 ) : autoMining === false ? (
                   "Not applicable"
-                ) : blockIntervalMs === undefined ? (
+                ) : blockTimeMs === undefined ? (
                   "Unavailable"
                 ) : (
-                  <Duration display="runtime" unit="milliseconds" value={blockIntervalMs} />
+                  <Duration display="runtime" unit="milliseconds" value={blockTimeMs} />
                 )
               }
             />

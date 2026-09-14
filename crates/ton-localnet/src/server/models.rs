@@ -88,22 +88,13 @@ pub struct SetMiningModeRequest {
 }
 
 #[derive(Deserialize)]
-pub struct CreateCheckpointRequest {
-    pub name: String,
-    #[serde(default)]
-    pub force: bool,
+pub struct CreateSnapshotRequest {
+    pub name: Option<String>,
 }
 
 #[derive(Deserialize)]
-pub struct CheckpointRequest {
-    pub name: String,
-}
-
-#[derive(Deserialize)]
-pub struct ImportCheckpointQuery {
-    pub name: String,
-    #[serde(default)]
-    pub force: bool,
+pub struct SnapshotRequest {
+    pub id: String,
 }
 
 #[derive(Deserialize)]

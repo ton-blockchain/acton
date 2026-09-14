@@ -17,11 +17,22 @@ check whether it is active, and remove it again.
 .SS "acton hooks new"
 Create a \fB\&.githooks/\fR scaffold in the resolved project root.
 .sp
-If \fB\-\-template\fR is omitted, Acton opens an interactive selector.
+In a terminal, Acton prompts for the hook and template unless their flags are
+provided. Non\-interactive mode defaults to \fBpre\-push\fR and \fBdefault\fR\&.
 .sp
 This command only works when the resolved project root already contains a local
 \fB\&.git\fR directory.
 .SS "Options"
+.sp
+\fB\-\-hook\fR \fIhook\fR
+.RS 4
+When Git runs the generated hook.
+.sp
+Possible values: \fBpre\-push\fR, \fBpre\-commit\fR
+.sp
+The default is \fBpre\-push\fR, which runs checks before pushing changes.
+Choose \fBpre\-commit\fR to run checks before each commit instead.
+.RE
 .sp
 \fB\-\-template\fR \fItemplate\fR
 .RS 4
@@ -30,13 +41,22 @@ Hook scaffold template to create.
 Possible values: \fBempty\fR, \fBdefault\fR
 .RE
 .sp
-The \fBdefault\fR template creates \fB\&.githooks/pre\-commit\fR with a starter hook that
-runs:
+The \fBdefault\fR template creates \fB\&.githooks/pre\-push\fR, or \fB\&.githooks/pre\-commit\fR
+when selected, with this starter hook:
 .sp
 .RS 4
 .nf
 #!/bin/sh
 set \-e
+if ! command \-v acton >/dev/null 2>&1; then
+    printf '%s\(rsn' \(rs
+        "${0##*/}: acton was not found in PATH" \(rs
+        'Install Acton and add it to PATH in the environment that runs Git' \(rs
+        'On Windows, run Git inside the WSL distribution where Acton is installed' \(rs
+        "In VS Code, use 'WSL: Reopen Folder in WSL'" \(rs
+        'See https://ton\-blockchain.github.io/acton/docs/installation' >&2
+    exit 127
+fi
 acton check
 acton fmt \-\-check
 .fi
@@ -44,6 +64,18 @@ acton fmt \-\-check
 .sp
 The generated hook script uses \fB/bin/sh\fR, so the default template assumes a
 POSIX\-like shell environment.
+.sp
+If Acton is absent from \fBPATH\fR, the hook blocks the Git operation with exit code 127
+and prints instructions for the Git environment. A failed \fBacton check\fR or
+\fBacton fmt \-\-check\fR also blocks the Git operation.
+.sp
+Only the selected hook file is created. Both hooks check the current working
+tree. They do not create a checkout of the staged or pushed revisions.
+The \fBempty\fR template creates an empty file for the selected hook.
+.sp
+On Windows, run Git and Acton inside the same WSL distribution. In VS Code,
+use \fBWSL: Reopen Folder in WSL\fR\&. Opening a WSL terminal in a Windows workspace
+does not change the environment for Git commands from the Source Control view.
 .sp
 If \fB\&.githooks/\fR already exists or local hooks are already configured, the
 command fails instead of overwriting existing hooks.
@@ -57,6 +89,8 @@ run \fBacton hooks uninstall\fR first.
 acton hooks new
 acton hooks new \-\-template empty
 acton hooks new \-\-template default
+acton hooks new \-\-hook pre\-commit \-\-template default
+acton hooks new \-\-hook pre\-push \-\-template empty
 .fi
 .RE
 .SS "acton hooks install"

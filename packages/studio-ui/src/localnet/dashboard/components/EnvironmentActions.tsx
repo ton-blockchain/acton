@@ -1,37 +1,12 @@
-import {
-  Archive,
-  ArchiveRestore,
-  Download,
-  FastForward,
-  FileJson,
-  HandCoins,
-  Pickaxe,
-  Plus,
-  RotateCcw,
-  Send,
-  Settings2,
-  Trash2,
-  Upload,
-} from "lucide-react"
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  EmptyState,
-  formatByteSize,
-  formatNumberValue,
-  InlineButton,
-  Input,
-  useToast,
-} from "@acton/ui"
-import {useCallback, useRef, useState} from "react"
-import type {ChangeEvent, FC, FormEvent} from "react"
+import {Archive, FastForward, HandCoins, Pickaxe, Send, Settings2} from "lucide-react"
+import {formatNumberValue, InlineButton, useToast} from "@acton/ui"
+import {useCallback, useState} from "react"
+import type {FC} from "react"
 
 import {supports, supportsAny} from "../../../environmentCapabilities"
 import {ImportAccountsButton} from "../../../components/ImportAccountsAction"
 import type {StudioEnvironment} from "../../../studioApi"
 import type {TonClient} from "@acton/explorer-core/api/client"
-import type {LocalnetCheckpoint} from "@acton/explorer-core/api/types"
 
 import styles from "../DashboardPage.module.css"
 
@@ -39,7 +14,6 @@ interface EnvironmentActionsProps {
   readonly client: TonClient
   readonly environment?: StudioEnvironment
   readonly isAdvanceTimeOpen: boolean
-  readonly latestBlockSeqno?: number
   readonly onAdvanceTime: () => void
   readonly onOpenMiningSettings: () => void
   readonly onFund: () => void
@@ -49,18 +23,10 @@ interface EnvironmentActionsProps {
   readonly onStateChanged: () => void
 }
 
-interface StateFileDetails {
-  readonly size: string
-  readonly blockSeqno?: number
-  readonly isInspecting?: boolean
-  readonly error?: string
-}
-
 export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
   client,
   environment,
   isAdvanceTimeOpen,
-  latestBlockSeqno,
   onAdvanceTime,
   onOpenMiningSettings,
   onFund,
@@ -69,41 +35,14 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
   onAdminActions,
   onStateChanged,
 }) => {
-  const {showToast, updateToast} = useToast()
-  const stateFileInputRef = useRef<HTMLInputElement>(null)
-  const [isCheckpointsOpen, setIsCheckpointsOpen] = useState(false)
-  const [checkpoints, setCheckpoints] = useState<readonly LocalnetCheckpoint[]>([])
-  const [checkpointName, setCheckpointName] = useState("")
-  const [checkpointError, setCheckpointError] = useState<string>()
-  const [isLoadingCheckpoints, setIsLoadingCheckpoints] = useState(false)
+  const {showToast} = useToast()
   const [busyAction, setBusyAction] = useState<string>()
-  const [stateFile, setStateFile] = useState<File>()
-  const [stateFileDetails, setStateFileDetails] = useState<StateFileDetails>()
-  const [checkpointToRestore, setCheckpointToRestore] = useState<LocalnetCheckpoint>()
   const hasFaucet = supportsAny(environment, "testnetFaucet", "gramFaucet", "jettonFaucet")
   const hasAccountActions = hasFaucet || supports(environment, "simulator")
   const hasRuntimeActions = supports(environment, "mining") || supports(environment, "timeTravel")
-  const hasStateActions = supports(environment, "checkpoints")
   const hasSnapshots = supports(environment, "snapshots")
   const hasAdminActions =
     environment?.config.kind === "fullTonNetwork" && environment.lifecycle === "managed"
-
-  const loadCheckpoints = useCallback(async () => {
-    setIsLoadingCheckpoints(true)
-    setCheckpointError(undefined)
-    try {
-      setCheckpoints(await client.listCheckpoints())
-    } catch (error) {
-      setCheckpointError(errorMessage(error, "Failed to load checkpoints"))
-    } finally {
-      setIsLoadingCheckpoints(false)
-    }
-  }, [client])
-
-  const openCheckpoints = useCallback(() => {
-    setIsCheckpointsOpen(true)
-    void loadCheckpoints()
-  }, [loadCheckpoints])
 
   const mineBlock = useCallback(async () => {
     setBusyAction("mine-block")
@@ -142,222 +81,9 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
     }
   }, [client, onOpenMiningSettings, onStateChanged, showToast])
 
-  const downloadState = useCallback(async () => {
-    setBusyAction("download-state")
-    try {
-      const state = await client.downloadState()
-      downloadBlob(state, `acton-simulated-localnet-state-${latestBlockSeqno ?? "latest"}.json`)
-      showToast({
-        variant: "success",
-        title: "State downloaded",
-        description: "The current localnet state was saved as a JSON file",
-      })
-    } catch (error) {
-      showToast({
-        variant: "error",
-        title: "State not downloaded",
-        description: errorMessage(error, "Failed to download localnet state"),
-      })
-    } finally {
-      setBusyAction(undefined)
-    }
-  }, [client, latestBlockSeqno, showToast])
-
-  const selectStateFile = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const [file] = Array.from(event.target.files ?? [])
-    if (!file) return
-
-    setStateFile(file)
-    setStateFileDetails({size: formatByteSize(file.size), isInspecting: true})
-    void file
-      .text()
-      .then(text => {
-        const document = JSON.parse(text) as {
-          readonly globals?: {readonly head_seqno?: unknown}
-        }
-        if (stateFileInputRef.current?.files?.[0] !== file) return
-        setStateFileDetails({
-          size: formatByteSize(file.size),
-          blockSeqno:
-            typeof document.globals?.head_seqno === "number"
-              ? document.globals.head_seqno
-              : undefined,
-        })
-      })
-      .catch(() => {
-        if (stateFileInputRef.current?.files?.[0] !== file) return
-        setStateFileDetails({
-          size: formatByteSize(file.size),
-          error: "This file is not valid JSON",
-        })
-      })
-  }, [])
-
-  const closeStateConfirmation = useCallback(() => {
-    setStateFile(undefined)
-    setStateFileDetails(undefined)
-    if (stateFileInputRef.current) stateFileInputRef.current.value = ""
-  }, [])
-
-  const loadState = useCallback(async () => {
-    if (!stateFile || busyAction === "load-state") return
-
-    const file = stateFile
-    const toastId = showToast({
-      variant: "loading",
-      title: "Loading localnet state",
-      description: file.name,
-      durationMs: 0,
-    })
-    setBusyAction("load-state")
-    try {
-      await client.loadState(file)
-      setCheckpoints([])
-      setStateFile(undefined)
-      setStateFileDetails(undefined)
-      if (stateFileInputRef.current) stateFileInputRef.current.value = ""
-      onStateChanged()
-      updateToast(toastId, {
-        variant: "success",
-        title: "State loaded",
-        description: `${file.name} replaced the current localnet state`,
-        durationMs: 4000,
-      })
-    } catch (error) {
-      updateToast(toastId, {
-        variant: "error",
-        title: "State not loaded",
-        description: errorMessage(error, "Failed to load localnet state"),
-        durationMs: 8000,
-      })
-    } finally {
-      setBusyAction(undefined)
-    }
-  }, [busyAction, client, onStateChanged, showToast, stateFile, updateToast])
-
-  const createCheckpoint = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault()
-      if (busyAction === "create-checkpoint") return
-
-      const name = checkpointName.trim()
-      if (!name) {
-        setCheckpointError("Enter a checkpoint name")
-        return
-      }
-
-      const toastId = showToast({
-        variant: "loading",
-        title: "Creating checkpoint",
-        description: name,
-        durationMs: 0,
-      })
-      setBusyAction("create-checkpoint")
-      setCheckpointError(undefined)
-      try {
-        const checkpoint = await client.createCheckpoint(name)
-        setCheckpoints(current => [...current, checkpoint])
-        setCheckpointName("")
-        updateToast(toastId, {
-          variant: "success",
-          title: "Checkpoint created",
-          description: `${checkpoint.name} stores block ${checkpoint.block_seqno}`,
-          durationMs: 4000,
-        })
-      } catch (error) {
-        const message = errorMessage(error, "Failed to create checkpoint")
-        setCheckpointError(message)
-        updateToast(toastId, {
-          variant: "error",
-          title: "Checkpoint not created",
-          description: message,
-          durationMs: 8000,
-        })
-      } finally {
-        setBusyAction(undefined)
-      }
-    },
-    [busyAction, checkpointName, client, showToast, updateToast],
-  )
-
-  const restoreCheckpoint = useCallback(async () => {
-    if (!checkpointToRestore || busyAction === "restore-checkpoint") return
-
-    const checkpoint = checkpointToRestore
-    const toastId = showToast({
-      variant: "loading",
-      title: "Restoring checkpoint",
-      description: checkpoint.name,
-      durationMs: 0,
-    })
-    setBusyAction("restore-checkpoint")
-    try {
-      await client.restoreCheckpoint(checkpoint.name)
-      setCheckpointToRestore(undefined)
-      onStateChanged()
-      updateToast(toastId, {
-        variant: "success",
-        title: "Checkpoint restored",
-        description: `${checkpoint.name} is now the current localnet state`,
-        durationMs: 4000,
-      })
-    } catch (error) {
-      updateToast(toastId, {
-        variant: "error",
-        title: "Checkpoint not restored",
-        description: errorMessage(error, "Failed to restore checkpoint"),
-        durationMs: 8000,
-      })
-    } finally {
-      setBusyAction(undefined)
-    }
-  }, [busyAction, checkpointToRestore, client, onStateChanged, showToast, updateToast])
-
-  const downloadCheckpoint = useCallback(
-    async (checkpoint: LocalnetCheckpoint) => {
-      setBusyAction(`download-${checkpoint.name}`)
-      try {
-        const state = await client.downloadCheckpoint(checkpoint.name)
-        downloadBlob(state, `acton-checkpoint-${safeFilename(checkpoint.name)}.json`)
-      } catch (error) {
-        showToast({
-          variant: "error",
-          title: "Checkpoint not downloaded",
-          description: errorMessage(error, "Failed to download checkpoint"),
-        })
-      } finally {
-        setBusyAction(undefined)
-      }
-    },
-    [client, showToast],
-  )
-
-  const deleteCheckpoint = useCallback(
-    async (checkpoint: LocalnetCheckpoint) => {
-      setBusyAction(`delete-${checkpoint.name}`)
-      try {
-        await client.deleteCheckpoint(checkpoint.name)
-        setCheckpoints(current => current.filter(item => item.name !== checkpoint.name))
-      } catch (error) {
-        showToast({
-          variant: "error",
-          title: "Checkpoint not deleted",
-          description: errorMessage(error, "Failed to delete checkpoint"),
-        })
-      } finally {
-        setBusyAction(undefined)
-      }
-    },
-    [client, showToast],
-  )
-
   return (
     <>
-      {hasAccountActions ||
-      hasRuntimeActions ||
-      hasStateActions ||
-      hasSnapshots ||
-      hasAdminActions ? (
+      {hasAccountActions || hasRuntimeActions || hasSnapshots || hasAdminActions ? (
         <div className={styles.environmentActions}>
           {hasAccountActions ? (
             <div className={styles.environmentActionGroup} aria-label="Account actions">
@@ -398,7 +124,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
             </div>
           ) : undefined}
 
-          {hasStateActions || hasSnapshots || hasAdminActions ? (
+          {hasSnapshots || hasAdminActions ? (
             <div className={styles.environmentActionGroup} aria-label="State actions">
               {hasAdminActions ? <ImportAccountsButton /> : undefined}
               {hasAdminActions ? (
@@ -411,241 +137,14 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
                   Snapshots
                 </InlineButton>
               ) : undefined}
-              {supports(environment, "checkpoints") ? (
-                <>
-                  <InlineButton
-                    leadingIcon={<ArchiveRestore size={15} />}
-                    onClick={openCheckpoints}
-                  >
-                    Checkpoints
-                  </InlineButton>
-                  <InlineButton
-                    leadingIcon={<Upload size={15} />}
-                    onClick={() => stateFileInputRef.current?.click()}
-                  >
-                    Load state
-                  </InlineButton>
-                  <InlineButton
-                    leadingIcon={<Download size={15} />}
-                    disabled={busyAction === "download-state"}
-                    onClick={() => void downloadState()}
-                  >
-                    {busyAction === "download-state" ? "Downloading" : "Download state"}
-                  </InlineButton>
-                  <input
-                    ref={stateFileInputRef}
-                    className={styles.visuallyHiddenInput}
-                    type="file"
-                    accept="application/json,.json"
-                    tabIndex={-1}
-                    onChange={selectStateFile}
-                  />
-                </>
-              ) : undefined}
             </div>
           ) : undefined}
         </div>
       ) : undefined}
-
-      <Dialog
-        open={isCheckpointsOpen}
-        title="Checkpoints"
-        description="Keep reusable restore points in this localnet process"
-        className={styles.dashboardDialog}
-        maxWidth={620}
-        closeLabel="Close checkpoints"
-        onOpenChange={setIsCheckpointsOpen}
-      >
-        <div className={styles.checkpointDialogContent}>
-          <form
-            className={styles.checkpointCreateRow}
-            onSubmit={event => void createCheckpoint(event)}
-          >
-            <Input
-              aria-label="Checkpoint name"
-              placeholder="Checkpoint name"
-              value={checkpointName}
-              disabled={busyAction === "create-checkpoint"}
-              onChange={event => {
-                setCheckpointName(event.target.value)
-                setCheckpointError(undefined)
-              }}
-            />
-            <Button
-              type="submit"
-              size="sm"
-              variant="primary"
-              leadingIcon={<Plus size={15} />}
-              loading={busyAction === "create-checkpoint"}
-              disabled={!checkpointName.trim()}
-            >
-              Create
-            </Button>
-          </form>
-
-          {checkpointError && (
-            <div className={styles.checkpointError} role="alert">
-              {checkpointError}
-            </div>
-          )}
-
-          <div className={styles.checkpointList}>
-            {isLoadingCheckpoints ? (
-              <div className={styles.checkpointLoading}>Loading checkpoints…</div>
-            ) : checkpoints.length === 0 ? (
-              <EmptyState
-                icon={<Archive size={20} aria-hidden="true" />}
-                title="No checkpoints yet"
-                description="Create a checkpoint to return to this localnet state later"
-              />
-            ) : (
-              checkpoints.map(checkpoint => (
-                <div key={checkpoint.name} className={styles.checkpointRow}>
-                  <div className={styles.checkpointIdentity}>
-                    <strong>{checkpoint.name}</strong>
-                    <span>Block {checkpoint.block_seqno}</span>
-                  </div>
-                  <div className={styles.checkpointActions}>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      leadingIcon={<RotateCcw size={14} />}
-                      disabled={busyAction !== undefined}
-                      onClick={() => {
-                        setIsCheckpointsOpen(false)
-                        setCheckpointToRestore(checkpoint)
-                      }}
-                    >
-                      Restore
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      leadingIcon={<Download size={15} />}
-                      aria-label={`Download ${checkpoint.name}`}
-                      title="Download checkpoint"
-                      loading={busyAction === `download-${checkpoint.name}`}
-                      disabled={busyAction !== undefined}
-                      onClick={() => void downloadCheckpoint(checkpoint)}
-                    />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      leadingIcon={<Trash2 size={15} />}
-                      aria-label={`Delete ${checkpoint.name}`}
-                      title="Delete checkpoint"
-                      loading={busyAction === `delete-${checkpoint.name}`}
-                      disabled={busyAction !== undefined}
-                      onClick={() => void deleteCheckpoint(checkpoint)}
-                    />
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </Dialog>
-
-      <Dialog
-        open={stateFile !== undefined}
-        title="Load localnet state?"
-        description="This replaces the current node state and clears all checkpoints"
-        className={styles.dashboardDialog}
-        maxWidth={460}
-        busy={busyAction === "load-state"}
-        closeLabel="Close load state dialog"
-        onOpenChange={open => {
-          if (!open) closeStateConfirmation()
-        }}
-      >
-        <div className={styles.stateConfirmationContent}>
-          <div className={styles.stateFileSummary}>
-            <FileJson size={20} aria-hidden="true" />
-            <div className={styles.stateFileIdentity}>
-              <strong>{stateFile?.name}</strong>
-              <span className={stateFileDetails?.error ? styles.stateFileError : undefined}>
-                {formatStateFileDetails(stateFileDetails)}
-              </span>
-            </div>
-          </div>
-          <DialogActions stackOnMobile>
-            <Button variant="outline" onClick={closeStateConfirmation}>
-              {busyAction === "load-state" ? "Close" : "Cancel"}
-            </Button>
-            <Button
-              variant="danger"
-              loading={busyAction === "load-state"}
-              disabled={stateFileDetails?.isInspecting || stateFileDetails?.error !== undefined}
-              onClick={() => void loadState()}
-            >
-              Load state
-            </Button>
-          </DialogActions>
-        </div>
-      </Dialog>
-
-      <Dialog
-        open={checkpointToRestore !== undefined}
-        title="Restore checkpoint?"
-        description="This replaces the current node state; the checkpoint remains available"
-        className={styles.dashboardDialog}
-        maxWidth={460}
-        busy={busyAction === "restore-checkpoint"}
-        closeLabel="Close checkpoint restore dialog"
-        onOpenChange={open => {
-          if (!open) setCheckpointToRestore(undefined)
-        }}
-      >
-        <div className={styles.stateConfirmationContent}>
-          <div className={styles.stateFileSummary}>
-            <ArchiveRestore size={20} aria-hidden="true" />
-            <div className={styles.stateFileIdentity}>
-              <strong>{checkpointToRestore?.name}</strong>
-              <span>Block {checkpointToRestore?.block_seqno}</span>
-            </div>
-          </div>
-          <DialogActions stackOnMobile>
-            <Button variant="outline" onClick={() => setCheckpointToRestore(undefined)}>
-              {busyAction === "restore-checkpoint" ? "Close" : "Cancel"}
-            </Button>
-            <Button
-              variant="primary"
-              leadingIcon={<RotateCcw size={15} />}
-              loading={busyAction === "restore-checkpoint"}
-              onClick={() => void restoreCheckpoint()}
-            >
-              Restore
-            </Button>
-          </DialogActions>
-        </div>
-      </Dialog>
     </>
   )
 }
 
-function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement("a")
-  link.href = url
-  link.download = filename
-  link.click()
-  URL.revokeObjectURL(url)
-}
-
-function safeFilename(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]+/g, "-")
-}
-
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback
-}
-
-function formatStateFileDetails(details: StateFileDetails | undefined): string {
-  if (!details) return "Reading file"
-  if (details.error) return details.error
-  if (details.isInspecting) return `${details.size} · Reading state metadata`
-
-  const metadata = [details.size]
-  if (details.blockSeqno !== undefined) metadata.push(`Block ${details.blockSeqno}`)
-  return metadata.join(" · ")
 }

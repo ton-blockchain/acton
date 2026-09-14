@@ -5,7 +5,7 @@
 //! `/localhost.global.config.json` returns a loopback liteserver config for
 //! clients on this host, while `/config` retains the advertised endpoint for
 //! other hosts. `/faucet` gives a new node an on-chain development balance.
-//! `/live` and `/healthz` report instance readiness.
+//! `/livez` and `/healthz` report instance readiness.
 
 use std::{path::Path, sync::Arc};
 
@@ -136,7 +136,7 @@ pub(super) async fn start(
         )
         .route("/config", get(global_config_handler))
         .route("/faucet", post(development_faucet_handler))
-        .route("/live", get(live_handler))
+        .route("/livez", get(live_handler))
         .route("/healthz", get(healthz_handler))
         .with_state(ConfigState {
             layout,
@@ -224,7 +224,7 @@ pub(super) fn root_document(settings: &Settings, runtime: &RuntimeState) -> Conf
         endpoints: ConfigEndpoints {
             global_config: format!("{config_endpoint}/localhost.global.config.json"),
             config: format!("{config_endpoint}/config"),
-            live: format!("{config_endpoint}/live"),
+            live: format!("{config_endpoint}/livez"),
             healthz: format!("{config_endpoint}/healthz"),
             faucet: format!("{config_endpoint}/faucet"),
             admin: admin_endpoint,
@@ -326,7 +326,7 @@ async fn development_faucet_handler(
 /// The endpoint returns `200` only when the instance and the network are ready
 #[utoipa::path(
     get,
-    path = "/live",
+    path = "/livez",
     tag = "configuration",
     responses(
         (status = 200, description = "Instance and network are ready", body = String),
@@ -340,7 +340,7 @@ async fn live_handler(State(state): State<ConfigState>) -> Response {
 
 /// Get the network health state
 ///
-/// This endpoint has the same readiness rules as `/live`
+/// This endpoint has the same readiness rules as `/livez`
 #[utoipa::path(
     get,
     path = "/healthz",

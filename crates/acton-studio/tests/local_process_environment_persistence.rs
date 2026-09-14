@@ -39,7 +39,7 @@ async fn local_process_environment_persists_its_full_lifecycle() {
                 accounts: vec!["deployer".to_owned(), "treasury".to_owned()],
                 rate_limit: Some(25),
                 response_delay_ms: Some(40),
-                block_interval_ms: Some(500),
+                block_time_ms: Some(500),
                 no_mining: false,
                 mine_empty_blocks: true,
             },
@@ -208,7 +208,7 @@ id: environment-1
 name: Persistent localnet
 status: Starting
 same id/name/config: n/a
-config: {"accounts":["deployer","treasury"],"blockIntervalMs":500,"forkBlockNumber":123456,"forkNetwork":"testnet","kind":"actonSimulatedLocalnet","mineEmptyBlocks":true,"noMining":false,"port":"<PORT>","rateLimit":25,"responseDelayMs":40}
+config: {"accounts":["deployer","treasury"],"blockTimeMs":500,"forkBlockNumber":123456,"forkNetwork":"testnet","kind":"actonSimulatedLocalnet","mineEmptyBlocks":true,"noMining":false,"port":"<PORT>","rateLimit":25,"responseDelayMs":40}
 desired running: true
 marker: environment data survives
 after shutdown and open
@@ -216,7 +216,7 @@ id: environment-1
 name: Persistent localnet
 status: Starting
 same id/name/config: true
-config: {"accounts":["deployer","treasury"],"blockIntervalMs":500,"forkBlockNumber":123456,"forkNetwork":"testnet","kind":"actonSimulatedLocalnet","mineEmptyBlocks":true,"noMining":false,"port":"<PORT>","rateLimit":25,"responseDelayMs":40}
+config: {"accounts":["deployer","treasury"],"blockTimeMs":500,"forkBlockNumber":123456,"forkNetwork":"testnet","kind":"actonSimulatedLocalnet","mineEmptyBlocks":true,"noMining":false,"port":"<PORT>","rateLimit":25,"responseDelayMs":40}
 desired running: true
 marker: environment data survives
 after user stop
@@ -224,7 +224,7 @@ id: environment-1
 name: Persistent localnet
 status: Stopped
 same id/name/config: true
-config: {"accounts":["deployer","treasury"],"blockIntervalMs":500,"forkBlockNumber":123456,"forkNetwork":"testnet","kind":"actonSimulatedLocalnet","mineEmptyBlocks":true,"noMining":false,"port":"<PORT>","rateLimit":25,"responseDelayMs":40}
+config: {"accounts":["deployer","treasury"],"blockTimeMs":500,"forkBlockNumber":123456,"forkNetwork":"testnet","kind":"actonSimulatedLocalnet","mineEmptyBlocks":true,"noMining":false,"port":"<PORT>","rateLimit":25,"responseDelayMs":40}
 desired running: false
 marker: environment data survives
 after stopped reopen
@@ -232,7 +232,7 @@ id: environment-1
 name: Persistent localnet
 status: Stopped
 same id/name/config: true
-config: {"accounts":["deployer","treasury"],"blockIntervalMs":500,"forkBlockNumber":123456,"forkNetwork":"testnet","kind":"actonSimulatedLocalnet","mineEmptyBlocks":true,"noMining":false,"port":"<PORT>","rateLimit":25,"responseDelayMs":40}
+config: {"accounts":["deployer","treasury"],"blockTimeMs":500,"forkBlockNumber":123456,"forkNetwork":"testnet","kind":"actonSimulatedLocalnet","mineEmptyBlocks":true,"noMining":false,"port":"<PORT>","rateLimit":25,"responseDelayMs":40}
 desired running: false
 marker: environment data survives
 after restart
@@ -240,7 +240,7 @@ id: environment-1
 name: Persistent localnet
 status: Starting
 same id/name/config: true
-config: {"accounts":["deployer","treasury"],"blockIntervalMs":500,"forkBlockNumber":123456,"forkNetwork":"testnet","kind":"actonSimulatedLocalnet","mineEmptyBlocks":true,"noMining":false,"port":"<PORT>","rateLimit":25,"responseDelayMs":40}
+config: {"accounts":["deployer","treasury"],"blockTimeMs":500,"forkBlockNumber":123456,"forkNetwork":"testnet","kind":"actonSimulatedLocalnet","mineEmptyBlocks":true,"noMining":false,"port":"<PORT>","rateLimit":25,"responseDelayMs":40}
 desired running: true
 marker: environment data survives
 after restarted reopen
@@ -248,7 +248,7 @@ id: environment-1
 name: Persistent localnet
 status: Starting
 same id/name/config: true
-config: {"accounts":["deployer","treasury"],"blockIntervalMs":500,"forkBlockNumber":123456,"forkNetwork":"testnet","kind":"actonSimulatedLocalnet","mineEmptyBlocks":true,"noMining":false,"port":"<PORT>","rateLimit":25,"responseDelayMs":40}
+config: {"accounts":["deployer","treasury"],"blockTimeMs":500,"forkBlockNumber":123456,"forkNetwork":"testnet","kind":"actonSimulatedLocalnet","mineEmptyBlocks":true,"noMining":false,"port":"<PORT>","rateLimit":25,"responseDelayMs":40}
 desired running: true
 marker: environment data survives
 after delete

@@ -16,7 +16,28 @@ export const CELL_INSPECTOR_FIXTURES = {
     "B5EE9C7241020A010002B8000114FF00F4A413F4BCF2C80B01020162020903C4D0F8918E34D31F31D72C20BC6A28CC96D33F31FA00308E11D72C23DEECBEF492F23FE1D33F31FA0030E2ED44D0FA0002A0C801FA02CEC9ED54E0D72C20BC6A28CCE302D72C207C53F52CE302D72C22CAF83DE4E302D72C269B90AC6431DC840FF2F003060802E6ED44D001D33FFA00FA50FA50FA0006FA0020FA48FA4830F89221C70591308E3AF892F82A28C8CF8420FA5213FA52C97829541242C8CF83CB04CF85A0CCCCF91684F7B013800B5004D724C8CF8A0040CE12CBF7CF50C705F2E04AE25126A0C801FA02CEC9ED5421935B345BE30D216E915BE30E04050052C8CF91CD8B427226CF0B3F5005FA0213FA5415CEC9C8CF850813FA5201FA0271CF0B6ACCC98011FB000068F8276F10F897A1F82FA07381040282100966018070F837B60972FB02C8CF850812FA528210D53276DBCF0B8ECB3FC9810082FB0001FED33FFA00FA48FA50F401FA0020F404016E913091D1E223FA4430F2D14DF897F89370F83A237271E304F839206E8118B722E304216E811D135803E3045023A825A07381032C70F83CA00170F836A00170F836A07381040282100966018070F837A0BCF2B0ED44D0FA0020FA48FA4830F89222C705F2E0495338BEF2AF5138A10700C0C801FA0212CEC9ED54F82A26C8CF8420FA5213FA52C978C8CF905E3514661ACB3F5008FA02FA5414FA5458FA02CEC9C8CF898801547425C8CF83CB04CF85A0CCCCF91684F7B004800B27D7243615CE12CBF781150DCF0B79CCCCCCC98050FB0000E0F897F839206E81109E58E304718102F270F8380170F836A0810FE770F836A0BCF2B0ED44D0FA0020FA48FA4830F89222C705F2E04904D33FFA00FA50305351BEF2AF5151A1C801FA0214CEC9ED54C8CF91EF765F7ACB3F58FA02FA52FA54C9C8CF858812FA5271CF0B6ECCC98050FB00001DA0F605DA89A1F401F491F49061F055DEA90626",
 } as const
 
-const TVM_CODE_HASH = "7bfa53bce90ce26cd368ec2989eba2bd15d286104742f0e04659f485a03012ba"
+export const TVM_CODE_HASH = "7bfa53bce90ce26cd368ec2989eba2bd15d286104742f0e04659f485a03012ba"
+export const CELL_INSPECTOR_VERIFIED_SOURCE = {
+  code_hash: TVM_CODE_HASH,
+  verified: true,
+  bundle: {
+    source_bundle_hash: "cell-inspector-source",
+    verified_at: 1,
+    storage_revision: "test",
+    entrypoint: "main.tolk",
+    compiler: {language: "tolk", version: "1.2.0", params: {}},
+    files: [
+      {
+        path: "main.tolk",
+        content_hash: "main-source",
+        include_in_command: true,
+        is_stdlib: false,
+        has_include_directives: false,
+        content: "fun onInternalMessage() {}",
+      },
+    ],
+  },
+} as const
 const REGISTRY_COMPILER_ABI = {
   alias_instantiations: [],
   compiler_name: "tolk",
@@ -168,6 +189,14 @@ export function describeCellInspector({app, route}: CellInspectorSuiteOptions): 
       await expect(page.getByText("Verified contract code", {exact: true})).toBeVisible()
       await expect(page.getByText(/^Verified source/)).toBeVisible()
       await expect(page.getByText("exact · 100%", {exact: true})).toBeVisible()
+      await expect(
+        page.getByRole("link", {name: "View verification", exact: true}),
+      ).toHaveAttribute(
+        "href",
+        app === "localnet"
+          ? `https://verifier-staging.ton.org/${TVM_CODE_HASH}`
+          : `/verified/${TVM_CODE_HASH}`,
+      )
       await expect(page.getByText("TON block.tlb · StateInit", {exact: true})).toHaveCount(0)
       await expect(page.getByText(/decoded only part of the root cell/i)).toHaveCount(0)
     })
@@ -250,7 +279,7 @@ async function installRegistryAbiRoute(
     await page.route("**/acton_getCompilerAbi?**", route => route.fulfill({json: {}}))
   }
 
-  await page.route("https://verifier-staging.actonscan.com/api/v1/abi?**", route =>
+  await page.route("https://verifier-staging.ton.org/api/v1/abi?**", route =>
     route.fulfill({
       json: {
         items: [
@@ -268,36 +297,14 @@ async function installVerifiedSourceRoute(
   page: Page,
   app: CellInspectorSuiteOptions["app"],
 ): Promise<void> {
-  const source = {
-    code_hash: TVM_CODE_HASH,
-    verified: true,
-    bundle: {
-      source_bundle_hash: "cell-inspector-source",
-      verified_at: 1,
-      storage_revision: "test",
-      entrypoint: "main.tolk",
-      compiler: {language: "tolk", version: "1.2.0", params: {}},
-      files: [
-        {
-          path: "main.tolk",
-          content_hash: "main-source",
-          include_in_command: true,
-          is_stdlib: false,
-          has_include_directives: false,
-          content: "fun onInternalMessage() {}",
-        },
-      ],
-    },
-  }
-
   if (app === "localnet") {
     await page.route("**/acton_getRegisteredVerifiedSource?**", route =>
-      route.fulfill({json: source}),
+      route.fulfill({json: CELL_INSPECTOR_VERIFIED_SOURCE}),
     )
     return
   }
 
-  await page.route("https://verifier-staging.actonscan.com/api/v1/verification/source?**", route =>
-    route.fulfill({json: source}),
+  await page.route("https://verifier-staging.ton.org/api/v1/verification/source?**", route =>
+    route.fulfill({json: CELL_INSPECTOR_VERIFIED_SOURCE}),
   )
 }

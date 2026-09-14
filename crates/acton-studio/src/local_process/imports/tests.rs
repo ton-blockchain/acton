@@ -172,7 +172,8 @@ async fn import_pins_cells_and_registers_after_success_across_a_studio_restart()
             location,
         ))),
         child: Mutex::new(None),
-        lifecycle: Mutex::new(()),
+        lifecycle: Arc::new(Mutex::new(())),
+        snapshot_operation: RwLock::new(None),
         generation: AtomicU64::new(1),
         resume_on_startup: AtomicBool::new(false),
         deleted: AtomicBool::new(false),
@@ -193,7 +194,7 @@ async fn import_pins_cells_and_registers_after_success_across_a_studio_restart()
         accounts: vec![],
         rate_limit: None,
         response_delay_ms: None,
-        block_interval_ms: None,
+        block_time_ms: None,
         no_mining: false,
         mine_empty_blocks: false,
     };
@@ -217,7 +218,8 @@ async fn import_pins_cells_and_registers_after_success_across_a_studio_restart()
         )
         .expect("source driver"),
         child: Mutex::new(None),
-        lifecycle: Mutex::new(()),
+        lifecycle: Arc::new(Mutex::new(())),
+        snapshot_operation: RwLock::new(None),
         generation: AtomicU64::new(1),
         resume_on_startup: AtomicBool::new(false),
         deleted: AtomicBool::new(false),

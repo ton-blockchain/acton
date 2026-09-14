@@ -14,8 +14,9 @@ on-chain code hash matches a code hash present in the source registry.
 The registry is off-chain. Git stores the source bundles and manifests, and the
 runtime registry layer serves reads from a SQLite index. The index can be
 rebuilt from the Git repository by scanning
-`{source_repository.storage_root}/{code_hash}/`. The storage root defaults to
-`sources`.
+`{source_repository.storage_root}/{code_hash_prefix}/{code_hash_suffix}/`,
+where `code_hash_prefix` is the first two characters of the code hash and
+`code_hash_suffix` is the rest. The storage root defaults to `sources`.
 
 The verifier uses TON testnet payments to limit automated spam. A separate
 SQLite ledger prevents payment replay. The backend rebuilds this ledger from
@@ -98,8 +99,16 @@ Responsibilities:
 
 ### Payment Verification
 
-Payment verification always uses TON testnet. The CLI does not accept `--net`
-with `--new`.
+`acton verify` uses TON verifier and pays for verification on TON testnet.
+Verification records are keyed by code hash, so the same verified code can be
+used on any TON network. Address lookups through this backend use its configured
+testnet provider.
+
+Acton validates portable source paths before payment. Uploads accept at most
+256 files. Source paths are relative, at most 128 ASCII characters, and contain
+only letters, numbers, `/`, `.`, `_`, and `-`. Empty components, traversal,
+trailing dots, `.git`, the root `output` directory, repeated source extensions,
+and case-insensitive duplicates are rejected.
 
 The ticket always binds a code hash, even when the final `/verify` request also
 contains an address. The client computes or resolves the code hash before it
@@ -149,14 +158,22 @@ processing lease. The fourth claim returns `payment_used` without another
 TON Center request. Each claim has a generation number. A stale worker cannot
 finish a newer claim after its lease expires.
 
+Recovery preserves payments already marked `consumed`, changes interrupted
+`processing` claims to `retryable`, and imports previously unseen finalized
+payments as `retryable`. Payments referenced by source manifests in the
+published Git revision are reconciled to `consumed`. This lets a client
+resubmit after a backend restart without making a published payment reusable.
+
 For a successful public verification, the backend stores the payment
 transaction hash in lowercase hexadecimal form. The source manifest and lookup
 API include this hash. The verifier UI links the hash to Actonscan testnet.
 
 At startup, the payment verifier is not ready. It reads every page of incoming
-testnet history up to a captured chain tip. It marks all known ledger entries
-as `consumed`, then adds funded historical protocol payments as `consumed`.
-The merge never deletes existing replay evidence.
+testnet history up to a captured chain tip. It preserves `consumed` ledger
+entries, releases interrupted `processing` claims as `retryable`, and adds
+previously unseen funded protocol payments as `retryable`. It then marks every
+payment referenced by the published source manifests as `consumed`. The merge
+never deletes existing replay evidence.
 
 The startup scan ignores payments below the configured minimum. These payments
 cannot authorize verification. Payments without the protocol comment also
@@ -168,9 +185,10 @@ a failed scan with an exponential delay of up to 30 seconds.
 For unverified code, `/verify` also returns `503` before it claims the payment.
 An already-verified lookup can still return successfully during recovery.
 
-Recovery conservatively consumes a payment that reached the payment wallet
-before a server crash. This rule also applies when compilation or storage did
-not finish before the crash.
+Recovery keeps a payment claimable when it reached the payment wallet before a
+server crash but no completed attempt was recorded. An interrupted `processing`
+attempt also becomes claimable again while it remains within the three-attempt
+limit.
 
 Another request can verify the code after ticket issuance but before source
 submission. In this race, `/verify` returns `already_verified` without claiming
@@ -195,10 +213,11 @@ Source storage persists verified bundles in Git:
 
 ```text
 <storage_root>/
-  <code_hash>/
-    manifest.json
-    files/
-      ...
+  <first_two_code_hash_characters>/
+    <remaining_code_hash_characters>/
+      manifest.json
+      files/
+        ...
 ```
 
 Git provides:
@@ -211,6 +230,40 @@ Git provides:
 
 The local Docker volume is only a checkout/cache. The remote Git repository is
 the durable storage target after every successful push.
+
+At startup, the verifier removes uncommitted files and Git index entries below
+the configured storage root. A completed local commit is retained and pushed
+before the registry index is served. Changes outside the storage root still
+stop startup instead of being modified automatically.
+
+Git commands have a 60-second deadline and cannot prompt for credentials on
+stdin. If a push fails or times out, the completed local commit remains pending
+and is pushed again before the registry index can be served. This also handles
+the ambiguous case where the remote accepted a push but the client did not
+receive the success response. Deployments must provide working noninteractive
+Git credentials.
+
+### Execution Limits
+
+Duplicate singleton multipart fields are rejected before payment is claimed.
+Repeated `files` fields remain supported.
+
+The compiler deadline covers writing stdin, reading stdout and stderr, and
+waiting for process exit. Both output pipes are drained concurrently. Output
+is limited to 16 MiB on stdout and 64 KiB on stderr; exceeding either limit
+terminates the worker. The default deadline is ten seconds and is configured
+with `compiler.timeout_ms`. Concurrent worker processes are limited by
+`compiler.max_concurrent_compilations`, which defaults to one. Compilation
+can run without a concurrency limit when this value is `-1`. Compilation failures,
+including resource limits, consume the current claim under the existing payment
+policy.
+
+These limits complement the container's memory and process limits and reverse
+proxy rate limits. They do not provide an independent OS sandbox for each
+compiler. Account lookups have a 30-second provider deadline.
+
+Verification logs contain operation, target hash, result and elapsed time.
+Submitted compiler parameters and complete source payloads are not logged.
 
 ### Verification Registry
 
@@ -279,7 +332,7 @@ not expose a base64 source-content field.
 2. Acton sends the code hash to `/take_ticket`.
 3. If the code hash is verified, Acton stops successfully without payment.
 4. For new code, the backend returns a testnet payment quote.
-5. Acton gets wallet approval and sends the payment with the exact comment.
+5. Acton validates source paths, gets wallet approval and sends the payment with the exact comment.
 6. Acton waits for the finalized recipient transaction.
 7. Acton sends the sources and recipient transaction hash to `/verify`.
 8. The backend resolves the target code hash.
@@ -288,9 +341,15 @@ not expose a base64 source-content field.
 11. The backend compiles the sources and compares both code hashes.
 12. If the hashes differ, the response is `mismatch` and no bundle is stored.
 13. If the hashes match, the registry stores the payment hash and source bundle.
-14. The API returns `match`, `source_bundle_hash`, and `storage_revision`.
-15. The backend consumes the payment unless an allowlisted source storage
+14. The backend consumes the payment unless an allowlisted source storage
     failure occurred and the retry budget remains.
+15. The API returns `match`, `source_bundle_hash`, and `storage_revision`.
+    Acton checks that both returned code hashes match its local compilation.
+
+After a payment is claimed, the verification runs as a tracked task independent
+of the HTTP connection. A client disconnect does not leave the claim half
+processed. The API can return success only after source publication, registry
+indexing, and the final payment-ledger update have all succeeded.
 
 ## Lookup Flow
 
@@ -330,11 +389,15 @@ Source responses include:
 
 - `code_hash`
 - `verified`
-- `bundle`, which is `null` when the code hash is not verified
+- `bundle` with the verified source; the endpoint returns HTTP 404 when the
+  code hash has no verified source bundle
 
 Each source bundle includes `source_bundle_hash`, optional `payment_tx_hash`,
 `verified_at`, `storage_revision`, `entrypoint`, a grouped `compiler` object,
 optional `source_map`, and source `files`.
+
+`/api/v1/abi?code_hash=...` returns HTTP 404 when the requested contract has no
+indexed ABI. The unfiltered `/api/v1/abi` collection still returns an empty list.
 
 `payment_tx_hash` is absent only for an authenticated administrative submission
 that sets `verified_at` and skips the public payment flow.
@@ -358,6 +421,9 @@ Important cases:
 - Payment is already used or processing: request fails with a conflict.
 - Source directory and file I/O failures are retryable. A failed Git push is
   also retryable. The payment state changes to `retryable`.
+- A process restart changes an interrupted `processing` payment to `retryable`;
+  payments already marked `consumed` and payments referenced by published
+  source manifests remain consumed.
 - Invalid storage configuration, repository integrity errors, Git commit
   errors, and cleanup errors consume the payment.
 - A payment can enter `processing` at most three times. Later claims return

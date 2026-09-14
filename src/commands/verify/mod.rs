@@ -1,67 +1,45 @@
 use crate::commands::common::{error_fmt, format_nanograms, select_contract, select_wallet};
-use crate::context::Wallet;
 use crate::contract_interface::is_boc_path;
+use crate::ffi::emulation;
 use crate::tonconnect::{TonConnectContext, TonConnectSession};
-use crate::wallets::{open_wallets, wallet_message_expire_at};
+use crate::wallets::open_wallets;
+use crate::{http, tonconnect, transaction_hash};
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use anyhow::{Context, anyhow};
-use base64::Engine;
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use ton::ton_core::cell::TonCell;
-use ton::ton_core::traits::tlb::TLB;
 use ton::ton_core::types::TonAddress;
-use ton_api::{
-    Network, TonApiClient,
-    toncenter::{v2, v3},
-};
-use tvm_ffi::stack::{Tuple, TupleItem};
+use ton_api::{Network, TonApiClient, toncenter::v3};
+use tvm_ffi::stack::Tuple;
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellSlice, CellSliceParts, HashBytes, Load};
-use tycho_types::dict::{Dict, RawDict};
+use tycho_types::cell::{Cell, CellBuilder, CellSliceParts, HashBytes};
 use tycho_types::models::{
     Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, MsgInfo, OwnedMessage,
     StdAddr,
 };
 
-const DEFAULT_VERIFIER_ID: &str = "verifier.ton.org";
-const MAINNET_SOURCE_REGISTRY: &str = "EQD-BJSVUJviud_Qv7Ymfd3qzXdrmV525e3YDzWQoHIAiInL";
-const TESTNET_SOURCE_REGISTRY: &str = "EQCsdKYwUaXkgJkz2l0ol6qT_WxeRbE_wBCwnEybmR0u5TO8";
-const MAINNET_VERIFIER_BACKEND: &str = "https://verifier-mainnet.tonstudio.io";
-const TESTNET_VERIFIER_BACKEND: &str = "https://verifier-testnet.tonstudio.io";
+const VERIFIER_BACKEND: &str = "https://verifier-staging.ton.org";
 const VERIFY_BACKEND_ENV: &str = "ACTON_VERIFY_BACKEND";
-const VERIFY_BACKENDS_ENV: &str = "ACTON_VERIFY_BACKENDS";
-const NEW_VERIFIER_BACKEND: &str = "https://verifier-staging.actonscan.com";
-const NEW_VERIFY_BACKEND_ENV: &str = "ACTON_NEW_VERIFY_BACKEND";
-const NEW_VERIFIER_PAYMENT_COMMENT_PREFIX: &str = "acton-verify:v1:";
+const VERIFIER_PAYMENT_COMMENT_PREFIX: &str = "acton-verify:v1:";
+const SOURCE_UPLOAD_ATTEMPTS: usize = 8;
 
-#[allow(clippy::too_many_arguments)]
 pub fn verify_cmd(
     contract_id: Option<String>,
     address: Option<String>,
-    network: Option<String>,
     wallet_name: Option<String>,
     compiler_version: Option<String>,
     dry_run: bool,
-    new_verifier: bool,
     payment_tx_hash: Option<String>,
     tonconnect: bool,
 ) -> anyhow::Result<()> {
-    if payment_tx_hash.is_some() && !new_verifier {
-        anyhow::bail!(
-            "{} requires {}",
-            "--payment-tx-hash".yellow(),
-            "--new".yellow()
-        );
-    }
     let config = ActonConfig::load()?;
 
     let contract_key = select_contract(contract_id, &config)?;
@@ -69,21 +47,11 @@ pub fn verify_cmd(
         .get_contract(&contract_key)
         .ok_or_else(|| anyhow!(error_fmt::contract_not_found(&config, &contract_key)))?;
     let contract_path = contract.absolute_source_path(configured_project_root());
-
-    let network = if new_verifier {
-        if network.is_some() {
-            anyhow::bail!(
-                "{} cannot be used with {}; the new verifier always uses TON testnet",
-                "--net".yellow(),
-                "--new".yellow()
-            );
-        }
-        Network::Testnet
-    } else {
-        Network::from_str(network.as_deref().unwrap_or("testnet"))?
-    };
+    let contract_address = address
+        .map(|addr| TonAddress::from_str(&addr).with_context(|| error_fmt::invalid_address(&addr)))
+        .transpose()?;
     if tonconnect {
-        crate::tonconnect::ensure_supported_network(&network)?;
+        tonconnect::ensure_supported_network(&Network::Testnet)?;
         if wallet_name.is_some() {
             anyhow::bail!(
                 "{} cannot be used with {}; TON Connect uses the externally connected wallet",
@@ -91,11 +59,6 @@ pub fn verify_cmd(
                 "--tonconnect".yellow()
             );
         }
-    }
-    if !matches!(network, Network::Mainnet | Network::Testnet) {
-        anyhow::bail!(
-            "Unsupported verification network {network}. Verification backends are available only for mainnet and testnet"
-        );
     }
     println!("  {} Contract: {}", "→".blue().bold(), contract_key.cyan());
 
@@ -141,53 +104,28 @@ pub fn verify_cmd(
         format!("0x{code_hash_hex}").dimmed()
     );
 
-    let new_payment_quote = if new_verifier {
-        match take_new_verifier_ticket(&code_hash_hex)? {
-            Some(quote) => Some(quote),
-            None => return Ok(()),
-        }
-    } else {
-        None
+    let Some(payment_quote) = take_verifier_ticket(&code_hash_hex)? else {
+        return Ok(());
     };
     let payment_tx_hash = payment_tx_hash
         .as_deref()
-        .map(normalize_new_verifier_transaction_hash)
+        .map(normalize_verifier_transaction_hash)
         .transpose()?;
-
-    let contract_address = match address {
-        Some(addr) => {
-            Some(TonAddress::from_str(&addr).with_context(|| error_fmt::invalid_address(&addr))?)
-        }
-        None if new_verifier => None,
-        None => {
-            let addr_input = inquire::Text::new("Enter deployed contract address:")
-                .prompt()
-                .context("Failed to read address")?;
-            Some(
-                TonAddress::from_str(&addr_input)
-                    .with_context(|| error_fmt::invalid_address(&addr_input))?,
-            )
-        }
-    };
 
     if let Some(contract_address) = &contract_address {
         println!(
             "  {} Contract address: {}",
             "→".blue().bold(),
-            format_ton_address(contract_address, network == Network::Testnet).dimmed()
+            format_ton_address(contract_address, true).dimmed()
         );
-        if new_verifier {
-            validate_new_verifier_address_code_hash(
-                &config,
-                &network,
-                contract_address,
-                code_hash,
-            )?;
-        }
+
+        validate_verifier_address_code_hash(&config, contract_address, code_hash)?;
     }
 
     println!("  {} Collecting source files", "→".blue().bold());
+
     let source_files = source_files_from_source_map(&source_map);
+
     println!(
         "  {} Collected {} source file{}",
         "✓".green().bold(),
@@ -206,202 +144,123 @@ pub fn verify_cmd(
     for (path, is_entrypoint) in &source_files {
         let path = dunce::canonicalize(path).unwrap_or_else(|_| path.clone());
         let file_content = fs::read(&path).context("Failed to read source file")?;
-        let Some(filename) = path.file_name().and_then(|it| it.to_str()) else {
-            anyhow::bail!("Failed to get filename from path: {}", path.display());
-        };
         let source_path = normalize_source_path_for_verifier(&path, project_root);
         normalized_source_paths.push((source_path.clone(), *is_entrypoint));
 
         upload_parts.push(UploadPart {
             field_name: source_path,
-            file_name: filename.to_string(),
             bytes: file_content,
         });
     }
 
     let version = compiler_version.unwrap_or_else(|| "1.4.2".to_owned());
 
-    if new_verifier {
-        return verify_with_new_verifier(
-            &config,
-            &code_hash_hex,
-            &upload_parts,
-            &normalized_source_paths,
-            &version,
-            dry_run,
-            NewVerifierPaymentOptions {
-                quote: new_payment_quote.expect("new verifier payment quote must be available"),
-                wallet_name,
-                tonconnect,
-                transaction_hash: payment_tx_hash,
-            },
-        );
-    }
+    println!("  {} Using TON verifier", "→".blue().bold());
 
-    let contract_address =
-        contract_address.expect("contract address must be present for built-in verifier flow");
+    let backend = verifier_backend();
+    let verify_url = format!("{backend}/api/v1/verify");
 
-    let local_wallet: Option<Wallet>;
-    let tonconnect_session: Option<Arc<TonConnectSession>>;
-    let sender_std_addr: StdAddr;
-    let sender_address: String;
-
-    if tonconnect {
-        let storage_path =
-            crate::tonconnect::session_storage_path(configured_project_root(), &network)?;
-        let session = Arc::new(TonConnectSession::start(storage_path)?);
-        let connected_wallet = session.connect(&network)?;
-        sender_std_addr = connected_wallet.address;
-        sender_address = format_std_address(&sender_std_addr, &network, false);
-
-        println!(
-            "  {} Using TON Connect wallet: {}",
-            "→".blue().bold(),
-            sender_address.dimmed()
-        );
-
-        local_wallet = None;
-        tonconnect_session = Some(session);
-    } else {
-        let wallet_name = select_wallet(wallet_name, &config)?;
-
-        let mut wallets = open_wallets(&config, Some(&network), true)?;
-        let wallet = wallets
-            .remove(&wallet_name)
-            .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &wallet_name)))?;
-        sender_std_addr = wallet.address();
-        sender_address = format_ton_address(&wallet.wallet.address, network == Network::Testnet);
-
-        println!(
-            "  {} Using wallet: {} {}",
-            "→".blue().bold(),
-            wallet_name.cyan(),
-            sender_address.dimmed()
-        );
-
-        local_wallet = Some(wallet);
-        tonconnect_session = None;
-    }
-
-    println!("  {} Using built-in verifier backends", "→".blue().bold());
-    let backends_config = get_backends()?;
-    let mut backend_info = get_backend_info(&network, &backends_config)?;
-    let backends_override = parse_backend_list_env(VERIFY_BACKENDS_ENV);
-
-    if let Some(overridden_backends) = &backends_override {
-        println!(
-            "  {} Using signer backend override list from {}",
-            "→".blue().bold(),
-            VERIFY_BACKENDS_ENV.dimmed()
-        );
-        backend_info.backends.clone_from(overridden_backends);
-    }
-
-    println!(
-        "  {} Found {} backend{} for {}",
-        "✓".green().bold(),
-        backend_info.backends.len(),
-        if backend_info.backends.len() == 1 {
-            ""
-        } else {
-            "s"
-        },
-        network
-    );
-
-    if backend_info.backends.is_empty() {
-        anyhow::bail!("No backends found for network: {network}");
-    }
-
-    let sources_meta: Vec<SourceObject> = normalized_source_paths
-        .iter()
-        .map(|(path, is_entrypoint)| SourceObject {
-            include_in_command: true,
-            is_entrypoint: *is_entrypoint,
-            is_stdlib: false,
-            has_include_directives: true,
-            folder: source_folder_for_verifier(path),
-        })
-        .collect();
-
-    let contract_hash = base64::engine::general_purpose::STANDARD.encode(code_hash);
-    let sources_object = SourcesObject {
-        known_contract_hash: contract_hash.clone(),
-        known_contract_address: format_ton_address(&contract_address, network == Network::Testnet),
-        sender_address,
-        sources: sources_meta,
-        compiler: CompilerSettings::Tolk {
-            compiler_settings: TolkCompilerSettings {
-                tolk_version: version.clone(),
-            },
-        },
-    };
-
-    let json_str = serde_json::to_string(&sources_object)?;
-    println!(
-        "  {} Sending sources to backend for verification",
-        "→".blue().bold()
-    );
-
-    let sign_client =
-        build_verify_http_client().context("Failed to create HTTP client for verifier backend")?;
-    let backend_override = parse_backend_env(VERIFY_BACKEND_ENV);
-    let first_backend = backend_override
-        .clone()
-        .unwrap_or_else(|| remove_random(&mut backend_info.backends));
-    let source_url = format!("{first_backend}/source");
     println!(
         "  {} Using backend: {}",
         "→".blue().bold(),
-        source_url.dimmed()
+        verify_url.dimmed()
     );
 
-    let verify_debug = std::env::var_os("ACTON_VERIFY_DEBUG").is_some();
-    if verify_debug {
+    let sources = verifier_sources(&normalized_source_paths)?;
+    let compile_params = verifier_compile_params(&config, &version)?;
+    let sources_json = serde_json::to_string(&sources)?;
+    let compile_params_json = serde_json::to_string(&compile_params)?;
+
+    let payment_amount_nano = payment_quote
+        .amount_nano
+        .parse::<BigInt>()
+        .context("TON verifier returned an invalid payment amount")?;
+    if payment_amount_nano <= BigInt::from(0) {
+        anyhow::bail!("TON verifier returned a zero payment amount");
+    }
+    let payment_address = TonAddress::from_str(&payment_quote.payment_address)
+        .context("Verifier returned an invalid payment address")?;
+    let payment_amount = format_nanograms(&payment_amount_nano);
+    let payment_address_display = format_std_address(
+        &ton_address_to_std_addr(&payment_address),
+        &Network::Testnet,
+        true,
+    );
+
+    println!("  {} Payment network: TON testnet", "→".blue().bold());
+    println!(
+        "  {} Payment amount: {}",
+        "→".blue().bold(),
+        payment_amount.cyan()
+    );
+    println!(
+        "  {} Payment address: {}",
+        "→".blue().bold(),
+        payment_address_display.dimmed()
+    );
+    println!(
+        "  {} Payment comment: {}",
+        "→".blue().bold(),
+        payment_quote.comment.dimmed()
+    );
+
+    if dry_run {
         println!(
-            "  {} Debug mode enabled via {}",
-            "ℹ".blue().bold(),
-            "ACTON_VERIFY_DEBUG=1".dimmed()
+            "  {} Dry run mode: skipping testnet payment and source upload",
+            "ℹ".blue().bold()
         );
+        println!();
         println!(
-            "    {} Compiler version: {}",
-            "→".dimmed(),
-            version.dimmed()
+            "{}",
+            "✓ TON verifier request prepared successfully!"
+                .green()
+                .bold()
         );
+        println!("  Backend: {}", verify_url.dimmed());
         println!(
-            "    {} Source file{}:",
-            "→".dimmed(),
-            if source_files.len() == 1 { "" } else { "s" }
+            "  Source files: {}",
+            upload_parts.len().to_string().dimmed()
         );
-        for (file, _) in &source_files {
-            println!("      {}", file.display().dimmed());
-        }
-        if let Some(backend_override) = &backend_override {
-            println!(
-                "    {} Backend override: {}",
-                "→".dimmed(),
-                backend_override.dimmed()
-            );
-        }
-        if let Some(backends_override) = &backends_override {
-            println!(
-                "    {} Signer backends override: {}",
-                "→".dimmed(),
-                backends_override.join(", ").dimmed()
-            );
-        }
+        return Ok(());
     }
 
-    let source_max_attempts = 8;
-    let mut response = None;
-    let mut last_send_error = None;
+    let tx_hash = match payment_tx_hash {
+        Some(tx_hash) => {
+            println!(
+                "  {} Reusing testnet payment transaction: {}",
+                "→".blue().bold(),
+                tx_hash.dimmed()
+            );
+            tx_hash
+        }
+        None => send_verifier_payment(
+            &config,
+            &payment_quote,
+            &payment_amount_nano,
+            &payment_address,
+            wallet_name,
+            tonconnect,
+        )?,
+    };
 
-    for attempt in 1..=source_max_attempts {
-        let form = build_verify_form(&upload_parts, &json_str)?;
+    println!("  {} Sending sources to TON verifier", "→".blue().bold());
+
+    let mut response = None;
+
+    for attempt in 1..=SOURCE_UPLOAD_ATTEMPTS {
+        let form = build_verify_form(
+            &upload_parts,
+            &code_hash_hex,
+            &tx_hash,
+            &sources_json,
+            &compile_params_json,
+        )?;
+
         let source_client = build_verify_http_client()
             .context("Failed to create HTTP client for verifier backend")?;
+
         match source_client
-            .post(&source_url)
+            .post(&verify_url)
             .header(reqwest::header::CONNECTION, "close")
             .multipart(form)
             .send()
@@ -413,11 +272,22 @@ pub fn verify_cmd(
                     .headers()
                     .get("cf-ray")
                     .and_then(|v| v.to_str().ok())
-                    .unwrap_or("-");
-                let should_retry = status.is_server_error() && attempt < source_max_attempts;
+                    .unwrap_or("-")
+                    .to_owned();
+
+                if status.is_success() {
+                    response = Some(res);
+                    break;
+                }
+
+                let error_text = res.text().unwrap_or_else(|_| "Unknown error".to_string());
+                let known_error = VerifierKnownError::from_response_body(&error_text);
+                let should_retry = known_error.is_some_and(VerifierKnownError::is_transient)
+                    && attempt < SOURCE_UPLOAD_ATTEMPTS;
+
                 if should_retry {
                     println!(
-                        "  {} Backend returned {} ({}, cf-ray={}) on attempt {attempt}/{source_max_attempts}, retrying...",
+                        "  {} TON verifier returned {} ({}, cf-ray={}) on attempt {attempt}/{SOURCE_UPLOAD_ATTEMPTS}, retrying...",
                         "↻".yellow().bold(),
                         status,
                         http_version,
@@ -426,281 +296,112 @@ pub fn verify_cmd(
                     std::thread::sleep(source_retry_delay(attempt));
                     continue;
                 }
-                response = Some(res);
-                break;
+
+                if let Some(known_error) = known_error {
+                    anyhow::bail!(known_error.friendly_message());
+                }
+                let body = truncate_for_display(&error_text, 4_000);
+                anyhow::bail!(
+                    "TON verifier request failed: HTTP {status} ({http_version}) at {verify_url}\nResponse body:\n{body}"
+                );
             }
             Err(err) => {
-                let should_retry = attempt < source_max_attempts;
+                let should_retry = attempt < SOURCE_UPLOAD_ATTEMPTS;
                 if should_retry {
                     println!(
-                        "  {} Network error on attempt {attempt}/{source_max_attempts}, retrying...\n    {}",
+                        "  {} Network error on attempt {attempt}/{SOURCE_UPLOAD_ATTEMPTS}, retrying...\n    {}",
                         "↻".yellow().bold(),
                         err.to_string().dimmed()
                     );
-                    last_send_error = Some(err);
                     std::thread::sleep(source_retry_delay(attempt));
                     continue;
                 }
-                return Err(err).context("Failed to send request to verification backend");
+                return Err(err).context("Failed to send request to verifier backend");
             }
         }
     }
 
-    let response = response.ok_or_else(|| {
-        if let Some(err) = last_send_error {
-            anyhow!("Failed to send request to verification backend: {err}")
-        } else {
-            anyhow!("Failed to get response from verification backend")
-        }
-    })?;
+    let response =
+        response.ok_or_else(|| anyhow!("Failed to get response from verifier backend"))?;
 
-    if !response.status().is_success() {
-        let status = response.status();
-        let http_version = format!("{:?}", response.version());
-        let headers = response.headers().clone();
-        let error_text = response
-            .text()
-            .unwrap_or_else(|_| "Unknown error".to_string());
+    let verify_result: VerifyResponse = response
+        .json()
+        .context("Failed to parse verifier response")?;
 
-        let mut header_parts = Vec::new();
-        if let Some(v) = headers.get("x-request-id").and_then(|v| v.to_str().ok()) {
-            header_parts.push(format!("x-request-id={v}"));
-        }
-        if let Some(v) = headers.get("cf-ray").and_then(|v| v.to_str().ok()) {
-            header_parts.push(format!("cf-ray={v}"));
-        }
-        if let Some(v) = headers.get("server").and_then(|v| v.to_str().ok()) {
-            header_parts.push(format!("server={v}"));
-        }
-
-        let header_suffix = if header_parts.is_empty() {
-            String::new()
-        } else {
-            format!("\nResponse headers: {}", header_parts.join(", "))
-        };
-
-        let retry_hint = if status.is_server_error() {
-            "\nHint: backend returned a server error (5xx). Retry later; if it persists, run with ACTON_VERIFY_DEBUG=1 and/or ACTON_VERIFY_BACKEND=https://... to test another endpoint."
-        } else {
-            "\nHint: run with ACTON_VERIFY_DEBUG=1 to print request details."
-        };
-
-        let body = truncate_for_display(&error_text, 4_000);
+    if verify_result.code_hash != code_hash_hex {
         anyhow::bail!(
-            "Backend compilation failed: HTTP {status} ({http_version}) at {source_url}{header_suffix}{retry_hint}\nResponse body:\n{body}"
+            "TON verifier returned a result for a different code hash: expected {code_hash_hex}, received {}",
+            verify_result.code_hash
         );
     }
+    if matches!(verify_result.verification_result, VerificationResult::Match)
+        && verify_result.compiled_code_hash.as_deref() != Some(code_hash_hex.as_str())
+    {
+        anyhow::bail!("TON verifier reported a match without a matching compiled code hash");
+    }
 
-    let source_result: SourceResponse = response
-        .json()
-        .context("Failed to parse backend response")?;
-
-    if source_result.compile_result.result != "similar" {
-        let error_msg = source_result
-            .compile_result
-            .error
-            .unwrap_or_else(|| "Unknown error".to_string());
-        if error_msg == "Proof has already been deployed" {
-            // This is kinda strange error, trying to show it somehow
-            println!(
-                "\n  {}: Contract with the hash {} has already been verified previously, no further action is required\n",
-                "Warning".yellow().bold(),
-                contract_hash.dimmed()
-            );
-            show_verifier_link(&network, contract_address);
+    match verify_result.verification_result {
+        VerificationResult::AlreadyVerified => {
+            println!("  {} Contract was already verified", "✓".green().bold());
+            if let Some(source_bundle_hash) = &verify_result.source_bundle_hash {
+                println!(
+                    "  {} Source bundle: {}",
+                    "→".blue().bold(),
+                    source_bundle_hash.dimmed()
+                );
+            }
+            if let Some(storage_revision) = &verify_result.storage_revision {
+                println!(
+                    "  {} Storage revision: {}",
+                    "→".blue().bold(),
+                    storage_revision.dimmed()
+                );
+            }
+            println!();
+            show_verifier_link(&backend, &code_hash_hex);
             return Ok(());
         }
-        anyhow::bail!("Verification failed: {error_msg}");
+        VerificationResult::Mismatch => {
+            anyhow::bail!(
+                "Verification failed: compiled code hash {} does not match target code hash {}",
+                verify_result
+                    .compiled_code_hash
+                    .as_deref()
+                    .unwrap_or("<unknown>"),
+                verify_result.code_hash
+            );
+        }
+        VerificationResult::Match => {}
     }
-
-    println!("  {} Backend verification successful", "✓".green().bold());
-
-    let config = ActonConfig::load().unwrap_or_default();
-    let custom_networks = config.custom_networks();
-    let is_testnet = network == Network::Testnet;
-    let api_client = TonApiClient::new(network.clone(), custom_networks)?;
-
-    wait_for_rate_limit(api_client.has_api_key());
-    let registry_address = get_verifier_address(&backend_info, &api_client)?;
-
-    wait_for_rate_limit(api_client.has_api_key());
-    let quorum = usize::from(get_verifier_quorum(
-        &api_client,
-        &registry_address,
-        &backend_info.id,
-        is_testnet,
-    )?);
-
-    let mut msg_cell = source_result
-        .msg_cell
-        .ok_or_else(|| anyhow!("No message cell in response"))?;
-    let mut acquired_sigs = 1usize;
 
     println!(
-        "  {} Collecting signatures (need {} of {})",
-        "→".blue().bold(),
-        quorum,
-        backend_info.backends.len() + 1
+        "  {} TON verifier accepted source bundle",
+        "✓".green().bold()
     );
-
-    while acquired_sigs < quorum && !backend_info.backends.is_empty() {
-        let cur_backend = remove_random(&mut backend_info.backends);
+    if let Some(source_bundle_hash) = &verify_result.source_bundle_hash {
         println!(
-            "    {} Requesting from: {}",
-            "→".dimmed(),
-            cur_backend.dimmed()
+            "  {} Source bundle: {}",
+            "→".blue().bold(),
+            source_bundle_hash.dimmed()
         );
-
-        let sign_url = format!("{cur_backend}/sign");
-        let sign_request = serde_json::json!({
-            "messageCell": msg_cell,
-        });
-
-        let response = sign_client
-            .post(&sign_url)
-            .json(&sign_request)
-            .send()
-            .context("Failed to send sign request")?;
-
-        if !response.status().is_success() {
-            let error_text = response
-                .text()
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            println!("    {} Signing failed: {}", "✗".red(), error_text.dimmed());
-            continue;
-        }
-
-        let sign_result: SignResponse = response.json().context("Failed to parse sign response")?;
-
-        msg_cell = sign_result.msg_cell;
-        acquired_sigs += 1;
+    }
+    if let Some(storage_revision) = &verify_result.storage_revision {
         println!(
-            "    {} Collected signature {}/{}",
-            "✓".green(),
-            acquired_sigs,
-            quorum
+            "  {} Storage revision: {}",
+            "→".blue().bold(),
+            storage_revision.dimmed()
         );
     }
 
-    if acquired_sigs < quorum {
-        anyhow::bail!("Failed to collect enough signatures ({acquired_sigs}/{quorum})");
-    }
-
-    println!("  {} All signatures collected", "✓".green().bold());
-
-    if dry_run {
-        println!(
-            "  {} Dry run mode: skipping transaction send",
-            "ℹ".blue().bold()
-        );
-        println!();
-        println!(
-            "{}",
-            "✓ Contract verification prepared successfully!"
-                .green()
-                .bold()
-        );
-        println!("  Message body: {}", hex::encode(&msg_cell.data).dimmed());
-        println!();
-        println!(
-            "Run without {} to send the verification transaction.",
-            "--dry-run".yellow()
-        );
-        return Ok(());
-    }
-
-    println!("  {} Sending verification transaction", "→".blue().bold());
-
-    let cell_data = &msg_cell.data;
-    let body_cell = Boc::decode(cell_data)?;
-
-    let message_info = tycho_types::models::IntMsgInfo {
-        ihr_disabled: true,
-        bounce: false,
-        bounced: false,
-        src: IntAddr::Std(sender_std_addr),
-        dst: IntAddr::Std(ton_address_to_std_addr(&registry_address)),
-        value: CurrencyCollection::new(100_000_000u128), // 0.1 GRAM
-        ihr_fee: Default::default(),
-        fwd_fee: Default::default(),
-        created_lt: 0,
-        created_at: 0,
-    };
-
-    let message = OwnedMessage {
-        info: MsgInfo::Int(message_info),
-        init: None,
-        body: CellSliceParts::from(body_cell),
-        layout: None,
-    };
-
-    let message_cell = CellBuilder::build_from(message)?;
-
-    if let Some(tonconnect) = tonconnect_session {
-        let transaction = crate::tonconnect::transaction_from_message(&message_cell, &network)?;
-        tonconnect.send_transaction(transaction)?;
-        println!("  {} Transaction sent successfully", "✓".green().bold());
-        println!();
-        println!("{}", "✓ Contract verification completed!".green().bold());
-        show_verifier_link(&network, contract_address);
-        return Ok(());
-    }
-
-    let wallet = local_wallet.expect("local wallet must be available without --tonconnect");
-    wait_for_rate_limit(api_client.has_api_key());
-    let (seqno, need_state_init) = wallet.seqno(&api_client)?;
-    wait_for_rate_limit(api_client.has_api_key());
-
-    let expire_at = wallet_message_expire_at(&network)?;
-    let message_cell_boc = Boc::encode(message_cell);
-    let message_cell = TonCell::from_boc(message_cell_boc)?;
-
-    let external =
-        wallet
-            .wallet
-            .create_ext_in_msg(vec![message_cell], seqno, expire_at, need_state_init)?;
-
-    api_client
-        .send_boc(&external.to_boc_base64()?)
-        .map_err(|error| anyhow!("Failed to send verification transaction: {error}"))?;
-
-    println!("  {} Transaction sent successfully", "✓".green().bold());
     println!();
     println!("{}", "✓ Contract verification completed!".green().bold());
-    show_verifier_link(&network, contract_address);
+    show_verifier_link(&backend, &code_hash_hex);
 
     Ok(())
 }
 
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct TolkCompilerSettings {
-    tolk_version: String,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(tag = "compiler")]
-enum CompilerSettings {
-    #[serde(rename = "tolk")]
-    Tolk {
-        #[serde(rename = "compilerSettings")]
-        compiler_settings: TolkCompilerSettings,
-    },
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SourceObject {
-    include_in_command: bool,
-    is_entrypoint: bool,
-    #[serde(rename = "isStdLib")]
-    is_stdlib: bool,
-    has_include_directives: bool,
-    folder: String,
-}
-
-#[derive(Debug, Serialize)]
-struct NewSourceObject {
+struct VerifierSource {
     path: String,
     is_entrypoint: bool,
     include_in_command: Option<bool>,
@@ -708,90 +409,11 @@ struct NewSourceObject {
     has_include_directives: Option<bool>,
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SourcesObject {
-    known_contract_hash: String,
-    known_contract_address: String,
-    sender_address: String,
-    sources: Vec<SourceObject>,
-    #[serde(flatten)]
-    compiler: CompilerSettings,
-}
-
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct BackendsConfig {
-    #[serde(default)]
-    verifiers: Vec<VerifierBackends>,
-    #[serde(default)]
-    backends: Vec<String>,
-    #[serde(default)]
-    backends_testnet: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct VerifierBackends {
-    id: String,
-    network: String,
-    backends: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum CompilerSettingsResponse {
-    Object {
-        #[serde(rename = "tolkVersion")]
-        #[allow(dead_code)]
-        tolk_version: String,
-    },
-    #[allow(dead_code)]
-    String(String),
-}
-
-#[derive(Debug, Deserialize)]
-struct SourceFileInfo {
-    #[allow(dead_code)]
-    filename: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CompileResult {
-    result: String,
-    #[allow(dead_code)]
-    compiler_settings: Option<CompilerSettingsResponse>,
-    error: Option<String>,
-    #[allow(dead_code)]
-    hash: Option<String>,
-    #[allow(dead_code)]
-    sources: Option<Vec<SourceFileInfo>>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct SourceResponse {
-    compile_result: CompileResult,
-    msg_cell: Option<MsgCell>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct MsgCell {
-    data: Vec<u8>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct SignResponse {
-    msg_cell: MsgCell,
-}
-
-#[derive(Debug, Deserialize)]
-struct NewVerifyResponse {
+struct VerifyResponse {
     code_hash: String,
     compiled_code_hash: Option<String>,
-    verification_result: NewVerificationResult,
+    verification_result: VerificationResult,
     #[serde(default)]
     source_bundle_hash: Option<String>,
     #[serde(default)]
@@ -800,7 +422,7 @@ struct NewVerifyResponse {
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
-enum NewVerifierTicketResponse {
+enum VerifierTicketResponse {
     AlreadyVerified {
         code_hash: String,
         source_bundle_hash: String,
@@ -815,12 +437,12 @@ enum NewVerifierTicketResponse {
 }
 
 #[derive(Debug, Deserialize)]
-struct NewVerifierErrorResponse {
+struct VerifierErrorResponse {
     error: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum NewVerifierKnownError {
+enum VerifierKnownError {
     RecoveryInProgress,
     VerificationRetryable,
     InvalidTransactionHash,
@@ -832,9 +454,9 @@ enum NewVerifierKnownError {
     InProgress,
 }
 
-impl NewVerifierKnownError {
+impl VerifierKnownError {
     fn from_response_body(body: &str) -> Option<Self> {
-        let response = serde_json::from_str::<NewVerifierErrorResponse>(body).ok()?;
+        let response = serde_json::from_str::<VerifierErrorResponse>(body).ok()?;
         let code = response
             .error
             .split_once(':')
@@ -857,7 +479,7 @@ impl NewVerifierKnownError {
     const fn friendly_message(self) -> &'static str {
         match self {
             Self::RecoveryInProgress => {
-                "Acton verifier is rebuilding payment history. Try again shortly"
+                "TON verifier is rebuilding payment history. Try again shortly"
             }
             Self::VerificationRetryable => {
                 "Verifier source storage is temporarily unavailable. The payment remains reusable; try again shortly"
@@ -892,60 +514,44 @@ impl NewVerifierKnownError {
     }
 }
 
-fn normalize_new_verifier_transaction_hash(transaction_hash: &str) -> anyhow::Result<String> {
-    crate::transaction_hash::toncenter_transaction_hash_hex(transaction_hash.trim()).map_err(|_| {
+fn normalize_verifier_transaction_hash(transaction_hash: &str) -> anyhow::Result<String> {
+    transaction_hash::toncenter_transaction_hash_hex(transaction_hash.trim()).map_err(|_| {
         anyhow!(
             "Invalid --payment-tx-hash: expected a 64-character hexadecimal or 32-byte base64 TON transaction hash"
         )
     })
 }
 
-fn friendly_new_verifier_error(body: &str) -> Option<&'static str> {
-    NewVerifierKnownError::from_response_body(body).map(NewVerifierKnownError::friendly_message)
+fn friendly_verifier_error(body: &str) -> Option<&'static str> {
+    VerifierKnownError::from_response_body(body).map(VerifierKnownError::friendly_message)
 }
 
-struct NewVerifierPaymentQuote {
+struct VerifierPaymentQuote {
     payment_address: String,
     amount_nano: String,
     comment: String,
 }
 
-struct NewVerifierPaymentOptions {
-    quote: NewVerifierPaymentQuote,
-    wallet_name: Option<String>,
-    tonconnect: bool,
-    transaction_hash: Option<String>,
-}
-
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-enum NewVerificationResult {
+enum VerificationResult {
     AlreadyVerified,
     Match,
     Mismatch,
 }
 
-#[derive(Debug)]
-struct BackendInfo {
-    source_registry: String,
-    backends: Vec<String>,
-    #[allow(dead_code)]
-    id: String,
-}
-
 #[derive(Debug, Clone)]
 struct UploadPart {
     field_name: String,
-    file_name: String,
     bytes: Vec<u8>,
 }
 
-fn take_new_verifier_ticket(code_hash: &str) -> anyhow::Result<Option<NewVerifierPaymentQuote>> {
+fn take_verifier_ticket(code_hash: &str) -> anyhow::Result<Option<VerifierPaymentQuote>> {
     println!("  {} Requesting verification ticket", "→".blue().bold());
-    let backend = new_verifier_backend();
+    let backend = verifier_backend();
     let ticket_url = format!("{backend}/api/v1/take_ticket");
-    let client = build_verify_http_client()
-        .context("Failed to create HTTP client for new verifier backend")?;
+    let client =
+        build_verify_http_client().context("Failed to create HTTP client for verifier backend")?;
     let response = client
         .post(&ticket_url)
         .json(&serde_json::json!({ "code_hash": code_hash }))
@@ -957,7 +563,7 @@ fn take_new_verifier_ticket(code_hash: &str) -> anyhow::Result<Option<NewVerifie
         let body = response
             .text()
             .unwrap_or_else(|_| "Unknown error".to_owned());
-        if let Some(message) = friendly_new_verifier_error(&body) {
+        if let Some(message) = friendly_verifier_error(&body) {
             anyhow::bail!(message);
         }
         anyhow::bail!(
@@ -967,10 +573,10 @@ fn take_new_verifier_ticket(code_hash: &str) -> anyhow::Result<Option<NewVerifie
     }
 
     match response
-        .json::<NewVerifierTicketResponse>()
+        .json::<VerifierTicketResponse>()
         .context("Failed to parse verification ticket response")?
     {
-        NewVerifierTicketResponse::AlreadyVerified {
+        VerifierTicketResponse::AlreadyVerified {
             code_hash: returned_code_hash,
             source_bundle_hash,
             storage_revision,
@@ -988,10 +594,10 @@ fn take_new_verifier_ticket(code_hash: &str) -> anyhow::Result<Option<NewVerifie
                 storage_revision.dimmed()
             );
             println!();
-            show_new_verifier_link(&backend, code_hash);
+            show_verifier_link(&backend, code_hash);
             Ok(None)
         }
-        NewVerifierTicketResponse::PaymentRequired {
+        VerifierTicketResponse::PaymentRequired {
             code_hash: returned_code_hash,
             payment_address,
             amount_nano,
@@ -999,7 +605,7 @@ fn take_new_verifier_ticket(code_hash: &str) -> anyhow::Result<Option<NewVerifie
         } => {
             ensure_ticket_code_hash(code_hash, &returned_code_hash)?;
             ensure_ticket_payment_details(code_hash, &payment_address, &comment)?;
-            Ok(Some(NewVerifierPaymentQuote {
+            Ok(Some(VerifierPaymentQuote {
                 payment_address,
                 amount_nano,
                 comment,
@@ -1022,7 +628,7 @@ fn ensure_ticket_payment_details(
     payment_address: &str,
     comment: &str,
 ) -> anyhow::Result<()> {
-    let expected_comment = format!("{NEW_VERIFIER_PAYMENT_COMMENT_PREFIX}{code_hash}");
+    let expected_comment = format!("{VERIFIER_PAYMENT_COMMENT_PREFIX}{code_hash}");
     if comment != expected_comment {
         anyhow::bail!("Verifier ticket returned a payment comment for a different code hash");
     }
@@ -1038,16 +644,15 @@ fn ensure_ticket_payment_details(
     Ok(())
 }
 
-fn send_new_verifier_payment(
+fn send_verifier_payment(
     config: &ActonConfig,
-    quote: &NewVerifierPaymentQuote,
-    amount_nano: u64,
+    quote: &VerifierPaymentQuote,
+    amount_nano: &BigInt,
     payment_address: &TonAddress,
     wallet_name: Option<String>,
     tonconnect: bool,
 ) -> anyhow::Result<String> {
     let network = Network::Testnet;
-    let payment_amount = format_nanograms(&BigInt::from(amount_nano));
     let payment_address_display = format_std_address(
         &ton_address_to_std_addr(payment_address),
         &Network::Testnet,
@@ -1055,8 +660,7 @@ fn send_new_verifier_payment(
     );
 
     let normalized_external_hash = if tonconnect {
-        let storage_path =
-            crate::tonconnect::session_storage_path(configured_project_root(), &network)?;
+        let storage_path = tonconnect::session_storage_path(configured_project_root(), &network)?;
         let session = Arc::new(TonConnectSession::start(storage_path)?);
         let connected_wallet = session.connect(&network)?;
         let sender_address = format_std_address(&connected_wallet.address, &network, false);
@@ -1065,7 +669,7 @@ fn send_new_verifier_payment(
             "→".blue().bold(),
             sender_address.dimmed()
         );
-        let message = build_new_verifier_payment_message(
+        let message = build_verifier_payment_message(
             connected_wallet.address.clone(),
             payment_address,
             amount_nano,
@@ -1076,7 +680,7 @@ fn send_new_verifier_payment(
             wallet: connected_wallet,
         };
         let (_, normalized_hash) =
-            crate::ffi::emulation::send_tonconnect_message(&message, &context, &network)?;
+            emulation::send_tonconnect_message(&message, &context, &network)?;
         normalized_hash
     } else {
         let wallet_name = select_wallet(wallet_name, config)?;
@@ -1091,6 +695,7 @@ fn send_new_verifier_payment(
             format_ton_address(&wallet.wallet.address, true).dimmed()
         );
 
+        let payment_amount = format_nanograms(amount_nano);
         let confirmed = inquire::Confirm::new(&format!(
             "Send {payment_amount} on TON testnet to {payment_address_display}?"
         ))
@@ -1101,31 +706,30 @@ fn send_new_verifier_payment(
             anyhow::bail!("Verification payment cancelled");
         }
 
-        let message = build_new_verifier_payment_message(
+        let message = build_verifier_payment_message(
             wallet.address(),
             payment_address,
             amount_nano,
             &quote.comment,
         )?;
-        let (_, normalized_hash) = crate::ffi::emulation::send_wallet_message(
-            &message,
-            wallet,
-            &network,
-            config.custom_networks(),
-        )?;
+        let (_, normalized_hash) =
+            emulation::send_wallet_message(&message, wallet, &network, config.custom_networks())?;
         normalized_hash
     };
 
     println!("  {} Testnet payment sent", "✓".green().bold());
-    wait_for_new_verifier_payment(config, quote, &normalized_external_hash)
+    wait_for_verifier_payment(config, quote, &normalized_external_hash)
 }
 
-fn build_new_verifier_payment_message(
+fn build_verifier_payment_message(
     sender: StdAddr,
     payment_address: &TonAddress,
-    amount_nano: u64,
+    amount_nano: &BigInt,
     comment: &str,
 ) -> anyhow::Result<Cell> {
+    let amount_nano = u128::try_from(amount_nano.clone())
+        .context("Verifier payment amount does not fit a TON currency collection")?;
+
     let mut body = CellBuilder::new();
     body.store_u32(0)?;
     let comment_bits = u16::try_from(comment.len().saturating_mul(8))
@@ -1140,7 +744,7 @@ fn build_new_verifier_payment_message(
             bounced: false,
             src: IntAddr::Std(sender),
             dst: IntAddr::Std(ton_address_to_std_addr(payment_address)),
-            value: CurrencyCollection::new(u128::from(amount_nano)),
+            value: CurrencyCollection::new(amount_nano),
             ihr_fee: Default::default(),
             fwd_fee: Default::default(),
             created_lt: 0,
@@ -1153,9 +757,9 @@ fn build_new_verifier_payment_message(
     CellBuilder::build_from(message).context("Failed to build verification payment message")
 }
 
-fn wait_for_new_verifier_payment(
+fn wait_for_verifier_payment(
     config: &ActonConfig,
-    quote: &NewVerifierPaymentQuote,
+    quote: &VerifierPaymentQuote,
     normalized_external_hash: &HashBytes,
 ) -> anyhow::Result<String> {
     const ATTEMPTS: usize = 60;
@@ -1180,9 +784,7 @@ fn wait_for_new_verifier_payment(
                         .find(|transaction| is_expected_payment_transaction(transaction, quote))
                     {
                         let transaction_hash_hex =
-                            crate::transaction_hash::toncenter_transaction_hash_hex(
-                                &transaction.hash,
-                            )?;
+                            transaction_hash::toncenter_transaction_hash_hex(&transaction.hash)?;
                         let actonscan_url = crate::explorer::actonscan_transaction_link(
                             &Network::Testnet,
                             &transaction_hash_hex,
@@ -1213,7 +815,7 @@ fn wait_for_new_verifier_payment(
 
 fn is_expected_payment_transaction(
     transaction: &v3::Transaction,
-    quote: &NewVerifierPaymentQuote,
+    quote: &VerifierPaymentQuote,
 ) -> bool {
     if transaction.emulated
         || transaction.finality != "finalized"
@@ -1281,323 +883,8 @@ fn ton_addresses_equal(left: &str, right: &str) -> bool {
         .is_some_and(|(left, right)| left == right)
 }
 
-fn verify_with_new_verifier(
-    config: &ActonConfig,
-    code_hash: &str,
-    upload_parts: &[UploadPart],
-    normalized_source_paths: &[(String, bool)],
-    version: &str,
-    dry_run: bool,
-    payment: NewVerifierPaymentOptions,
-) -> anyhow::Result<()> {
-    let NewVerifierPaymentOptions {
-        quote: payment_quote,
-        wallet_name,
-        tonconnect,
-        transaction_hash,
-    } = payment;
-    println!("  {} Using new Acton verifier", "→".blue().bold());
-
-    let backend = new_verifier_backend();
-    let verify_url = format!("{backend}/api/v1/verify");
-
-    println!(
-        "  {} Using backend: {}",
-        "→".blue().bold(),
-        verify_url.dimmed()
-    );
-
-    let sources = new_verifier_sources(normalized_source_paths)?;
-    let compile_params = new_verifier_compile_params(config, version)?;
-    let sources_json = serde_json::to_string(&sources)?;
-    let compile_params_json = serde_json::to_string(&compile_params)?;
-
-    let payment_amount_nano = payment_quote
-        .amount_nano
-        .parse::<u64>()
-        .context("Verifier returned an invalid payment amount")?;
-    if payment_amount_nano == 0 {
-        anyhow::bail!("Verifier returned a zero payment amount");
-    }
-    let payment_address = TonAddress::from_str(&payment_quote.payment_address)
-        .context("Verifier returned an invalid payment address")?;
-    let payment_amount = format_nanograms(&BigInt::from(payment_amount_nano));
-    let payment_address_display = format_std_address(
-        &ton_address_to_std_addr(&payment_address),
-        &Network::Testnet,
-        true,
-    );
-
-    println!("  {} Payment network: TON testnet", "→".blue().bold());
-    println!(
-        "  {} Payment amount: {}",
-        "→".blue().bold(),
-        payment_amount.cyan()
-    );
-    println!(
-        "  {} Payment address: {}",
-        "→".blue().bold(),
-        payment_address_display.dimmed()
-    );
-    println!(
-        "  {} Payment comment: {}",
-        "→".blue().bold(),
-        payment_quote.comment.dimmed()
-    );
-
-    if dry_run {
-        println!(
-            "  {} Dry run mode: skipping testnet payment and source upload",
-            "ℹ".blue().bold()
-        );
-        println!();
-        println!(
-            "{}",
-            "✓ New verifier request prepared successfully!"
-                .green()
-                .bold()
-        );
-        println!("  Backend: {}", verify_url.dimmed());
-        println!(
-            "  Source files: {}",
-            upload_parts.len().to_string().dimmed()
-        );
-        return Ok(());
-    }
-
-    let tx_hash = match transaction_hash {
-        Some(tx_hash) => {
-            println!(
-                "  {} Reusing testnet payment transaction: {}",
-                "→".blue().bold(),
-                tx_hash.dimmed()
-            );
-            tx_hash
-        }
-        None => send_new_verifier_payment(
-            config,
-            &payment_quote,
-            payment_amount_nano,
-            &payment_address,
-            wallet_name,
-            tonconnect,
-        )?,
-    };
-
-    println!("  {} Sending sources to new verifier", "→".blue().bold());
-
-    let source_max_attempts = 8;
-    let mut response = None;
-
-    for attempt in 1..=source_max_attempts {
-        let form = build_new_verify_form(
-            upload_parts,
-            code_hash,
-            &tx_hash,
-            &sources_json,
-            &compile_params_json,
-        )?;
-        let source_client = build_verify_http_client()
-            .context("Failed to create HTTP client for new verifier backend")?;
-        match source_client
-            .post(&verify_url)
-            .header(reqwest::header::CONNECTION, "close")
-            .multipart(form)
-            .send()
-        {
-            Ok(res) => {
-                let status = res.status();
-                let http_version = format!("{:?}", res.version());
-                let cf_ray = res
-                    .headers()
-                    .get("cf-ray")
-                    .and_then(|v| v.to_str().ok())
-                    .unwrap_or("-")
-                    .to_owned();
-                if status.is_success() {
-                    response = Some(res);
-                    break;
-                }
-
-                let error_text = res.text().unwrap_or_else(|_| "Unknown error".to_string());
-                let known_error = NewVerifierKnownError::from_response_body(&error_text);
-                let should_retry = known_error.is_some_and(NewVerifierKnownError::is_transient)
-                    && attempt < source_max_attempts;
-                if should_retry {
-                    println!(
-                        "  {} New verifier returned {} ({}, cf-ray={}) on attempt {attempt}/{source_max_attempts}, retrying...",
-                        "↻".yellow().bold(),
-                        status,
-                        http_version,
-                        cf_ray
-                    );
-                    std::thread::sleep(source_retry_delay(attempt));
-                    continue;
-                }
-
-                if let Some(known_error) = known_error {
-                    anyhow::bail!(known_error.friendly_message());
-                }
-                let body = truncate_for_display(&error_text, 4_000);
-                anyhow::bail!(
-                    "New verifier request failed: HTTP {status} ({http_version}) at {verify_url}\nResponse body:\n{body}"
-                );
-            }
-            Err(err) => {
-                let should_retry = attempt < source_max_attempts;
-                if should_retry {
-                    println!(
-                        "  {} Network error on attempt {attempt}/{source_max_attempts}, retrying...\n    {}",
-                        "↻".yellow().bold(),
-                        err.to_string().dimmed()
-                    );
-                    std::thread::sleep(source_retry_delay(attempt));
-                    continue;
-                }
-                return Err(err).context("Failed to send request to new verifier backend");
-            }
-        }
-    }
-
-    let response =
-        response.ok_or_else(|| anyhow!("Failed to get response from new verifier backend"))?;
-
-    let verify_result: NewVerifyResponse = response
-        .json()
-        .context("Failed to parse new verifier response")?;
-
-    match verify_result.verification_result {
-        NewVerificationResult::AlreadyVerified => {
-            println!("  {} Contract was already verified", "✓".green().bold());
-            if let Some(source_bundle_hash) = &verify_result.source_bundle_hash {
-                println!(
-                    "  {} Source bundle: {}",
-                    "→".blue().bold(),
-                    source_bundle_hash.dimmed()
-                );
-            }
-            if let Some(storage_revision) = &verify_result.storage_revision {
-                println!(
-                    "  {} Storage revision: {}",
-                    "→".blue().bold(),
-                    storage_revision.dimmed()
-                );
-            }
-            println!();
-            show_new_verifier_link(&backend, code_hash);
-            return Ok(());
-        }
-        NewVerificationResult::Mismatch => {
-            anyhow::bail!(
-                "Verification failed: compiled code hash {} does not match target code hash {}",
-                verify_result
-                    .compiled_code_hash
-                    .as_deref()
-                    .unwrap_or("<unknown>"),
-                verify_result.code_hash
-            );
-        }
-        NewVerificationResult::Match => {}
-    }
-
-    println!(
-        "  {} New verifier accepted source bundle",
-        "✓".green().bold()
-    );
-    if let Some(source_bundle_hash) = &verify_result.source_bundle_hash {
-        println!(
-            "  {} Source bundle: {}",
-            "→".blue().bold(),
-            source_bundle_hash.dimmed()
-        );
-    }
-    if let Some(storage_revision) = &verify_result.storage_revision {
-        println!(
-            "  {} Storage revision: {}",
-            "→".blue().bold(),
-            storage_revision.dimmed()
-        );
-    }
-
-    println!();
-    println!("{}", "✓ Contract verification completed!".green().bold());
-    show_new_verifier_link(&backend, code_hash);
-
-    Ok(())
-}
-
-fn get_backends() -> anyhow::Result<BackendsConfig> {
-    Ok(BackendsConfig {
-        verifiers: vec![
-            VerifierBackends {
-                id: DEFAULT_VERIFIER_ID.to_string(),
-                network: "mainnet".to_string(),
-                backends: vec![MAINNET_VERIFIER_BACKEND.to_string()],
-            },
-            VerifierBackends {
-                id: DEFAULT_VERIFIER_ID.to_string(),
-                network: "testnet".to_string(),
-                backends: vec![TESTNET_VERIFIER_BACKEND.to_string()],
-            },
-        ],
-        backends: Vec::new(),
-        backends_testnet: Vec::new(),
-    })
-}
-
-fn get_backend_info(network: &Network, config: &BackendsConfig) -> anyhow::Result<BackendInfo> {
-    let network_name = match network {
-        Network::Mainnet => "mainnet",
-        Network::Testnet => "testnet",
-        _ => {
-            anyhow::bail!("Unsupported network: {network}. Supported networks: mainnet, testnet")
-        }
-    };
-
-    // New config style:
-    // {
-    //   "verifiers": [{ "id": "...", "network": "...", "backends": [...] }]
-    // }
-    // Prefer TON Verifier entries first, fallback to legacy root fields.
-    let mut resolved_backends: Vec<String> = config
-        .verifiers
-        .iter()
-        .filter(|entry| {
-            entry.id == DEFAULT_VERIFIER_ID && entry.network.eq_ignore_ascii_case(network_name)
-        })
-        .flat_map(|entry| entry.backends.clone())
-        .collect();
-
-    if resolved_backends.is_empty() {
-        resolved_backends = match network {
-            Network::Mainnet => config.backends.clone(),
-            Network::Testnet => config.backends_testnet.clone(),
-            _ => unreachable!("network variants are checked above"),
-        };
-    }
-
-    match network {
-        Network::Mainnet => Ok(BackendInfo {
-            source_registry: MAINNET_SOURCE_REGISTRY.to_string(),
-            backends: resolved_backends,
-            id: DEFAULT_VERIFIER_ID.to_string(),
-        }),
-        Network::Testnet => Ok(BackendInfo {
-            source_registry: TESTNET_SOURCE_REGISTRY.to_string(),
-            backends: resolved_backends,
-            id: DEFAULT_VERIFIER_ID.to_string(),
-        }),
-        _ => anyhow::bail!("Unsupported network: {network}. Supported networks: mainnet, testnet"),
-    }
-}
-
-fn remove_random<T>(els: &mut Vec<T>) -> T {
-    let index = (rand::random::<usize>()) % els.len();
-    els.remove(index)
-}
-
 fn build_verify_http_client() -> anyhow::Result<reqwest::blocking::Client> {
-    crate::http::blocking_client_builder()
+    http::blocking_client_builder()
         .pool_max_idle_per_host(0)
         .user_agent(crate::build_info::user_agent())
         .build()
@@ -1610,17 +897,8 @@ fn parse_backend_env(var_name: &str) -> Option<String> {
         .and_then(|s| normalize_backend_url(&s))
 }
 
-pub(crate) fn new_verifier_backend() -> String {
-    parse_backend_env(NEW_VERIFY_BACKEND_ENV).unwrap_or_else(|| NEW_VERIFIER_BACKEND.to_string())
-}
-
-fn parse_backend_list_env(var_name: &str) -> Option<Vec<String>> {
-    let backends = parse_backend_list(&std::env::var(var_name).ok()?);
-    if backends.is_empty() {
-        None
-    } else {
-        Some(backends)
-    }
+pub(crate) fn verifier_backend() -> String {
+    parse_backend_env(VERIFY_BACKEND_ENV).unwrap_or_else(|| VERIFIER_BACKEND.to_string())
 }
 
 fn normalize_backend_url(raw: &str) -> Option<String> {
@@ -1632,16 +910,52 @@ fn normalize_backend_url(raw: &str) -> Option<String> {
     }
 }
 
-fn parse_backend_list(raw: &str) -> Vec<String> {
-    raw.split(',').filter_map(normalize_backend_url).collect()
-}
-
-fn new_verifier_sources(paths: &[(String, bool)]) -> anyhow::Result<Vec<NewSourceObject>> {
+fn verifier_sources(paths: &[(String, bool)]) -> anyhow::Result<Vec<VerifierSource>> {
+    // Match the public verifier's upload policy before asking the user to pay.
+    // Buildable local paths are not necessarily safe portable registry paths.
+    anyhow::ensure!(
+        paths.len() <= 256,
+        "TON verifier accepts at most 256 source files"
+    );
+    let mut seen = BTreeSet::new();
     paths
         .iter()
         .map(|(path, is_entrypoint)| {
-            validate_new_verifier_relative_path(path, "source path")?;
-            Ok(NewSourceObject {
+            validate_verifier_relative_path(path, "source path")?;
+            let portable = path.len() <= 128
+                && path.bytes().all(|byte| {
+                    byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-')
+                })
+                && path.split('/').all(|part| {
+                    !part.is_empty() && !part.ends_with('.') && !part.eq_ignore_ascii_case(".git")
+                })
+                && !path
+                    .split('/')
+                    .next()
+                    .is_some_and(|part| part.eq_ignore_ascii_case("output"));
+            anyhow::ensure!(
+                portable,
+                "Source path is not supported by TON verifier: {path}. \
+                 Use relative paths up to 128 ASCII characters with letters, numbers, '.', '_' and '-'; \
+                 '.git' and the root 'output' directory are reserved"
+            );
+
+            let filename = path.rsplit('/').next().unwrap_or(path).to_ascii_lowercase();
+            let source_extension_count = filename
+                .split('.')
+                .skip(1)
+                .filter(|ext| matches!(*ext, "tolk" | "fc" | "func" | "tact" | "pkg"))
+                .count();
+            anyhow::ensure!(
+                filename.ends_with(".tolk") && source_extension_count == 1,
+                "Source path must have a single .tolk source extension: {path}"
+            );
+            anyhow::ensure!(
+                seen.insert(path.to_ascii_lowercase()),
+                "Duplicate source path (case-insensitive): {path}"
+            );
+
+            Ok(VerifierSource {
                 path: path.clone(),
                 is_entrypoint: *is_entrypoint,
                 include_in_command: Some(true),
@@ -1652,7 +966,7 @@ fn new_verifier_sources(paths: &[(String, bool)]) -> anyhow::Result<Vec<NewSourc
         .collect()
 }
 
-fn new_verifier_compile_params(
+fn verifier_compile_params(
     config: &ActonConfig,
     version: &str,
 ) -> anyhow::Result<serde_json::Value> {
@@ -1662,7 +976,7 @@ fn new_verifier_compile_params(
         serde_json::Value::String(version.to_string()),
     );
 
-    let import_mappings = new_verifier_import_mappings(config)?;
+    let import_mappings = verifier_import_mappings(config)?;
     if !import_mappings.is_empty() {
         params.insert(
             "import_mappings".to_string(),
@@ -1673,7 +987,7 @@ fn new_verifier_compile_params(
     Ok(serde_json::Value::Object(params))
 }
 
-fn new_verifier_import_mappings(config: &ActonConfig) -> anyhow::Result<BTreeMap<String, String>> {
+fn verifier_import_mappings(config: &ActonConfig) -> anyhow::Result<BTreeMap<String, String>> {
     let project_root = acton_config::config::project_root();
     config
         .mappings
@@ -1687,13 +1001,13 @@ fn new_verifier_import_mappings(config: &ActonConfig) -> anyhow::Result<BTreeMap
                 format!("@{key}")
             };
             let normalized_value =
-                normalize_new_verifier_relative_path(&value, project_root, "import mapping")?;
+                normalize_verifier_relative_path(&value, project_root, "import mapping")?;
             Ok((normalized_key, normalized_value))
         })
         .collect()
 }
 
-fn normalize_new_verifier_relative_path(
+fn normalize_verifier_relative_path(
     raw: &str,
     project_root: &Path,
     label: &str,
@@ -1730,12 +1044,12 @@ fn normalize_new_verifier_relative_path(
     Ok(parts.join("/"))
 }
 
-fn validate_new_verifier_relative_path(raw: &str, label: &str) -> anyhow::Result<()> {
-    let _ = normalize_new_verifier_relative_path(raw, acton_config::config::project_root(), label)?;
+fn validate_verifier_relative_path(raw: &str, label: &str) -> anyhow::Result<()> {
+    let _ = normalize_verifier_relative_path(raw, acton_config::config::project_root(), label)?;
     Ok(())
 }
 
-fn build_new_verify_form(
+fn build_verify_form(
     parts: &[UploadPart],
     code_hash: &str,
     tx_hash: &str,
@@ -1758,31 +1072,6 @@ fn build_new_verify_form(
                 .mime_str("application/octet-stream")?,
         );
     }
-
-    Ok(form)
-}
-
-fn build_verify_form(
-    parts: &[UploadPart],
-    json_str: &str,
-) -> anyhow::Result<reqwest::blocking::multipart::Form> {
-    let mut form = reqwest::blocking::multipart::Form::new().percent_encode_noop();
-
-    for part in parts {
-        form = form.part(
-            part.field_name.clone(),
-            reqwest::blocking::multipart::Part::bytes(part.bytes.clone())
-                .file_name(part.file_name.clone())
-                .mime_str("application/octet-stream")?,
-        );
-    }
-
-    form = form.part(
-        "json",
-        reqwest::blocking::multipart::Part::text(json_str.to_owned())
-            .file_name("blob")
-            .mime_str("application/json")?,
-    );
 
     Ok(form)
 }
@@ -1840,20 +1129,6 @@ fn source_files_from_source_map(source_map: &tolk_compiler::SourceMap) -> Vec<(P
         .collect()
 }
 
-fn source_folder_for_verifier(path: &str) -> String {
-    let folder = Path::new(path)
-        .parent()
-        .unwrap_or_else(|| Path::new("."))
-        .to_string_lossy()
-        .replace('\\', "/");
-
-    if folder.is_empty() {
-        ".".to_string()
-    } else {
-        folder
-    }
-}
-
 fn truncate_for_display(text: &str, max_chars: usize) -> String {
     if max_chars == 0 {
         return String::new();
@@ -1870,47 +1145,25 @@ fn truncate_for_display(text: &str, max_chars: usize) -> String {
     out
 }
 
-fn wait_for_rate_limit(has_api_key: bool) {
-    if !has_api_key {
-        // rate limit
-        println!("  {} Waiting for Toncenter rate limit", "→".blue().bold());
-        std::thread::sleep(Duration::from_secs(1));
-    }
-}
-
-fn show_verifier_link(network: &Network, contract_address: TonAddress) {
-    let is_testnet = network == &Network::Testnet;
-    println!(
-        "View at: {}",
-        format!(
-            "https://verifier.ton.org/{}{}",
-            format_ton_address(&contract_address, is_testnet),
-            if is_testnet { "?testnet" } else { "" }
-        )
-        .blue()
-    );
-}
-
-fn show_new_verifier_link(backend: &str, code_hash: &str) {
+fn show_verifier_link(backend: &str, code_hash: &str) {
     println!(
         "View at: {}",
         format!("{}/{}", backend.trim_end_matches('/'), code_hash).blue()
     );
 }
 
-fn validate_new_verifier_address_code_hash(
+fn validate_verifier_address_code_hash(
     config: &ActonConfig,
-    network: &Network,
     contract_address: &TonAddress,
     compiled_code_hash: &HashBytes,
 ) -> anyhow::Result<()> {
-    let address = format_ton_address(contract_address, network == &Network::Testnet);
+    let address = format_ton_address(contract_address, true);
     println!(
         "  {} Checking deployed code hash for address",
         "→".blue().bold()
     );
 
-    let api_client = TonApiClient::new(network.clone(), config.custom_networks())?;
+    let api_client = TonApiClient::new(Network::Testnet, config.custom_networks())?;
     let account = api_client
         .get_account_state(&address)
         .with_context(|| format!("Failed to fetch account state for {address}"))?;
@@ -1946,120 +1199,10 @@ fn validate_new_verifier_address_code_hash(
     Ok(())
 }
 
-fn get_verifier_address(
-    backend_info: &BackendInfo,
-    api_client: &TonApiClient,
-) -> anyhow::Result<TonAddress> {
-    let result = api_client.run_get_method(
-        &backend_info.source_registry,
-        "get_verifier_registry_address",
-        &[],
-    )?;
-
-    parse_verifier_registry_address(&result).with_context(|| {
-        format!(
-            "Failed to parse verifier registry address from source registry {}",
-            backend_info.source_registry
-        )
-    })
-}
-
-fn get_verifier_quorum(
-    api_client: &TonApiClient,
-    registry_address: &TonAddress,
-    verifier_id: &str,
-    is_testnet: bool,
-) -> anyhow::Result<u8> {
-    let registry_address = format_ton_address(registry_address, is_testnet);
-    let result = api_client.run_get_method(&registry_address, "get_verifiers", &[])?;
-    parse_verifier_quorum_from_get_method(&result, verifier_id)
-}
-
-fn parse_verifier_registry_address(result: &v2::RunGetMethodResult) -> anyhow::Result<TonAddress> {
-    let cell = parse_stack_cell(result, "get_verifier_registry_address")?;
-    TonAddress::from_cell(&TonCell::from_boc(Boc::encode(cell))?)
-        .context("Failed to parse registry address from object")
-}
-
-fn parse_verifier_quorum_from_get_method(
-    result: &v2::RunGetMethodResult,
-    verifier_id: &str,
-) -> anyhow::Result<u8> {
-    let cell = parse_stack_cell(result, "get_verifiers")?;
-    let mut parser = cell
-        .as_slice()
-        .context("Failed to parse verifier cell slice")?;
-    let verifiers = Dict::<HashBytes, CellSlice>::load_from(&mut parser)
-        .context("Failed to parse verifier dictionary")?;
-
-    let mut available_verifiers = Vec::new();
-    for verifier_entry in verifiers.iter() {
-        let (_, mut verifier) = verifier_entry.context("Failed to iterate verifier dictionary")?;
-        let _admin =
-            IntAddr::load_from(&mut verifier).context("Failed to parse verifier admin address")?;
-        let quorum = verifier
-            .load_u8()
-            .context("Failed to parse verifier quorum")?;
-        let _pub_key_endpoints = RawDict::<256>::load_from(&mut verifier)
-            .context("Failed to parse verifier endpoints")?;
-        let name = parse_string_ref(&mut verifier).context("Failed to parse verifier name")?;
-        let _url = parse_string_ref(&mut verifier).context("Failed to parse verifier URL")?;
-
-        available_verifiers.push(name.clone());
-        if name == verifier_id {
-            if quorum == 0 {
-                anyhow::bail!("Verifier '{verifier_id}' returned zero quorum");
-            }
-            return Ok(quorum);
-        }
-    }
-
-    available_verifiers.sort();
-    available_verifiers.dedup();
-    anyhow::bail!(
-        "Verifier '{verifier_id}' is not registered in verifier registry. Available verifiers: {}",
-        if available_verifiers.is_empty() {
-            "none".to_string()
-        } else {
-            available_verifiers.join(", ")
-        }
-    );
-}
-
-fn parse_stack_cell(result: &v2::RunGetMethodResult, method_name: &str) -> anyhow::Result<Cell> {
-    if result.exit_code != 0 {
-        anyhow::bail!(
-            "{method_name} returned non-zero exit code: {}",
-            result.exit_code
-        );
-    }
-
-    let tuple = result.parse_stack_tuple().with_context(|| {
-        format!("Failed to parse stack from '{method_name}' with tvm-ffi JSON stack parser")
-    })?;
-    let Some(item) = tuple.first() else {
-        anyhow::bail!("Stack from '{method_name}' is empty");
-    };
-
-    match item {
-        TupleItem::Cell(cell) | TupleItem::Slice(cell) => Ok(cell.clone()),
-        _ => {
-            anyhow::bail!("Unexpected stack item type for '{method_name}'");
-        }
-    }
-}
-
-fn parse_string_ref(parser: &mut CellSlice<'_>) -> anyhow::Result<String> {
-    let string_cell = parser
-        .load_reference_cloned()
-        .context("Expected string reference")?;
-    Tuple::parse_snake_string(&string_cell)
-        .ok_or_else(|| anyhow!("String reference is not valid UTF-8"))
-}
-
 #[cfg(test)]
 mod tests {
     use serde_json::json;
+    use tycho_types::cell::CellSlice;
 
     use super::*;
 
@@ -2070,6 +1213,53 @@ mod tests {
     const CODE_HASH: &str = "e67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973";
     const COMMENT: &str =
         "acton-verify:v1:e67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973";
+
+    #[test]
+    fn verifier_sources_validate_portable_paths_before_payment() {
+        for path in [
+            "contracts/main.tolk",
+            "lib/my-contract.v2.tolk",
+            "deps/Lib.TOLK",
+        ] {
+            assert!(
+                verifier_sources(&[(path.to_owned(), true)]).is_ok(),
+                "{path}"
+            );
+        }
+        for path in [
+            "contracts/my contract.tolk",
+            "../main.tolk",
+            "/main.tolk",
+            "a//main.tolk",
+            "a./main.tolk",
+            ".Git/main.tolk",
+            "output/main.tolk",
+            "main.fc.tolk",
+            "main.tolk.pkg",
+            "main.txt",
+            "合约.tolk",
+        ] {
+            assert!(
+                verifier_sources(&[(path.to_owned(), true)]).is_err(),
+                "{path}"
+            );
+        }
+        assert!(verifier_sources(&[(format!("{}.tolk", "a".repeat(124)), true)]).is_err());
+        assert!(
+            verifier_sources(&[
+                ("Main.tolk".to_owned(), true),
+                ("main.tolk".to_owned(), false)
+            ])
+            .is_err()
+        );
+        let paths = (0..256)
+            .map(|index| (format!("file{index}.tolk"), index == 0))
+            .collect::<Vec<_>>();
+        assert!(verifier_sources(&paths).is_ok());
+        let mut paths = paths;
+        paths.push(("extra.tolk".to_owned(), false));
+        assert!(verifier_sources(&paths).is_err());
+    }
 
     #[test]
     fn payment_address_uses_bounceable_testnet_format() {
@@ -2084,8 +1274,8 @@ mod tests {
         );
     }
 
-    fn payment_quote() -> NewVerifierPaymentQuote {
-        NewVerifierPaymentQuote {
+    fn payment_quote() -> VerifierPaymentQuote {
+        VerifierPaymentQuote {
             payment_address: PAYMENT_ADDRESS.to_owned(),
             amount_nano: "10000000".to_owned(),
             comment: COMMENT.to_owned(),
@@ -2123,15 +1313,19 @@ mod tests {
     }
 
     #[test]
-    fn new_verifier_payment_message_contains_the_exact_code_hash_comment() {
+    fn verifier_payment_message_contains_the_exact_code_hash_comment() {
         let sender = ton_address_to_std_addr(
             &TonAddress::from_str(SENDER_ADDRESS).expect("sender address should parse"),
         );
         let destination =
             TonAddress::from_str(PAYMENT_ADDRESS).expect("payment address should parse");
-        let cell =
-            build_new_verifier_payment_message(sender.clone(), &destination, 10_000_000, COMMENT)
-                .expect("payment message should build");
+        let cell = build_verifier_payment_message(
+            sender.clone(),
+            &destination,
+            &BigInt::from(10_000_000u64),
+            COMMENT,
+        )
+        .expect("payment message should build");
         let message = cell
             .parse::<OwnedMessage>()
             .expect("payment message should parse");

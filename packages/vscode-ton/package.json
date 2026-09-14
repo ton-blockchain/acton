@@ -640,7 +640,7 @@
     "esbuild": "^0.28.1",
     "typescript": "^7.0.2",
     "vite": "^8.2.0",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.11"
   },
   "engines": {
     "vscode": "^1.88.0"

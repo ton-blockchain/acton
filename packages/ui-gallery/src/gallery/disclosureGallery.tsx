@@ -12,7 +12,7 @@ function DisclosureSamples() {
             <Input label="Rate limit" suffix="RPS" type="number" min={1} placeholder="Unlimited" />
             <Input label="Response delay" suffix="ms" type="number" min={1} placeholder="None" />
             <Input
-              label="Block interval"
+              label="Block time"
               suffix="ms"
               type="number"
               min={1}

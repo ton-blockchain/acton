@@ -1,0 +1,6 @@
+error: invalid value 'post-commit' for '--hook <HOOK>'
+  [possible values: pre-push, pre-commit]
+
+  tip: a similar value exists: 'pre-commit'
+
+For more information, try '--help'.

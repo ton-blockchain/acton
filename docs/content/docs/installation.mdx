@@ -49,6 +49,15 @@ Acton ships as a single, dependency-free executable. You can install it via the 
 
 <Callout type="warning" title="Use WSL on Windows">
     On Windows, use WSL with Ubuntu 22 or newer; native Windows is not supported.
+
+    Run Git and Acton inside the same WSL distribution. In VS Code, install the
+    [WSL extension](https://code.visualstudio.com/docs/remote/wsl), then use
+    **WSL: Reopen Folder in WSL**. You can also run `code .` from the project directory
+    inside WSL. This also applies to project folders on Windows drives, such as `/mnt/c`.
+
+    A WSL terminal alone does not change the environment for Git commands from the
+    Source Control view. If a Git hook reports `acton was not found in PATH`,
+    make sure that VS Code shows the correct WSL distribution in its status bar.
 </Callout>
 
 To confirm installation, open a new terminal window and run:

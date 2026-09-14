@@ -357,6 +357,24 @@ port = {port}
     fs::write(&acton_toml_path, acton_toml).expect("Failed to write Acton.toml with localnet port");
 }
 
+fn append_localnet_api_v2(project_path: &Path, api_v2_url: &str) {
+    use std::fmt::Write as _;
+
+    let acton_toml_path = project_path.join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("Failed to read generated Acton.toml");
+    let _ = write!(
+        acton_toml,
+        r#"
+
+[networks.localnet.api]
+v2 = "{api_v2_url}"
+"#
+    );
+    fs::write(&acton_toml_path, acton_toml)
+        .expect("Failed to write Acton.toml with localnet API v2 URL");
+}
+
 fn find_unused_port() -> u16 {
     TcpListener::bind(("127.0.0.1", 0))
         .expect("failed to reserve test port")
@@ -937,6 +955,86 @@ fn test_wallet_airdrop_localnet_waits_for_top_up_balance() {
 }
 
 #[test]
+fn test_wallet_airdrop_localnet_uses_configured_studio_environment_gateway() {
+    let project = ProjectBuilder::new("wallet-airdrop-studio-localnet").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let environment_rpc_path = "/api/v1/environments/full-localnet-1/rpc";
+    let (port, faucet_handle, captured_requests) = spawn_localnet_faucet_mock(vec![
+        FaucetMockResponse {
+            method: "GET",
+            path: "/api/v1/environments/full-localnet-1/rpc/api/v2/getAddressInformation*",
+            status: 200,
+            body: r#"{"ok":true,"result":{"balance":"0"}}"#,
+        },
+        FaucetMockResponse {
+            method: "POST",
+            path: "/api/v1/environments/full-localnet-1/rpc/acton_fundAccount",
+            status: 200,
+            body: r#"{"ok":true,"result":{"hash":"accepted"}}"#,
+        },
+        FaucetMockResponse {
+            method: "GET",
+            path: "/api/v1/environments/full-localnet-1/rpc/api/v2/getAddressInformation*",
+            status: 200,
+            body: r#"{"ok":true,"result":{"balance":"100000000000"}}"#,
+        },
+    ]);
+    append_localnet_api_v2(
+        project.path(),
+        &format!("http://127.0.0.1:{port}{environment_rpc_path}/api/v2"),
+    );
+
+    let output = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--net")
+        .arg("localnet")
+        .run()
+        .success();
+
+    faucet_handle
+        .join()
+        .expect("mock localnet faucet thread must finish without panic");
+    let request_sequence = captured_requests
+        .lock()
+        .expect("captured requests mutex poisoned")
+        .iter()
+        .map(|request| {
+            let path = request.path.split('?').next().unwrap_or(&request.path);
+            format!("{} {path}", request.method)
+        })
+        .collect::<Vec<_>>();
+    let summary = serde_json::json!({
+        "success_message": strip_ansi(&output.get_stdout()).contains("Successfully airdropped 100 GRAM on localnet"),
+        "request_sequence": request_sequence,
+    });
+    let summary_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&summary).expect("Failed to serialize JSON snapshot")
+    );
+
+    assertion().eq(
+        summary_json,
+        snapbox::file!(
+            "snapshots/wallet_airdrop/test_wallet_airdrop_localnet_uses_configured_studio_environment_gateway.summary.json"
+        ),
+    );
+}
+
+#[test]
 fn test_wallet_airdrop_localnet_transport_error_without_running_node() {
     let project = ProjectBuilder::new("wallet-airdrop-localnet-transport-error").build();
 
@@ -964,7 +1062,7 @@ fn test_wallet_airdrop_localnet_transport_error_without_running_node() {
         .failure();
 
     output.assert_stderr_contains(
-        "Failed to send request to localnet faucet. Make sure `acton simulated-localnet start` is running",
+        "Failed to send request to the configured localnet faucet. Make sure the localnet environment is running",
     );
 }
 

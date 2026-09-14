@@ -2,12 +2,12 @@ use crate::LocalnetError;
 use crate::executor::TvmEmulatorAdapter;
 use crate::jetton_faucet;
 use crate::node::{Node, NodeClockInfo, StateSource};
-use crate::node_snapshot::{NodeStateSnapshot, snapshot_from_json, snapshot_to_json};
 use crate::remote::{
     RemoteProvider, fetch_remote_block_header_v2, fetch_remote_block_transactions_ext_v2,
     fetch_remote_block_transactions_v2, fetch_remote_block_v2, fetch_remote_blocks_v3,
     fetch_remote_lookup_block_v2, fetch_remote_shards_v2, fetch_remote_transactions_v3,
 };
+use crate::snapshots::{Snapshot, SnapshotStore};
 use crate::storage;
 use crate::storage::{AccountStatus, BlockMeta, MasterchainBlockMeta, MsgMeta, TransactionInfo};
 use crate::streaming::StreamingCommitEvent;
@@ -403,12 +403,6 @@ impl Default for LocalnetMiningMode {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct LocalnetCheckpointResult {
-    pub name: String,
-    pub block_seqno: Seqno,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetBlockHeader {
     pub id: LocalnetBlockId,
     pub global_id: i32,
@@ -681,49 +675,29 @@ pub(crate) enum Request {
         address: Addr,
         resp: oneshot::Sender<anyhow::Result<LocalnetContractData>>,
     },
-    DumpStateToPath {
-        path: String,
+    CreateSnapshot {
+        name: Option<String>,
+        resp: oneshot::Sender<anyhow::Result<Snapshot>>,
+    },
+    ListSnapshots {
+        resp: oneshot::Sender<anyhow::Result<Vec<Snapshot>>>,
+    },
+    RestoreSnapshot {
+        id: String,
+        resp: oneshot::Sender<anyhow::Result<Snapshot>>,
+    },
+    DeleteSnapshot {
+        id: String,
         resp: oneshot::Sender<anyhow::Result<()>>,
     },
-    LoadStateFromPath {
-        path: String,
-        resp: oneshot::Sender<anyhow::Result<()>>,
-    },
-    DumpState {
+    ExportSnapshot {
+        id: String,
         resp: oneshot::Sender<anyhow::Result<Vec<u8>>>,
     },
-    LoadState {
+    ImportSnapshot {
+        name: Option<String>,
         json: Vec<u8>,
-        resp: oneshot::Sender<anyhow::Result<()>>,
-    },
-    CreateCheckpoint {
-        name: String,
-        force: bool,
-        resp: oneshot::Sender<anyhow::Result<LocalnetCheckpointResult>>,
-    },
-    ListCheckpoints {
-        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetCheckpointResult>>>,
-    },
-    RestoreCheckpoint {
-        name: String,
-        resp: oneshot::Sender<anyhow::Result<LocalnetCheckpointResult>>,
-    },
-    DeleteCheckpoint {
-        name: String,
-        resp: oneshot::Sender<anyhow::Result<LocalnetCheckpointResult>>,
-    },
-    ClearCheckpoints {
-        resp: oneshot::Sender<anyhow::Result<usize>>,
-    },
-    ExportCheckpoint {
-        name: String,
-        resp: oneshot::Sender<anyhow::Result<Vec<u8>>>,
-    },
-    ImportCheckpoint {
-        name: String,
-        json: Vec<u8>,
-        force: bool,
-        resp: oneshot::Sender<anyhow::Result<LocalnetCheckpointResult>>,
+        resp: oneshot::Sender<anyhow::Result<Snapshot>>,
     },
     MineBlocks {
         count: u32,
@@ -757,142 +731,19 @@ pub struct Localnet {
     tx: mpsc::Sender<Request>,
     events_tx: broadcast::Sender<StreamingCommitEvent>,
     started_at: SystemTime,
-    block_interval_ms: u64,
+    block_time_ms: u64,
     auto_mining: bool,
 }
 
-#[derive(Default)]
-struct Checkpoints {
-    points: Vec<Checkpoint>,
-}
-
-struct Checkpoint {
-    name: String,
-    snapshot: NodeStateSnapshot,
-}
-
-impl Checkpoints {
-    fn create(
-        &mut self,
-        node: &Node,
-        name: String,
-        force: bool,
-    ) -> anyhow::Result<LocalnetCheckpointResult> {
-        let name = normalize_checkpoint_name(name)?;
-        let replacement_index = self.replacement_index(&name, force)?;
-        let snapshot = node.build_snapshot()?;
-        Ok(self.store_snapshot(snapshot, name, replacement_index))
-    }
-
-    fn import(
-        &mut self,
-        json: &[u8],
-        name: String,
-        force: bool,
-    ) -> anyhow::Result<LocalnetCheckpointResult> {
-        let name = normalize_checkpoint_name(name)?;
-        let replacement_index = self.replacement_index(&name, force)?;
-        let snapshot = snapshot_from_json(json)?;
-        Node::validate_snapshot(&snapshot)?;
-        Ok(self.store_snapshot(snapshot, name, replacement_index))
-    }
-
-    fn store_snapshot(
-        &mut self,
-        snapshot: NodeStateSnapshot,
-        name: String,
-        replacement_index: Option<usize>,
-    ) -> LocalnetCheckpointResult {
-        let block_seqno = snapshot.globals.head_seqno;
-        let point = Checkpoint {
-            name: name.clone(),
-            snapshot,
-        };
-        if let Some(index) = replacement_index {
-            self.points[index] = point;
-        } else {
-            self.points.push(point);
-        }
-        LocalnetCheckpointResult { name, block_seqno }
-    }
-
-    fn list(&self) -> Vec<LocalnetCheckpointResult> {
-        self.points
-            .iter()
-            .map(|point| LocalnetCheckpointResult {
-                name: point.name.clone(),
-                block_seqno: point.snapshot.globals.head_seqno,
-            })
-            .collect()
-    }
-
-    fn restore(&self, node: &mut Node, name: String) -> anyhow::Result<LocalnetCheckpointResult> {
-        let index = self.find_index(&name)?;
-        let snapshot = self.points[index].snapshot.clone();
-        let result = self.result_at(index);
-        node.apply_snapshot(snapshot)?;
-        Ok(result)
-    }
-
-    fn delete(&mut self, name: String) -> anyhow::Result<LocalnetCheckpointResult> {
-        let index = self.find_index(&name)?;
-        let result = self.result_at(index);
-        self.points.remove(index);
-        Ok(result)
-    }
-
-    fn export(&self, name: String) -> anyhow::Result<Vec<u8>> {
-        let index = self.find_index(&name)?;
-        snapshot_to_json(&self.points[index].snapshot)
-    }
-
-    fn clear(&mut self) -> usize {
-        let count = self.points.len();
-        self.points.clear();
-        count
-    }
-
-    fn replacement_index(&self, name: &str, force: bool) -> anyhow::Result<Option<usize>> {
-        let index = self.points.iter().position(|point| point.name == name);
-        if index.is_some() && !force {
-            anyhow::bail!("Checkpoint name {name} already exists");
-        }
-        Ok(index)
-    }
-
-    fn find_index(&self, name: &str) -> anyhow::Result<usize> {
-        let name = normalize_checkpoint_name(name.to_owned())?;
-        self.points
-            .iter()
-            .position(|point| point.name == name)
-            .with_context(|| format!("Checkpoint name {name} not found"))
-    }
-
-    fn result_at(&self, index: usize) -> LocalnetCheckpointResult {
-        let point = &self.points[index];
-        LocalnetCheckpointResult {
-            name: point.name.clone(),
-            block_seqno: point.snapshot.globals.head_seqno,
-        }
-    }
-}
-
-fn normalize_checkpoint_name(name: String) -> anyhow::Result<String> {
-    let name = name.trim();
-    if name.is_empty() {
-        anyhow::bail!("Checkpoint name cannot be empty");
-    }
-    Ok(name.to_owned())
-}
-
-pub const DEFAULT_BLOCK_INTERVAL_MS: u64 = 500;
+pub const DEFAULT_BLOCK_TIME_MS: u64 = 500;
 
 impl Localnet {
     #[must_use]
     pub fn new(
         state_source: StateSource,
         db_path: Option<String>,
-        block_interval: Duration,
+        snapshots: SnapshotStore,
+        block_time: Duration,
         auto_mining: bool,
         mining_mode: LocalnetMiningMode,
     ) -> Self {
@@ -900,7 +751,7 @@ impl Localnet {
         let (events_tx, _) = broadcast::channel(1024);
         let started_at = SystemTime::now();
         let node_events_tx = events_tx.clone();
-        let block_interval_ms = u64::try_from(block_interval.as_millis()).unwrap_or(u64::MAX);
+        let block_time_ms = u64::try_from(block_time.as_millis()).unwrap_or(u64::MAX);
 
         std::thread::spawn(move || {
             if let Err(e) = run_node_loop(
@@ -908,7 +759,8 @@ impl Localnet {
                 node_events_tx,
                 state_source,
                 db_path,
-                block_interval,
+                snapshots,
+                block_time,
                 auto_mining,
                 mining_mode,
             ) {
@@ -920,7 +772,7 @@ impl Localnet {
             tx,
             events_tx,
             started_at,
-            block_interval_ms,
+            block_time_ms,
             auto_mining,
         }
     }
@@ -932,9 +784,11 @@ impl Localnet {
             .map_or(0, |duration| duration.as_secs())
     }
 
+    /// Reports the configured delay between automatic mining attempts for runtime settings.
+    /// Manual mining does not use this delay; changing mining mode leaves it unchanged.
     #[must_use]
-    pub const fn block_interval_ms(&self) -> u64 {
-        self.block_interval_ms
+    pub const fn block_time_ms(&self) -> u64 {
+        self.block_time_ms
     }
 
     #[must_use]
@@ -1905,102 +1759,50 @@ impl Localnet {
         rx.await?
     }
 
-    pub async fn dump_state_to_path(&self, path: String) -> anyhow::Result<()> {
+    /// Saves a consistent state between node requests; automatic mining cannot interleave.
+    pub async fn create_snapshot(&self, name: Option<String>) -> anyhow::Result<Snapshot> {
         let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::DumpStateToPath { path, resp })
-            .await?;
+        self.tx.send(Request::CreateSnapshot { name, resp }).await?;
         rx.await?
     }
 
-    pub async fn load_state_from_path(&self, path: String) -> anyhow::Result<()> {
+    /// Reads the durable inventory independently of the current blockchain head.
+    pub async fn list_snapshots(&self) -> anyhow::Result<Vec<Snapshot>> {
         let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::LoadStateFromPath { path, resp })
-            .await?;
+        self.tx.send(Request::ListSnapshots { resp }).await?;
         rx.await?
     }
 
-    pub async fn dump_state(&self) -> anyhow::Result<Vec<u8>> {
+    /// Replaces live and persisted state in the node actor while retaining all saved snapshots.
+    pub async fn restore_snapshot(&self, id: String) -> anyhow::Result<Snapshot> {
         let (resp, rx) = oneshot::channel();
-        self.tx.send(Request::DumpState { resp }).await?;
+        self.tx.send(Request::RestoreSnapshot { id, resp }).await?;
         rx.await?
     }
 
-    pub async fn load_state(&self, json: Vec<u8>) -> anyhow::Result<()> {
+    /// Removes a saved file without modifying the current state.
+    pub async fn delete_snapshot(&self, id: String) -> anyhow::Result<()> {
         let (resp, rx) = oneshot::channel();
-        self.tx.send(Request::LoadState { json, resp }).await?;
+        self.tx.send(Request::DeleteSnapshot { id, resp }).await?;
         rx.await?
     }
 
-    pub async fn create_checkpoint(
+    /// Downloads an immutable saved snapshot, never an implicit dump of live state.
+    pub async fn export_snapshot(&self, id: String) -> anyhow::Result<Vec<u8>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::ExportSnapshot { id, resp }).await?;
+        rx.await?
+    }
+
+    /// Validates and stores a JSON snapshot without restoring it.
+    pub async fn import_snapshot(
         &self,
-        name: String,
-        force: bool,
-    ) -> anyhow::Result<LocalnetCheckpointResult> {
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::CreateCheckpoint { name, force, resp })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn list_checkpoints(&self) -> anyhow::Result<Vec<LocalnetCheckpointResult>> {
-        let (resp, rx) = oneshot::channel();
-        self.tx.send(Request::ListCheckpoints { resp }).await?;
-        rx.await?
-    }
-
-    pub async fn restore_checkpoint(
-        &self,
-        name: String,
-    ) -> anyhow::Result<LocalnetCheckpointResult> {
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::RestoreCheckpoint { name, resp })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn delete_checkpoint(
-        &self,
-        name: String,
-    ) -> anyhow::Result<LocalnetCheckpointResult> {
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::DeleteCheckpoint { name, resp })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn clear_checkpoints(&self) -> anyhow::Result<usize> {
-        let (resp, rx) = oneshot::channel();
-        self.tx.send(Request::ClearCheckpoints { resp }).await?;
-        rx.await?
-    }
-
-    pub async fn export_checkpoint(&self, name: String) -> anyhow::Result<Vec<u8>> {
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::ExportCheckpoint { name, resp })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn import_checkpoint(
-        &self,
-        name: String,
+        name: Option<String>,
         json: Vec<u8>,
-        force: bool,
-    ) -> anyhow::Result<LocalnetCheckpointResult> {
+    ) -> anyhow::Result<Snapshot> {
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::ImportCheckpoint {
-                name,
-                json,
-                force,
-                resp,
-            })
+            .send(Request::ImportSnapshot { name, json, resp })
             .await?;
         rx.await?
     }
@@ -2062,27 +1864,28 @@ impl Localnet {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_node_loop(
     mut rx: mpsc::Receiver<Request>,
     events_tx: broadcast::Sender<StreamingCommitEvent>,
     state_source: StateSource,
     db_path: Option<String>,
-    block_interval: Duration,
+    snapshots: SnapshotStore,
+    block_time: Duration,
     auto_mining: bool,
     mut mining_mode: LocalnetMiningMode,
 ) -> anyhow::Result<()> {
     let mut node = create_node(events_tx, state_source, db_path)?;
-    let mut checkpoints = Checkpoints::default();
     tracing::info!(
-        "TON localnet started, block interval: {}ms, auto mining: {}, skip empty blocks: {}",
-        block_interval.as_millis(),
+        "TON localnet started, block time: {}ms, auto mining: {}, skip empty blocks: {}",
+        block_time.as_millis(),
         auto_mining,
         mining_mode.skip_empty_blocks
     );
 
     if !auto_mining {
         while let Some(req) = rx.blocking_recv() {
-            process_loop_request(&mut node, &mut checkpoints, &mut mining_mode, req);
+            process_loop_request(&mut node, &snapshots, &mut mining_mode, req);
         }
         return Ok(());
     }
@@ -2091,7 +1894,13 @@ fn run_node_loop(
         .enable_time()
         .build()
         .context("Failed to create localnet node runtime")?;
-    runtime.block_on(run_node_loop_async(rx, node, block_interval, mining_mode))
+    runtime.block_on(run_node_loop_async(
+        rx,
+        node,
+        snapshots,
+        block_time,
+        mining_mode,
+    ))
 }
 
 fn create_node(
@@ -2112,28 +1921,28 @@ fn create_node(
 async fn run_node_loop_async(
     mut rx: mpsc::Receiver<Request>,
     mut node: Node,
-    block_interval: Duration,
+    snapshots: SnapshotStore,
+    block_time: Duration,
     mut mining_mode: LocalnetMiningMode,
 ) -> anyhow::Result<()> {
-    let mut next_block_at = Instant::now() + block_interval;
-    let mut checkpoints = Checkpoints::default();
+    let mut next_block_at = Instant::now() + block_time;
 
     loop {
         if Instant::now() >= next_block_at {
-            next_block_at = mine_scheduled_block(&mut node, block_interval, mining_mode);
+            next_block_at = mine_scheduled_block(&mut node, block_time, mining_mode);
             continue;
         }
 
         tokio::select! {
             biased;
             () = tokio::time::sleep_until(next_block_at) => {
-                next_block_at = mine_scheduled_block(&mut node, block_interval, mining_mode);
+                next_block_at = mine_scheduled_block(&mut node, block_time, mining_mode);
             }
             req = rx.recv() => {
                 let Some(req) = req else {
                     return Ok(());
                 };
-                process_loop_request(&mut node, &mut checkpoints, &mut mining_mode, req);
+                process_loop_request(&mut node, &snapshots, &mut mining_mode, req);
             }
         }
     }
@@ -2141,13 +1950,13 @@ async fn run_node_loop_async(
 
 fn mine_scheduled_block(
     node: &mut Node,
-    block_interval: Duration,
+    block_time: Duration,
     mining_mode: LocalnetMiningMode,
 ) -> Instant {
     if let Err(e) = mine_block_with_mode(node, mining_mode) {
         tracing::error!("Block mining failed: {:?}", e);
     }
-    Instant::now() + block_interval
+    Instant::now() + block_time
 }
 
 fn mine_block_with_mode(
@@ -2194,11 +2003,11 @@ fn handle_mine_blocks(
 
 fn process_loop_request(
     node: &mut Node,
-    checkpoints: &mut Checkpoints,
+    snapshots: &SnapshotStore,
     mining_mode: &mut LocalnetMiningMode,
     req: Request,
 ) {
-    tracing::debug!("Node loop processing request: {:?}", req);
+    tracing::debug!(request = ?std::mem::discriminant(&req), "Processing node request");
     match req {
         Request::SendBoc { boc, resp } => {
             let res = handle_send_boc(node, boc);
@@ -2486,60 +2295,23 @@ fn process_loop_request(
             let res = node.detect_contract_data(&address);
             let _ = resp.send(res);
         }
-        Request::DumpStateToPath { path, resp } => {
-            let res = node.dump_state_to_path(path);
-            let _ = resp.send(res);
+        Request::CreateSnapshot { name, resp } => {
+            let _ = resp.send(snapshots.create(node, name));
         }
-        Request::LoadStateFromPath { path, resp } => {
-            let res = node.load_state_from_path(path);
-            if res.is_ok() {
-                checkpoints.clear();
-            }
-            let _ = resp.send(res);
+        Request::ListSnapshots { resp } => {
+            let _ = resp.send(snapshots.list());
         }
-        Request::DumpState { resp } => {
-            let res = node.dump_state_to_json();
-            let _ = resp.send(res);
+        Request::RestoreSnapshot { id, resp } => {
+            let _ = resp.send(snapshots.restore(node, &id));
         }
-        Request::LoadState { json, resp } => {
-            let res = node.load_state_from_json(&json);
-            if res.is_ok() {
-                checkpoints.clear();
-            }
-            let _ = resp.send(res);
+        Request::DeleteSnapshot { id, resp } => {
+            let _ = resp.send(snapshots.delete(&id));
         }
-        Request::CreateCheckpoint { name, force, resp } => {
-            let res = checkpoints.create(node, name, force);
-            let _ = resp.send(res);
+        Request::ExportSnapshot { id, resp } => {
+            let _ = resp.send(snapshots.export(&id));
         }
-        Request::ListCheckpoints { resp } => {
-            let res = Ok(checkpoints.list());
-            let _ = resp.send(res);
-        }
-        Request::RestoreCheckpoint { name, resp } => {
-            let res = checkpoints.restore(node, name);
-            let _ = resp.send(res);
-        }
-        Request::DeleteCheckpoint { name, resp } => {
-            let res = checkpoints.delete(name);
-            let _ = resp.send(res);
-        }
-        Request::ClearCheckpoints { resp } => {
-            let res = Ok(checkpoints.clear());
-            let _ = resp.send(res);
-        }
-        Request::ExportCheckpoint { name, resp } => {
-            let res = checkpoints.export(name);
-            let _ = resp.send(res);
-        }
-        Request::ImportCheckpoint {
-            name,
-            json,
-            force,
-            resp,
-        } => {
-            let res = checkpoints.import(&json, name, force);
-            let _ = resp.send(res);
+        Request::ImportSnapshot { name, json, resp } => {
+            let _ = resp.send(snapshots.import(&json, name));
         }
         Request::MineBlocks { count, resp } => {
             let res = handle_mine_blocks(node, count, *mining_mode);

@@ -85,6 +85,7 @@ export function CodeViewer({
   const code = trimFinalNewline(activeFile.content)
   const activePath = normalizeFilePath(activeFile.path)
   const entrypointPath = normalizeFilePath(entrypointFile?.path ?? entrypoint ?? "")
+  const treeToggleLabel = isDesktopTreeVisible ? "Hide source files" : "Show source files"
 
   const selectFile = (path: string) => {
     setSelectedPath(path)
@@ -127,33 +128,25 @@ export function CodeViewer({
     >
       {isDesktopTreeVisible && (
         <aside className={cx(styles.fileTree, styles.desktopFileTree)} aria-label="Source files">
-          <Tooltip content="Hide source files">
-            <button
-              type="button"
-              className={styles.desktopTreeToggle}
-              aria-label="Hide source files"
-              onClick={() => setDesktopTreeVisible(false)}
-            >
-              <PanelLeftClose aria-hidden="true" />
-            </button>
-          </Tooltip>
           {fileTree}
         </aside>
       )}
       <div className={styles.codePane}>
         <div className={styles.codePaneHeader}>
-          {!isDesktopTreeVisible && (
-            <Tooltip content="Show source files">
-              <button
-                type="button"
-                className={styles.desktopTreeExpand}
-                aria-label="Show source files"
-                onClick={() => setDesktopTreeVisible(true)}
-              >
+          <Tooltip content={treeToggleLabel}>
+            <button
+              type="button"
+              className={styles.desktopTreeToggle}
+              aria-label={treeToggleLabel}
+              onClick={() => setDesktopTreeVisible(visible => !visible)}
+            >
+              {isDesktopTreeVisible ? (
+                <PanelLeftClose aria-hidden="true" />
+              ) : (
                 <PanelLeftOpen aria-hidden="true" />
-              </button>
-            </Tooltip>
-          )}
+              )}
+            </button>
+          </Tooltip>
           <button
             type="button"
             className={cx(styles.mobileTreeToggle, isMobileTreeOpen && styles.mobileTreeToggleOpen)}

@@ -5,7 +5,7 @@ import {EmulatePage} from "@acton/explorer-core/pages/EmulatePage"
 
 import styles from "./CatalogPages.module.css"
 
-function ExplorerToolHeader({title}: {readonly title: string}) {
+export function ExplorerToolHeader({title}: {readonly title: string}) {
   return (
     <section className={`${styles.container} ${styles.toolHeader}`}>
       <ExplorerBreadcrumbs items={[{label: title}]} />

@@ -2,6 +2,7 @@ import {
   Checkbox,
   CountValue,
   CopyInlineAction,
+  Disclosure,
   EmptyState,
   HighlightedCode,
   Input,
@@ -23,6 +24,8 @@ import {useCallback, useDeferredValue, useEffect, useRef, useState, type FC} fro
 
 import type {ExtendedContractABI} from "../api/compilerAbi"
 import {getBundledCompilerAbiCatalog} from "../api/compilerAbiCatalog"
+import {formatAddress} from "../components/utils"
+import {useAddressFormat} from "../hooks/useNetworkInfo"
 import {type ExplorerNavigationClickEvent, useOpenExplorerPath} from "../hooks/useOpenExplorerPath"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
@@ -94,7 +97,11 @@ const EMPTY_CELL_INSPECTOR_DRAFT: CellInspectorDraft = {
   customTlbEnabled: false,
 }
 
-export const CellInspectorPage: FC = () => {
+interface CellInspectorPageProps {
+  readonly getVerificationUrl?: (codeHash: string) => string
+}
+
+export const CellInspectorPage: FC<CellInspectorPageProps> = ({getVerificationUrl}) => {
   const metadataRegistry = useMetadataRegistry()
   const resolveVerifiedSourceByCodeHash = useCallback(
     async (codeHash: string): Promise<ContractVerifiedSource | undefined> => {
@@ -335,6 +342,7 @@ export const CellInspectorPage: FC = () => {
               onTabChange={setActiveTab}
               disassembly={disassembly}
               resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
+              getVerificationUrl={getVerificationUrl}
             />
           ) : null}
         </section>
@@ -373,88 +381,107 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
   customTlbEnabled,
   onCustomTlbChange,
   onCustomTlbEnabledChange,
-}) => (
-  <section className={styles.inputPanel}>
-    <div className={`${styles.textareaField} ${styles.cellField}`}>
-      <textarea
-        id="cell-inspector-input"
-        aria-label="Cell input"
-        className={styles.cellInput}
-        value={input}
-        onChange={event => onInputChange(event.target.value)}
-        placeholder="te6cc… or b5ee9c72…"
-        spellCheck={false}
-        autoCapitalize="off"
-        autoComplete="off"
-      />
-      <span className={styles.fieldHint}>Paste Base64, hex, a ton:// URL, or an explorer link</span>
-    </div>
+}) => {
+  const [optionsOpen, setOptionsOpen] = useState(readCellInspectorOptionsOpen)
 
-    <div className={styles.optionsGrid}>
-      <Input
-        className={styles.numberInput}
-        label="Root"
-        type="number"
-        min={0}
-        max={rootCount === undefined ? undefined : Math.max(0, rootCount - 1)}
-        disabled={rootCount === 1}
-        value={rootIndex}
-        onChange={event => onRootIndexChange(nonNegativeInteger(event.target.value, 0))}
-        description={
-          rootCount === undefined ? (
-            "0-based index"
-          ) : (
-            <>
-              <CountValue singular="root" value={rootCount} /> available
-            </>
-          )
-        }
-      />
-      <Input
-        className={styles.numberInput}
-        label="Tree depth"
-        type="number"
-        min={0}
-        max={128}
-        value={maxDepth}
-        onChange={event => onMaxDepthChange(boundedInteger(event.target.value, 8, 0, 128))}
-        description="Raw depth limit"
-      />
-    </div>
+  return (
+    <section className={styles.inputPanel}>
+      <div className={styles.inputHeader}>
+        <div className={styles.provenanceTitle}>Input</div>
+        <div className={styles.provenanceMeta}>Base64, hex, a ton:// URL, or an explorer link</div>
+      </div>
+      <div className={`${styles.textareaField} ${styles.cellField}`}>
+        <textarea
+          id="cell-inspector-input"
+          aria-label="Cell input"
+          className={styles.cellInput}
+          value={input}
+          onChange={event => onInputChange(event.target.value)}
+          placeholder="te6cc… or b5ee9c72…"
+          spellCheck={false}
+          autoCapitalize="off"
+          autoComplete="off"
+        />
+      </div>
 
-    <Checkbox
-      className={styles.strictOption}
-      label="Strict parsing"
-      description="Require full cell consumption"
-      checked={strict}
-      onChange={event => onStrictChange(event.currentTarget.checked)}
-    />
-
-    <div className={styles.customTlbSection}>
-      <Checkbox
-        label="Use custom TL-B schema"
-        description="Ignore ABI and automatic detection"
-        checked={customTlbEnabled}
-        onChange={event => onCustomTlbEnabledChange(event.currentTarget.checked)}
-      />
-      {customTlbEnabled && (
-        <label className={styles.textareaField} htmlFor="cell-inspector-custom-tlb">
-          <span className={styles.fieldLabel}>Schema</span>
-          <span className={styles.fieldHint}>Applied to the selected root</span>
-          <textarea
-            id="cell-inspector-custom-tlb"
-            aria-label="Custom TL-B schema"
-            className={styles.tlbInput}
-            value={customTlb}
-            onChange={event => onCustomTlbChange(event.target.value)}
-            placeholder="message#1234 value:uint32 = Message;"
-            spellCheck={false}
+      <Disclosure
+        className={styles.optionsDisclosure}
+        contentClassName={styles.optionsDisclosureContent}
+        label="Parsing options"
+        open={optionsOpen}
+        onToggle={event => {
+          const open = event.currentTarget.open
+          setOptionsOpen(open)
+          replaceCellInspectorOptionsQuery(open)
+        }}
+      >
+        <div className={styles.optionsGrid}>
+          <Input
+            className={styles.numberInput}
+            label="Root"
+            type="number"
+            min={0}
+            max={rootCount === undefined ? undefined : Math.max(0, rootCount - 1)}
+            disabled={rootCount === 1}
+            value={rootIndex}
+            onChange={event => onRootIndexChange(nonNegativeInteger(event.target.value, 0))}
+            description={
+              rootCount === undefined ? (
+                "0-based index"
+              ) : (
+                <>
+                  <CountValue singular="root" value={rootCount} /> available
+                </>
+              )
+            }
           />
-        </label>
-      )}
-    </div>
-  </section>
-)
+          <Input
+            className={styles.numberInput}
+            label="Tree depth"
+            type="number"
+            min={0}
+            max={128}
+            value={maxDepth}
+            onChange={event => onMaxDepthChange(boundedInteger(event.target.value, 8, 0, 128))}
+            description="Raw depth limit"
+          />
+        </div>
+
+        <Checkbox
+          className={styles.strictOption}
+          label="Strict parsing"
+          description="Require full cell consumption"
+          checked={strict}
+          onChange={event => onStrictChange(event.currentTarget.checked)}
+        />
+
+        <div className={styles.customTlbSection}>
+          <Checkbox
+            label="Use custom TL-B schema"
+            description="Ignore ABI and automatic detection"
+            checked={customTlbEnabled}
+            onChange={event => onCustomTlbEnabledChange(event.currentTarget.checked)}
+          />
+          {customTlbEnabled && (
+            <label className={styles.textareaField} htmlFor="cell-inspector-custom-tlb">
+              <span className={styles.fieldLabel}>Schema</span>
+              <span className={styles.fieldHint}>Applied to the selected root</span>
+              <textarea
+                id="cell-inspector-custom-tlb"
+                aria-label="Custom TL-B schema"
+                className={styles.tlbInput}
+                value={customTlb}
+                onChange={event => onCustomTlbChange(event.target.value)}
+                placeholder="message#1234 value:uint32 = Message;"
+                spellCheck={false}
+              />
+            </label>
+          )}
+        </div>
+      </Disclosure>
+    </section>
+  )
+}
 
 async function inspectCell({
   input,
@@ -615,6 +642,7 @@ function ResultOutput({
   onTabChange,
   disassembly,
   resolveVerifiedSourceByCodeHash,
+  getVerificationUrl,
 }: {
   readonly result: CellInspectorParseResult
   readonly loading: boolean
@@ -624,6 +652,7 @@ function ResultOutput({
   readonly resolveVerifiedSourceByCodeHash: (
     codeHash: string,
   ) => Promise<ContractVerifiedSource | undefined>
+  readonly getVerificationUrl?: (codeHash: string) => string
 }) {
   if (result.status === "error") {
     return <ErrorOutput message={result.error.message} cause={result.error.cause} />
@@ -743,6 +772,7 @@ function ResultOutput({
           <CodeOutput
             state={disassembly}
             resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
+            getVerificationUrl={getVerificationUrl}
           />
         )}
         {visibleActiveTab === "boc" && <BocOutput result={result} />}
@@ -754,17 +784,26 @@ function ResultOutput({
 function ParsedOutput({result}: {readonly result: ParsedInspectionResult}) {
   const routes = useExplorerRoutePaths()
   const openExplorerPath = useOpenExplorerPath()
+  const addressFormat = useAddressFormat()
   const handleContractClick = useCallback(
     (address: string, event?: ExplorerNavigationClickEvent) => {
       openExplorerPath(routes.addressPath(address), event)
     },
     [openExplorerPath, routes],
   )
+  const formatParsedAddress = useCallback(
+    (address: string) => formatAddress(address, false, addressFormat),
+    [addressFormat],
+  )
 
-  if (result.abiValue) {
+  if (result.parsedValue) {
     return (
       <div className={styles.parsedValue}>
-        <ParsedValueView value={result.abiValue} onContractClick={handleContractClick} />
+        <ParsedValueView
+          value={result.parsedValue}
+          formatAddress={formatParsedAddress}
+          onContractClick={handleContractClick}
+        />
       </div>
     )
   }
@@ -807,11 +846,13 @@ function CodeBlock({
 function CodeOutput({
   state,
   resolveVerifiedSourceByCodeHash,
+  getVerificationUrl,
 }: {
   readonly state: DisassemblyState
   readonly resolveVerifiedSourceByCodeHash: (
     codeHash: string,
   ) => Promise<ContractVerifiedSource | undefined>
+  readonly getVerificationUrl?: (codeHash: string) => string
 }) {
   if (state.loading) {
     return (
@@ -836,6 +877,7 @@ function CodeOutput({
           : undefined
       }
       resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
+      verificationUrl={state.codeHash ? getVerificationUrl?.(state.codeHash) : undefined}
     />
   )
 }
@@ -911,6 +953,8 @@ function provenanceSourceLabel(source: string): string {
       return "Custom TL-B"
     case "ton-standard":
       return "TON comment"
+    case "ton-domain":
+      return "TON protocol"
     case "canonical-block-tlb":
       return "TON block format"
     default:
@@ -944,17 +988,30 @@ function cellQueryValue(result: CellInspectorParseResult): string | undefined {
 }
 
 function replaceCellQuery(cell?: string): void {
+  replaceCellInspectorQueryParameter("cell", cell)
+}
+
+function readCellInspectorOptionsOpen(): boolean {
+  if (typeof globalThis.location === "undefined") return false
+  return new URLSearchParams(globalThis.location.search).get("options") === "open"
+}
+
+function replaceCellInspectorOptionsQuery(open: boolean): void {
+  replaceCellInspectorQueryParameter("options", open ? "open" : undefined)
+}
+
+function replaceCellInspectorQueryParameter(name: "cell" | "options", value?: string): void {
   if (typeof globalThis.location === "undefined" || typeof globalThis.history === "undefined") {
     return
   }
 
   const url = new URL(globalThis.location.href)
-  if ((url.searchParams.get("cell") ?? undefined) === cell) return
+  if ((url.searchParams.get(name) ?? undefined) === value) return
 
-  if (cell) {
-    url.searchParams.set("cell", cell)
+  if (value) {
+    url.searchParams.set(name, value)
   } else {
-    url.searchParams.delete("cell")
+    url.searchParams.delete(name)
   }
   globalThis.history.replaceState(
     globalThis.history.state,

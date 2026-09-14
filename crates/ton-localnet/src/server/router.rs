@@ -1,26 +1,26 @@
 use super::handlers::utils::get_extra;
 use super::handlers::{
-    change_account_state, clear_checkpoints, create_checkpoint, delete_checkpoint, detect_address,
-    detect_hash, dump_state, emulate_ton_connect_v1, emulate_trace_v1, estimate_fee_v3,
-    export_checkpoint, faucet, get_account_states_v3, get_address_balance, get_address_book_v3,
-    get_address_information, get_address_information_v3, get_address_state,
-    get_adjacent_transactions_v3, get_block, get_block_header, get_block_post,
-    get_block_transactions, get_block_transactions_ext, get_blocks_v3, get_config_all,
-    get_config_param, get_consensus_block, get_dns_records, get_extended_address_information,
-    get_jetton_burns, get_jetton_masters, get_jetton_transfers, get_jetton_wallets, get_libraries,
-    get_masterchain_block_shard_state_v3, get_masterchain_block_shards_v3, get_masterchain_info,
-    get_masterchain_info_v3, get_messages_v3, get_metadata_v3, get_multisig_orders,
-    get_multisig_wallets, get_nft_collections, get_nft_items, get_nft_sales, get_nft_transfers,
-    get_out_msg_queue_size, get_pending_actions_v3, get_pending_traces_v3,
-    get_pending_transactions_v3, get_shard_account_cell, get_shards, get_startup_accounts,
-    get_status, get_token_data, get_top_accounts_by_balance_v3, get_traces, get_transactions,
+    change_account_state, create_snapshot, delete_snapshot, detect_address, detect_hash,
+    emulate_ton_connect_v1, emulate_trace_v1, estimate_fee_v3, export_snapshot, faucet,
+    get_account_states_v3, get_address_balance, get_address_book_v3, get_address_information,
+    get_address_information_v3, get_address_state, get_adjacent_transactions_v3, get_block,
+    get_block_header, get_block_post, get_block_transactions, get_block_transactions_ext,
+    get_blocks_v3, get_config_all, get_config_param, get_consensus_block, get_dns_records,
+    get_extended_address_information, get_jetton_burns, get_jetton_masters, get_jetton_transfers,
+    get_jetton_wallets, get_libraries, get_masterchain_block_shard_state_v3,
+    get_masterchain_block_shards_v3, get_masterchain_info, get_masterchain_info_v3,
+    get_messages_v3, get_metadata_v3, get_multisig_orders, get_multisig_wallets,
+    get_nft_collections, get_nft_items, get_nft_sales, get_nft_transfers, get_out_msg_queue_size,
+    get_pending_actions_v3, get_pending_traces_v3, get_pending_transactions_v3,
+    get_shard_account_cell, get_shards, get_startup_accounts, get_status, get_token_data,
+    get_top_accounts_by_balance_v3, get_traces, get_transactions,
     get_transactions_by_masterchain_block_v3, get_transactions_by_message_v3, get_transactions_std,
     get_transactions_v3, get_verified_source, get_vesting, get_wallet_information,
-    get_wallet_information_v3, get_wallet_states_v3, import_checkpoint, increase_time,
-    jetton_faucet, json_rpc, list_checkpoints, load_state, lookup_block, mine_blocks, pack_address,
-    restore_checkpoint, run_get_method, run_get_method_std, run_get_method_v3, send_boc,
-    send_boc_return_hash, send_internal_message, send_message_v3, set_config, set_config_param,
-    set_mining_mode, set_network_conditions, set_next_block_timestamp, set_shard_account, set_time,
+    get_wallet_information_v3, get_wallet_states_v3, import_snapshot, increase_time, jetton_faucet,
+    json_rpc, list_snapshots, lookup_block, mine_blocks, pack_address, restore_snapshot,
+    run_get_method, run_get_method_std, run_get_method_v3, send_boc, send_boc_return_hash,
+    send_internal_message, send_message_v3, set_config, set_config_param, set_mining_mode,
+    set_network_conditions, set_next_block_timestamp, set_shard_account, set_time,
     source_trace::build_source_trace, streaming_sse, streaming_ws, try_locate_result_tx,
     try_locate_source_tx, try_locate_tx, unpack_address,
 };
@@ -186,20 +186,14 @@ pub fn create_router(state: ServerState) -> Router {
         .route("/acton_fundJetton", post(jetton_faucet))
         .route("/acton_getVerifiedSource", get(get_verified_source))
         .route("/acton_buildSourceTrace", post(build_source_trace))
-        .route("/acton_dumpState", get(dump_state))
+        .route("/acton_createSnapshot", post(create_snapshot))
+        .route("/acton_listSnapshots", get(list_snapshots))
+        .route("/acton_restoreSnapshot", post(restore_snapshot))
+        .route("/acton_deleteSnapshot", post(delete_snapshot))
+        .route("/acton_exportSnapshot", get(export_snapshot))
         .route(
-            "/acton_loadState",
-            post(load_state).layer(DefaultBodyLimit::max(256 * 1024 * 1024)),
-        )
-        .route("/acton_createCheckpoint", post(create_checkpoint))
-        .route("/acton_listCheckpoints", get(list_checkpoints))
-        .route("/acton_restoreCheckpoint", post(restore_checkpoint))
-        .route("/acton_deleteCheckpoint", post(delete_checkpoint))
-        .route("/acton_clearCheckpoints", post(clear_checkpoints))
-        .route("/acton_exportCheckpoint", get(export_checkpoint))
-        .route(
-            "/acton_importCheckpoint",
-            post(import_checkpoint).layer(DefaultBodyLimit::max(256 * 1024 * 1024)),
+            "/acton_importSnapshot",
+            post(import_snapshot).layer(DefaultBodyLimit::max(256 * 1024 * 1024)),
         )
         .route("/acton_setConfig", post(set_config))
         .route("/acton_setConfigParam", post(set_config_param))

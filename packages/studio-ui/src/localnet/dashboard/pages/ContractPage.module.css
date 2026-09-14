@@ -311,7 +311,7 @@
 
 .abiViewer {
   min-height: 24rem;
-  background: var(--acton-color-surface-raised);
+  background: var(--acton-color-surface);
 }
 
 .artifactEmpty {

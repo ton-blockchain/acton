@@ -15,7 +15,7 @@ target/
 /libraries.toml
 /.env
 /config.toml
-/verifier-index.sqlite3
-/verifier-index.sqlite3-*
+*.sqlite3-*
+*.sqlite3
 .playwright-mcp/
 /.codegraph/

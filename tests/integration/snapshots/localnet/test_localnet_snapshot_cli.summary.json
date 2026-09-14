@@ -1,0 +1,37 @@
+{
+  "created": {
+    "ok": true,
+    "result": {
+      "block_seqno": 0,
+      "has_created_at": true,
+      "has_id": true,
+      "has_size": true,
+      "name": "stable"
+    }
+  },
+  "empty_after_delete": [],
+  "export_requires_force": true,
+  "exported": true,
+  "failed_export_preserves_file": true,
+  "import_gets_new_id": true,
+  "restore_preserves_inventory": {
+    "ok": true,
+    "result": [
+      {
+        "block_seqno": 0,
+        "has_created_at": true,
+        "has_id": true,
+        "has_size": true,
+        "name": "imported"
+      },
+      {
+        "block_seqno": 0,
+        "has_created_at": true,
+        "has_id": true,
+        "has_size": true,
+        "name": "stable"
+      }
+    ]
+  },
+  "restored_import": true
+}

@@ -1,7 +1,9 @@
 import {describe, expect, test} from "bun:test"
 
 import type {JettonWallet} from "../src/api/types"
-import {sortJettonWalletsByAmount} from "../src/api/jettonWallets"
+import {sortJettonWalletsForDisplay} from "../src/api/jettonWallets"
+
+const USDT_MASTER = "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
 
 describe("Jetton wallet amounts", () => {
   test("sorts large balances exactly across token decimal scales", () => {
@@ -12,7 +14,7 @@ describe("Jetton wallet amounts", () => {
       wallet("one-a", "1", "0", "A"),
     ]
 
-    expect(sortJettonWalletsByAmount(wallets).map(item => item.address)).toMatchInlineSnapshot(`
+    expect(sortJettonWalletsForDisplay(wallets).map(item => item.address)).toMatchInlineSnapshot(`
       [
         "larger",
         "smaller",
@@ -21,18 +23,40 @@ describe("Jetton wallet amounts", () => {
       ]
     `)
   })
+
+  test("keeps mainnet USD₮ first when it is present", () => {
+    const wallets = [
+      wallet("large", "1000000000000", "6", "LARGE"),
+      wallet("usdt", "1", "6", "USD₮", USDT_MASTER),
+      wallet("medium", "1000000", "6", "MEDIUM"),
+    ]
+
+    expect(sortJettonWalletsForDisplay(wallets).map(item => item.address)).toMatchInlineSnapshot(`
+      [
+        "usdt",
+        "large",
+        "medium",
+      ]
+    `)
+  })
 })
 
-function wallet(address: string, balance: string, decimals: string, symbol: string): JettonWallet {
+function wallet(
+  address: string,
+  balance: string,
+  decimals: string,
+  symbol: string,
+  jetton = `master-${address}`,
+): JettonWallet {
   return {
     address,
     balance,
     code_hash: "",
     data_hash: "",
-    jetton: `master-${address}`,
+    jetton,
     last_transaction_lt: "0",
     master: {
-      address: `master-${address}`,
+      address: jetton,
       jetton_content: {decimals, symbol},
     },
     owner: "owner",

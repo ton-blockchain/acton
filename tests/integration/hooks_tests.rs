@@ -89,8 +89,8 @@ fn test_hooks_new_empty_non_interactive() {
 
     output.assert_snapshot_matches("integration/snapshots/hooks/test_hooks_new_empty.stdout.txt");
     output.assert_file_snapshot_matches(
-        ".githooks/pre-commit",
-        "integration/snapshots/hooks/test_hooks_new_empty.pre-commit.txt",
+        ".githooks/pre-push",
+        "integration/snapshots/hooks/test_hooks_new_empty.hook.txt",
     );
 }
 
@@ -104,15 +104,150 @@ fn test_hooks_new_default_non_interactive() {
         .current_dir(project.path())
         .arg("hooks")
         .arg("new")
-        .arg("--template")
-        .arg("default")
         .run()
         .success();
 
     output.assert_snapshot_matches("integration/snapshots/hooks/test_hooks_new_default.stdout.txt");
     output.assert_file_snapshot_matches(
-        ".githooks/pre-commit",
-        "integration/snapshots/hooks/test_hooks_new_default.pre-commit.txt",
+        ".githooks/pre-push",
+        "integration/snapshots/hooks/test_hooks_new_default.hook.txt",
+    );
+}
+
+#[test]
+fn test_hooks_new_creates_only_selected_hook() {
+    use std::fmt::Write as _;
+
+    let mut report = String::new();
+    for hook in ["pre-push", "pre-commit"] {
+        for template in ["default", "empty"] {
+            let project = ProjectBuilder::new(&format!("hooks-{hook}-{template}")).build();
+            init_git_repo(project.path());
+            let output = project
+                .acton()
+                .current_dir(project.path())
+                .arg("hooks")
+                .arg("new")
+                .arg("--hook")
+                .arg(hook)
+                .arg("--template")
+                .arg(template)
+                .run()
+                .success();
+
+            output.assert_file_snapshot_matches(
+                &format!(".githooks/{hook}"),
+                &format!("integration/snapshots/hooks/test_hooks_new_{template}.hook.txt"),
+            );
+            let mut files = fs::read_dir(project.path().join(".githooks"))
+                .unwrap()
+                .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+                .collect::<Vec<_>>();
+            files.sort();
+            writeln!(
+                report,
+                "{hook}, {template}: {files:?}\n{}",
+                output.get_stdout()
+            )
+            .unwrap();
+        }
+    }
+
+    crate::common::assertion().eq(
+        report.trim_end(),
+        snapbox::file!["snapshots/hooks/test_hooks_new_selected_hook.txt"],
+    );
+}
+
+#[test]
+fn test_hooks_new_rejects_invalid_hook() {
+    let project = ProjectBuilder::new("hooks-invalid-hook").build();
+    project
+        .acton()
+        .arg("hooks")
+        .arg("new")
+        .arg("--hook")
+        .arg("post-commit")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/hooks/test_hooks_new_invalid_hook.stderr.txt",
+        );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_default_hook_requires_acton_and_propagates_failures() {
+    use std::fmt::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+
+    let mut report = String::new();
+    for hook in ["pre-push", "pre-commit"] {
+        // Regression for #1065: missing tools must explain the Git environment without skipping checks.
+        let project = ProjectBuilder::new(&format!("hooks-execution-{hook}"))
+            .raw_file(
+                "hook bin/acton",
+                r#"#!/bin/sh
+printf '%s\n' "$*"
+case "$1" in
+    check) exit "$ACTON_HOOK_TEST_CHECK_EXIT" ;;
+    fmt) exit "$ACTON_HOOK_TEST_FMT_EXIT" ;;
+    *) exit 99 ;;
+esac
+"#,
+            )
+            .build();
+        init_git_repo(project.path());
+        project
+            .acton()
+            .current_dir(project.path())
+            .arg("hooks")
+            .arg("new")
+            .arg("--hook")
+            .arg(hook)
+            .arg("--template")
+            .arg("default")
+            .run()
+            .success();
+
+        let bin_dir = project.path().join("hook bin");
+        fs::set_permissions(bin_dir.join("acton"), fs::Permissions::from_mode(0o755))
+            .expect("fake Acton must be executable");
+
+        for (scenario, missing_acton, check_exit, fmt_exit) in [
+            ("missing Acton", true, 0, 0),
+            ("check failed", false, 41, 0),
+            ("fmt failed", false, 0, 42),
+            ("success", false, 0, 0),
+        ] {
+            let output = Command::new(project.path().join(".githooks").join(hook))
+                .current_dir(project.path())
+                .env(
+                    "PATH",
+                    if missing_acton {
+                        project.path().join("missing-bin")
+                    } else {
+                        bin_dir.clone()
+                    },
+                )
+                .env("ACTON_HOOK_TEST_CHECK_EXIT", check_exit.to_string())
+                .env("ACTON_HOOK_TEST_FMT_EXIT", fmt_exit.to_string())
+                .output()
+                .expect("generated hook must run");
+            writeln!(
+                report,
+                "{hook}: {scenario}\nexit: {}\nstdout:\n{}stderr:\n{}",
+                output.status.code().expect("hook must exit normally"),
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr),
+            )
+            .expect("hook report must be writable");
+        }
+    }
+
+    crate::common::assertion().eq(
+        report.trim_end(),
+        snapbox::file!["snapshots/hooks/test_default_hook_execution.txt"],
     );
 }
 
@@ -132,14 +267,16 @@ fn test_hooks_new_interactive_defaults_to_default() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(10)));
 
+    session.expect("Git hooks:");
+    session.send_line("", "failed to select default pre-push hook");
     session.expect("Hooks template:");
     session.send_line("", "failed to select default hooks template");
-    session.expect("Created default hooks scaffold in .githooks");
+    session.expect("Created default pre-push hook in .githooks");
     session.expect(Eof);
 
     session.assert_file_snapshot_matches(
-        ".githooks/pre-commit",
-        "integration/snapshots/hooks/test_hooks_new_default.pre-commit.txt",
+        ".githooks/pre-push",
+        "integration/snapshots/hooks/test_hooks_new_default.hook.txt",
     );
 }
 
@@ -163,6 +300,31 @@ fn test_hooks_new_fails_when_githooks_exists() {
         .assert_stderr_snapshot_matches(
             "integration/snapshots/hooks/test_hooks_new_existing_pre_commit.stderr.txt",
         );
+}
+
+#[test]
+fn test_hooks_new_preserves_existing_pre_push() {
+    let project = ProjectBuilder::new("hooks-existing-pre-push")
+        .raw_file(".githooks/pre-push", "#!/bin/sh\necho custom checks\n")
+        .build();
+    init_git_repo(project.path());
+
+    let output = project
+        .acton()
+        .current_dir(project.path())
+        .arg("hooks")
+        .arg("new")
+        .arg("--hook")
+        .arg("pre-commit")
+        .run()
+        .failure();
+    output.assert_stderr_snapshot_matches(
+        "integration/snapshots/hooks/test_hooks_new_existing_pre_push.stderr.txt",
+    );
+    output.assert_file_snapshot_matches(
+        ".githooks/pre-push",
+        "integration/snapshots/hooks/test_hooks_new_existing_pre_push.hook.txt",
+    );
 }
 
 #[test]
@@ -271,8 +433,8 @@ fn test_hooks_new_uses_auto_detected_project_root_from_nested_directory() {
 
     output.assert_snapshot_matches("integration/snapshots/hooks/test_hooks_new_empty.stdout.txt");
     output.assert_file_snapshot_matches(
-        ".githooks/pre-commit",
-        "integration/snapshots/hooks/test_hooks_new_empty.pre-commit.txt",
+        ".githooks/pre-push",
+        "integration/snapshots/hooks/test_hooks_new_empty.hook.txt",
     );
 
     assert!(
@@ -611,7 +773,7 @@ fn test_hooks_uninstall_fails_without_local_git_directory() {
 
 #[cfg(unix)]
 #[test]
-fn test_hooks_new_marks_pre_commit_executable() {
+fn test_hooks_new_marks_pre_push_executable() {
     use std::os::unix::fs::PermissionsExt;
 
     let project = ProjectBuilder::new("hooks-new-executable").build();
@@ -627,10 +789,10 @@ fn test_hooks_new_marks_pre_commit_executable() {
         .run()
         .success();
 
-    let mode = fs::metadata(project.path().join(".githooks/pre-commit"))
-        .expect("pre-commit metadata must exist")
+    let mode = fs::metadata(project.path().join(".githooks/pre-push"))
+        .expect("pre-push metadata must exist")
         .permissions()
         .mode();
 
-    assert_eq!(mode & 0o111, 0o111, "pre-commit must be executable");
+    assert_eq!(mode & 0o111, 0o111, "pre-push must be executable");
 }

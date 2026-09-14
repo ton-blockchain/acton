@@ -415,6 +415,10 @@ their original text.
 
 ## MultiValueInput
 
+Suggestions use the same Base UI autocomplete portal as SearchInput so they stay visible above
+dialog footers and scrolling containers. Keep filtering, keyboard navigation, and popup positioning
+inside this component instead of changing dialog overflow or z-index in callers.
+
 Status: ready
 
 Import:

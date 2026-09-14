@@ -21,6 +21,8 @@ import {useNetworkInfo} from "../hooks/useNetworkInfo"
 
 import {formatAddress, hashToHex, parseAddress, parseTonDnsSearchQuery} from "./utils"
 import type {AddressFormatOptions} from "./utils"
+import {TOKEN_PLACEHOLDER_IMAGE, replaceBrokenImageWithFallback} from "./imageFallbacks"
+import styles from "./ExplorerSearch.module.css"
 
 type ExplorerSearchVariant = "hero" | "header"
 
@@ -56,7 +58,7 @@ const MAX_WORKCHAIN = 2_147_483_647
 const BLOCK_ID_PATTERN =
   /^\s*(?<workchain>-?\d+)\s*(?<separator>[,:])\s*(?<shard>[\da-f]{16})\s*\k<separator>\s*(?<seqno>\d+)\s*$/i
 const INVALID_SEARCH_DESCRIPTION =
-  "Paste a valid TON address, .ton or .t.me name, transaction hash, block ID, or ABI name."
+  "Enter a valid TON address, token, .ton or .t.me name, transaction hash, block ID, or ABI name"
 const OPCODE_NOT_FOUND_DESCRIPTION = "No ABI declaration found for opcode"
 
 export const ExplorerSearch: FC<ExplorerSearchProps> = ({
@@ -247,9 +249,31 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
   const dropdownItems: readonly SearchInputItem[] = [
     ...registryNameMatches.map(match => ({
       id: `registry:${match.address}`,
-      label: match.name,
+      label:
+        match.kind === "token" ? (
+          <span className={styles.tokenLabel}>
+            <span>{match.name}</span>
+            <span className={styles.tokenMeta}>· {match.symbol} · Token</span>
+          </span>
+        ) : (
+          match.name
+        ),
       description: formatAddress(match.address, false, addressFormat),
-      icon: <Search size={16} />,
+      icon:
+        match.kind === "token" ? (
+          <img
+            src={match.image ?? TOKEN_PLACEHOLDER_IMAGE}
+            alt=""
+            className={styles.tokenImage}
+            loading="lazy"
+            onError={event =>
+              replaceBrokenImageWithFallback(event, match.image ? [match.image] : [])
+            }
+          />
+        ) : (
+          <Search size={16} />
+        ),
+      iconClassName: match.kind === "token" ? styles.tokenIcon : undefined,
       onSelect: () =>
         openRegistryNameMatch({
           match,
@@ -300,7 +324,7 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
           setIsInvalid(false)
         }
       }}
-      placeholder="Search by address, .ton name, hash, or block"
+      placeholder="Search by address, token, .ton name, hash, or block"
       size={variant === "header" ? "sm" : "lg"}
       value={input}
     />

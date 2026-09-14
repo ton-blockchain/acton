@@ -40,7 +40,8 @@ fun impl.setConfigParam<T>(value: T, index: int): void {
 
 /// Opaque cursor for step-by-step transaction execution.
 ///
-/// Use [testing.createTraceIterationCursor] to create it,
+/// Use [testing.createTraceIterationCursor] for internal messages or
+/// [testing.createExternalTraceIterationCursor] for external-in messages,
 /// then drain it in parts with [TxCursor.executeN], [TxCursor.executeTill], or [TxCursor.executeAllRemaining].
 struct TxCursor {
     id: int
@@ -96,6 +97,24 @@ fun TxCursor.executeAllRemaining(self): SendResultList {
 /// such as large cascades and interleaving multiple message chains.
 fun testing.createTraceIterationCursor(from: address, message: OutMessage): TxCursor {
     return { id: ffi.startMessageIter(message.messageCell, from.toCell()) };
+}
+
+/// Start step-by-step execution for an external-in message from [net.createExternalMessage].
+///
+/// This emulation-only method queues the message without executing it. Advance the returned
+/// cursor to execute the root transaction and its descendants in batches, or close it to discard pending messages.
+/// The message retains its external source and optional state init; no internal sender is required.
+/// If the contract rejects the message, advancing the cursor fails the test.
+///
+/// Example:
+/// ```tolk
+/// val message = net.createExternalMessage(walletAddress, request);
+/// val cursor = testing.createExternalTraceIterationCursor(message);
+/// val first = cursor.executeN(1);
+/// cursor.close();
+/// ```
+fun testing.createExternalTraceIterationCursor(message: ExternalInMessage): TxCursor {
+    return { id: ffi.startMessageIter(message.messageCell, null) };
 }
 
 /// Send a single message from a specified address.
@@ -309,7 +328,8 @@ fun testing.setRandomSeed(seed: uint256? = null): uint256 {
 /// The setting is scoped to the current emulated world state and affects
 /// subsequent transaction execution paths such as [net.send],
 /// [net.sendExternal], [testing.processSingleTraceStep],
-/// [testing.createTraceIterationCursor], and [testing.runTickTock]. It does not
+/// [testing.createTraceIterationCursor], [testing.createExternalTraceIterationCursor],
+/// and [testing.runTickTock]. It does not
 /// affect get-method calls or broadcast sends to a real network.
 ///
 /// Example:
@@ -578,7 +598,7 @@ fun testing.outActions(): OutActionList {
 fun ffi.sendSingleMessage(msg: cell, from: cell): tuple?
     asm "30 EXTCALL"
 
-fun ffi.startMessageIter(msg: cell, from: cell): int
+fun ffi.startMessageIter(msg: cell, from: cell?): int
     asm "39 EXTCALL"
 
 fun ffi.executeMessageIterN(cursorId: int, n: int): SendResultList

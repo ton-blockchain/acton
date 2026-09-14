@@ -28,7 +28,11 @@ import {type ApiSearchIndexEntry, loadApiSearchIndex} from "./apiSearchIndex"
 import {contentString, matchesQuery} from "./dashboardUtils"
 import styles from "./DashboardPage.module.css"
 import {shortenMiddle} from "@acton/ui"
-import {TOKEN_PLACEHOLDER_IMAGE} from "@acton/explorer-core/components/imageFallbacks"
+import {
+  NFT_PLACEHOLDER_IMAGE,
+  TOKEN_PLACEHOLDER_IMAGE,
+  getNftImageSources,
+} from "@acton/explorer-core/components/imageFallbacks"
 
 interface DashboardSearchOverlayProps {
   readonly client: TonClient
@@ -61,7 +65,7 @@ interface SearchResult {
   readonly workspace?: boolean
   readonly image?: string
   readonly fallbackImage?: string
-  readonly collectionName?: string
+  readonly isNsfw?: boolean
   readonly isScam?: boolean
   readonly capabilities?: readonly EnvironmentCapability[]
 }
@@ -138,7 +142,6 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
   onClose,
   originStyle,
 }) => {
-  const [hiddenNftResultIds, setHiddenNftResultIds] = useState<ReadonlySet<string>>(() => new Set())
   const navigate = useNavigate()
   const addressFormat = useAddressFormat()
   const routes = useExplorerRoutePaths()
@@ -257,9 +260,9 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
           description: collectionName ? `NFT · ${collectionName}` : `NFT · #${item.index}`,
           href: routes.addressPath(item.address),
           icon: Image,
-          image: contentString(item.content, "image"),
-          fallbackImage: TOKEN_PLACEHOLDER_IMAGE,
-          collectionName,
+          image: getNftImageSources(item.content)[0],
+          fallbackImage: NFT_PLACEHOLDER_IMAGE,
+          isNsfw: item.is_nsfw === true,
           isScam: item.is_scam === true,
         })
         if (results.length >= 12) {
@@ -442,7 +445,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
         </div>
 
         <div className={styles.searchResultBody}>
-          {searchResults.filter(result => !hiddenNftResultIds.has(result.id)).length === 0 ? (
+          {searchResults.filter(result => !result.isNsfw).length === 0 ? (
             <div className={styles.searchEmpty}>
               No matches. Paste an address, a transaction hash, or search by API method, token/NFT
               metadata.
@@ -450,7 +453,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
           ) : (
             <div className={styles.searchResultList}>
               {searchResults
-                .filter(result => !hiddenNftResultIds.has(result.id))
+                .filter(result => !result.isNsfw)
                 .map(result => {
                   const Icon = result.icon
 
@@ -488,11 +491,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
                               }
                               alt=""
                               blurredClassName={styles.blurredAssetImage}
-                              collectionName={result.collectionName}
                               blurred={result.isScam}
-                              onNsfw={() => {
-                                setHiddenNftResultIds(current => new Set(current).add(result.id))
-                              }}
                             />
                           )
                         ) : (

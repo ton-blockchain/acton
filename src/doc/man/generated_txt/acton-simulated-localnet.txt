@@ -44,7 +44,8 @@ SUBCOMMANDS
               virtual-clock origin.
 
           --accounts name[,name…]_
-              Wallet names to auto-fund and deploy on startup.
+              Project wallets to initialize and fund with 100 GRAM. Defaults to
+              [localnet].accounts.
 
           --db-path path
               Path to a SQLite database for persistent node state. Defaults to
@@ -57,18 +58,19 @@ SUBCOMMANDS
           --response-delay-ms ms
               Delay TON Center v2/v3 and Emulate API responses.
 
-          --block-interval-ms ms
-              Localnet block production interval.
+          --block-time-ms ms
+              Target interval between automatic blocks, in milliseconds.
+              Ignored when automatic mining is disabled.
 
           --no-mining
               Disable automatic block production. Mine blocks manually with
               acton simulated-localnet mine or POST /acton_mine.
 
-          --load-state path
-              Load Localnet state from a JSON state file before startup.
-
-          --dump-state path
-              Dump Localnet state to a JSON state file on shutdown.
+          --snapshots-dir path
+              Directory for persistent JSON snapshots. Defaults to a .snapshots
+              directory next to the SQLite database, or
+              .acton/simulated-localnet/<port>/snapshots inside the project
+              when no database is configured.
 
           --liteapi
               Start the LiteAPI server on the TCP port immediately after the
@@ -81,9 +83,6 @@ SUBCOMMANDS
           --require-auth
               Require a token for all Localnet HTTP API, control, emulate, and
               streaming endpoints. The server prints the token on startup.
-
-          --load-state cannot be used when a database path comes from either
-          --db-path or [localnet].db-path.
 
    acton simulated-localnet airdrop
        Send GRAM from the local faucet to an address.
@@ -193,48 +192,38 @@ SUBCOMMANDS
               Localnet API token for a server started with --require-auth. If
               omitted, Acton reads ACTON_LOCALNET_AUTH_TOKEN.
 
-   acton simulated-localnet state
-       Transfer the current state of a running localnet as a portable JSON
-       file.
+   acton simulated-localnet snapshot
+       Save and restore persistent JSON snapshots of a localnet.
 
       Synopsis
-          acton simulated-localnet state [options] command
+          acton simulated-localnet snapshot [options] command
 
       Subcommands
-          o  dump <path> downloads the current live state directly to a file
+          o  create [name] saves the current network state
 
-          o  load <path> uploads a state file and replaces the current live
-             state
+          o  list prints saved snapshots with IDs, names, block seqnos, and
+             file sizes
 
-          dump refuses to overwrite an existing file unless --force is passed.
-          A successful load clears all in-memory checkpoints.
+          o  restore <id> restores the saved network state
 
-   acton simulated-localnet checkpoint
-       Manage named in-memory restore points for a running localnet.
+          o  delete <id> deletes one saved snapshot
 
-      Synopsis
-          acton simulated-localnet checkpoint [options] command
+          o  export <id> --out <path> downloads a saved snapshot; --force
+             replaces an existing file
 
-      Subcommands
-          o  create <name> stores the current localnet state as a checkpoint
+          o  import <path> [--name <name>] validates and saves a JSON snapshot
+             under a new ID without restoring it
 
-          o  list prints named checkpoints and their block seqnos
+          Snapshots survive node restarts. Creation and restoration run in the
+          node’s mutation queue without stopping its process. A snapshot
+          includes accounts, block and transaction history, registered
+          metadata, pending messages, and virtual time. Restoration also
+          updates SQLite when persistence is enabled.
 
-          o  restore <name> restores a checkpoint without deleting any
-             checkpoints
-
-          o  delete <name> deletes one checkpoint
-
-          o  clear deletes all checkpoints
-
-          o  export <name> --out <path> downloads a checkpoint as a JSON file
-
-          o  import <path> uploads a JSON file as a checkpoint, using the file
-             stem as the name unless --name is passed
-
-          Relative paths resolve from the Acton project root. These commands
-          call the running localnet control API, so pass --port or --auth-token
-          when the node does not use defaults.
+          Relative file paths resolve from the Acton project root. These
+          commands call the running localnet control API. Pass --port or
+          --auth-token when needed, and --json for structured output. Use the
+          returned ID for restore, delete, and export.
 
 CONFIGURATION
        You can store defaults in Acton.toml:
@@ -247,7 +236,7 @@ CONFIGURATION
            accounts = ["deployer", "user"]
            rate-limit = 1
            response-delay-ms = 300
-           block-interval-ms = 500
+           block-time-ms = 500
            no-mining = false
 
        CLI flags override config values for the current invocation. In
@@ -308,7 +297,7 @@ RUNTIME MODEL
        o  the Localnet UI is available on the root path, for example
           http://127.0.0.1:<port>/
 
-       o  the node produces a block every --block-interval-ms milliseconds,
+       o  the node produces a block every --block-time-ms milliseconds,
           defaults to 500 ms, and still creates empty blocks when no
           transactions are queued
 
@@ -334,7 +323,7 @@ RUNTIME MODEL
 
        o  the UI reads chain data from /api/v2 and /api/v3, and uses acton_*
           control endpoints for local address aliases, registered compiler
-          ABIs, status, state files, and checkpoint tooling
+          ABIs, status and saved snapshots
 
        o  --require-auth protects read and write API routes, including
           read-only streaming endpoints
@@ -352,8 +341,6 @@ RUNTIME MODEL
           the server is running, and GET /acton_nodeInfo reports the current
           value
 
-       o  --dump-state writes a state file during graceful shutdown
-
 CONTROL ENDPOINTS
        The localnet server exposes acton_* control routes for local development
        tooling:
@@ -361,28 +348,22 @@ CONTROL ENDPOINTS
        o  GET /acton_nodeInfo returns uptime, latest block seqno, and the
           active state source
 
-       o  GET /acton_dumpState downloads the current live state as JSON bytes
+       o  POST /acton_createSnapshot with {"name":"before-upgrade"} saves a
+          JSON snapshot
 
-       o  POST /acton_loadState accepts JSON state bytes, replaces the current
-          node state, and clears all checkpoints
+       o  GET /acton_listSnapshots lists saved snapshots
 
-       o  POST /acton_createCheckpoint with {"name":"before-upgrade"} creates a
-          named in-memory checkpoint
+       o  POST /acton_restoreSnapshot with {"id":"<SNAPSHOT_ID>"} restores the
+          saved network state
 
-       o  GET /acton_listCheckpoints lists checkpoints
+       o  POST /acton_deleteSnapshot with {"id":"<SNAPSHOT_ID>"} deletes one
+          saved file
 
-       o  POST /acton_restoreCheckpoint with {"name":"before-upgrade"} restores
-          a checkpoint without deleting it or newer checkpoints
+       o  GET /acton_exportSnapshot?id=<SNAPSHOT_ID> downloads the saved JSON
+          file
 
-       o  POST /acton_deleteCheckpoint deletes one named checkpoint
-
-       o  POST /acton_clearCheckpoints deletes all checkpoints
-
-       o  GET /acton_exportCheckpoint?name=before-upgrade downloads a
-          checkpoint as JSON bytes
-
-       o  POST /acton_importCheckpoint?name=bug accepts JSON state bytes and
-          imports them as a named checkpoint
+       o  POST /acton_importSnapshot?name=bug validates JSON bytes and saves
+          them under a new ID without changing the running state
 
        o  POST /acton_setConfig with {"config":"<BASE64_BOC>"} validates and
           replaces the full blockchain config dictionary, then commits it in a
@@ -436,24 +417,23 @@ PERSISTENCE
        o  --db-path or [localnet].db-path enables persistent SQLite-backed node
           state across runs
 
-       o  --load-state initializes state from a JSON state file and cannot be
-          combined with a database path from either CLI or Acton.toml
+       o  snapshot create saves a persistent restore point as JSON
 
-       o  --dump-state exports a JSON state file on shutdown
+       o  --snapshots-dir sets the directory used for saved snapshots
 
        o  blockchain configs changed through /acton_setConfig or
           /acton_setConfigParam are stored in block history and survive
           restarts when --db-path is configured
 
-       o  when no database path is configured, node state is ephemeral unless
-          loaded or dumped
+       o  without a database, live state is ephemeral; saved snapshots remain
+          available in the snapshot directory
 
 EXIT STATUS
        o  0: The selected localnet subcommand completed successfully. For acton
           simulated-localnet status, this also includes the selected port not
           running; use --json and inspect running for automation.
 
-       o  1: Startup failed because port binding, state loading, remote fork
+       o  1: Startup failed because port binding, database setup, remote fork
           initialization, faucet handling, or a status/control query failed.
 
 DISPLAY OPTIONS
@@ -484,11 +464,9 @@ EXAMPLES
 
               acton simulated-localnet start --fork-net testnet --fork-block-number 55000000
 
-       3. Load and dump JSON state files:
+       3. Use a dedicated snapshot directory:
 
-              acton simulated-localnet start \
-                --load-state states/localnet.json \
-                --dump-state states/localnet.json
+              acton simulated-localnet start --snapshots-dir snapshots
 
        4. Airdrop local funds:
 
@@ -502,14 +480,13 @@ EXAMPLES
 
               acton simulated-localnet status --json
 
-       7. Dump/load state files and manage runtime checkpoints:
+       7. Save and share a snapshot:
 
-              acton simulated-localnet state dump states/localnet.json
-              acton simulated-localnet checkpoint create before-upgrade
-              acton simulated-localnet checkpoint list
-              acton simulated-localnet checkpoint restore before-upgrade
-              acton simulated-localnet checkpoint export before-upgrade --out states/before-upgrade.json
-              acton simulated-localnet checkpoint import states/before-upgrade.json
+              acton simulated-localnet snapshot create before-upgrade
+              acton simulated-localnet snapshot list --json
+              acton simulated-localnet snapshot restore <SNAPSHOT_ID>
+              acton simulated-localnet snapshot export <SNAPSHOT_ID> --out snapshots/before-upgrade.json
+              acton simulated-localnet snapshot import snapshots/before-upgrade.json
 
 SEE ALSO
        o  acton help wallet

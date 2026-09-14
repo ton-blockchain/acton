@@ -36,8 +36,10 @@ Options:
       --app
           Include the template's TypeScript app scaffold when available
 
-      --hooks
-          Create and install the default project-local Git hooks
+      --hooks[=<HOOK>]
+          Create and install a Git hook (default: pre-push)
+          
+          [possible values: pre-push, pre-commit]
 
       --agents
           Include an AGENTS.md file with coding-agent guidance

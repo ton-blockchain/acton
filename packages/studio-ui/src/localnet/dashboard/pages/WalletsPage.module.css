@@ -49,6 +49,12 @@
   display: flex;
 }
 
+.walletBalanceContent {
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--acton-space-3);
+}
+
 .sessionTitle,
 .pickerTitle,
 .permissionTitle,

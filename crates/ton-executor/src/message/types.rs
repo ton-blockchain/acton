@@ -73,8 +73,9 @@ pub struct PrevBlocksInfo {
     pub last_mc_blocks: Vec<PrevBlockId>,
     /// Block used by `PREVKEYBLOCK`.
     pub prev_key_block: PrevBlockId,
-    /// List used by `PREVMCBLOCKS_100`.
-    pub last_mc_blocks_100: Vec<PrevBlockId>,
+    /// List used by `PREVMCBLOCKS_100`, introduced in TVM 9.
+    /// `None` omits the third tuple item, preserving the historical c7 layout.
+    pub last_mc_blocks_100: Option<Vec<PrevBlockId>>,
 }
 
 impl PrevBlocksInfo {
@@ -83,7 +84,7 @@ impl PrevBlocksInfo {
     pub const fn new(
         last_mc_blocks: Vec<PrevBlockId>,
         prev_key_block: PrevBlockId,
-        last_mc_blocks_100: Vec<PrevBlockId>,
+        last_mc_blocks_100: Option<Vec<PrevBlockId>>,
     ) -> Self {
         Self {
             last_mc_blocks,
@@ -95,11 +96,13 @@ impl PrevBlocksInfo {
     /// Serializes previous-blocks info into the base64 stack-entry `BoC` expected by
     /// TON native emulators.
     pub fn to_stack_entry_boc_base64(&self) -> anyhow::Result<String> {
-        let fields = vec![
+        let mut fields = vec![
             block_ids_to_tuple_item(&self.last_mc_blocks),
             block_id_to_tuple(&self.prev_key_block),
-            block_ids_to_tuple_item(&self.last_mc_blocks_100),
         ];
+        if let Some(blocks) = &self.last_mc_blocks_100 {
+            fields.push(block_ids_to_tuple_item(blocks));
+        }
 
         let tuple_item = TupleItem::Tuple(Tuple(fields));
         let mut builder = CellBuilder::new();

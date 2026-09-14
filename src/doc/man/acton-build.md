@@ -20,7 +20,8 @@ dependencies.
 For each successful build, Acton writes a JSON artifact to the build output
 directory. When compiler ABI is available, Acton also writes a contract ABI JSON
 file to the ABI output directory. When the contract config has an `output` path,
-Acton writes the compiled `.boc` file there. Dependency helper files are emitted
+Acton writes the compiled `.boc` file there. Use `--output-boc` to also export
+the code for every built contract into one directory. Dependency helper files are emitted
 into the generated-code directory, and optional Fift output can be written
 separately. Source registration artifacts for local explorer source upload can
 also be written when explicitly configured.
@@ -79,11 +80,14 @@ Optional default output paths can be configured in `[build]`:
 out-dir = "build"
 gen-dir = "gen"
 output-abi = "build/abi"
+output-boc = "build/boc"
 output-fift = "build/fift"
 output-sources = "build/sources"
 ```
 
 CLI flags override config values for the current invocation.
+Relative output paths in the config resolve from the project root.
+Relative output paths in CLI flags resolve from the current working directory.
 For dependency helpers, a per-dependency `depends[].path` still overrides the
 resolved `gen-dir` for that helper file.
 
@@ -95,6 +99,8 @@ Depending on command flags and project configuration, `acton build` may write:
 - `<output-abi>/<contract-name>.json` with ABI from a `.tolk` contract or from
   `types` on a precompiled `.boc` contract
 - the configured contract `output` `.boc` file
+- `<output-boc>/<contract-name>.boc` for compiled `.tolk` contracts and
+  precompiled `.boc` inputs
 - `<gen-dir>/<dependency>.code.tolk` helper files for dependencies by default
   (or a dependency-specific custom path when `depends[].path` is configured)
 - `<output-fift>/<contract-name>.fif` for compiled `.tolk` contracts
@@ -171,6 +177,7 @@ refresh for the current process.
    ```bash
    acton build --out-dir artifacts --gen-dir artifacts/gen \
                                    --output-abi artifacts/abi \
+                                   --output-boc artifacts/boc \
                                    --output-fift artifacts/fift \
                                    --output-sources artifacts/sources
    ```

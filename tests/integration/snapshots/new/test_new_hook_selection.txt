@@ -1,0 +1,3 @@
+--hooks: installed=Some(".githooks"), pre-push=true, pre-commit=false
+--hooks=pre-push: installed=Some(".githooks"), pre-push=true, pre-commit=false
+--hooks=pre-commit: installed=Some(".githooks"), pre-push=false, pre-commit=true

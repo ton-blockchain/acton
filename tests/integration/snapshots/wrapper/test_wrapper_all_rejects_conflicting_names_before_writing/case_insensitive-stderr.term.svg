@@ -1,0 +1,33 @@
+<svg width="740px" height="110px" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .fg { fill: #AAAAAA }
+    .bg { fill: #000000 }
+    .fg-red { fill: #AA0000 }
+    .fg-yellow { fill: #AA5500 }
+    .container {
+      padding: 0 10px;
+      line-height: 18px;
+    }
+    tspan {
+      font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+      white-space: pre;
+      line-height: 18px;
+    }
+  </style>
+
+  <rect width="100%" height="100%" y="0" rx="4.5" class="bg" />
+
+  <text xml:space="preserve" class="container fg">
+    <tspan x="10px" y="28px"><tspan class="fg-red">Error:</tspan><tspan> Contracts </tspan><tspan class="fg-yellow">second</tspan><tspan> and </tspan><tspan class="fg-yellow">third</tspan><tspan> have conflicting wrapper name </tspan><tspan class="fg-yellow">SHAREDNAME</tspan>
+</tspan>
+    <tspan x="10px" y="46px">
+</tspan>
+    <tspan x="10px" y="64px"><tspan>Set distinct </tspan><tspan class="fg-yellow">display-name</tspan><tspan> values in </tspan><tspan class="fg-yellow">Acton.toml</tspan>
+</tspan>
+    <tspan x="10px" y="82px"><tspan>Wrapper names must differ after PascalCase conversion, ignoring case</tspan>
+</tspan>
+    <tspan x="10px" y="100px">
+</tspan>
+  </text>
+
+</svg>

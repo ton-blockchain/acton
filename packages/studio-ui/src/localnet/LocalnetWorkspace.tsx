@@ -1,4 +1,4 @@
-import {Navigate, Route, Routes, useLocation} from "react-router"
+import {Navigate, Route, Routes, useLocation, useNavigate} from "react-router"
 import {Check, KeyRound, ShieldCheck} from "lucide-react"
 import {Dialog, DialogActions, Input} from "@acton/ui"
 import {createObservabilityClient} from "@acton/localton-ui"
@@ -19,17 +19,21 @@ import type {EnvironmentCapability, StudioEnvironment} from "../studioApi"
 import dashboardStyles from "./dashboard/DashboardPage.module.css"
 import {AccountPage} from "@acton/explorer-core/pages/AccountPage"
 import {BlockDetailsPage, BlocksPage} from "@acton/explorer-core/pages/BlocksPage"
+import {AddressConverterPage} from "@acton/explorer-core/pages/AddressConverterPage"
+import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
+import {networkStudioPath} from "../studioRoutes"
 import {CellInspectorPage} from "@acton/explorer-core/pages/CellInspectorPage"
 import {ConfigPage} from "@acton/explorer-core/pages/ConfigPage"
 import {EmulatePage} from "@acton/explorer-core/pages/EmulatePage"
 import {ExplorerIndexPage} from "@acton/explorer-core/pages/ExplorerIndexPage"
 import {FavoriteAccountsPage} from "@acton/explorer-core/pages/FavoriteAccountsPage"
-import {FaucetPage as TestnetFaucetPage} from "@acton/explorer-ui/faucet/FaucetPage"
+import {FaucetPage as TestnetFaucetPage} from "@acton/faucet-ui"
 import {ValidatorsPage} from "@acton/explorer-ui/pages/ValidatorsPage"
 import {SuspendedAddressesPage} from "@acton/explorer-core/pages/SuspendedAddressesPage"
 import {TransactionPage} from "@acton/explorer-core/pages/TransactionPage"
 import {AddressBookProvider} from "@acton/explorer-core/hooks/useAddressBook"
 import {MetadataRegistryProvider} from "@acton/explorer-core/metadata/MetadataRegistryProvider"
+import {verifierVerificationUrl} from "@acton/explorer-core/metadata/verifierRegistry"
 import {FaucetPage} from "./dashboard/pages/FaucetPage"
 import {HomePage} from "./dashboard/pages/HomePage"
 import {NetworkConfigPage} from "./dashboard/pages/NetworkConfigPage"
@@ -73,6 +77,7 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/wallets": "Wallets",
   "/simulator": "Simulator",
   "/cell-inspector": "Cell Inspector",
+  "/address-converter": "Address Converter",
   "/contracts": "Contracts",
   "/contracts/sources": "Sources",
   "/contracts/abi": "ABI",
@@ -106,6 +111,7 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/wallets": "Project wallets available on this network, ready for TON Connect",
   "/simulator": "Build and replay messages against this network",
   "/cell-inspector": "Decode cells and inspect serialized TON data",
+  "/address-converter": "Convert TON addresses and inspect their flags",
   "/contracts": "Track deployed contracts and match them with source artifacts",
   "/contracts/sources": "Manage source artifacts available to contracts on this network",
   "/contracts/abi": "Manage ABI used to decode contract state and messages",
@@ -138,7 +144,6 @@ export interface LocalnetWorkspaceShellState {
   readonly pageDescription: string
   readonly pageTitle: string
   readonly primaryAction?: LocalnetWorkspaceShellAction
-  readonly rpcUrl?: string
 }
 
 export interface LocalnetWorkspaceShellAction {
@@ -202,6 +207,8 @@ const AppContent: FC<AppContentProps> = ({
   onShellChange,
 }) => {
   const runtime = useLocalnetRuntime()
+  const explorerRoutes = useExplorerRoutePaths()
+  const navigate = useNavigate()
   const client = runtime.client
   const observabilityClient = useMemo(
     () =>
@@ -263,10 +270,6 @@ const AppContent: FC<AppContentProps> = ({
     }
     return undefined
   }, [localPathname, openAddContract, runtime.environment])
-  const primaryEndpoint =
-    runtime.environment?.endpoints.apiV3 ??
-    runtime.environment?.endpoints.apiV2 ??
-    runtime.environment?.endpoints.control
   const headerActions =
     localPathname === "/network/config"
       ? configActions
@@ -284,9 +287,8 @@ const AppContent: FC<AppContentProps> = ({
       pageDescription,
       pageTitle,
       primaryAction,
-      rpcUrl: primaryEndpoint ? absoluteUrl(primaryEndpoint) : undefined,
     })
-  }, [onShellChange, pageDescription, pageTitle, primaryAction, primaryEndpoint, headerActions])
+  }, [onShellChange, pageDescription, pageTitle, primaryAction, headerActions])
 
   useEffect(() => {
     if (localPathname !== "/contracts") setIsAddContractOpen(false)
@@ -483,7 +485,12 @@ const AppContent: FC<AppContentProps> = ({
               element={withCapability(
                 "wallets",
                 <DashboardPage>
-                  <WalletsPage client={client} />
+                  <WalletsPage
+                    client={client}
+                    faucetEnabled={
+                      supports(runtime.environment, "testnetFaucet") || runtime.gramFaucetEnabled
+                    }
+                  />
                 </DashboardPage>,
               )}
             />
@@ -776,11 +783,31 @@ const AppContent: FC<AppContentProps> = ({
               )}
             />
             <Route
+              path={path("/address-converter")}
+              element={
+                <DashboardPage embedded>
+                  <AddressConverterPage
+                    onOpenAddress={(address, testOnly) => {
+                      // Raw addresses have no network flag and stay in the current environment.
+                      const target =
+                        testOnly === undefined
+                          ? explorerRoutes.addressPath(address)
+                          : localnetPath(
+                              networkStudioPath(testOnly ? "testnet" : "mainnet"),
+                              `/explorer/address/${encodeURIComponent(address)}`,
+                            )
+                      void navigate(target)
+                    }}
+                  />
+                </DashboardPage>
+              }
+            />
+            <Route
               path={path("/cell-inspector")}
               element={withCapability(
                 "simulator",
                 <DashboardPage embedded>
-                  <CellInspectorPage />
+                  <CellInspectorPage getVerificationUrl={verifierVerificationUrl} />
                 </DashboardPage>,
               )}
             />
@@ -905,14 +932,6 @@ function contractDetailsPageDescription(localPathname: string): string | undefin
   return /^\/contracts\/[^/]+(?:\/(?:abi|raw-abi))?$/.test(localPathname)
     ? "Inspect deployed code, ABI and project artifacts"
     : undefined
-}
-
-function absoluteUrl(value: string): string {
-  try {
-    return new URL(value, globalThis.location.origin).href
-  } catch {
-    return value
-  }
 }
 
 function networkDashboardView(path: "/network" | "/network/nodes" | "/network/validators") {

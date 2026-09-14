@@ -353,7 +353,7 @@ fn test_doc_abi_verifier_contract_by_code_hash_and_cache() {
             .arg("doc")
             .arg("abi")
             .arg(&code_hash_query)
-            .env("ACTON_NEW_VERIFY_BACKEND", &verifier_url)
+            .env("ACTON_VERIFY_BACKEND", &verifier_url)
             .env("ACTON_LOG_DIR", &log_dir)
             .run()
             .success()

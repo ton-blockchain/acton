@@ -1,6 +1,7 @@
 use crate::{AdminOperation, AdminRequest, ImportAccountsRequest};
 
 mod imports;
+mod snapshots;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener as StdTcpListener};
 use std::path::{Path, PathBuf};
@@ -63,7 +64,8 @@ struct LocalEnvironment {
     details: RwLock<StudioEnvironment>,
     driver: EnvironmentDriver,
     child: Mutex<Option<Child>>,
-    lifecycle: Mutex<()>,
+    lifecycle: Arc<Mutex<()>>,
+    snapshot_operation: RwLock<Option<EnvironmentSnapshotOperation>>,
     generation: AtomicU64,
     resume_on_startup: AtomicBool,
     deleted: AtomicBool,
@@ -276,7 +278,8 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 )),
                 driver,
                 child: Mutex::new(None),
-                lifecycle: Mutex::new(()),
+                lifecycle: Arc::new(Mutex::new(())),
+                snapshot_operation: RwLock::new(None),
                 generation: AtomicU64::new(1),
                 resume_on_startup: AtomicBool::new(true),
                 deleted: AtomicBool::new(false),
@@ -806,15 +809,20 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let environment_id = environment_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &environment_id).await?;
-            let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver else {
-                return Err(snapshots_unavailable());
-            };
-            driver
-                .client()
-                .await?
-                .snapshots()
-                .await
-                .map_err(localnet::error)
+            match &environment.driver {
+                EnvironmentDriver::FullTonNetwork(driver) => driver
+                    .client()
+                    .await?
+                    .snapshots()
+                    .await
+                    .map(|snapshots| snapshots.into_iter().map(Into::into).collect())
+                    .map_err(localnet::error),
+                EnvironmentDriver::ActonSimulatedLocalnet { db_path, .. } => {
+                    snapshots::files(db_path, |store| store.list())
+                        .await
+                        .map(|snapshots| snapshots.into_iter().map(Into::into).collect())
+                }
+            }
         })
     }
 
@@ -826,6 +834,19 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let environment_id = environment_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &environment_id).await?;
+            if matches!(
+                environment.driver,
+                EnvironmentDriver::ActonSimulatedLocalnet { .. }
+            ) {
+                return snapshots::start(
+                    Arc::clone(&self.inner),
+                    environment,
+                    crate::environment::EnvironmentSnapshotOperationKind::Create,
+                    request.name,
+                    None,
+                )
+                .await;
+            }
             let _guard = environment.lifecycle.lock().await;
             ensure_environment_not_deleted(&environment).await?;
             let client = full_localnet(&environment)?.client().await?;
@@ -846,6 +867,19 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let snapshot_id = snapshot_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &environment_id).await?;
+            if matches!(
+                environment.driver,
+                EnvironmentDriver::ActonSimulatedLocalnet { .. }
+            ) {
+                return snapshots::start(
+                    Arc::clone(&self.inner),
+                    environment,
+                    crate::environment::EnvironmentSnapshotOperationKind::Restore,
+                    None,
+                    Some(snapshot_id),
+                )
+                .await;
+            }
             let _guard = environment.lifecycle.lock().await;
             ensure_environment_not_deleted(&environment).await?;
             let client = full_localnet(&environment)?.client().await?;
@@ -868,6 +902,11 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let snapshot_id = snapshot_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &environment_id).await?;
+            let _guard = environment.lifecycle.lock().await;
+            ensure_environment_not_deleted(&environment).await?;
+            if let EnvironmentDriver::ActonSimulatedLocalnet { db_path, .. } = &environment.driver {
+                return snapshots::files(db_path, move |store| store.delete(&snapshot_id)).await;
+            }
             let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver else {
                 return Err(snapshots_unavailable());
             };
@@ -881,6 +920,55 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         })
     }
 
+    fn import_snapshot(
+        &self,
+        environment_id: &str,
+        name: Option<String>,
+        json: Vec<u8>,
+    ) -> EnvironmentRuntimeFuture<'_, EnvironmentSnapshot> {
+        let environment_id = environment_id.to_owned();
+
+        Box::pin(async move {
+            let environment = find_environment(&self.inner, &environment_id).await?;
+            let _guard = environment.lifecycle.lock().await;
+            ensure_environment_not_deleted(&environment).await?;
+
+            let EnvironmentDriver::ActonSimulatedLocalnet { db_path, .. } = &environment.driver
+            else {
+                return Err(EnvironmentRuntimeError::Conflict {
+                    code: "snapshot_import_unavailable",
+                    message: "JSON snapshot import is available for simulated environments".into(),
+                });
+            };
+
+            snapshots::files(db_path, move |store| store.import(&json, name))
+                .await
+                .map(Into::into)
+        })
+    }
+
+    fn export_snapshot(
+        &self,
+        environment_id: &str,
+        snapshot_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, Vec<u8>> {
+        let environment_id = environment_id.to_owned();
+        let snapshot_id = snapshot_id.to_owned();
+
+        Box::pin(async move {
+            let environment = find_environment(&self.inner, &environment_id).await?;
+            let EnvironmentDriver::ActonSimulatedLocalnet { db_path, .. } = &environment.driver
+            else {
+                return Err(EnvironmentRuntimeError::Conflict {
+                    code: "snapshot_export_unavailable",
+                    message: "JSON snapshot export is available for simulated environments".into(),
+                });
+            };
+
+            snapshots::files(db_path, move |store| store.export(&snapshot_id)).await
+        })
+    }
+
     fn snapshot_operation(
         &self,
         environment_id: &str,
@@ -888,8 +976,11 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let environment_id = environment_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &environment_id).await?;
-            if !matches!(environment.driver, EnvironmentDriver::FullTonNetwork(_)) {
-                return Err(snapshots_unavailable());
+            if matches!(
+                environment.driver,
+                EnvironmentDriver::ActonSimulatedLocalnet { .. }
+            ) {
+                return Ok(environment.snapshot_operation.read().await.clone());
             }
             Ok(full_localnet(&environment)?
                 .network()
@@ -1054,7 +1145,7 @@ async fn resolve_request(
             accounts,
             rate_limit,
             response_delay_ms,
-            block_interval_ms,
+            block_time_ms,
             no_mining,
             mine_empty_blocks,
         } => {
@@ -1068,13 +1159,11 @@ async fn resolve_request(
                     message: "Fork network is required when a fork block is selected".to_owned(),
                 });
             }
-            if rate_limit == Some(0) || response_delay_ms == Some(0) || block_interval_ms == Some(0)
-            {
+            if rate_limit == Some(0) || response_delay_ms == Some(0) || block_time_ms == Some(0) {
                 return Err(EnvironmentRuntimeError::InvalidRequest {
                     code: "environment_limit_invalid",
-                    message:
-                        "Rate limit, response delay and block interval must be greater than zero"
-                            .to_owned(),
+                    message: "Rate limit, response delay and block time must be greater than zero"
+                        .to_owned(),
                 });
             }
             if no_mining && mine_empty_blocks {
@@ -1096,7 +1185,7 @@ async fn resolve_request(
                     .collect(),
                 rate_limit,
                 response_delay_ms,
-                block_interval_ms,
+                block_time_ms,
                 no_mining,
                 mine_empty_blocks,
             }
@@ -1110,7 +1199,21 @@ async fn resolve_request(
             block_time_ms,
             election_time_seconds,
             mut imported_accounts,
+            accounts,
+            startup_wallets,
         } => {
+            if accounts
+                != startup_wallets
+                    .iter()
+                    .map(|wallet| wallet.name.clone())
+                    .collect::<Vec<_>>()
+            {
+                return Err(EnvironmentRuntimeError::InvalidRequest {
+                    code: "startup_wallet_unresolved",
+                    message: "Startup wallets must be resolved before creating the network"
+                        .to_owned(),
+                });
+            }
             let imported_account_bocs = imported_accounts
                 .iter()
                 .map(|account| {
@@ -1130,6 +1233,7 @@ async fn resolve_request(
                 block_time_ms,
                 election_time_seconds,
                 imported_account_bocs,
+                startup_wallets,
                 ports: acton_localnet::PortOptions {
                     config: config_port,
                     admin: admin_port,
@@ -1341,7 +1445,8 @@ async fn restore_environment(
         )),
         driver,
         child: Mutex::new(child),
-        lifecycle: Mutex::new(()),
+        lifecycle: Arc::new(Mutex::new(())),
+        snapshot_operation: RwLock::new(None),
         generation: AtomicU64::new(1),
         resume_on_startup: AtomicBool::new(record.resume_on_startup),
         deleted: AtomicBool::new(false),
@@ -1490,7 +1595,7 @@ fn spawn_localnet(
         accounts,
         rate_limit,
         response_delay_ms,
-        block_interval_ms,
+        block_time_ms,
         no_mining,
         mine_empty_blocks,
     } = config
@@ -1521,9 +1626,8 @@ fn spawn_localnet(
             .arg("--fork-block-number")
             .arg(fork_block_number.to_string());
     }
-    if !accounts.is_empty() {
-        command.arg("--accounts").arg(accounts.join(","));
-    }
+    // An empty Studio selection must override the CLI's [localnet].accounts defaults too.
+    command.arg("--accounts").arg(accounts.join(","));
     if let Some(rate_limit) = rate_limit {
         command.arg("--rate-limit").arg(rate_limit.to_string());
     }
@@ -1532,16 +1636,26 @@ fn spawn_localnet(
             .arg("--response-delay-ms")
             .arg(response_delay_ms.to_string());
     }
-    if let Some(block_interval_ms) = block_interval_ms {
+    if let Some(block_time_ms) = block_time_ms {
         command
-            .arg("--block-interval-ms")
-            .arg(block_interval_ms.to_string());
+            .arg("--block-time-ms")
+            .arg(block_time_ms.to_string());
     }
     if *no_mining {
         command.arg("--no-mining");
     }
     if *mine_empty_blocks {
         command.arg("--mine-empty-blocks");
+    }
+
+    // Studio owns the managed environment lifecycle. Keep the child outside the
+    // terminal's foreground process group so one Ctrl+C produces one Studio
+    // shutdown sequence instead of one message from every simulated localnet.
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+
+        command.as_std_mut().process_group(0);
     }
 
     command
@@ -1725,9 +1839,13 @@ async fn monitor_full_ton_network(
                     .await
                 }
             }
+            let has_runtime_diagnostic = environment.details.read().await.error.is_some();
             if let Ok(Some(status)) = child_status
                 && !status.success()
+                && !has_runtime_diagnostic
             {
+                // The persisted network error explains startup failures to the user. Only fall
+                // back to the process status when the runtime did not publish that diagnostic.
                 set_environment_status(
                     &environment,
                     EnvironmentStatus::Failed,
@@ -2094,6 +2212,14 @@ async fn restart_environment(
     environment: &Arc<LocalEnvironment>,
 ) -> Result<StudioEnvironment, EnvironmentRuntimeError> {
     let _lifecycle_guard = environment.lifecycle.lock().await;
+    restart_environment_locked(runtime, environment).await
+}
+
+// Callers hold the lifecycle lock through startup and any pending snapshot restoration.
+async fn restart_environment_locked(
+    runtime: &Arc<LocalProcessRuntimeInner>,
+    environment: &Arc<LocalEnvironment>,
+) -> Result<StudioEnvironment, EnvironmentRuntimeError> {
     ensure_environment_not_deleted(environment).await?;
     let details = environment.details.read().await.clone();
     if !matches!(

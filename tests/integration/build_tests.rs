@@ -1839,6 +1839,142 @@ fn test_build_without_output_fift_does_not_emit_fift_by_default() {
 }
 
 #[test]
+fn test_build_output_boc_from_config_and_cache() {
+    let project = ProjectBuilder::new("build-output-boc-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    project.acton().build().run().success();
+    let default_boc_exists = project.path().join("build/boc/simple.boc").exists();
+
+    let manifest_path = project.path().join("Acton.toml");
+    let manifest = fs::read_to_string(&manifest_path).unwrap();
+    fs::write(
+        &manifest_path,
+        format!("{manifest}\n[build]\noutput-boc = \"export/boc\"\n"),
+    )
+    .unwrap();
+    let nested = project.path().join("nested");
+    fs::create_dir(&nested).unwrap();
+
+    project.acton().build().current_dir(&nested).run().success();
+    let output_path = project.path().join("export/boc/simple.boc");
+    let first_boc = fs::read(&output_path).unwrap();
+    fs::remove_file(&output_path).unwrap();
+    project.acton().build().current_dir(&nested).run().success();
+    let cached_boc = fs::read(&output_path).unwrap();
+
+    expect_test::expect![[r"
+        default_boc_exists=false
+        nested_output_exists=false
+        cached_boc_matches=true
+    "]]
+    .assert_eq(&format!(
+        "default_boc_exists={default_boc_exists}\nnested_output_exists={}\ncached_boc_matches={}\n",
+        nested.join("export/boc/simple.boc").exists(),
+        first_boc == cached_boc,
+    ));
+    assertion().eq(
+        Boc::encode_hex(Boc::decode(cached_boc).unwrap()),
+        snapbox::file!("snapshots/build/test_build_with_boc_output.boc.gen"),
+    );
+}
+
+#[test]
+fn test_build_output_boc_cli_overrides_config_for_all_source_kinds() {
+    let precompiled_boc = fs::read("tests/integration/testdata/child.boc").unwrap();
+    let project = ProjectBuilder::new("build-output-boc-cli")
+        .contract_with_output("simple", SIMPLE_CONTRACT, "individual/simple.boc")
+        .contract_from_boc("precompiled", precompiled_boc.clone())
+        .build();
+    let manifest_path = project.path().join("Acton.toml");
+    let manifest = fs::read_to_string(&manifest_path).unwrap();
+    fs::write(
+        &manifest_path,
+        format!("{manifest}\n[build]\noutput-boc = \"config/boc\"\n"),
+    )
+    .unwrap();
+    let nested = project.path().join("nested");
+    fs::create_dir(&nested).unwrap();
+
+    project
+        .acton()
+        .build()
+        .arg("--output-boc")
+        .arg("cli/boc")
+        .current_dir(&nested)
+        .run()
+        .success();
+
+    let compiled = fs::read(nested.join("cli/boc/simple.boc")).unwrap();
+    let precompiled = fs::read(nested.join("cli/boc/precompiled.boc")).unwrap();
+    expect_test::expect![[r"
+        config_output_exists=false
+        project_relative_cli_output_exists=false
+        individual_output_matches=true
+        precompiled_code_matches=true
+    "]]
+    .assert_eq(&format!(
+        "config_output_exists={}\nproject_relative_cli_output_exists={}\nindividual_output_matches={}\nprecompiled_code_matches={}\n",
+        project.path().join("config/boc").exists(),
+        project.path().join("cli/boc").exists(),
+        fs::read(project.path().join("individual/simple.boc")).unwrap() == compiled,
+        Boc::decode(precompiled).unwrap().repr_hash() == Boc::decode(precompiled_boc).unwrap().repr_hash(),
+    ));
+    assertion().eq(
+        Boc::encode_hex(Boc::decode(compiled).unwrap()),
+        snapbox::file!("snapshots/build/test_build_with_boc_output.boc.gen"),
+    );
+}
+
+#[test]
+fn test_build_output_boc_absolute_cli_path_and_target() {
+    let project = ProjectBuilder::new("build-output-boc-target")
+        .contract("selected", SIMPLE_CONTRACT)
+        .contract("other", SIMPLE_CONTRACT)
+        .build();
+    let output_dir = project.path().join("absolute/boc");
+
+    project
+        .acton()
+        .build()
+        .arg("selected")
+        .arg("--output-boc")
+        .arg(output_dir.to_str().unwrap())
+        .run()
+        .success();
+
+    expect_test::expect![[r"
+        selected=true
+        other=false
+    "]]
+    .assert_eq(&format!(
+        "selected={}\nother={}\n",
+        output_dir.join("selected.boc").is_file(),
+        output_dir.join("other.boc").exists(),
+    ));
+}
+
+#[test]
+fn test_build_output_boc_directory_write_error() {
+    let project = ProjectBuilder::new("build-output-boc-write-error")
+        .contract("simple", SIMPLE_CONTRACT)
+        .raw_file("blocked", "not a directory")
+        .build();
+
+    project
+        .acton()
+        .build()
+        .arg("--output-boc")
+        .arg("blocked/boc")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/build/test_build_output_boc_directory_write_error.stderr.txt",
+        );
+}
+
+#[test]
 fn test_build_with_output_fift_cli() {
     let project = ProjectBuilder::new("build-output-fift-cli")
         .contract("simple", SIMPLE_CONTRACT)

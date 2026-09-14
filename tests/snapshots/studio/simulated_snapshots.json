@@ -1,0 +1,24 @@
+{
+  "attachment": "attachment; filename=snapshot.json",
+  "capability": true,
+  "import": {
+    "clock_unchanged": true,
+    "head_unchanged": true,
+    "new_id": true
+  },
+  "restart": {
+    "delete_status": 204,
+    "persisted_snapshot_count": 4,
+    "remaining_snapshot_count": 3,
+    "restored_head": 1,
+    "status_after_stopped_save": "stopped",
+    "status_after_studio_restart": "stopped"
+  },
+  "restore": {
+    "clock": 0,
+    "head": 1,
+    "process_kept_running": true,
+    "saved_bytes_unchanged": true,
+    "snapshot_count": 3
+  }
+}

@@ -1,7 +1,7 @@
 NEXTEST_PROFILE_ARGS := if env_var_or_default("CI", "") != "" { "-P ci" } else { "" }
 TEST_FEATURE_ARGS := if env_var_or_default("CI", "") != "" { "--features only_ci" } else { "" }
 SOURCE_TRACE_WASM_OUT := env_var_or_default("ACTON_SOURCE_TRACE_WASM_OUT", "/tmp/acton-source-trace-wasm")
-FAUCET_POW_WASM_OUT := env_var_or_default("ACTON_FAUCET_POW_WASM_OUT", justfile_directory() + "/packages/explorer-ui/src/faucet/wasm")
+FAUCET_POW_WASM_OUT := env_var_or_default("ACTON_FAUCET_POW_WASM_OUT", justfile_directory() + "/packages/faucet-ui/src/wasm")
 LOCALTON_DEV_IMAGE := env_var_or_default("ACTON_STUDIO_LOCALTON_IMAGE", "localton:dev")
 LOCALTON_BASE_IMAGE := env_var_or_default("LOCALTON_BASE_IMAGE", "ghcr.io/ton-blockchain/localton:sha-72bf7425d9d034adf81ac7ebd900c7d03182f234")
 
@@ -161,7 +161,7 @@ check-grammar-security:
 check-ui-security:
   bun audit --audit-level=moderate
 
-check-security: check-deny check-audit check-templates-security check-grammar-security check-ui-security
+check-security: check-deny check-audit check-ui-security check-templates-security check-grammar-security
 
 check-tolk:
     cargo run -- test

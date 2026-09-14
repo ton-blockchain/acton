@@ -1,5 +1,8 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use crate::support::toncenter::{
+    ToncenterV3MockResponse, append_custom_network_with_urls, spawn_toncenter_v3_mock,
+};
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
@@ -42,24 +45,53 @@ fn test_retrace_rejects_invalid_network_name() {
 }
 
 #[test]
-fn test_retrace_localnet_is_rejected_before_logs_are_created() {
-    let project = ProjectBuilder::new("retrace-localnet-unsupported").build();
+fn test_retrace_localnet_uses_configured_api() {
+    let project = ProjectBuilder::new("retrace-localnet").build();
+    let (url, server, requests) = spawn_toncenter_v3_mock(vec![ToncenterV3MockResponse {
+        status: 200,
+        body: r#"{"transactions": [], "address_book": {}}"#.to_owned(),
+    }]);
+    append_custom_network_with_urls(project.path(), "localnet", "http://127.0.0.1:1/v2", &url);
     let logs_dir = project.path().join("retrace-logs");
 
     project
         .acton()
         .env("ACTON_LOG_DIR", ".acton/logs")
+        .env("ACTON_LOCALNET_AUTH_TOKEN", "retrace-fixture-key")
         .arg("retrace")
         .arg("deadbeef")
         .arg("--net")
         .arg("localnet")
         .arg("--logs-dir")
         .arg("retrace-logs")
+        .current_dir(project.path())
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/retrace/test_retrace_localnet_is_rejected_before_logs_are_created.stderr.txt",
+            "integration/snapshots/retrace/test_retrace_localnet_uses_configured_api.stderr.txt",
         );
+
+    server.join().expect("TonCenter mock failed");
+    let request = requests
+        .lock()
+        .expect("request capture lock")
+        .first()
+        .expect("retrace should request transaction metadata")
+        .clone();
+    expect_test::expect![[r#"
+        (
+            "GET",
+            "/transactions?hash=deadbeef&limit=1",
+            true,
+        )
+    "#]]
+    .assert_debug_eq(&(
+        request.method.as_str(),
+        request.path.as_str(),
+        request.headers.iter().any(|(name, value)| {
+            name.eq_ignore_ascii_case("x-api-key") && value == "retrace-fixture-key"
+        }),
+    ));
 
     assert!(
         !logs_dir.exists(),
@@ -108,7 +140,7 @@ fn test_retrace_debug_port_without_debug_is_ignored_before_logs_are_created() {
         .arg("--debug-port")
         .arg("5005")
         .arg("--net")
-        .arg("localnet")
+        .arg("custom:missing")
         .arg("--logs-dir")
         .arg("retrace-logs")
         .current_dir(project.path())
@@ -231,24 +263,53 @@ fn test_retrace_contract_compile_error_is_reported_before_logs_are_created() {
 }
 
 #[test]
-fn test_retrace_custom_network_is_rejected_before_logs_are_created() {
-    let project = ProjectBuilder::new("retrace-custom-network-unsupported").build();
+fn test_retrace_custom_network_uses_configured_api() {
+    let project = ProjectBuilder::new("retrace-custom-network").build();
+    let (url, server, requests) = spawn_toncenter_v3_mock(vec![ToncenterV3MockResponse {
+        status: 200,
+        body: r#"{"transactions": [], "address_book": {}}"#.to_owned(),
+    }]);
+    append_custom_network_with_urls(project.path(), "ci", "http://127.0.0.1:1/v2", &url);
     let logs_dir = project.path().join("custom-retrace-logs");
 
     project
         .acton()
         .env("ACTON_LOG_DIR", ".acton/logs")
+        .env("CI_API_KEY", "retrace-fixture-key")
         .arg("retrace")
         .arg("deadbeef")
         .arg("--net")
         .arg("custom:ci")
         .arg("--logs-dir")
         .arg("custom-retrace-logs")
+        .current_dir(project.path())
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/retrace/test_retrace_custom_network_is_rejected_before_logs_are_created.stderr.txt",
+            "integration/snapshots/retrace/test_retrace_custom_network_uses_configured_api.stderr.txt",
         );
+
+    server.join().expect("TonCenter mock failed");
+    let request = requests
+        .lock()
+        .expect("request capture lock")
+        .first()
+        .expect("retrace should request transaction metadata")
+        .clone();
+    expect_test::expect![[r#"
+        (
+            "GET",
+            "/transactions?hash=deadbeef&limit=1",
+            true,
+        )
+    "#]]
+    .assert_debug_eq(&(
+        request.method.as_str(),
+        request.path.as_str(),
+        request.headers.iter().any(|(name, value)| {
+            name.eq_ignore_ascii_case("x-api-key") && value == "retrace-fixture-key"
+        }),
+    ));
 
     assert!(
         !logs_dir.exists(),

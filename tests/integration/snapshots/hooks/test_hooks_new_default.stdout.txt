@@ -1,2 +1,2 @@
-Created default hooks scaffold in .githooks
+Created default pre-push hook in .githooks
 Run `acton hooks install` to enable it.

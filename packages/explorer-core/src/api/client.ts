@@ -1,6 +1,5 @@
 import {Cell} from "@ton/core"
 
-import {hashToHex} from "../components/utils"
 import {addressKey, type ExtendedContractABI} from "./compilerAbi"
 import {parseNetworkConfig, type NetworkConfig} from "./config"
 import {
@@ -20,7 +19,6 @@ import type {
   JettonTransfer,
   JettonWallet,
   JettonWalletData,
-  LocalnetCheckpoint,
   LocalnetContract,
   LocalnetMineResult,
   LocalnetMiningMode,
@@ -33,12 +31,14 @@ import type {
   StreamingActionsEvent,
   StreamingTransactionsEvent,
   SourceTraceResponse,
+  SingleNominatorRoles,
   V3Action,
   V3ActionsResponse,
   V3BlocksResponse,
   V3MultisigOrdersResponse,
   V3MultisigWalletsResponse,
   V3Metadata,
+  V3NominatorPool,
   V3RunGetMethodResponse,
   V3RunGetMethodStackEntry,
   V3TransactionDetailsResponse,
@@ -174,23 +174,6 @@ export interface RawBlockReference {
   readonly seqno: number
   readonly root_hash: string
   readonly file_hash: string
-}
-
-export function buildToncoinBlockDownloadUrl(
-  toncoinOrigin: string,
-  block: RawBlockReference,
-): URL | undefined {
-  const rootHash = hashToHex(block.root_hash)
-  const fileHash = hashToHex(block.file_hash)
-  if (!rootHash || !fileHash) return undefined
-
-  const url = new URL("/download", toncoinOrigin)
-  url.searchParams.append("workchain", block.workchain.toString())
-  url.searchParams.append("shard", block.shard)
-  url.searchParams.append("seqno", block.seqno.toString())
-  url.searchParams.append("roothash", rootHash.toUpperCase())
-  url.searchParams.append("filehash", fileHash.toUpperCase())
-  return url
 }
 
 interface GetTracesOptions {
@@ -766,6 +749,17 @@ export class TonClient {
     return this.request(url, "Failed to fetch multisig orders")
   }
 
+  /**
+   * Loads the indexed Nominator Pool snapshot used by the pool overview and nominator list.
+   * Toncenter owns stake aggregation and pending-deposit semantics for this endpoint.
+   */
+  async getNominatorPool(address: string): Promise<V3NominatorPool> {
+    const url = this.buildUrl(this.v3BaseUrl, "/staking/nominatorPools/pool")
+    url.searchParams.append("pool", address)
+
+    return this.request(url, "Failed to fetch nominator pool")
+  }
+
   async runGetMethod(
     address: string,
     method: string | number,
@@ -785,6 +779,25 @@ export class TonClient {
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify(body),
     })
+  }
+
+  /**
+   * Resolves the two role addresses stored by a Single Nominator contract.
+   * Both supported versions expose the same get_roles stack shape.
+   */
+  async getSingleNominatorRoles(address: string): Promise<SingleNominatorRoles> {
+    const response = await this.runGetMethod(address, "get_roles")
+    if (response.exit_code !== 0) {
+      throw new Error(`get_roles failed with exit code ${response.exit_code}`)
+    }
+
+    const ownerAddress = this.stackAddress(response.stack[0])
+    const validatorAddress = this.stackAddress(response.stack[1])
+    if (!ownerAddress || !validatorAddress) {
+      throw new Error("get_roles returned an unexpected stack")
+    }
+
+    return {ownerAddress, validatorAddress}
   }
 
   async getJettonWalletData(
@@ -924,7 +937,12 @@ export class TonClient {
     return this.request(url, "Failed to fetch blocks")
   }
 
-  async getRawBlockBoc(block: RawBlockReference): Promise<Cell> {
+  /**
+   * Fetches the original block BoC from the selected network's v2 endpoint.
+   * Downloads must retain the exact bytes used to calculate the file hash,
+   * so this method decodes base64 without reserializing the cells.
+   */
+  async getRawBlockBoc(block: RawBlockReference): Promise<Buffer> {
     const url = this.buildUrl(this.v2BaseUrl, "/getBlock")
     url.searchParams.append("workchain", block.workchain.toString())
     url.searchParams.append("shard", v3ShardToV2Shard(block.shard))
@@ -933,11 +951,7 @@ export class TonClient {
     url.searchParams.append("file_hash", block.file_hash)
     url.searchParams.append("archival", "true")
     const response = await this.request<RawBlockResponse>(url, "Failed to fetch raw block")
-    try {
-      return Cell.fromBase64(response.data)
-    } catch {
-      throw new Error("Raw block response contains invalid BoC data")
-    }
+    return Buffer.from(response.data, "base64")
   }
 
   async getMasterchainBlockShards(seqno: number): Promise<V3BlocksResponse> {
@@ -1217,83 +1231,6 @@ export class TonClient {
   async getNodeInfo(): Promise<LocalnetNodeInfo> {
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_nodeInfo")
     return this.request(url, "Failed to fetch node info")
-  }
-
-  async downloadState(): Promise<Blob> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_dumpState")
-    return this.requestBlob(url, "Failed to download localnet state")
-  }
-
-  async loadState(state: Blob): Promise<void> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_loadState")
-    await this.request<null>(url, "Failed to load localnet state", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: state,
-    })
-  }
-
-  async createCheckpoint(name: string, force = false): Promise<LocalnetCheckpoint> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_createCheckpoint")
-    return this.request(url, "Failed to create checkpoint", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({name, force}),
-    })
-  }
-
-  async listCheckpoints(): Promise<readonly LocalnetCheckpoint[]> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_listCheckpoints")
-    return this.request(url, "Failed to list checkpoints")
-  }
-
-  async restoreCheckpoint(name: string): Promise<LocalnetCheckpoint> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_restoreCheckpoint")
-    return this.request(url, "Failed to restore checkpoint", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({name}),
-    })
-  }
-
-  async deleteCheckpoint(name: string): Promise<LocalnetCheckpoint> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_deleteCheckpoint")
-    return this.request(url, "Failed to delete checkpoint", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({name}),
-    })
-  }
-
-  async clearCheckpoints(): Promise<number> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_clearCheckpoints")
-    const result = await this.request<{readonly deleted: number}>(
-      url,
-      "Failed to clear checkpoints",
-      {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: "{}",
-      },
-    )
-    return result.deleted
-  }
-
-  async downloadCheckpoint(name: string): Promise<Blob> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_exportCheckpoint")
-    url.searchParams.set("name", name)
-    return this.requestBlob(url, "Failed to download checkpoint")
-  }
-
-  async importCheckpoint(name: string, state: Blob, force = false): Promise<LocalnetCheckpoint> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_importCheckpoint")
-    url.searchParams.set("name", name)
-    url.searchParams.set("force", force.toString())
-    return this.request(url, "Failed to import checkpoint", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: state,
-    })
   }
 
   async mineBlocks(blocks = 1): Promise<LocalnetMineResult> {
@@ -1654,24 +1591,6 @@ export class TonClient {
     return this.request<DnsResolvedResponse>(url, "Failed to resolve TON DNS name on-chain")
   }
 
-  private async requestBlob(url: URL, errorMessage: string): Promise<Blob> {
-    const response = await fetch(url.toString(), this.withRequestHeaders(url))
-    if (response.status === 401) {
-      this.onUnauthorized?.()
-    }
-    if (!response.ok) {
-      const text = await response.text()
-      let error = text
-      try {
-        error = this.extractError(JSON.parse(text) as unknown) ?? text
-      } catch {
-        // Preserve a non-JSON server response when one is available.
-      }
-      throw new Error(error || errorMessage)
-    }
-    return response.blob()
-  }
-
   private pendingRequestKey(url: URL, options?: RequestInit): string | undefined {
     const method = options?.method?.toUpperCase() ?? "GET"
     return method === "GET" ? url.toString() : undefined
@@ -1788,7 +1707,7 @@ export class TonClient {
   }
 
   private stackAddress(entry: V3RunGetMethodStackEntry | undefined): string | undefined {
-    if (entry?.type !== "slice" || typeof entry.value !== "string") {
+    if ((entry?.type !== "cell" && entry?.type !== "slice") || typeof entry.value !== "string") {
       return undefined
     }
 

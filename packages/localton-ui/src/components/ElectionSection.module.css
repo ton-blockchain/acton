@@ -60,6 +60,7 @@
 }
 
 .validatorSetDisclosure > summary {
+  align-items: center;
   border-radius: 0;
   padding-inline: 0.5rem;
 }
@@ -71,6 +72,7 @@
 .validatorSetDisclosure > summary > svg {
   width: 0.75rem;
   height: 0.75rem;
+  margin-top: 0;
 }
 
 .validatorSetSummary {

@@ -26,7 +26,7 @@
   min-height: 0;
   flex: 1 1 auto;
   gap: var(--acton-space-5);
-  padding: 0 var(--acton-space-5) var(--acton-space-5);
+  padding: 0 var(--acton-space-5) var(--acton-space-3);
   overflow-y: auto;
   overscroll-behavior-y: contain;
 }
@@ -51,6 +51,98 @@
 .fullTonFields {
   display: grid;
   gap: var(--acton-space-5);
+}
+
+.compactDisclosure {
+  margin-top: calc(-1 * var(--acton-space-2));
+}
+
+.compactDisclosure > summary {
+  min-height: 36px;
+  padding-block: var(--acton-space-2);
+}
+
+.environmentTypeLink {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--acton-color-accent);
+  background: transparent;
+  font: inherit;
+  font-weight: var(--acton-font-weight-medium);
+  cursor: pointer;
+}
+
+.environmentTypeLink:hover {
+  text-decoration: underline;
+}
+
+.environmentTypeLink:focus-visible {
+  border-radius: var(--acton-radius-control-sm);
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.dockerRequirement {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: var(--acton-space-3) var(--acton-space-4);
+  border: 1px solid color-mix(in srgb, var(--acton-color-accent) 35%, var(--acton-color-border));
+  border-radius: var(--acton-radius-control);
+  color: var(--acton-color-text-muted);
+  background: color-mix(in srgb, var(--acton-color-accent) 7%, var(--acton-color-surface));
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.45;
+}
+
+.dockerRequirement > svg {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  color: var(--acton-color-accent);
+}
+
+.dockerRequirement a {
+  color: var(--acton-color-accent);
+  font-weight: var(--acton-font-weight-medium);
+  text-decoration: none;
+}
+
+.dockerRequirement a:hover {
+  text-decoration: underline;
+}
+
+.dockerRequirement a:focus-visible {
+  border-radius: var(--acton-radius-control-sm);
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.dockerRequirementDismiss {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  margin: -2px -4px -2px auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--acton-radius-control-sm);
+  color: var(--acton-color-text-subtle);
+  background: transparent;
+  cursor: pointer;
+  transition: color var(--acton-duration-fast);
+}
+
+.dockerRequirementDismiss:hover {
+  color: var(--acton-color-text);
+}
+
+.dockerRequirementDismiss:focus-visible {
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 1px;
 }
 
 .formActions {

@@ -1,0 +1,4 @@
+Error: Cannot generate wrapper for configured_id: ../outside is not a valid wrapper type name
+
+Set display-name in Acton.toml to a name starting with a letter
+Use ASCII letters and digits, with spaces, underscores, or hyphens between words

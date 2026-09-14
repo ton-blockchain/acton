@@ -76,6 +76,23 @@ fn build_model(
         .get_contract(contract_id)
         .ok_or_else(|| anyhow!(error_fmt::contract_not_found(config, contract_id)))?;
 
+    let contract_name = to_pascal_case(contract_config.display_name(contract_id));
+    // This name becomes both a language identifier and a filename. Reject invalid display
+    // names before compilation or writing, including names containing path separators.
+    if !contract_name.starts_with(|ch: char| ch.is_ascii_alphabetic())
+        || !contract_name.chars().all(|ch| ch.is_ascii_alphanumeric())
+    {
+        anyhow::bail!(
+            "Cannot generate wrapper for {}: {} is not a valid wrapper type name\n\n\
+             Set {} in {} to a name starting with a letter\n\
+             Use ASCII letters and digits, with spaces, underscores, or hyphens between words",
+            contract_id.yellow(),
+            contract_name.yellow(),
+            "display-name".yellow(),
+            "Acton.toml".yellow(),
+        );
+    }
+
     let contract_path = contract_config.absolute_source_path(&project_root);
 
     if !contract_path.exists() {
@@ -122,12 +139,6 @@ fn build_model(
         }
     };
 
-    let file_stem = contract_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or(contract_id);
-
-    let contract_name = to_pascal_case(file_stem);
     let contract_tolk_settings = contract_config
         .wrappers
         .as_ref()
@@ -254,6 +265,10 @@ fn generated_wrapper_header(contract_name: &str) -> String {
     )
 }
 
+/// Generates wrappers using the project configuration as their public naming authority.
+///
+/// A batch is compiled and checked for duplicate names before any output is written, so
+/// `--all` cannot silently replace one contract's wrapper with another contract's wrapper.
 #[allow(clippy::too_many_arguments)]
 pub fn wrapper_cmd(
     contract_id: Option<&str>,
@@ -277,6 +292,7 @@ pub fn wrapper_cmd(
         );
     }
 
+    let mut models = Vec::new();
     if all {
         let contracts = config
             .contracts()
@@ -289,55 +305,61 @@ pub fn wrapper_cmd(
                 continue;
             }
 
-            generate_for_contract(
+            models.push(build_model(
                 &config,
                 contract_id,
                 None,
                 wrapper_output_dir.clone(),
                 None,
                 test_output_dir.clone(),
-                explicit_test_request,
                 generate_typescript,
-            )?;
+            )?);
         }
     } else {
         let contract_id =
             contract_id.ok_or_else(|| anyhow!("contract_id is required when --all is not set"))?;
-        generate_for_contract(
+        models.push(build_model(
             &config,
             contract_id,
             wrapper_output,
             wrapper_output_dir,
             test_output,
             test_output_dir,
-            explicit_test_request,
             generate_typescript,
-        )?;
+        )?);
+    }
+
+    let mut wrapper_names = BTreeMap::new();
+    for model in &models {
+        // Filenames must also be distinct on case-insensitive filesystems.
+        if let Some(previous_id) =
+            wrapper_names.insert(model.contract_name.to_lowercase(), &model.contract_id)
+        {
+            anyhow::bail!(
+                "Contracts {} and {} have conflicting wrapper name {}\n\n\
+                 Set distinct {} values in {}\n\
+                 Wrapper names must differ after PascalCase conversion, ignoring case",
+                previous_id.yellow(),
+                model.contract_id.yellow(),
+                model.contract_name.yellow(),
+                "display-name".yellow(),
+                "Acton.toml".yellow(),
+            );
+        }
+    }
+
+    for model in &models {
+        generate_for_contract(model, explicit_test_request, generate_typescript)?;
     }
 
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn generate_for_contract(
-    config: &ActonConfig,
-    contract_id: &str,
-    wrapper_output: Option<String>,
-    wrapper_output_dir: Option<String>,
-    test_output: Option<String>,
-    test_output_dir: Option<String>,
+    model: &WrapperModel,
     explicit_test_request: bool,
     generate_typescript: bool,
 ) -> anyhow::Result<()> {
-    let model = build_model(
-        config,
-        contract_id,
-        wrapper_output,
-        wrapper_output_dir,
-        test_output,
-        test_output_dir,
-        generate_typescript,
-    )?;
     let generate_test_stub =
         !generate_typescript && (explicit_test_request || model.generate_test_by_default);
 
@@ -347,13 +369,13 @@ fn generate_for_contract(
     }
 
     if generate_typescript {
-        let wrapper_code = generate_typescript_wrapper(&model)?;
+        let wrapper_code = generate_typescript_wrapper(model)?;
         fs::write(&model.wrapper_path, wrapper_code)
             .map_err(|e| anyhow!("Failed to write wrapper file: {e}"))?;
     } else {
-        let wrapper_code = generate_wrapper(&model);
+        let wrapper_code = generate_wrapper(model);
         let wrapper_code =
-            format_generated_tolk(&model, wrapper_code, &model.wrapper_path, "wrapper");
+            format_generated_tolk(model, wrapper_code, &model.wrapper_path, "wrapper");
         let wrapper_code = format!(
             "{}{}",
             generated_wrapper_header(&model.contract_name),
@@ -370,8 +392,8 @@ fn generate_for_contract(
                 })?;
             }
 
-            let test_code = generate_test(&model);
-            let test_code = format_generated_tolk(&model, test_code, &model.test_path, "test stub");
+            let test_code = generate_test(model);
+            let test_code = format_generated_tolk(model, test_code, &model.test_path, "test stub");
             fs::write(&model.test_path, test_code)
                 .map_err(|e| anyhow!("Failed to write test file: {e}"))?;
         }
@@ -533,9 +555,8 @@ fn generate_typescript_wrapper(model: &WrapperModel) -> anyhow::Result<String> {
 
 fn serialize_typescript_abi(model: &WrapperModel) -> anyhow::Result<String> {
     let mut abi = model.abi.clone();
-    if abi.contract_name.is_empty() {
-        abi.contract_name.clone_from(&model.contract_name);
-    }
+    // The TypeScript class must have the same configured identity as its output filename.
+    abi.contract_name.clone_from(&model.contract_name);
 
     serde_json::to_string(&TypescriptGeneratorAbi {
         abi,
@@ -760,7 +781,7 @@ fn to_pascal_case(s: &str) -> String {
     let mut capitalize_next = true;
 
     for ch in s.chars() {
-        if ch == '_' || ch == '-' {
+        if ch == '_' || ch == '-' || ch.is_whitespace() {
             capitalize_next = true;
         } else if capitalize_next {
             result.push(ch.to_uppercase().next().unwrap_or(ch));

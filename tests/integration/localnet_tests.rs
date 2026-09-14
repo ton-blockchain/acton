@@ -525,7 +525,7 @@ fn localnet_start_port_conflict_is_reported_with_hint() {
         .arg("start")
         .arg("--port")
         .arg(&port)
-        .arg("--block-interval-ms")
+        .arg("--block-time-ms")
         .arg("50")
         .run()
         .failure();
@@ -674,8 +674,12 @@ fn localnet_v2_json_rpc_entrypoints_share_canonical_envelope() {
 #[test]
 fn localnet_mines_empty_blocks_on_interval_without_transactions() {
     let project = ProjectBuilder::new("localnet-empty-interval-blocks").build();
-    let node = project.localnet().args(["--mine-empty-blocks"]).start();
+    let node = project
+        .localnet()
+        .args(["--block-time-ms", "75", "--mine-empty-blocks"])
+        .start();
 
+    let node_info = node.get_json("/acton_nodeInfo");
     let initial_seqno = latest_masterchain_seqno(&node);
     let empty_block_seqno = initial_seqno + 1;
     let target_seqno = initial_seqno + 2;
@@ -696,6 +700,7 @@ fn localnet_mines_empty_blocks_on_interval_without_transactions() {
 
     let snapshot = json!({
         "target_seqno_reached": reached_seqno >= target_seqno,
+        "block_time_ms": node_info["result"]["block_time_ms"].as_u64(),
         "empty_block": {
             "type": block_payload["@type"].as_str(),
             "req_count": block_payload["req_count"].as_u64(),
@@ -1217,7 +1222,7 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
         },
         "runtime": {
             "auto_mining": node_info["result"]["auto_mining"].as_bool(),
-            "block_interval_ms": node_info["result"]["block_interval_ms"].as_u64(),
+            "block_time_ms": node_info["result"]["block_time_ms"].as_u64(),
             "rate_limit_rps": node_info["result"]["rate_limit_rps"].as_u64(),
         },
         "historical_reads": {
@@ -3963,7 +3968,7 @@ fn localnet_send_boc_return_hash_waits_for_scheduled_block_before_transaction_ap
         .args([
             "--accounts",
             "deployer",
-            "--block-interval-ms",
+            "--block-time-ms",
             "3000",
             "--mine-empty-blocks",
         ])
@@ -6814,7 +6819,7 @@ fn localnet_batches_pending_faucet_messages_into_one_scheduled_block() {
     let project = ProjectBuilder::new("localnet-batch-faucet-scheduled-block").build();
     let node = project
         .localnet()
-        .args(["--block-interval-ms", "3000", "--mine-empty-blocks"])
+        .args(["--block-time-ms", "3000", "--mine-empty-blocks"])
         .start();
     let initial_seqno = latest_masterchain_seqno(&node);
     wait_for_masterchain_seqno_at_least(&node, initial_seqno + 1, Duration::from_secs(6));

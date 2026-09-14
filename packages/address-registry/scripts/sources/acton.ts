@@ -24,6 +24,10 @@ export const ACTON_MAINNET_ADDRESSES = [
     address: "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
     name: "Tether USD (USDT)",
   },
+  {
+    address: "EQCZ-7akCw_dvl_Q5xyriWqCXdWubIPbuN7aDQlzX45paxCU",
+    name: "Bybit 11",
+  },
 ] as const satisfies readonly SourceAddress[]
 
 export const ACTON_TESTNET_ADDRESSES = [

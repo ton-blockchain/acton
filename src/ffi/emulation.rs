@@ -1634,22 +1634,34 @@ fn send_single_message_impl(
     Ok(())
 }
 
-extension!(start_message_iter in (Context) with (src: IntAddr, msg: Cell) using start_message_iter_impl);
+extension!(start_message_iter in (Context) with (src: Option<IntAddr>, msg: Cell) using start_message_iter_impl);
 fn start_message_iter_impl(
     ctx: &mut Context,
     stack: &mut Tuple,
-    src: IntAddr,
+    src: Option<IntAddr>,
     msg: Cell,
 ) -> anyhow::Result<()> {
     if ctx.is_broadcasting {
+        if src.is_none() {
+            anyhow::bail!(
+                "createExternalTraceIterationCursor() is available only in emulation mode"
+            )
+        }
         anyhow::bail!("createTraceIterationCursor() is available only in emulation mode")
     }
 
-    let std_address = src.as_std().context("Var addresses are not supported")?;
-    let libs_owner = std_address.address;
+    // External roots use the same library ownership scope as net.sendExternal.
+    let libs_owner = match &src {
+        Some(src) => {
+            src.as_std()
+                .context("Var addresses are not supported")?
+                .address
+        }
+        None => HashBytes::ZERO,
+    };
     let cursor_id = ctx
         .message_iters
-        .insert_message_cursor(msg, Some(src), libs_owner);
+        .insert_message_cursor(msg, src, libs_owner);
     stack.push(TupleItem::Int(BigInt::from(cursor_id)));
     Ok(())
 }

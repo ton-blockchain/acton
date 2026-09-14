@@ -29,31 +29,48 @@ if ! command -v yq >/dev/null 2>&1; then
     exit 1
 fi
 
-repo_path="$(yq -p=toml -o=json -r '.source_repository.path // ""' "$config_path")"
-if [[ -z "$repo_path" ]]; then
+repo_path="$(yq -p=toml -o=json -r '.source_repository.path' "$config_path")"
+if [[ -z "$repo_path" || "$repo_path" == "null" ]]; then
     echo "source_repository.path is missing in verifier config: $config_path" >&2
     exit 1
 fi
 
 storage_root="$(
-    yq -p=toml -o=json -r '.source_repository.storage_root // "sources"' "$config_path"
+    yq -p=toml -o=json -r '.source_repository.storage_root' "$config_path"
 )"
+if [[ -z "$storage_root" || "$storage_root" == "null" ]]; then
+    echo "source_repository.storage_root is missing in verifier config: $config_path" >&2
+    exit 1
+fi
+
 attributes_rule="$storage_root/** -text"
 
-branch="$(yq -p=toml -o=json -r '.source_repository.branch // "master"' "$config_path")"
+branch="$(yq -p=toml -o=json -r '.source_repository.branch' "$config_path")"
+if [[ -z "$branch" || "$branch" == "null" ]]; then
+    echo "source_repository.branch is missing in verifier config: $config_path" >&2
+    exit 1
+fi
+
 if ! git check-ref-format --branch "$branch" >/dev/null 2>&1; then
     echo "source_repository.branch is invalid: $branch" >&2
     exit 1
 fi
 
 author_name="$(
-    yq -p=toml -o=json -r '.source_repository.author_name // "ton-verifier"' "$config_path"
+    yq -p=toml -o=json -r '.source_repository.author_name' "$config_path"
 )"
+if [[ -z "$author_name" || "$author_name" == "null" ]]; then
+    echo "source_repository.author_name is missing in verifier config: $config_path" >&2
+    exit 1
+fi
+
 author_email="$(
-    yq -p=toml -o=json -r \
-        '.source_repository.author_email // "ton-verifier@example.invalid"' \
-        "$config_path"
+    yq -p=toml -o=json -r '.source_repository.author_email' "$config_path"
 )"
+if [[ -z "$author_email" || "$author_email" == "null" ]]; then
+    echo "source_repository.author_email is missing in verifier config: $config_path" >&2
+    exit 1
+fi
 
 if [[ ! -e "$repo_path" ]]; then
     mkdir -p "$repo_path"

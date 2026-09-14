@@ -20,7 +20,7 @@ pub(crate) fn run(args: GithubCleanupArgs) -> Result<()> {
         .map(to_actions_cache_entry)
         .collect();
 
-    run_cache_cleanup(cleanup, cache_entries, |entry| {
+    run_cache_cleanup("GitHub", cleanup, cache_entries, |entry| {
         github.delete_cache_entry(&entry.id)
     })
 }

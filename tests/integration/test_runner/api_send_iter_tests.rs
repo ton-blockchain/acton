@@ -105,6 +105,27 @@ get fun received(): int {
 }
 "#;
 
+const EXTERNAL_IN_FORWARDER_CONTRACT: &str = r#"
+import "@stdlib/gas-payments"
+import "messages"
+
+fun onExternalMessage(body: slice) {
+    val msg = TriggerForward.fromSlice(body);
+    assert (msg.queryId != 0) throw 701;
+    acceptExternalMessage();
+
+    createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: msg.target,
+        body: Notify { queryId: msg.queryId },
+    }).send(SEND_MODE_PAY_FEES_SEPARATELY);
+}
+
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
 const EXTERNAL_FORWARDER_CONTRACT: &str = r#"
 import "messages"
 
@@ -448,6 +469,158 @@ get fun `test send iter execute n and from`() {
 }
 "#,
         "send_iter_execute_n_processes_first_hop_and_execute_from_drains_rest",
+    );
+}
+
+#[test]
+fn external_send_iter_preserves_message_and_controls_descendants() {
+    let test_body = r#"
+import "../../lib/tlb/either"
+import "../../lib/tlb/maybe"
+import "../../lib/types/transaction"
+
+get fun `test external cursor controls execution`() {
+    val sender = testing.treasury("sender");
+    val receiverInit = ContractState {
+        code: build("receiver"),
+        data: createEmptyCell(),
+    };
+    val receiverAddress = AutoDeployAddress { stateInit: receiverInit }.calculateAddress();
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: receiverInit },
+    }))).toHaveSuccessfulDeploy({ to: receiverAddress });
+
+    val init = StateInit {
+        fixedPrefixLength: null,
+        special: null,
+        code: build("external_in_forwarder"),
+        data: createEmptyCell(),
+        library: null,
+    };
+    val target = AutoDeployAddress { stateInit: init.toCell() }.calculateAddress();
+    testing.topUp(target, ton("2"));
+    val src = beginCell()
+        .storeUint(0b01, 2)
+        .storeUint(16, 9)
+        .storeUint(0xBEEF, 16)
+        .endCell()
+        .beginParse()
+        .loadAddressAny();
+    val request = TriggerForward { queryId: 7, target: receiverAddress };
+    val message = net.createExternalMessage(target, request, init, src);
+    val cursor = testing.createExternalTraceIterationCursor(message);
+
+    expect(cursor.isDone()).toBeFalse();
+    expect(testing.isDeployed(target)).toBeFalse();
+    expect(cursor.executeN(0)).toBeEmpty();
+    expect(testing.isDeployed(target)).toBeFalse();
+
+    val first = cursor.executeN(1);
+    expect(first).toHaveLength(1);
+    expect(first).toHaveAllSuccessfulTxs();
+    expect(testing.isDeployed(target)).toBeTrue();
+    expect(first.at(0).childTxs.size()).toEqual(0);
+    val incoming = first.at(0).tx.load().loadInMsg<TriggerForward>();
+    expect(incoming.loadBody()).toEqual(request);
+    expect(incoming.info is TlbExternalInMessageInfo).toBeTrue();
+    if (incoming.info is TlbExternalInMessageInfo) {
+        expect(incoming.info.src).toEqual(src);
+        expect(incoming.info.dest).toEqual(target);
+    }
+    val receivedInit = incoming.init.unwrap();
+    expect(receivedInit is TlbEitherRight<Cell<StateInit>>).toBeTrue();
+    if (receivedInit is TlbEitherRight<Cell<StateInit>>) {
+        expect(receivedInit.value.load()).toEqual(init);
+    }
+    expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(0);
+    expect(cursor.isDone()).toBeFalse();
+
+    val rest = cursor.executeAllRemaining();
+    expect(rest).toHaveLength(1);
+    expect(rest).toHaveSuccessfulTx<Notify>({ from: target, to: receiverAddress });
+    expect(rest.at(0).parentLt).toEqual(first.at(0).tx.load().lt);
+    expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(1);
+    expect(cursor.isDone()).toBeTrue();
+
+    val nextMessage = net.createExternalMessage(target, request);
+    val stopped = testing.createExternalTraceIterationCursor(nextMessage);
+    expect(stopped.executeN(1)).toHaveLength(1);
+    stopped.close();
+    expect(stopped.isDone()).toBeTrue();
+    expect(stopped.executeAllRemaining()).toBeEmpty();
+    expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(1);
+
+    val until = testing.createExternalTraceIterationCursor(nextMessage);
+    expect(until.executeTill<Notify>({ to: receiverAddress })).toHaveLength(2);
+    expect(until.isDone()).toBeTrue();
+    expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(2);
+}
+"#;
+    build_send_iter_project("external-send-iter-control")
+        .contract("external_in_forwarder", EXTERNAL_IN_FORWARDER_CONTRACT)
+        .test_file("test", &format!("{TEST_IMPORTS}\n{test_body}\n"))
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(&format!(
+            "{SNAPSHOT_DIR}/external_send_iter_preserves_message_and_controls_descendants.stdout.txt"
+        ));
+}
+
+#[test]
+fn external_send_iter_reports_rejection_when_advanced() {
+    let test_body = r#"
+get fun `test external cursor reports rejection when advanced`() {
+    val init = ContractState {
+        code: build("external_in_forwarder"),
+        data: createEmptyCell(),
+    };
+    val target = AutoDeployAddress { stateInit: init }.calculateAddress();
+    val sender = testing.treasury("sender");
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: init },
+    }))).toHaveSuccessfulDeploy({ to: target });
+
+    val message = net.createExternalMessage(target, TriggerForward { queryId: 0, target });
+    val cursor = testing.createExternalTraceIterationCursor(message);
+    expect(cursor.isDone()).toBeFalse();
+    cursor.executeN(1);
+}
+"#;
+    build_send_iter_project("external-send-iter-rejection")
+        .contract("external_in_forwarder", EXTERNAL_IN_FORWARDER_CONTRACT)
+        .test_file("test", &format!("{TEST_IMPORTS}\n{test_body}\n"))
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(&format!(
+            "{SNAPSHOT_DIR}/external_send_iter_reports_rejection_when_advanced.stdout.txt"
+        ));
+}
+
+#[test]
+fn external_send_iter_rejects_broadcast_mode_before_cursor_creation() {
+    run_send_iter_failure(
+        "external-send-iter-broadcast-reject",
+        r#"
+get fun `test external cursor rejects broadcast mode`() {
+    val target = testing.treasury("target").address;
+    val message = net.createExternalMessage(target, createEmptyCell());
+    net.enableBroadcast();
+    testing.createExternalTraceIterationCursor(message);
+}
+"#,
+        "external_send_iter_rejects_broadcast_mode_before_cursor_creation",
     );
 }
 

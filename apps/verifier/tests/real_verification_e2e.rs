@@ -128,10 +128,12 @@ async fn verify_tolk_with_real_compiler_and_stores_generated_abi() {
 #[tokio::test]
 async fn verify_tolk_import_mappings_with_real_compiler() {
     let state = real_compiler_app_state(&[]);
-    let response =
-        verify_fixture(state, TOLK_CODE_HASH, fixture("valid-import-mapping.json")).await;
+    let mut input = fixture("valid-import-mapping.json");
+    input.sources.push(unused_source("unused.tolk"));
+    let response = verify_fixture(state.clone(), TOLK_CODE_HASH, input).await;
 
     assert_verified(response, "tolk", TOLK_CODE_HASH).await;
+    assert_bundle_excludes(state, TOLK_CODE_HASH, "unused.tolk").await;
 }
 
 #[tokio::test]
@@ -152,9 +154,12 @@ async fn verify_all_tolk_npm_versions_with_real_compiler() {
 #[tokio::test]
 async fn verify_func_with_real_compiler() {
     let state = real_compiler_app_state(&[]);
-    let response = verify_fixture(state, FUNC_CODE_HASH, fixture("valid-func.json")).await;
+    let mut input = fixture("valid-func.json");
+    input.sources.push(unused_source("unused.fc"));
+    let response = verify_fixture(state.clone(), FUNC_CODE_HASH, input).await;
 
     assert_verified(response, "func", FUNC_CODE_HASH).await;
+    assert_bundle_excludes(state, FUNC_CODE_HASH, "unused.fc").await;
 }
 
 #[tokio::test]
@@ -170,7 +175,9 @@ async fn verify_all_func_npm_versions_with_real_compiler() {
 #[tokio::test]
 async fn verify_tact_with_real_compiler_and_stores_generated_sources() {
     let state = real_compiler_app_state(&[]);
-    let response = verify_fixture(state.clone(), TACT_CODE_HASH, fixture("valid-tact.json")).await;
+    let mut input = fixture("valid-tact.json");
+    input.sources.push(unused_source("unused.tact"));
+    let response = verify_fixture(state.clone(), TACT_CODE_HASH, input).await;
     assert_verified(response, "tact", TACT_CODE_HASH).await;
 
     let response = get(
@@ -190,6 +197,7 @@ async fn verify_tact_with_real_compiler_and_stores_generated_sources() {
     assert_eq!(bundle.entrypoint, "contract/contract.tact");
     let files = &bundle.files;
     assert!(files.iter().any(|file| file.path == "contract.pkg"));
+    assert!(!files.iter().any(|file| file.path == "unused.tact"));
     assert!(
         files.iter().any(|file| has_extension(&file.path, "abi")),
         "expected stored Tact bundle to include generated ABI"
@@ -238,6 +246,16 @@ async fn verify_all_tact_npm_versions_with_real_compiler() {
             assert_verified(response, "tact", group.code_hash).await;
         }
     }
+}
+
+#[tokio::test]
+async fn verify_tact_accepts_uppercase_package_extension() {
+    let state = real_compiler_app_state(&[]);
+    let mut input = fixture("valid-tact.json");
+    input.entrypoint = "contract.PKG".to_owned();
+    input.sources[0].path = input.entrypoint.clone();
+    let response = verify_fixture(state, TACT_CODE_HASH, input).await;
+    assert_verified(response, "tact", TACT_CODE_HASH).await;
 }
 
 async fn verify_fixture(
@@ -308,6 +326,38 @@ async fn assert_verified(response: axum::response::Response, _language: &str, co
     assert_eq!(body.verification_result, "match");
     assert!(body.source_bundle_hash.is_some());
     assert!(body.storage_revision.is_some());
+}
+
+async fn assert_bundle_excludes(
+    state: verifier::state::AppState,
+    code_hash: &str,
+    excluded_path: &str,
+) {
+    let response = get(
+        state,
+        &format!("/api/v1/verification/source?code_hash={code_hash}"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_json::<VerificationSourceResponse>(response).await;
+    let bundle = body
+        .bundle
+        .expect("verified source should include a bundle");
+    assert!(
+        !bundle.files.iter().any(|file| file.path == excluded_path),
+        "unused source should not be stored: {excluded_path}"
+    );
+}
+
+fn unused_source(path: &str) -> WorkerSource {
+    WorkerSource {
+        path: path.to_owned(),
+        content: "unused source".to_owned(),
+        is_entrypoint: false,
+        include_in_command: None,
+        is_stdlib: None,
+        has_include_directives: None,
+    }
 }
 
 fn fixture(name: &str) -> WorkerFixture {

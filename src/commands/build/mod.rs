@@ -34,6 +34,8 @@ pub struct BuildCommandOptions {
     pub out_dir: Option<String>,
     pub gen_dir: Option<String>,
     pub output_abi: Option<String>,
+    /// CLI-selected `BoC` export directory; relative paths resolve from cwd and override the build config default.
+    pub output_boc: Option<String>,
     pub output_fift: Option<String>,
     pub output_sources: Option<String>,
     pub show_info: bool,
@@ -55,6 +57,7 @@ pub fn build_cmd(options: BuildCommandOptions) -> anyhow::Result<()> {
         out_dir,
         gen_dir,
         output_abi,
+        output_boc,
         output_fift,
         output_sources,
         show_info,
@@ -104,6 +107,14 @@ pub fn build_cmd(options: BuildCommandOptions) -> anyhow::Result<()> {
         "build/abi",
         project_root,
     );
+    let output_boc_dir = resolve_optional_build_output_dir(
+        output_boc,
+        config
+            .build
+            .as_ref()
+            .and_then(|build| non_empty_path(build.output_boc.clone())),
+        project_root,
+    );
     let output_fift_dir = resolve_optional_build_output_dir(
         output_fift,
         config
@@ -136,7 +147,7 @@ display-name = \"MyContract\"
 src = \"contracts/MyContract.tolk\"
 depends = []
 
-See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-section for more information"
+See https://ton-blockchain.github.io/acton/docs/building/reference#contracts-section for more information"
             );
         }
         return Ok(());
@@ -291,7 +302,27 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
             error_count += 1;
         }
 
-        if let Err(err) = save_boc_file(project_root, contract_config, &code_boc64) {
+        if let Some(output_path) = contract_config
+            .output
+            .as_deref()
+            .filter(|path| !path.is_empty())
+            && let Err(err) = save_boc_file(
+                project_root,
+                &resolve_project_config_path(project_root, output_path),
+                &code_boc64,
+            )
+        {
+            record_contract_error(&mut artifact_errors, &parent_contract, err);
+            error_count += 1;
+        }
+
+        if let Some(output_boc_dir) = &output_boc_dir
+            && let Err(err) = save_boc_file(
+                project_root,
+                &contract_artifact_path(output_boc_dir, &parent_contract, "boc"),
+                &code_boc64,
+            )
+        {
             record_contract_error(&mut artifact_errors, &parent_contract, err);
             error_count += 1;
         }
@@ -530,42 +561,29 @@ fn process_contract(
     }
 }
 
-fn save_boc_file(
-    project_root: &Path,
-    contract_config: &ContractConfig,
-    code_boc64: &str,
-) -> anyhow::Result<()> {
-    if let Some(config_output_path) = contract_config
-        .output
-        .as_deref()
-        .filter(|path| !path.is_empty())
+fn save_boc_file(project_root: &Path, output_path: &Path, code_boc64: &str) -> anyhow::Result<()> {
+    let display_path = output_path
+        .strip_prefix(project_root)
+        .unwrap_or(output_path);
+    if let Some(parent_dir) = output_path.parent()
+        && let Err(err) = fs::create_dir_all(parent_dir)
     {
-        let output_path = resolve_project_config_path(project_root, config_output_path);
-        let display_parent_dir = Path::new(config_output_path)
-            .parent()
-            .or_else(|| output_path.parent());
-        if let Some(parent_dir) = output_path.parent()
-            && let Err(err) = fs::create_dir_all(parent_dir)
-        {
-            anyhow::bail!(
-                "Failed to create directory for BoC file {}: {}",
-                display_parent_dir.map_or_else(
-                    || parent_dir.display().to_string(),
-                    |path| path.display().to_string()
-                ),
-                err
-            );
-        }
-
-        let code = Boc::decode_base64(code_boc64)?;
-        fs::write(&output_path, Boc::encode(code)).map_err(|err| {
-            anyhow!(
-                "Failed to save BoC file {}: {}",
-                Path::new(config_output_path).display(),
-                err
-            )
-        })?;
+        anyhow::bail!(
+            "Failed to create directory for BoC file {}: {}",
+            display_path.parent().unwrap_or(parent_dir).display(),
+            err
+        );
     }
+
+    let code = Boc::decode_base64(code_boc64)?;
+    fs::write(output_path, Boc::encode(code)).map_err(|err| {
+        anyhow!(
+            "Failed to save BoC file {}: {}",
+            display_path.display(),
+            err
+        )
+    })?;
+
     Ok(())
 }
 

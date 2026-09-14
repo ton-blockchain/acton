@@ -158,13 +158,13 @@ fn validate_sources(sources: &[SourceMetadata]) -> Result<(), ApiError> {
 
     for source in sources {
         validate_source_path(&source.path)?;
-        if Path::new(&source.path).starts_with("output") {
+        let normalized_path = source.path.to_ascii_lowercase();
+        if Path::new(&normalized_path).starts_with("output") {
             return Err(ApiError::bad_request(format!(
                 "source path uses reserved output directory: {}",
                 source.path
             )));
         }
-        let normalized_path = source.path.to_ascii_lowercase();
         if let Some(existing_path) = seen_paths.insert(normalized_path, source.path.clone()) {
             return Err(ApiError::bad_request(format!(
                 "duplicate source paths: {existing_path}, {}",

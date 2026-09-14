@@ -8,6 +8,7 @@ export interface StudioInfo {
   readonly workspace?: {
     readonly name: string
     readonly walletNames?: readonly string[]
+    readonly defaultStartupAccounts?: readonly string[]
   }
 }
 
@@ -24,13 +25,14 @@ export interface ActonSimulatedLocalnetEnvironmentConfig {
   readonly accounts: readonly string[]
   readonly rateLimit?: number
   readonly responseDelayMs?: number
-  readonly blockIntervalMs?: number
+  readonly blockTimeMs?: number
   readonly noMining: boolean
   readonly mineEmptyBlocks: boolean
 }
 
 export interface FullTonNetworkEnvironmentConfig {
   readonly kind: "fullTonNetwork"
+  readonly accounts: readonly string[]
   readonly apiV2Port: number
   readonly apiV3Port: number
   readonly adminPort: number
@@ -74,13 +76,14 @@ export interface CreateActonSimulatedLocalnetEnvironmentConfig {
   readonly accounts: readonly string[]
   readonly rateLimit?: number
   readonly responseDelayMs?: number
-  readonly blockIntervalMs?: number
+  readonly blockTimeMs?: number
   readonly noMining: boolean
   readonly mineEmptyBlocks: boolean
 }
 
 export interface CreateFullTonNetworkEnvironmentConfig {
   readonly kind: "fullTonNetwork"
+  readonly accounts: readonly string[]
   readonly apiV2Port?: number
   readonly apiV3Port?: number
   readonly adminPort?: number
@@ -112,7 +115,6 @@ export type EnvironmentCapability =
   | "mining"
   | "timeTravel"
   | "snapshots"
-  | "checkpoints"
   | "observability"
   | "health"
 
@@ -265,14 +267,11 @@ export interface CreateFullTonNodeRequest {
 }
 
 export interface EnvironmentSnapshot {
-  readonly formatVersion: number
   readonly id: string
   readonly name?: string
   readonly createdAt: number
-  readonly archiveSizeBytes: number
-  readonly stateSizeBytes: number
-  readonly stateSchemaVersion: number
-  readonly tonRelease: string
+  readonly sizeBytes: number
+  readonly stateSizeBytes?: number
   readonly masterchainSeqno?: number
 }
 
@@ -281,6 +280,7 @@ export type EnvironmentSnapshotOperationPhase =
   | "preparing"
   | "stopping"
   | "creatingArchive"
+  | "savingState"
   | "restoringState"
   | "resettingIndexer"
   | "starting"
@@ -341,7 +341,6 @@ export interface TestRunStats {
 }
 
 export interface TestRunSummary {
-  readonly formatVersion: number
   readonly id: string
   readonly source: TestRunSource
   readonly status: TestRunStatus
@@ -605,6 +604,32 @@ export function restoreStudioEnvironmentSnapshot(
     `/api/v1/environments/${encodeURIComponent(environmentId)}/snapshots/${encodeURIComponent(snapshotId)}/restore`,
     {method: "POST", headers: {accept: "application/json"}},
   )
+}
+
+export function importStudioEnvironmentSnapshot(
+  environmentId: string,
+  file: File,
+): Promise<EnvironmentSnapshot> {
+  return requestJson<EnvironmentSnapshot>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/snapshots/import`,
+    {
+      method: "POST",
+      headers: {"content-type": "application/json"},
+      body: file,
+    },
+  )
+}
+
+export async function downloadStudioEnvironmentSnapshot(
+  environmentId: string,
+  snapshotId: string,
+): Promise<Blob> {
+  const response = await request(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/snapshots/${encodeURIComponent(snapshotId)}/download`,
+    {headers: {accept: "application/json"}},
+  )
+
+  return response.blob()
 }
 
 export async function deleteStudioEnvironmentSnapshot(

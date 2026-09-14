@@ -1,12 +1,14 @@
 use crate::Network;
-use crate::remote::{TonCenterClient, TonHubClient};
-use crate::types::{BaseTxInfo, Block, BlockInfo, ComputeInfo, RawTransaction, TraceMoneyResult};
+use crate::remote::TonCenterClient;
+use crate::types::{BaseTxInfo, ComputeInfo, TraceMoneyResult};
 use anyhow::Context;
 use base64::Engine;
 use base64::engine::general_purpose;
 use std::collections::HashMap;
 use std::str::FromStr;
+use ton_api::toncenter::v3;
 use ton_executor::message::RunTransactionResultSuccess;
+use ton_networks::CustomNetworkUrls;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Lazy;
 use tycho_types::dict::Dict;
@@ -23,17 +25,24 @@ use tycho_types::prelude::{Cell, HashBytes};
 ///
 /// * `net`  — network to use
 /// * `hash` — transaction hash to find
+/// * `custom_networks` — V2/V3 endpoints for localnet and custom networks
 ///
 /// # Examples
 ///
 /// ```ignore
-/// let info = find_base_tx_by_hash(Network::Mainnet, "transaction_hash_hex").await?;
+/// let info = find_base_tx_by_hash(Network::Mainnet, "transaction_hash_hex", &Default::default()).await?;
 /// println!("Found tx with lt: {}", info.lt);
 /// ```
-pub async fn find_base_tx_by_hash(net: Network, hash: &str) -> anyhow::Result<BaseTxInfo> {
-    let client = TonCenterClient::new(net.clone())?;
+pub async fn find_base_tx_by_hash(
+    net: Network,
+    hash: &str,
+    custom_networks: &HashMap<String, CustomNetworkUrls>,
+) -> anyhow::Result<BaseTxInfo> {
+    let client = TonCenterClient::new(net.clone(), custom_networks)?;
 
-    let resp = client.get_transactions(hash, 1).await?;
+    let resp = client
+        .get_transactions(&[("hash", hash.to_owned()), ("limit", "1".to_owned())])
+        .await?;
 
     let Some(raw_tx) = resp.transactions.first() else {
         anyhow::bail!("Cannot find transaction in network {net}");
@@ -54,91 +63,24 @@ pub async fn find_base_tx_by_hash(net: Network, hash: &str) -> anyhow::Result<Ba
         lt,
         hash: hash_bytes,
         address,
+        block: raw_tx.block_ref.clone(),
     })
 }
 
-/// Returns full on-chain transaction information using a base handle.
-///
-/// This function queries multiple blocks via `TonHub` API to find the complete
-/// record of the transaction, including its raw `BoC`.
-///
-/// # Arguments
-///
-/// * `net`  — Network to use.
-/// * `info` — Base transaction information handle.
-pub(crate) async fn find_raw_tx_by_hash(
-    net: Network,
-    info: BaseTxInfo,
-) -> anyhow::Result<Vec<RawTransaction>> {
-    let client = TonHubClient::new(net)?;
-    let address = info.address.display_base64_url(true).to_string();
-    let hash_base64 = general_purpose::URL_SAFE.encode(info.hash);
-
-    let resp = client
-        .get_account_transactions(&address, info.lt, &hash_base64)
-        .await?;
-
-    let cells = boc_ext::decode_multi_root_base64(resp.boc)?;
-
-    let mut txs = vec![];
-    for (id, block) in resp.blocks.iter().enumerate() {
-        let Some(cell) = cells.get(id) else { break };
-        let tx: tycho_types::models::Transaction = cell.parse()?;
-        txs.push(RawTransaction {
-            block: block.clone(),
-            tx,
-        });
-    }
-
-    Ok(txs)
-}
-
-/// Returns the shard-block header that contains a given [`RawTransaction`].
-///
-/// This is used to extract block-level metadata like `rand_seed` and
-/// master-block references required for emulation.
-///
-/// # Arguments
-///
-/// * `net` — Network to use.
-/// * `tx`  — Raw transaction object.
-///
-/// # Returns
-///
-/// Returns the matching shard-block or `None` if it cannot be found.
+/// Loads the indexed shard-block header for the target transaction.
+/// The header supplies the random seed and the masterchain reference used to
+/// retrieve the configuration and the account state before replay.
 pub(crate) async fn find_shard_block_for_tx(
-    net: Network,
-    tx: &RawTransaction,
-) -> anyhow::Result<Option<Block>> {
-    let shard = &tx.block;
-
-    // normalize potentially negative shard to positive one
-    let shard_int = shard.shard.parse::<i64>()?;
-    let shard_uint = shard_int as u64;
-    let shard_hex = format!("0x{shard_uint:x}");
-
-    let client = TonCenterClient::new(net)?;
-
-    let res = client
-        .get_blocks(shard.workchain, &shard_hex, shard.seqno)
-        .await?;
-
-    Ok(res.blocks.into_iter().next())
-}
-
-/// Returns a master‑block (full representation, including `shards[]`)
-/// by its sequence number via TON API v4.
-///
-/// # Arguments
-///
-/// * `net`   — Network to use.
-/// * `seqno` — Master‑block sequence number.
-pub(crate) async fn find_full_block_for_seqno(
-    net: Network,
-    seqno: u32,
-) -> anyhow::Result<BlockInfo> {
-    let client = TonHubClient::new(net)?;
-    client.get_block(seqno).await
+    client: &TonCenterClient,
+    tx: &BaseTxInfo,
+) -> anyhow::Result<v3::Block> {
+    client
+        .get_blocks(&tx.block)
+        .await?
+        .blocks
+        .into_iter()
+        .next()
+        .context("Cannot find shard block for transaction")
 }
 
 /// Loads the global configuration cell for the specified master‑block.
@@ -148,130 +90,126 @@ pub(crate) async fn find_full_block_for_seqno(
 ///
 /// # Arguments
 ///
-/// * `net`   — Network to use.
+/// * `client` — Client for the network being replayed.
 /// * `seqno` — Master-block sequence number.
 ///
 /// # Returns
 ///
 /// Returns the config cell as a base64-encoded `BoC`.
-pub(crate) async fn get_block_config(net: Network, seqno: u32) -> anyhow::Result<String> {
-    let client = TonCenterClient::new(net)?;
+pub(crate) async fn get_block_config(
+    client: &TonCenterClient,
+    seqno: u32,
+) -> anyhow::Result<String> {
     let config = client.get_config_all(seqno).await?;
     Ok(Boc::encode_base64(config))
 }
 
 /// Retrieves all transactions of an account within a logical-time interval.
 ///
-/// Fetches transactions in the range `(min_lt, base_tx.lt]`, inclusive of the
+/// Fetches transactions in the range `(after_lt, base_tx.lt]`, inclusive of the
 /// target transaction. This is essential for reconstructing the account state
-/// by re-playing all preceding transactions that occurred in the same block.
+/// by replaying every transaction after the loaded account snapshot.
 ///
 /// # Arguments
 ///
-/// * `net`     — Network to use.
+/// * `client` — Client for the network being replayed.
 /// * `base_tx` — The "upper bound" transaction handle.
-/// * `min_lt`  — Lower logical‑time boundary.
+/// * `after_lt` — Last transaction LT in the loaded account snapshot.
 ///
 /// # Returns
 ///
 /// Returns transactions ordered from **newest to oldest**.
 pub(crate) async fn find_all_transactions_between(
-    net: Network,
+    client: &TonCenterClient,
     base_tx: &BaseTxInfo,
-    min_lt: u64,
+    after_lt: u64,
 ) -> anyhow::Result<Vec<tycho_types::models::Transaction>> {
-    let client = TonCenterClient::new(net)?;
-
     let address = base_tx.address.display_base64_url(false).to_string();
     let hash_base64 = general_purpose::STANDARD.encode(base_tx.hash);
 
-    let to_lt = min_lt.saturating_sub(1);
-
     let raw_txs = client
-        .get_transactions_toncenter(&address, base_tx.lt, &hash_base64, to_lt, 1000)
+        .get_account_transactions(&address, base_tx.lt, &hash_base64, after_lt, 1000)
         .await?;
 
-    let mut txs = Vec::new();
+    let mut txs = Vec::with_capacity(raw_txs.len());
+    let mut expected_lt = base_tx.lt;
+    let mut expected_hash = HashBytes(base_tx.hash);
     for raw_tx in raw_txs {
-        let Some(data) = raw_tx.get("data").and_then(|v| v.as_str()) else {
-            continue;
-        };
-        let cell = Boc::decode_base64(data)?;
-        let tx: tycho_types::models::Transaction = cell.parse()?;
+        let cell = Boc::decode_base64(raw_tx.data).with_context(|| {
+            format!(
+                "Failed to decode transaction at LT {}",
+                raw_tx.transaction_id.lt
+            )
+        })?;
+        let tx: tycho_types::models::Transaction = cell.parse().with_context(|| {
+            format!(
+                "Failed to parse TON Center transaction at LT {}",
+                raw_tx.transaction_id.lt
+            )
+        })?;
+        if tx.lt != expected_lt || *cell.repr_hash() != expected_hash {
+            anyhow::bail!(
+                "TON Center history does not match expected transaction at LT {expected_lt}"
+            );
+        }
+        if tx.account != base_tx.address.address || tx.lt <= after_lt {
+            anyhow::bail!(
+                "TON Center history contains a transaction outside the requested account or LT range"
+            );
+        }
+        if tx.prev_trans_lt >= tx.lt {
+            anyhow::bail!(
+                "TON Center transaction at LT {} has an invalid predecessor LT",
+                tx.lt
+            );
+        }
+
+        expected_lt = tx.prev_trans_lt;
+        expected_hash = tx.prev_trans_hash;
         txs.push(tx);
     }
 
-    Ok(txs)
-}
-
-/// Computes the smallest logical-time for an account within a master-block.
-///
-/// Scans every shard-summary in the master-block to find the earliest
-/// transaction of the specified account. This marks the starting point
-/// for state reconstruction.
-///
-/// # Arguments
-///
-/// * `tx`      — Target (latest) transaction object.
-/// * `address` — Account address.
-/// * `block`   — Master‑block that contains `tx`.
-///
-/// # Returns
-///
-/// Returns the minimum logical‑time as `u64`.
-pub(crate) fn compute_min_lt(
-    tx: &tycho_types::models::Transaction,
-    address: &StdAddr,
-    block: &BlockInfo,
-) -> u64 {
-    let mut min_lt = tx.lt;
-    let addr_str = address.display_base64_url(false).to_string();
-    for shard in &block.shards {
-        for tx_in_block in &shard.transactions {
-            if tx_in_block.account == addr_str
-                && let Ok(lt) = tx_in_block.lt.parse::<u64>()
-                && lt < min_lt
-            {
-                min_lt = lt;
-            }
-        }
+    // An archive can return fewer records than requested. Follow the chain to
+    // detect truncation independently of the server's page size.
+    if expected_lt > after_lt {
+        anyhow::bail!("Incomplete TON Center history: missing transaction at LT {expected_lt}");
     }
-    min_lt
+
+    Ok(txs)
 }
 
 /// Returns an account snapshot as it existed *before* the current master‑block.
 ///
 /// Fetches the account state at the end of the preceding master-block (N-1)
 /// and converts it into a [`ShardAccount`] suitable for the TVM executor.
+/// For block 1, `TON Center` cannot serve the zerostate, so replay uses the state
+/// after block 1 as an approximation. The resulting state hash can differ from
+/// the on-chain transaction and is still checked by the caller.
 ///
 /// # Arguments
 ///
-/// * `net`     — Network to use.
+/// * `client` — Client for the network being replayed.
 /// * `address` — Account address.
-/// * `block`   — The master‑block (N) containing the target transaction.
+/// * `mc_seqno` — The master-block (N) containing the target transaction.
 ///
 /// # Returns
 ///
-/// Returns [`ShardAccount`] representing the state on master‑block N‑1.
+/// Returns [`ShardAccount`] at N-1, or at block 1 for the first-block approximation.
 pub(crate) async fn get_block_account(
-    net: Network,
+    client: &TonCenterClient,
     address: &StdAddr,
-    block: &BlockInfo,
+    mc_seqno: u32,
 ) -> anyhow::Result<ShardAccount> {
-    let client = TonCenterClient::new(net)?;
-
-    let block_seqno = block
-        .shards
-        .first()
-        .map(|s| s.seqno)
-        .ok_or_else(|| anyhow::anyhow!("No shards found in master block"))?;
-    let prev_block_seqno = block_seqno
+    // TonCenter rejects seqno 0. Match retracer-core's first-block replay while
+    // keeping the state-hash comparison visible to callers.
+    let state_block_seqno = mc_seqno
         .checked_sub(1)
-        .ok_or_else(|| anyhow::anyhow!("Cannot fetch account state before block seqno 0"))?;
+        .ok_or_else(|| anyhow::anyhow!("Cannot fetch account state before block seqno 0"))?
+        .max(1);
     let address_str = address.to_string();
 
     let shard_account_cell = client
-        .get_shard_account_cell(prev_block_seqno, &address_str)
+        .get_shard_account_cell(state_block_seqno, &address_str)
         .await?;
 
     let shard_account: ShardAccount = shard_account_cell
@@ -361,6 +299,8 @@ pub(crate) fn tx_opcode(tx: &tycho_types::models::Transaction) -> Option<u32> {
 /// Assembles final execution data from successful emulation results.
 ///
 /// Extracts balance changes, fee breakdown, and compute phase statistics.
+/// Tick-tock has no incoming message, so its contract address comes from the
+/// requested transaction's account, even if execution destroyed the account.
 ///
 /// # Returns
 ///
@@ -370,6 +310,7 @@ pub(crate) fn tx_opcode(tx: &tycho_types::models::Transaction) -> Option<u32> {
 pub(crate) fn compute_final_data(
     res: &RunTransactionResultSuccess,
     balance_before: Tokens,
+    contract_address: &StdAddr,
 ) -> anyhow::Result<(
     Option<IntAddr>,
     IntAddr,
@@ -387,28 +328,32 @@ pub(crate) fn compute_final_data(
     let emulated_tx_cell = Boc::decode_base64(res.transaction.as_ref())?;
     let emulated_tx: tycho_types::models::Transaction = emulated_tx_cell.parse()?;
 
-    let in_msg = emulated_tx
-        .load_in_msg()?
-        .ok_or_else(|| anyhow::anyhow!("No in_message was found in result tx"))?;
+    let (src, dest, amount, compute_phase) = match emulated_tx.load_info()? {
+        TxInfo::Ordinary(info) => {
+            let in_msg = emulated_tx
+                .load_in_msg()?
+                .context("No in_message was found in result tx")?;
 
-    let (src, dest, amount) = match &in_msg.info {
-        MsgInfo::Int(info) => (
-            Some(info.src.clone()),
-            info.dst.clone(),
-            Some(info.value.tokens),
+            let (src, dest, amount) = match in_msg.info {
+                MsgInfo::Int(info) => (Some(info.src), info.dst, Some(info.value.tokens)),
+                MsgInfo::ExtIn(info) => (None, info.dst, None),
+                MsgInfo::ExtOut(_) => anyhow::bail!("External out message as in_msg"),
+            };
+
+            (src, dest, amount, info.compute_phase)
+        }
+        TxInfo::TickTock(info) => (
+            None,
+            IntAddr::Std(contract_address.clone()),
+            None,
+            info.compute_phase,
         ),
-        MsgInfo::ExtIn(info) => (None, info.dst.clone(), None),
-        MsgInfo::ExtOut(_) => anyhow::bail!("External out message as in_msg"),
     };
 
     let sent_total = calculate_sent_total(&emulated_tx);
     let total_fees = emulated_tx.total_fees.tokens;
 
-    let TxInfo::Ordinary(info) = emulated_tx.load_info()? else {
-        anyhow::bail!("Only ordinary transactions are supported");
-    };
-
-    let compute_info = match info.compute_phase {
+    let compute_info = match compute_phase {
         tycho_types::models::ComputePhase::Skipped(_) => ComputeInfo::Skipped,
         tycho_types::models::ComputePhase::Executed(exec) => ComputeInfo::Success {
             success: exec.success,
@@ -432,14 +377,16 @@ pub(crate) fn compute_final_data(
 /// Loads a library cell (T‑lib) by its 256‑bit hash.
 ///
 /// Fetches the library from `TON Center`.
-pub(crate) async fn get_library_by_hash(net: Network, hash: &str) -> anyhow::Result<Cell> {
-    let toncenter = TonCenterClient::new(net)?;
-    let data = toncenter.get_libraries(hash).await?;
+pub(crate) async fn get_library_by_hash(
+    client: &TonCenterClient,
+    hash: &str,
+) -> anyhow::Result<Cell> {
+    let data = client.get_libraries(hash).await?;
     Boc::decode_base64(data).context("Failed to decode library BOC data")
 }
 
 async fn add_maybe_exotic_library(
-    net: Network,
+    client: &TonCenterClient,
     code: Option<Cell>,
 ) -> anyhow::Result<Option<(HashBytes, Cell)>> {
     const EXOTIC_LIBRARY_TAG: u8 = 2;
@@ -460,7 +407,7 @@ async fn add_maybe_exotic_library(
 
     let lib_hash = cs.load_u256()?;
     let lib_hash_hex = format!("{lib_hash:X}");
-    let actual_code = get_library_by_hash(net, &lib_hash_hex).await?;
+    let actual_code = get_library_by_hash(client, &lib_hash_hex).await?;
     Ok(Some((lib_hash, actual_code)))
 }
 
@@ -473,7 +420,7 @@ async fn add_maybe_exotic_library(
 ///
 /// # Arguments
 ///
-/// * `net`             — Network to use.
+/// * `client`          — Client for the network being replayed.
 /// * `account`         — Current account state.
 /// * `tx`              — Incoming transaction.
 /// * `additional_libs` — User-provided libraries to include.
@@ -482,7 +429,7 @@ async fn add_maybe_exotic_library(
 ///
 /// Returns a tuple: (Dictionary cell with resolved libs, Actual code cell if original code was exotic).
 pub(crate) async fn collect_used_libraries(
-    net: Network,
+    client: &TonCenterClient,
     account: &ShardAccount,
     tx: &tycho_types::models::Transaction,
     additional_libs: &HashMap<HashBytes, Cell>,
@@ -500,7 +447,7 @@ pub(crate) async fn collect_used_libraries(
         // cell may itself be a 264‑bit exotic library reference (tag 2).
         // If that’s the case, download the real library code and
         // register it in the `libs` dictionary.
-        if let Some((hash, code)) = add_maybe_exotic_library(net.clone(), state.code).await? {
+        if let Some((hash, code)) = add_maybe_exotic_library(client, state.code).await? {
             libs.insert(hash, code.clone());
             loaded_cell_code = Some(code);
         }
@@ -515,7 +462,7 @@ pub(crate) async fn collect_used_libraries(
         // be an exotic library cell. We must preload such libraries as
         // well, otherwise the sandbox would fail to resolve a library
         // during emulation.
-        if let Some((hash, code)) = add_maybe_exotic_library(net, init.code).await? {
+        if let Some((hash, code)) = add_maybe_exotic_library(client, init.code).await? {
             libs.insert(hash, code.clone());
             loaded_cell_code.get_or_insert(code);
         }
@@ -537,56 +484,4 @@ pub(crate) async fn collect_used_libraries(
     }
 
     Ok((dict.into_root(), loaded_cell_code))
-}
-
-pub(crate) mod boc_ext {
-    use base64::Engine;
-    use base64::engine::general_purpose;
-    use tycho_types::boc::de;
-    use tycho_types::boc::de::Options;
-    use tycho_types::cell::{Cell, CellContext, CellFamily};
-
-    macro_rules! ok {
-        ($e:expr $(,)?) => {
-            match $e {
-                core::result::Result::Ok(val) => val,
-                core::result::Result::Err(err) => return core::result::Result::Err(err),
-            }
-        };
-    }
-
-    pub(super) fn decode_multi_root_base64<T: AsRef<[u8]>>(
-        data: T,
-    ) -> Result<Vec<Cell>, de::Error> {
-        fn decode_base64_impl(data: &[u8]) -> Result<Vec<Cell>, de::Error> {
-            match general_purpose::STANDARD.decode(data) {
-                Ok(data) => decode_ext(data.as_slice(), Cell::empty_context()),
-                Err(_) => Err(de::Error::UnknownBocTag),
-            }
-        }
-        decode_base64_impl(data.as_ref())
-    }
-
-    pub(super) fn decode_ext(
-        data: &[u8],
-        context: &dyn CellContext,
-    ) -> Result<Vec<Cell>, de::Error> {
-        let header = ok!(de::BocHeader::decode(
-            data,
-            &Options {
-                max_roots: Some(usize::MAX),
-                min_roots: Some(1),
-            },
-        ));
-
-        let mut final_cells = vec![];
-        let cells = ok!(header.finalize(context));
-        for root in header.roots() {
-            if let Some(root) = cells.get(*root) {
-                final_cells.push(root);
-            }
-        }
-
-        Ok(final_cells)
-    }
 }

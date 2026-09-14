@@ -19,6 +19,11 @@ export {
   type CustomTlbParseResult,
 } from "./customTlb"
 export {
+  parseDomainCell,
+  type DomainParser,
+  type DomainParserMatch,
+} from "./domain-parsers"
+export {
   canonicalizeBase64,
   decodeCellInput,
   DEFAULT_MAX_INPUT_BYTES,

@@ -4,269 +4,140 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-pub async fn simulated_localnet_state_dump_cmd(
-    path: PathBuf,
-    force: bool,
+/// Saved JSON snapshots use stable IDs; import creates a new snapshot and restore is explicit.
+#[derive(clap::Subcommand, Clone)]
+pub enum SnapshotCommand {
+    #[command(about = "Save the current network state as a persistent JSON snapshot")]
+    Create { name: Option<String> },
+    #[command(about = "List saved snapshots")]
+    List,
+    #[command(about = "Restore the network state from a saved snapshot")]
+    Restore { id: String },
+    #[command(about = "Delete a saved snapshot")]
+    Delete { id: String },
+    #[command(about = "Export a saved snapshot to a JSON file")]
+    Export {
+        id: String,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long, help = "Overwrite the output file")]
+        force: bool,
+    },
+    #[command(about = "Import a JSON snapshot without restoring it")]
+    Import {
+        path: PathBuf,
+        #[arg(long)]
+        name: Option<String>,
+    },
+}
+
+/// Uses the node control API so CLI and Studio share snapshot validation and ownership.
+pub async fn simulated_localnet_snapshot_cmd(
+    command: SnapshotCommand,
     port: u16,
     auth_token: Option<String>,
+    json: bool,
 ) -> anyhow::Result<()> {
-    let path = resolve_project_path(path);
-    if path.exists() && !force {
-        anyhow::bail!(
-            "Output file {} already exists; pass {} to overwrite it",
-            path.display().to_string().cyan(),
-            "--force".yellow(),
-        );
-    }
-    let json =
-        super::get_localnet_control_bytes(port, auth_token, "acton_dumpState", &[], "Dump state")
+    let result = match command {
+        SnapshotCommand::Create { name } => {
+            super::post_localnet_control(
+                port,
+                auth_token,
+                "acton_createSnapshot",
+                serde_json::json!({ "name": name }),
+                "Create snapshot",
+            )
+            .await?
+        }
+        SnapshotCommand::List => {
+            super::get_localnet_control(port, auth_token, "acton_listSnapshots", "List snapshots")
+                .await?
+        }
+        SnapshotCommand::Restore { id } => {
+            super::post_localnet_control(
+                port,
+                auth_token,
+                "acton_restoreSnapshot",
+                serde_json::json!({ "id": id }),
+                "Restore snapshot",
+            )
+            .await?
+        }
+        SnapshotCommand::Delete { id } => {
+            super::post_localnet_control(
+                port,
+                auth_token,
+                "acton_deleteSnapshot",
+                serde_json::json!({ "id": id }),
+                "Delete snapshot",
+            )
             .await?;
-    write_json_atomically(&path, &json)?;
 
-    println!(
-        "{} localnet state to {}",
-        "Dumped".green().bold(),
-        display_project_path(&path).dimmed(),
-    );
-    Ok(())
-}
+            serde_json::json!({ "deleted": id })
+        }
+        SnapshotCommand::Export { id, out, force } => {
+            let out = resolve_project_path(out);
+            let bytes = super::get_localnet_control_bytes(
+                port,
+                auth_token,
+                "acton_exportSnapshot",
+                &[("id", id.as_str())],
+                "Export snapshot",
+            )
+            .await?;
 
-pub async fn simulated_localnet_state_load_cmd(
-    path: PathBuf,
-    port: u16,
-    auth_token: Option<String>,
-) -> anyhow::Result<()> {
-    let path = resolve_project_path(path);
-    let json = fs::read(&path).with_context(|| {
-        format!(
-            "Failed to read localnet state file {}",
-            path.display().to_string().cyan()
-        )
-    })?;
-    super::post_localnet_control_bytes(
-        port,
-        auth_token,
-        "acton_loadState",
-        &[],
-        json,
-        "Load state",
-    )
-    .await?;
+            write_json_atomically(&out, &bytes, force)?;
 
-    println!(
-        "{} localnet state from {}",
-        "Loaded".green().bold(),
-        display_project_path(&path).dimmed(),
-    );
-    Ok(())
-}
+            serde_json::json!({ "exported": id, "path": display_project_path(&out) })
+        }
+        SnapshotCommand::Import { path, name } => {
+            let path = resolve_project_path(path);
+            let bytes = fs::read(&path)
+                .with_context(|| format!("Cannot read snapshot {}", path.display()))?;
+            let query = name
+                .as_deref()
+                .map(|name| vec![("name", name)])
+                .unwrap_or_default();
 
-pub async fn simulated_localnet_checkpoint_create_cmd(
-    name: &str,
-    force: bool,
-    port: u16,
-    auth_token: Option<String>,
-) -> anyhow::Result<()> {
-    let name = normalize_checkpoint_name(name)?;
-
-    super::post_localnet_control(
-        port,
-        auth_token,
-        "acton_createCheckpoint",
-        serde_json::json!({
-            "name": &name,
-            "force": force,
-        }),
-        "Create checkpoint",
-    )
-    .await?;
-
-    println!(
-        "{} localnet checkpoint {}",
-        "Created".green().bold(),
-        name.cyan(),
-    );
-    Ok(())
-}
-
-pub async fn simulated_localnet_checkpoint_list_cmd(
-    port: u16,
-    auth_token: Option<String>,
-) -> anyhow::Result<()> {
-    let result = super::get_localnet_control(
-        port,
-        auth_token,
-        "acton_listCheckpoints",
-        "List checkpoints",
-    )
-    .await?;
-    let checkpoints = result
-        .as_array()
-        .cloned()
-        .unwrap_or_default()
-        .into_iter()
-        .filter_map(|checkpoint| {
-            Some((
-                checkpoint.get("name")?.as_str()?.to_owned(),
-                checkpoint.get("block_seqno")?.as_u64()?,
-            ))
-        })
-        .collect::<Vec<_>>();
-    if checkpoints.is_empty() {
-        println!("No localnet checkpoints found");
-        return Ok(());
-    }
-
-    println!("{}", "Localnet checkpoints:".white().bold());
-    for (name, block_seqno) in checkpoints {
-        let block = format!("(block {block_seqno})");
-        println!("  {} {}", name.cyan(), block.dimmed());
-    }
-    Ok(())
-}
-
-pub async fn simulated_localnet_checkpoint_restore_cmd(
-    name: &str,
-    port: u16,
-    auth_token: Option<String>,
-) -> anyhow::Result<()> {
-    let name = normalize_checkpoint_name(name)?;
-
-    super::post_localnet_control(
-        port,
-        auth_token,
-        "acton_restoreCheckpoint",
-        serde_json::json!({ "name": &name }),
-        "Restore checkpoint",
-    )
-    .await?;
-
-    println!(
-        "{} localnet checkpoint {}",
-        "Restored".green().bold(),
-        name.cyan(),
-    );
-    Ok(())
-}
-
-pub async fn simulated_localnet_checkpoint_delete_cmd(
-    name: &str,
-    port: u16,
-    auth_token: Option<String>,
-) -> anyhow::Result<()> {
-    let name = normalize_checkpoint_name(name)?;
-    super::post_localnet_control(
-        port,
-        auth_token,
-        "acton_deleteCheckpoint",
-        serde_json::json!({ "name": &name }),
-        "Delete checkpoint",
-    )
-    .await?;
-
-    println!(
-        "{} localnet checkpoint {}",
-        "Deleted".green().bold(),
-        name.cyan(),
-    );
-    Ok(())
-}
-
-pub async fn simulated_localnet_checkpoint_clear_cmd(
-    port: u16,
-    auth_token: Option<String>,
-) -> anyhow::Result<()> {
-    let result = super::post_localnet_control(
-        port,
-        auth_token,
-        "acton_clearCheckpoints",
-        serde_json::json!({}),
-        "Clear checkpoints",
-    )
-    .await?;
-    let deleted = result
-        .get("deleted")
-        .and_then(serde_json::Value::as_u64)
-        .unwrap_or_default();
-    println!(
-        "{} {deleted} localnet checkpoint{}",
-        "Deleted".green().bold(),
-        if deleted == 1 { "" } else { "s" },
-    );
-    Ok(())
-}
-
-pub async fn simulated_localnet_checkpoint_export_cmd(
-    name: &str,
-    out: PathBuf,
-    force: bool,
-    port: u16,
-    auth_token: Option<String>,
-) -> anyhow::Result<()> {
-    let name = normalize_checkpoint_name(name)?;
-    let out = resolve_project_path(out);
-    if out.exists() && !force {
-        anyhow::bail!(
-            "Output file {} already exists; pass {} to overwrite it",
-            out.display().to_string().cyan(),
-            "--force".yellow(),
-        );
-    }
-    let json = super::get_localnet_control_bytes(
-        port,
-        auth_token,
-        "acton_exportCheckpoint",
-        &[("name", name.as_str())],
-        "Export checkpoint",
-    )
-    .await?;
-    write_json_atomically(&out, &json)?;
-
-    println!(
-        "{} localnet checkpoint {} to {}",
-        "Exported".green().bold(),
-        name.cyan(),
-        display_project_path(&out).dimmed(),
-    );
-    Ok(())
-}
-
-pub async fn simulated_localnet_checkpoint_import_cmd(
-    path: PathBuf,
-    name: Option<String>,
-    force: bool,
-    port: u16,
-    auth_token: Option<String>,
-) -> anyhow::Result<()> {
-    let path = resolve_project_path(path);
-    let json = fs::read(&path).with_context(|| {
-        format!(
-            "Failed to read checkpoint file {}",
-            path.display().to_string().cyan()
-        )
-    })?;
-    let name = match name {
-        Some(name) => normalize_checkpoint_name(&name)?,
-        None => checkpoint_name_from_path(&path)?,
+            super::post_localnet_control_bytes(
+                port,
+                auth_token,
+                "acton_importSnapshot",
+                &query,
+                bytes,
+                "Import snapshot",
+            )
+            .await?
+        }
     };
-    let force = force.to_string();
-    super::post_localnet_control_bytes(
-        port,
-        auth_token,
-        "acton_importCheckpoint",
-        &[("name", name.as_str()), ("force", force.as_str())],
-        json,
-        "Import checkpoint",
-    )
-    .await?;
 
-    println!(
-        "{} localnet checkpoint {} from {}",
-        "Imported".green().bold(),
-        name.cyan(),
-        display_project_path(&path).dimmed(),
-    );
+    if json {
+        println!("{}", serde_json::to_string_pretty(&result)?);
+    } else if let Some(snapshots) = result.as_array() {
+        if snapshots.is_empty() {
+            println!("No snapshots yet");
+        }
+
+        for snapshot in snapshots {
+            print_snapshot(snapshot);
+        }
+    } else if result.get("id").is_some() {
+        print_snapshot(&result);
+    } else {
+        println!("{}", serde_json::to_string_pretty(&result)?);
+    }
+
     Ok(())
+}
+
+fn print_snapshot(snapshot: &serde_json::Value) {
+    println!(
+        "{}  {}  (block {}, {} bytes)",
+        snapshot["id"].as_str().unwrap_or_default().cyan(),
+        snapshot["name"].as_str().unwrap_or("Snapshot"),
+        snapshot["block_seqno"],
+        snapshot["size_bytes"]
+    );
 }
 
 fn resolve_project_path(path: PathBuf) -> PathBuf {
@@ -277,7 +148,7 @@ fn resolve_project_path(path: PathBuf) -> PathBuf {
     }
 }
 
-fn write_json_atomically(path: &Path, json: &[u8]) -> anyhow::Result<()> {
+fn write_json_atomically(path: &Path, json: &[u8], force: bool) -> anyhow::Result<()> {
     let parent = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
@@ -288,42 +159,21 @@ fn write_json_atomically(path: &Path, json: &[u8]) -> anyhow::Result<()> {
     temp.write_all(json)?;
     temp.as_file_mut().flush()?;
     temp.as_file().sync_all()?;
-    temp.persist(path).map_err(|error| error.error)?;
+
+    if force {
+        temp.persist(path)
+    } else {
+        temp.persist_noclobber(path)
+    }
+    .map_err(|error| error.error)
+    .with_context(|| {
+        format!(
+            "Cannot export snapshot to {}; use --force to replace an existing file",
+            path.display()
+        )
+    })?;
+
     Ok(())
-}
-
-fn normalize_checkpoint_name(name: &str) -> anyhow::Result<String> {
-    let name = name.trim();
-    if name.is_empty() {
-        anyhow::bail!("Localnet checkpoint name cannot be empty");
-    }
-    if name == "." || name == ".." {
-        anyhow::bail!("Localnet checkpoint name cannot be {}", name.cyan());
-    }
-    if !name
-        .bytes()
-        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
-    {
-        anyhow::bail!(
-            "Invalid localnet checkpoint name {}; use only letters, numbers, '.', '_' and '-'",
-            name.cyan(),
-        );
-    }
-    Ok(name.to_owned())
-}
-
-fn checkpoint_name_from_path(path: &Path) -> anyhow::Result<String> {
-    let stem = path
-        .file_stem()
-        .and_then(|name| name.to_str())
-        .with_context(|| {
-            format!(
-                "Cannot infer localnet checkpoint name from file {}; pass {}",
-                path.display().to_string().cyan(),
-                "--name".yellow(),
-            )
-        })?;
-    normalize_checkpoint_name(stem)
 }
 
 fn display_project_path(path: &Path) -> String {

@@ -331,15 +331,15 @@ the scaffold. `App.tsx` only contains poll-specific logic.
 The scaffold defaults to mainnet. For testnet, append `?testnet=true` to the URL — the bundled router picks up the flag and sends transactions via the testnet chain id.
 
 ```bash
-npm run dev
+npm run dev -- --host 127.0.0.1
 ```
 
 ```acton-cli noCopy title="terminal"
   VITE v6.x.x  ready in 312 ms
-  ➜  Local:   http://localhost:5173/
+  ➜  Local:   http://127.0.0.1:5173/
 ```
 
-Open [http://localhost:5173/?testnet=true](http://localhost:5173/?testnet=true). The page shows:
+Open [http://127.0.0.1:5173/?testnet=true](http://127.0.0.1:5173/?testnet=true). The page shows:
 
 1. An **Acton Poll** header with a **Connect Wallet** button
 2. Two progress bars with current vote counts, refreshed every 5 seconds

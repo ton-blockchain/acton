@@ -324,6 +324,10 @@
   flex: 1 1 auto;
 }
 
+.messageAddress > :first-child {
+  color: var(--acton-color-accent);
+}
+
 .messageIndex {
   box-sizing: border-box;
   display: grid;
@@ -331,6 +335,7 @@
   height: 24px;
   flex: 0 0 auto;
   place-items: center;
+  margin-top: -2px;
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-semibold);

@@ -18,7 +18,8 @@ dependencies.
 For each successful build, Acton writes a JSON artifact to the build output
 directory. When compiler ABI is available, Acton also writes a contract ABI JSON
 file to the ABI output directory. When the contract config has an \fBoutput\fR path,
-Acton writes the compiled \fB\&.boc\fR file there. Dependency helper files are emitted
+Acton writes the compiled \fB\&.boc\fR file there. Use \fB\-\-output\-boc\fR to also export
+the code for every built contract into one directory. Dependency helper files are emitted
 into the generated\-code directory, and optional Fift output can be written
 separately. Source registration artifacts for local explorer source upload can
 also be written when explicitly configured.
@@ -70,6 +71,16 @@ Defaults to \fB[build].gen\-dir\fR when configured, otherwise \fBgen/\fR\&.
 Directory for contract ABI JSON files.
 .sp
 Defaults to \fB[build].output\-abi\fR when configured, otherwise \fBbuild/abi/\fR\&.
+.RE
+.sp
+\fB\-\-output\-boc\fR \fIdir\fR
+.RS 4
+Directory for \fB<contract\-name>.boc\fR files from compiled \fB\&.tolk\fR contracts and
+precompiled \fB\&.boc\fR inputs.
+.sp
+Defaults to \fB[build].output\-boc\fR when configured. If neither value is set,
+Acton writes BoC files only to individual contract \fBoutput\fR paths.
+When enabled, this export is additional to those paths.
 .RE
 .sp
 \fB\-\-output\-fift\fR \fIdir\fR
@@ -153,12 +164,15 @@ Optional default output paths can be configured in \fB[build]\fR:
 out\-dir = "build"
 gen\-dir = "gen"
 output\-abi = "build/abi"
+output\-boc = "build/boc"
 output\-fift = "build/fift"
 output\-sources = "build/sources"
 .fi
 .RE
 .sp
 CLI flags override config values for the current invocation.
+Relative output paths in the config resolve from the project root.
+Relative output paths in CLI flags resolve from the current working directory.
 For dependency helpers, a per\-dependency \fBdepends[].path\fR still overrides the
 resolved \fBgen\-dir\fR for that helper file.
 .SH "OUTPUTS"
@@ -175,6 +189,11 @@ Depending on command flags and project configuration, \fBacton build\fR may writ
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'the configured contract \fBoutput\fR \fB\&.boc\fR file
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB<output\-boc>/<contract\-name>.boc\fR for compiled \fB\&.tolk\fR contracts and
+precompiled \fB\&.boc\fR inputs
 .RE
 .sp
 .RS 4
@@ -289,6 +308,7 @@ acton build \-\-graph deps.dot
 .nf
 acton build \-\-out\-dir artifacts \-\-gen\-dir artifacts/gen \(rs
                                 \-\-output\-abi artifacts/abi \(rs
+                                \-\-output\-boc artifacts/boc \(rs
                                 \-\-output\-fift artifacts/fift \(rs
                                 \-\-output\-sources artifacts/sources
 .fi

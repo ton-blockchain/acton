@@ -113,6 +113,7 @@ export default defineConfig(({mode}) => {
       emptyOutDir: true,
     },
     server: {
+      host: "127.0.0.1",
       port: 3007,
       proxy: {
         ...toncenterNetworkDevProxies("mainnet", mainnetApiV2Url, mainnetApiV3Url, mainnetApiKey),

@@ -9,7 +9,8 @@ import {Cell} from "@ton/core"
 
 import type {AccountHistorySortOrder, TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
-import {sortJettonWalletsByAmount} from "../api/jettonWallets"
+import {resolveAccountCompilerAbi} from "../api/compilerAbiResolver"
+import {sortJettonWalletsForDisplay} from "../api/jettonWallets"
 import {isAddressSuspended} from "../api/suspendedAccounts"
 import type {
   AddressInformation,
@@ -51,12 +52,20 @@ import {NftOverview} from "../components/NftOverview"
 import {SuspendedAccountOverview} from "../components/SuspendedAccountOverview"
 import {VestingOverview} from "../components/VestingOverview"
 import {
+  NominatorPoolNominatorsTab,
+  NominatorPoolOverview,
+  SingleNominatorOverview,
+  type NominatorPoolDetailsState,
+} from "../components/staking-pool-details"
+import {
   NFT_CARD_IMAGE_SOURCE_KEYS,
   NFT_COLLECTION_CARD_IMAGE_SOURCE_KEYS,
   NFT_IMAGE_SOURCE_KEYS,
+  NFT_PLACEHOLDER_IMAGE,
   TOKEN_IMAGE_SOURCE_KEYS,
   TOKEN_PLACEHOLDER_IMAGE,
   getImageSources,
+  getNftImageSources,
   replaceBrokenImageWithFallback,
 } from "../components/imageFallbacks"
 import {mergeAccountDomains, normalizeAddress, toRawAddress} from "../components/utils"
@@ -66,7 +75,6 @@ import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useOpenExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
-import {isNftItemNsfw} from "../nftSafetyRegistry"
 import {
   countActionsForTrace,
   mergeAutomaticActionPage,
@@ -227,6 +235,9 @@ export const AccountPage: FC<AccountPageProps> = ({
   const [vestingData, setVestingData] = useState<VestingData | undefined>()
   const [multisigDetails, setMultisigDetails] = useState<MultisigDetailsState>({status: "idle"})
   const [multisigReloadKey, setMultisigReloadKey] = useState(0)
+  const [nominatorPoolDetails, setNominatorPoolDetails] = useState<NominatorPoolDetailsState>({
+    status: "loading",
+  })
   const [hoveredMultisigSignerAddress, setHoveredMultisigSignerAddress] = useState<
     string | undefined
   >()
@@ -340,6 +351,7 @@ export const AccountPage: FC<AccountPageProps> = ({
   )
   useEffect(() => {
     setHoveredMultisigSignerAddress(undefined)
+    setNominatorPoolDetails({status: "loading"})
   }, [accountRequestKey])
   const historyRequestKey = `${accountRequestKey}:${historySortOrder}`
   const activeTab = useMemo<AccountTab>(() => {
@@ -360,6 +372,13 @@ export const AccountPage: FC<AccountPageProps> = ({
     }
   }, [accountState?.code, accountStateV3?.code_hash])
   const compilerAbi = extendedContractAbi?.compiler_abi
+  const isNominatorPoolAccount = compilerAbi?.contract_name === "NominatorPool"
+  const singleNominatorVersion =
+    compilerAbi?.contract_name === "SingleNominatorV10"
+      ? "1.0"
+      : compilerAbi?.contract_name === "SingleNominatorV11"
+        ? "1.1"
+        : undefined
   const isJettonMasterAccount = hasAccountContractHint(
     accountInterfaces,
     accountTokenInfo,
@@ -375,6 +394,15 @@ export const AccountPage: FC<AccountPageProps> = ({
     accountInterfaces,
     accountTokenInfo,
     "nft_collection",
+  )
+  const accountAbiInterfaces = useMemo(
+    () => [
+      ...(isJettonMasterAccount ? ["jetton_master"] : []),
+      ...(isJettonWalletAccount ? ["jetton_wallet"] : []),
+      ...(isNftItemAccount ? ["nft_item"] : []),
+      ...(isNftCollectionAccount ? ["nft_collection"] : []),
+    ],
+    [isJettonMasterAccount, isJettonWalletAccount, isNftItemAccount, isNftCollectionAccount],
   )
   const isMultisigWalletAccount = hasAccountInterface(accountInterfaces, "multisig_v2")
   const isMultisigOrderAccount = hasAccountInterface(accountInterfaces, "multisig_order_v2")
@@ -989,8 +1017,12 @@ export const AccountPage: FC<AccountPageProps> = ({
 
       try {
         const abis = await metadataRegistry.getCompilerAbis([accountCodeLookupHash])
+        const abi = await resolveAccountCompilerAbi(
+          abis[accountCodeLookupHash],
+          accountAbiInterfaces,
+        )
         if (!isActive) return
-        setExtendedContractAbi(abis[accountCodeLookupHash] ?? undefined)
+        setExtendedContractAbi(abi)
         setCompilerAbiLoading(false)
       } catch (error) {
         if (!isActive) return
@@ -1004,7 +1036,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     return () => {
       isActive = false
     }
-  }, [accountCodeLookupHash, metadataRegistry])
+  }, [accountCodeLookupHash, accountAbiInterfaces, metadataRegistry])
 
   useEffect(() => {
     let isActive = true
@@ -1203,7 +1235,7 @@ export const AccountPage: FC<AccountPageProps> = ({
         })
         if (!isActive) return
         setAccountTokensState({
-          wallets: sortJettonWalletsByAmount(wallets),
+          wallets: sortJettonWalletsForDisplay(wallets),
           isLoading: false,
           isLoadingMore: false,
           hasMore: wallets.length === ACCOUNT_TOKENS_INITIAL_LIMIT,
@@ -1616,7 +1648,7 @@ export const AccountPage: FC<AccountPageProps> = ({
         })
         if (!isActive) return
         setJettonHoldersState({
-          wallets: sortJettonWalletsByAmount(masterHolders),
+          wallets: sortJettonWalletsForDisplay(masterHolders),
           loadedAccountKey: accountRequestKey,
           isLoading: false,
           isLoadingMore: false,
@@ -1780,9 +1812,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     : undefined
   const nftItemTokenInfo = accountTokenInfo.find(info => info.type === "nft_items")
   const nftCollectionTokenInfo = accountTokenInfo.find(info => info.type === "nft_collections")
-  const nftItemIsNsfw =
-    nftItemTokenInfo?.is_nsfw === true ||
-    (currentNftItem !== undefined && isNftItemNsfw(currentNftItem))
+  const nftItemIsNsfw = nftItemTokenInfo?.is_nsfw === true || currentNftItem?.is_nsfw === true
   const nftItemName =
     tokenInfoString(nftItemTokenInfo, "name") ||
     contentString(currentNftItem?.content, "name") ||
@@ -1793,12 +1823,9 @@ export const AccountPage: FC<AccountPageProps> = ({
   const nftItemImageSources = nftItemIsNsfw
     ? []
     : [
-        ...getImageSources(nftItemTokenInfo, NFT_IMAGE_SOURCE_KEYS),
-        ...getImageSources(currentNftItem?.content, NFT_IMAGE_SOURCE_KEYS),
+        ...getNftImageSources(nftItemTokenInfo, NFT_IMAGE_SOURCE_KEYS),
+        ...getNftImageSources(currentNftItem?.content, NFT_IMAGE_SOURCE_KEYS),
       ]
-  const nftItemCollectionName =
-    tokenInfoString(nftItemTokenInfo, "collection_name") ||
-    contentString(currentNftItem?.content, "collection_name")
   const nftItemIsScam = nftItemTokenInfo?.is_scam === true || currentNftItem?.is_scam === true
   const nftItemMetadataJson = currentNftItem
     ? JSON.stringify(
@@ -1815,6 +1842,11 @@ export const AccountPage: FC<AccountPageProps> = ({
     : undefined
   const nftItemOwnerAddress = currentNftItem?.owner_address
   const nftItemCollectionAddress = currentNftItem?.collection_address
+  const fragmentIdentity = getFragmentNftIdentity(
+    compilerAbi?.contract_name,
+    nftItemName,
+    currentNftItem?.content,
+  )
   const activeMetadataJson = jettonMaster ? jettonMetadataJson : nftItemMetadataJson
   const activeMetadataTitle = jettonMaster ? tokenName : (nftItemName ?? "NFT item")
   const activeMetadataImageSources = jettonMaster
@@ -1838,15 +1870,13 @@ export const AccountPage: FC<AccountPageProps> = ({
   const nftCollectionIsNsfw = nftCollectionTokenInfo?.is_nsfw === true
   const nftCollectionIsScam = nftCollectionTokenInfo?.is_scam === true
   const collectiblePreviews = nftItems.slice(0, 8).map(item => {
-    const imageSources = isNftItemNsfw(item)
-      ? []
-      : getImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
+    const imageSources =
+      item.is_nsfw === true ? [] : getNftImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
     return {
       address: item.address,
-      image: imageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE,
+      image: imageSources[0] ?? NFT_PLACEHOLDER_IMAGE,
       imageSources,
       blurred: item.is_scam === true,
-      collectionName: contentString(item.content, "collection_name"),
       name:
         contentString(item.content, "name") ||
         contentString(item.content, "collection_name") ||
@@ -1896,16 +1926,76 @@ export const AccountPage: FC<AccountPageProps> = ({
       nftCollectionName !== undefined ||
       isScheduleAccount ||
       isMultisigAccount ||
+      isNominatorPoolAccount ||
+      singleNominatorVersion !== undefined ||
       accountSuspended)
 
   const topSectionClassName = hasHeaderContextCard
-    ? isScheduleAccount || isMultisigAccount || accountSuspended
+    ? isScheduleAccount ||
+      isMultisigAccount ||
+      isNominatorPoolAccount ||
+      singleNominatorVersion !== undefined ||
+      accountSuspended
       ? `${styles.topSection} ${styles.topSectionEqual}`
       : styles.topSection
     : `${styles.topSection} ${styles.topSectionSingle}`
 
-  const accountInfoDetails =
-    isVestingAccount && vestingData
+  const accountInfoDetails = [
+    ...(fragmentIdentity?.kind === "username"
+      ? [
+          {
+            key: "fragment-username",
+            label: "Username",
+            value: (
+              <a
+                className={styles.accountDetailLink}
+                href={`https://t.me/${fragmentIdentity.handle}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                @{fragmentIdentity.handle}
+              </a>
+            ),
+          },
+          {
+            key: "fragment-username-aliases",
+            label: "Aliases",
+            value: (
+              <div className={styles.accountDetailLinks}>
+                {fragmentIdentity.aliases.map(alias => (
+                  <a
+                    className={styles.accountDetailLink}
+                    href={alias.href}
+                    key={alias.label}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {alias.label}
+                  </a>
+                ))}
+              </div>
+            ),
+          },
+        ]
+      : fragmentIdentity?.kind === "number"
+        ? [
+            {
+              key: "fragment-number",
+              label: "Number",
+              value: (
+                <a
+                  className={styles.accountDetailLink}
+                  href={`https://t.me/${fragmentIdentity.compactNumber}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {fragmentIdentity.displayNumber}
+                </a>
+              ),
+            },
+          ]
+        : []),
+    ...(isVestingAccount && vestingData
       ? [
           {
             key: "vesting-owner",
@@ -1930,21 +2020,23 @@ export const AccountPage: FC<AccountPageProps> = ({
             ),
           },
         ]
-      : multisigOrder
-        ? [
-            {
-              key: "multisig-wallet",
-              label: "Multisig wallet",
-              value: (
-                <ExplorerAddressChip
-                  address={multisigOrder.multisig_address}
-                  onAddressClick={handleSearch}
-                  variant="plain"
-                />
-              ),
-            },
-          ]
-        : undefined
+      : []),
+    ...(multisigOrder
+      ? [
+          {
+            key: "multisig-wallet",
+            label: "Multisig wallet",
+            value: (
+              <ExplorerAddressChip
+                address={multisigOrder.multisig_address}
+                onAddressClick={handleSearch}
+                variant="plain"
+              />
+            ),
+          },
+        ]
+      : []),
+  ]
 
   const multisigTabs = useMemo<readonly AccountDetailsTab[]>(() => {
     if (isMultisigWalletAccount) {
@@ -2013,6 +2105,28 @@ export const AccountPage: FC<AccountPageProps> = ({
     isMultisigOrderAccount,
     isMultisigWalletAccount,
   ])
+
+  const customTabs = useMemo<readonly AccountDetailsTab[]>(
+    () => [
+      ...multisigTabs,
+      ...(isNominatorPoolAccount
+        ? [
+            {
+              id: "nominators",
+              label: "Nominators",
+              icon: <UsersRound size={18} />,
+              content: (
+                <NominatorPoolNominatorsTab
+                  state={nominatorPoolDetails}
+                  onAddressClick={handleSearch}
+                />
+              ),
+            },
+          ]
+        : []),
+    ],
+    [handleSearch, isNominatorPoolAccount, multisigTabs, nominatorPoolDetails],
+  )
 
   return (
     <div className={styles.container}>
@@ -2094,6 +2208,22 @@ export const AccountPage: FC<AccountPageProps> = ({
                       onSignerHoverChange={setHoveredMultisigSignerAddress}
                     />
                   )}
+                  {isNominatorPoolAccount && (
+                    <NominatorPoolOverview
+                      address={formattedAddress}
+                      client={client}
+                      onAddressClick={handleSearch}
+                      onStateChange={setNominatorPoolDetails}
+                    />
+                  )}
+                  {singleNominatorVersion !== undefined && (
+                    <SingleNominatorOverview
+                      address={formattedAddress}
+                      client={client}
+                      onAddressClick={handleSearch}
+                      version={singleNominatorVersion}
+                    />
+                  )}
                   {accountState !== undefined && tokenInfo !== undefined && (
                     <JettonOverview
                       name={tokenName}
@@ -2140,7 +2270,6 @@ export const AccountPage: FC<AccountPageProps> = ({
                       isScam={nftItemIsScam}
                       ownerAddress={nftItemOwnerAddress}
                       collectionAddress={nftItemCollectionAddress}
-                      collectionName={nftItemCollectionName}
                       index={currentNftItem.index}
                       onAddressClick={handleSearch}
                       onMetadataClick={() => setJettonMetadataOpen(true)}
@@ -2211,7 +2340,7 @@ export const AccountPage: FC<AccountPageProps> = ({
             accountLoading={accountLoading}
             showHoldersTab={isJettonMasterAccount}
             showItemsTab={isNftCollectionAccount}
-            customTabs={multisigTabs}
+            customTabs={customTabs}
             client={client}
             onAddressClick={handleSearch}
             onTransactionClick={handleTransactionClick}
@@ -2244,7 +2373,6 @@ export const AccountPage: FC<AccountPageProps> = ({
                       alt=""
                       className={`${styles.metadataTokenImage} ${styles.metadataNftImage}`}
                       blurredClassName={styles.blurredImage}
-                      collectionName={nftItemCollectionName}
                       blurred={nftItemIsScam}
                     />
                   ) : (
@@ -2410,6 +2538,78 @@ function contentString(
 ): string | undefined {
   const value = content?.[key]
   return typeof value === "string" && value.length > 0 ? value : undefined
+}
+
+interface FragmentLink {
+  readonly label: string
+  readonly href: string
+}
+
+interface FragmentUsernameIdentity {
+  readonly kind: "username"
+  readonly handle: string
+  readonly aliases: readonly FragmentLink[]
+}
+
+interface FragmentNumberIdentity {
+  readonly kind: "number"
+  readonly displayNumber: string
+  readonly compactNumber: string
+}
+
+type FragmentNftIdentity = FragmentUsernameIdentity | FragmentNumberIdentity
+
+/**
+ * Builds the Telegram identity represented by a recognized Fragment NFT
+ *
+ * Contract identity gates this conversion because arbitrary NFT metadata is untrusted and may use
+ * the same name shape without representing a Telegram username or anonymous number
+ */
+function getFragmentNftIdentity(
+  contractName: string | undefined,
+  nftName: string | undefined,
+  content: Record<string, unknown> | undefined,
+): FragmentNftIdentity | undefined {
+  if (contractName === "FragmentUsernameItem") {
+    const domain = contentString(content, "domain")?.trim().toLowerCase()
+    const domainHandle = domain?.endsWith(".t.me") ? domain.slice(0, -".t.me".length) : undefined
+    const nameHandle = nftName?.trim().startsWith("@") ? nftName.trim().slice(1) : undefined
+    const handle = domainHandle || nameHandle
+
+    if (!handle || !/^[a-zA-Z0-9_]+$/.test(handle)) return undefined
+
+    return {
+      kind: "username",
+      handle,
+      aliases: [
+        {label: `${handle}.t.me`, href: `https://${handle}.t.me`},
+        {label: `t.me/${handle}`, href: `https://t.me/${handle}`},
+      ],
+    }
+  }
+
+  if (contractName === "FragmentNumbersItem") {
+    const displayNumber = nftName?.trim()
+    const metadataNumber = displayNumber?.replace(/\s/g, "")
+    const uriNumber = contentString(content, "uri")?.match(/\/number\/(\d+)\.json(?:$|[?#])/i)?.[1]
+    const compactNumber =
+      metadataNumber && /^\+\d+$/.test(metadataNumber)
+        ? metadataNumber
+        : uriNumber
+          ? `+${uriNumber}`
+          : undefined
+
+    if (!compactNumber) return undefined
+
+    return {
+      kind: "number",
+      displayNumber:
+        metadataNumber === compactNumber ? (displayNumber ?? compactNumber) : compactNumber,
+      compactNumber,
+    }
+  }
+
+  return undefined
 }
 
 function getAccountLoadIssue({

@@ -1,15 +1,20 @@
-//! Internal HTTP clients for interacting with external TON APIs (`TON Center`, `TonHub`).
+//! Asynchronous access to TON Center using the shared API response models.
 
 use crate::Network;
-use crate::types::{BlockInfo, BlocksResponse, TransactionData, TransactionTransactionsResponse};
 use anyhow::Context;
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use reqwest::Client;
-use serde::Deserialize;
+use serde::de::DeserializeOwned;
+use std::collections::HashMap;
 use std::env;
 use std::ffi::OsStr;
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
+use ton_api::toncenter::{v2, v3};
+use ton_executor::message::{PrevBlockId, PrevBlocksInfo};
+use ton_networks::CustomNetworkUrls;
 use toncenter_keys::api_key as toncenter_api_key;
 use tycho_types::boc::Boc;
 use tycho_types::prelude::Cell;
@@ -50,23 +55,25 @@ fn proxy_enabled_from_value(value: Option<&OsStr>) -> bool {
 pub(crate) struct TonCenterClient {
     client: Client,
     api_key: Option<String>,
-    base_url: String,
+    v2_url: String,
+    v3_url: String,
+    rate_limited: bool,
 }
 
 impl TonCenterClient {
-    /// Creates a new `TON Center` client for the specified network.
-    pub(crate) fn new(network: Network) -> anyhow::Result<Self> {
-        let base_url = match network {
-            Network::Mainnet => "https://toncenter.com/api/v3".to_string(),
-            Network::Testnet => "https://testnet.toncenter.com/api/v3".to_string(),
-            Network::Localnet | Network::Custom(_) => {
-                anyhow::bail!("Network {network} is not yet supported in retrace")
-            }
-        };
+    /// Resolves both API endpoints through the shared network configuration.
+    /// V2 and V3 may use different origins or path prefixes; neither is derived
+    /// from the other. Custom networks must configure both APIs for replay.
+    pub(crate) fn new(
+        network: Network,
+        custom_networks: &HashMap<String, CustomNetworkUrls>,
+    ) -> anyhow::Result<Self> {
         Ok(Self {
             client: http_client_builder().build()?,
             api_key: toncenter_api_key(&network),
-            base_url,
+            v2_url: network.toncenter_v2_url(custom_networks)?,
+            v3_url: network.toncenter_v3_url(custom_networks)?,
+            rate_limited: matches!(network, Network::Mainnet | Network::Testnet),
         })
     }
 
@@ -75,7 +82,7 @@ impl TonCenterClient {
     /// `TON Center` has stricter limits without an API key, so we serialize
     /// requests and keep at least 1 second between request starts.
     async fn maybe_wait_for_rate_limit(&self) {
-        if self.api_key.is_some() {
+        if !self.rate_limited || self.api_key.is_some() {
             return;
         }
 
@@ -91,351 +98,791 @@ impl TonCenterClient {
         *last_request = Some(Instant::now());
     }
 
-    /// Fetches transaction metadata by its hash using V3 API.
+    /// Sends an authenticated request and decodes a shared TON Center response.
+    /// Error envelopes are checked before success deserialization so API errors
+    /// retain their endpoint context without including the response payload.
+    async fn get<T: DeserializeOwned>(
+        &self,
+        base_url: &str,
+        method: &str,
+        query: &[(&str, String)],
+    ) -> anyhow::Result<T> {
+        let url = format!("{}/{method}", base_url.trim_end_matches('/'));
+        let mut request = self.client.get(url).query(query);
+        if let Some(key) = &self.api_key {
+            request = request.header("X-API-Key", key);
+        }
+
+        self.maybe_wait_for_rate_limit().await;
+        let response = request
+            .send()
+            .await
+            .with_context(|| format!("TON Center {method} request failed"))?;
+        let status = response.status();
+        let value: serde_json::Value = response
+            .json()
+            .await
+            .with_context(|| format!("Failed to decode TON Center {method} response ({status})"))?;
+
+        if let Some(error) = value.get("error") {
+            anyhow::bail!("TON Center {method} error ({status}): {error}");
+        }
+        if !status.is_success()
+            || value.get("ok").and_then(serde_json::Value::as_bool) == Some(false)
+        {
+            anyhow::bail!("TON Center {method} request failed ({status})");
+        }
+
+        serde_json::from_value(value)
+            .with_context(|| format!("Failed to decode TON Center {method} response"))
+    }
+
+    /// Unwraps the V2 envelope; result schemas are owned by `ton-api`.
+    async fn get_v2<T: DeserializeOwned>(
+        &self,
+        method: &str,
+        query: &[(&str, String)],
+    ) -> anyhow::Result<T> {
+        let response: v2::TonlibResponse<T> = self.get(&self.v2_url, method, query).await?;
+        Ok(response.result)
+    }
+
+    /// Fetches indexed transaction metadata with V3 filters.
     pub(crate) async fn get_transactions(
         &self,
-        hash: &str,
-        limit: u32,
-    ) -> anyhow::Result<TransactionData> {
-        let mut request = self
-            .client
-            .get(format!("{}/transactions", self.base_url))
-            .query(&[("hash", hash), ("limit", &limit.to_string())]);
-
-        if let Some(key) = &self.api_key {
-            request = request.header("X-API-Key", key);
-        }
-
-        self.maybe_wait_for_rate_limit().await;
-        let response = request.send().await?;
-        if !response.status().is_success() {
-            anyhow::bail!("TON Center V3 returned status: {}", response.status());
-        }
-
-        let result: serde_json::Value = response.json().await?;
-
-        if let Some(error) = result.get("error") {
-            anyhow::bail!("TON Center V3 error: {error}");
-        }
-
-        let response_data: TransactionData = serde_json::from_value(result)
-            .map_err(|e| anyhow::anyhow!("Failed to decode TON Center V3 response: {e}"))?;
-        Ok(response_data)
+        query: &[(&str, String)],
+    ) -> anyhow::Result<v3::TransactionsResponse> {
+        self.get(&self.v3_url, "transactions", query).await
     }
 
-    /// Fetches block information by workchain, shard, and seqno using V3 API.
+    /// Loads the shard header containing a transaction, including its random seed.
     pub(crate) async fn get_blocks(
         &self,
-        workchain: i32,
-        shard: &str,
-        seqno: u32,
-    ) -> anyhow::Result<BlocksResponse> {
-        let mut request = self
-            .client
-            .get(format!("{}/blocks", self.base_url))
-            .query(&[
-                ("workchain", workchain.to_string()),
-                ("shard", shard.to_string()),
-                ("seqno", seqno.to_string()),
-            ]);
-
-        if let Some(key) = &self.api_key {
-            request = request.header("X-API-Key", key);
-        }
-
-        self.maybe_wait_for_rate_limit().await;
-        let response = request.send().await?;
-        if !response.status().is_success() {
-            anyhow::bail!("TON Center V3 returned status: {}", response.status());
-        }
-
-        let result: serde_json::Value = response.json().await?;
-
-        if let Some(error) = result.get("error") {
-            anyhow::bail!("TON Center V3 error: {error}");
-        }
-
-        let response_data: BlocksResponse = serde_json::from_value(result)
-            .map_err(|e| anyhow::anyhow!("Failed to decode TON Center V3 response: {e}"))?;
-        Ok(response_data)
+        block: &v3::BlockId,
+    ) -> anyhow::Result<v3::BlocksResponse> {
+        self.get(
+            &self.v3_url,
+            "blocks",
+            &[
+                ("workchain", block.workchain.to_string()),
+                ("shard", block.shard.clone()),
+                ("seqno", block.seqno.to_string()),
+            ],
+        )
+        .await
     }
 
-    /// Fetches transactions for an account using `TON Center` V2 JSON-RPC.
-    ///
-    /// Used as a fallback or for specific V2-only functionality.
-    pub(crate) async fn get_transactions_toncenter(
+    /// Reconstructs c7 history at the referenced masterchain state, newest first.
+    /// The anchor is included, as is zerostate when fewer than 16 blocks exist.
+    /// Lookups are sequential to respect public API limits; overlapping lists
+    /// share results for the duration of this reconstruction.
+    pub(crate) async fn get_prev_blocks_info(
+        &self,
+        mc_seqno: u32,
+        with_100: bool,
+    ) -> anyhow::Result<PrevBlocksInfo> {
+        async {
+            let mut blocks = HashMap::new();
+            let key_seqno = if mc_seqno == 0 {
+                0
+            } else {
+                let header: v2::BlockHeader = self
+                    .get_v2(
+                        "getBlockHeader",
+                        &[
+                            ("workchain", "-1".to_owned()),
+                            ("shard", "8000000000000000".to_owned()),
+                            ("seqno", mc_seqno.to_string()),
+                        ],
+                    )
+                    .await?;
+                let key_seqno = if header.is_key_block {
+                    mc_seqno
+                } else {
+                    u32::try_from(header.prev_key_block_seqno)
+                        .context("Invalid previous key block seqno")?
+                };
+                anyhow::ensure!(
+                    key_seqno <= mc_seqno,
+                    "Previous key block is after masterchain block {mc_seqno}"
+                );
+                blocks.insert(mc_seqno, prev_block_id(header.id, mc_seqno)?);
+                key_seqno
+            };
+
+            let recent_seqnos = (mc_seqno.saturating_sub(15)..=mc_seqno)
+                .rev()
+                .collect::<Vec<_>>();
+            let hundred_seqnos = if with_100 {
+                (0..=mc_seqno / 100)
+                    .rev()
+                    .take(16)
+                    .map(|seqno| seqno * 100)
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            };
+
+            for seqno in std::iter::once(key_seqno)
+                .chain(recent_seqnos.iter().copied())
+                .chain(hundred_seqnos.iter().copied())
+            {
+                if blocks.contains_key(&seqno) {
+                    continue;
+                }
+
+                // lookupBlock cannot return zerostate; the network's initial ID
+                // is available in getMasterchainInfo instead.
+                let id = if seqno == 0 {
+                    let info: v2::MasterchainInfo = self.get_v2("getMasterchainInfo", &[]).await?;
+                    info.init
+                } else {
+                    self.get_v2(
+                        "lookupBlock",
+                        &[
+                            ("workchain", "-1".to_owned()),
+                            ("shard", "8000000000000000".to_owned()),
+                            ("seqno", seqno.to_string()),
+                        ],
+                    )
+                    .await?
+                };
+                blocks.insert(seqno, prev_block_id(id, seqno)?);
+            }
+
+            Ok(PrevBlocksInfo::new(
+                recent_seqnos
+                    .iter()
+                    .map(|seqno| blocks[seqno].clone())
+                    .collect(),
+                blocks[&key_seqno].clone(),
+                with_100.then(|| {
+                    hundred_seqnos
+                        .iter()
+                        .map(|seqno| blocks[seqno].clone())
+                        .collect()
+                }),
+            ))
+        }
+        .await
+        .with_context(|| format!("Failed to load previous blocks at masterchain block {mc_seqno}"))
+    }
+
+    /// Loads raw archival transactions in newest-to-oldest order for replay.
+    pub(crate) async fn get_account_transactions(
         &self,
         address: &str,
         lt: u64,
         hash: &str,
         to_lt: u64,
         limit: u32,
-    ) -> anyhow::Result<Vec<serde_json::Value>> {
-        let url = format!("{}/jsonRPC", self.base_url.replace("/api/v3", "/api/v2"));
-
-        let body = serde_json::json!({
-            "id": "1",
-            "jsonrpc": "2.0",
-            "method": "getTransactions",
-            "params": {
-                "address": address,
-                "lt": lt.to_string(),
-                "hash": hash,
-                "to_lt": to_lt.to_string(),
-                "limit": limit,
-                "archival": true
-            }
-        });
-
-        let mut request = self.client.post(url).json(&body);
-
-        if let Some(key) = &self.api_key {
-            request = request.header("X-API-Key", key);
-        }
-
-        self.maybe_wait_for_rate_limit().await;
-        let response = request.send().await?;
-        if !response.status().is_success() {
-            anyhow::bail!("TON Center V2 returned status: {}", response.status());
-        }
-
-        let result: serde_json::Value = response.json().await?;
-
-        if let Some(error) = result.get("error") {
-            anyhow::bail!("TON Center V2 error: {error}");
-        }
-
-        let result = result.get("result").and_then(|v| v.as_array()).cloned();
-        Ok(result.unwrap_or_default())
+    ) -> anyhow::Result<Vec<v2::Transaction>> {
+        self.get_v2(
+            "getTransactions",
+            &[
+                ("address", address.to_owned()),
+                ("lt", lt.to_string()),
+                ("hash", hash.to_owned()),
+                ("to_lt", to_lt.to_string()),
+                ("limit", limit.to_string()),
+                ("archival", "true".to_owned()),
+            ],
+        )
+        .await
     }
 
-    /// Fetches library cells (T-libs) by their hash using V2 API.
+    /// Fetches the global library cell needed to resolve an exotic code cell.
     pub(crate) async fn get_libraries(&self, hash: &str) -> anyhow::Result<String> {
-        let url = format!(
-            "{}/getLibraries",
-            self.base_url.replace("/api/v3", "/api/v2")
-        );
-
-        let mut request = self.client.get(url).query(&[("libraries", hash)]);
-
-        if let Some(key) = &self.api_key {
-            request = request.header("X-API-Key", key);
-        }
-
-        self.maybe_wait_for_rate_limit().await;
-        let response = request.send().await?;
-        if !response.status().is_success() {
-            anyhow::bail!("TON Center V2 returned status: {}", response.status());
-        }
-
-        let result: serde_json::Value = response.json().await?;
-
-        if let Some(error) = result.get("error") {
-            anyhow::bail!("TON Center V2 error: {error}");
-        }
-
-        let result = result
-            .get("result")
-            .and_then(|v| v.get("result"))
-            .and_then(|v| v.as_array());
-        let lib_data = result
-            .and_then(|arr| arr.first())
-            .and_then(|v| v.get("data"))
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("Library not found"))?;
-
-        Ok(lib_data.to_string())
-    }
-
-    /// Fetches all blockchain config parameters for a masterchain block using V2 API.
-    pub(crate) async fn get_config_all(&self, seqno: u32) -> anyhow::Result<Cell> {
-        let url = format!(
-            "{}/getConfigAll",
-            self.base_url.replace("/api/v3", "/api/v2")
-        );
-
-        let mut request = self.client.get(url).query(&[("seqno", seqno.to_string())]);
-
-        if let Some(key) = &self.api_key {
-            request = request.header("X-API-Key", key);
-        }
-
-        self.maybe_wait_for_rate_limit().await;
-        let response = request.send().await?;
-        if !response.status().is_success() {
-            anyhow::bail!("TON Center V2 returned status: {}", response.status());
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterConfigAllResponse {
-            ok: bool,
-            result: Option<TonCenterConfigInfo>,
-            error: Option<String>,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterConfigInfo {
-            config: TonCenterConfigCell,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterConfigCell {
-            bytes: String,
-        }
-
-        let data: TonCenterConfigAllResponse = response
-            .json()
-            .await
-            .context("Failed to parse TON Center getConfigAll response")?;
-
-        if !data.ok {
-            anyhow::bail!(
-                "{}",
-                data.error
-                    .unwrap_or_else(|| "TON Center returned ok=false for getConfigAll".into())
-            );
-        }
-
-        let config_boc = data
+        let libraries: v2::LibraryResult = self
+            .get_v2("getLibraries", &[("libraries", hash.to_owned())])
+            .await?;
+        libraries
             .result
-            .ok_or_else(|| anyhow::anyhow!("TON Center getConfigAll response has no result"))?
-            .config
-            .bytes;
-
-        Boc::decode_base64(&config_boc).context("Failed to decode blockchain config BOC data")
+            .into_iter()
+            .next()
+            .map(|library| library.data)
+            .with_context(|| format!("TON Center library {hash} not found"))
     }
 
-    /// Fetches a serialized `ShardAccount` cell using V2 API.
+    /// Fetches the configuration in effect at the replayed masterchain block.
+    pub(crate) async fn get_config_all(&self, seqno: u32) -> anyhow::Result<Cell> {
+        let config: v2::ConfigInfo = self
+            .get_v2("getConfigAll", &[("seqno", seqno.to_string())])
+            .await?;
+        Boc::decode_base64(config.config.bytes)
+            .context("Failed to decode blockchain config BOC data")
+    }
+
+    /// Loads a serialized `ShardAccount`, preserving its previous transaction reference.
     pub(crate) async fn get_shard_account_cell(
         &self,
         seqno: u32,
         address: &str,
     ) -> anyhow::Result<Cell> {
-        let url = format!(
-            "{}/getShardAccountCell",
-            self.base_url.replace("/api/v3", "/api/v2")
-        );
-        let query = [
-            ("address", address.to_owned()),
-            ("seqno", seqno.to_string()),
-        ];
-
-        let mut request = self.client.get(url).query(&query);
-
-        if let Some(key) = &self.api_key {
-            request = request.header("X-API-Key", key);
-        }
-
-        self.maybe_wait_for_rate_limit().await;
-        let response = request.send().await?;
-        if !response.status().is_success() {
-            anyhow::bail!("TON Center V2 returned status: {}", response.status());
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterShardAccountCellResponse {
-            ok: bool,
-            result: Option<TonCenterTvmCell>,
-            error: Option<String>,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterTvmCell {
-            bytes: String,
-        }
-
-        let data: TonCenterShardAccountCellResponse = response
-            .json()
-            .await
-            .context("Failed to parse getShardAccountCell response")?;
-
-        if !data.ok {
-            anyhow::bail!(
-                "{}",
-                data.error.unwrap_or_else(|| {
-                    "TON Center returned ok=false for getShardAccountCell".into()
-                })
-            );
-        }
-
-        let cell_boc = data
-            .result
-            .ok_or_else(|| {
-                anyhow::anyhow!("TON Center getShardAccountCell response has no result")
-            })?
-            .bytes;
-
-        Boc::decode_base64(&cell_boc).context("Failed to decode shard account cell BOC data")
+        let cell: v2::TvmCell = self
+            .get_v2(
+                "getShardAccountCell",
+                &[
+                    ("address", address.to_owned()),
+                    ("seqno", seqno.to_string()),
+                ],
+            )
+            .await?;
+        Boc::decode_base64(cell.bytes).context("Failed to decode shard account cell BOC data")
     }
 }
 
-/// Client for `TonHub` (TON API v4).
-///
-/// Used for fetching account transaction `BoCs` and master-block metadata.
-pub(crate) struct TonHubClient {
-    client: Client,
-    base_url: String,
+/// Validates API block IDs before exposing their hashes to contract code in c7.
+fn prev_block_id(id: v2::TonBlockIdExt, expected_seqno: u32) -> anyhow::Result<PrevBlockId> {
+    anyhow::ensure!(
+        id.workchain == -1
+            && (matches!(
+                id.shard.as_str(),
+                "-9223372036854775808" | "8000000000000000"
+            ) || (expected_seqno == 0 && id.shard == "0"))
+            && id.seqno == u64::from(expected_seqno),
+        "TON Center returned an unexpected masterchain block for seqno {expected_seqno}"
+    );
+    let decode_hash = |value: &str| -> anyhow::Result<[u8; 32]> {
+        STANDARD
+            .decode(value)?
+            .try_into()
+            .map_err(|bytes: Vec<u8>| {
+                anyhow::anyhow!(
+                    "Invalid block hash length: expected 32 bytes, got {}",
+                    bytes.len()
+                )
+            })
+    };
+
+    Ok(PrevBlockId {
+        workchain: -1,
+        shard: i64::MIN,
+        seqno: expected_seqno,
+        root_hash: decode_hash(&id.root_hash).context("Invalid masterchain root hash")?,
+        file_hash: decode_hash(&id.file_hash).context("Invalid masterchain file hash")?,
+    })
 }
 
-impl TonHubClient {
-    /// Creates a new `TonHub` client for the specified network.
-    pub(crate) fn new(network: Network) -> anyhow::Result<Self> {
-        let base_url = match network {
-            Network::Mainnet => "https://mainnet-v4.tonhubapi.com".to_string(),
-            Network::Testnet => "https://testnet-v4.tonhubapi.com".to_string(),
-            Network::Localnet | Network::Custom(_) => {
-                anyhow::bail!("Network {network} is not yet supported in retrace")
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::BaseTxInfo;
+    use crate::methods::find_all_transactions_between;
+    use base64::Engine;
+    use base64::engine::general_purpose::STANDARD;
+    use expect_test::expect;
+    use serde_json::{Value, json};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+    use tokio::task::JoinHandle;
+    use ton_api::toncenter::v3;
+    use tycho_types::cell::{CellBuilder, CellFamily, HashBytes, Lazy};
+    use tycho_types::models::{
+        AccountStatus, ComputePhase, ComputePhaseSkipReason, HashUpdate, OrdinaryTxInfo,
+        SkippedComputePhase, StdAddr, Transaction, TxInfo,
+    };
+
+    async fn serve_response(
+        status: &str,
+        response: Value,
+    ) -> (TonCenterClient, JoinHandle<String>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base_url = format!("http://{}/api/v3", listener.local_addr().unwrap());
+        let body = response.to_string();
+        let response = format!(
+            "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0; 1024];
+            while !request.windows(4).any(|bytes| bytes == b"\r\n\r\n") {
+                let count = stream.read(&mut buffer).await.unwrap();
+                assert_ne!(count, 0, "request closed before headers");
+                request.extend_from_slice(&buffer[..count]);
             }
+            stream.write_all(response.as_bytes()).await.unwrap();
+            String::from_utf8(request).unwrap()
+        });
+        let client = TonCenterClient {
+            client: Client::builder()
+                .no_proxy()
+                .timeout(Duration::from_secs(5))
+                .build()
+                .unwrap(),
+            api_key: Some("fixture-key".to_owned()),
+            v2_url: base_url.replace("/api/v3", "/api/v2"),
+            v3_url: base_url,
+            rate_limited: false,
         };
-        Ok(Self {
-            client: http_client_builder().build()?,
-            base_url,
+        (client, server)
+    }
+
+    fn transaction_cell(lt: u64, previous: Option<&Cell>) -> anyhow::Result<Cell> {
+        let previous_tx = previous
+            .map(|cell| cell.parse::<Transaction>())
+            .transpose()?;
+        Ok(CellBuilder::build_from(Transaction {
+            account: HashBytes([0x11; 32]),
+            lt,
+            prev_trans_lt: previous_tx.map_or(0, |tx| tx.lt),
+            prev_trans_hash: previous.map_or(HashBytes::ZERO, |cell| *cell.repr_hash()),
+            now: 1,
+            out_msg_count: Default::default(),
+            orig_status: AccountStatus::Uninit,
+            end_status: AccountStatus::Uninit,
+            in_msg: None,
+            out_msgs: Default::default(),
+            total_fees: Default::default(),
+            state_update: Lazy::new(&HashUpdate {
+                old: HashBytes::ZERO,
+                new: HashBytes::ZERO,
+            })?,
+            info: Lazy::new(&TxInfo::Ordinary(OrdinaryTxInfo {
+                credit_first: false,
+                storage_phase: None,
+                credit_phase: None,
+                compute_phase: ComputePhase::Skipped(SkippedComputePhase {
+                    reason: ComputePhaseSkipReason::NoState,
+                }),
+                action_phase: None,
+                aborted: true,
+                bounce_phase: None,
+                destroyed: false,
+            }))?,
+        })?)
+    }
+
+    #[tokio::test]
+    async fn prev_blocks_at_zerostate_use_the_network_initial_id() -> anyhow::Result<()> {
+        let zero = json!({
+            "@type": "ton.blockIdExt", "workchain": -1, "shard": "0", "seqno": 0,
+            "root_hash": STANDARD.encode([0x11; 32]), "file_hash": STANDARD.encode([0x22; 32]),
+        });
+        let (client, server) = serve_response("200 OK", json!({
+            "ok": true, "@extra": "", "result": {
+                "@type": "blocks.masterchainInfo", "last": zero, "init": zero, "state_root_hash": "",
+            },
+        })).await;
+        let info = client.get_prev_blocks_info(0, true).await?;
+        expect![[r#"
+            (
+                "GET /api/v2/getMasterchainInfo HTTP/1.1",
+                1,
+                1,
+                0,
+                -9223372036854775808,
+                true,
+                true,
+            )
+        "#]]
+        .assert_debug_eq(&(
+            server.await?.lines().next().unwrap(),
+            info.last_mc_blocks.len(),
+            info.last_mc_blocks_100.as_ref().unwrap().len(),
+            info.prev_key_block.seqno,
+            info.prev_key_block.shard,
+            info.last_mc_blocks == vec![info.prev_key_block.clone()],
+            info.last_mc_blocks_100 == Some(vec![info.prev_key_block]),
+        ));
+        Ok(())
+    }
+
+    fn transaction_response(cell: &Cell) -> Value {
+        let tx: Transaction = cell.parse().unwrap();
+        let account = StdAddr::new(0, tx.account).to_string();
+        json!({
+            "@type": "raw.transaction",
+            "address": { "@type": "accountAddress", "account_address": account },
+            "account": account,
+            "utime": tx.now,
+            "data": Boc::encode_base64(cell),
+            "transaction_id": { "@type": "internal.transactionId", "lt": tx.lt.to_string(), "hash": STANDARD.encode(cell.repr_hash().as_slice()) },
+            "fee": "0", "storage_fee": "0", "other_fee": "0", "out_msgs": []
         })
     }
 
-    /// Fetches full transaction details including `BoC` and blocks for a specific account/lt/hash.
-    pub(crate) async fn get_account_transactions(
-        &self,
-        address: &str,
-        lt: u64,
-        hash: &str,
-    ) -> anyhow::Result<TransactionTransactionsResponse> {
-        let url = format!("{}/account/{}/tx/{}/{}", self.base_url, address, lt, hash);
-        let response = self.client.get(url).send().await?;
-        let status = response.status();
-        let text = response.text().await?;
-        if !status.is_success() {
-            anyhow::bail!("TonHub API error {status}: {text}");
+    #[tokio::test]
+    async fn localnet_and_custom_network_use_independent_api_urls() -> anyhow::Result<()> {
+        let mut results = Vec::new();
+        for network in [Network::Localnet, Network::Custom("archive".into())] {
+            let cell = Cell::empty_cell();
+            let (v2, v2_server) = serve_response("200 OK", json!({
+                "ok": true, "@extra": "", "result": {"@type": "tvm.cell", "bytes": Boc::encode_base64(&cell)}
+            })).await;
+            let (v3, v3_server) =
+                serve_response("200 OK", json!({"transactions": [], "address_book": {}})).await;
+            let networks = HashMap::from([(
+                network.as_str(),
+                CustomNetworkUrls {
+                    v2_url: v2.v2_url.replace("/api/v2", "/rpc/archive/").into(),
+                    v3_url: Some(v3.v3_url.replace("/api/v3", "/indexer/").into()),
+                    explorer_url: None,
+                },
+            )]);
+            let mut client = TonCenterClient::new(network.clone(), &networks)?;
+            client.client = v2.client;
+
+            let account = client.get_shard_account_cell(42, "0:11").await?;
+            let transactions = client
+                .get_transactions(&[("hash", "fixture".to_owned())])
+                .await?;
+            let v2_request = v2_server.await?;
+            let v3_request = v3_server.await?;
+            results.push((
+                network.as_str(),
+                v2_request.lines().next().unwrap().to_owned(),
+                v3_request.lines().next().unwrap().to_owned(),
+                account == cell,
+                transactions.transactions.len(),
+            ));
         }
-        let response_data: TransactionTransactionsResponse = serde_json::from_str(&text)
-            .map_err(|e| anyhow::anyhow!("Failed to decode TonHub response: {e}. Body: {text}"))?;
-        Ok(response_data)
+        expect![[r#"
+            [
+                (
+                    "localnet",
+                    "GET /rpc/archive/getShardAccountCell?address=0%3A11&seqno=42 HTTP/1.1",
+                    "GET /indexer/transactions?hash=fixture HTTP/1.1",
+                    true,
+                    0,
+                ),
+                (
+                    "archive",
+                    "GET /rpc/archive/getShardAccountCell?address=0%3A11&seqno=42 HTTP/1.1",
+                    "GET /indexer/transactions?hash=fixture HTTP/1.1",
+                    true,
+                    0,
+                ),
+            ]
+        "#]]
+        .assert_debug_eq(&results);
+        Ok(())
     }
 
-    /// Fetches master-block information by sequence number.
-    pub(crate) async fn get_block(&self, seqno: u32) -> anyhow::Result<BlockInfo> {
-        let url = format!("{}/block/{}", self.base_url, seqno);
+    #[test]
+    fn custom_network_requires_configured_v2_and_v3() {
+        let missing = TonCenterClient::new(Network::Custom("archive".into()), &HashMap::new())
+            .err()
+            .expect("missing network should fail");
+        let networks = HashMap::from([(
+            "archive".to_owned(),
+            CustomNetworkUrls {
+                v2_url: "http://localhost/rpc".into(),
+                v3_url: None,
+                explorer_url: None,
+            },
+        )]);
+        let missing_v3 = TonCenterClient::new(Network::Custom("archive".into()), &networks)
+            .err()
+            .expect("missing v3 URL should fail");
+        expect![[r#"
+            (
+                "unknown custom network: archive",
+                "v3_url not configured for custom network: archive",
+            )
+        "#]]
+        .assert_debug_eq(&(missing.to_string(), missing_v3.to_string()));
+    }
 
-        #[derive(Deserialize)]
-        struct BlockResponse {
-            exist: bool,
-            block: Option<BlockInfo>,
-        }
+    #[tokio::test]
+    async fn archive_history_preserves_order_and_excludes_snapshot_transaction()
+    -> anyhow::Result<()> {
+        let snapshot = transaction_cell(10, None)?;
+        let predecessor = transaction_cell(20, Some(&snapshot))?;
+        let target = transaction_cell(30, Some(&predecessor))?;
+        let base_tx = BaseTxInfo {
+            lt: 30,
+            hash: target.repr_hash().0,
+            address: StdAddr::new(0, HashBytes([0x11; 32])),
+            block: v3::BlockId {
+                workchain: 0,
+                shard: "8000000000000000".to_owned(),
+                seqno: 1,
+            },
+        };
+        let (client, server) = serve_response("200 OK", json!({
+            "ok": true, "@extra": "", "result": [transaction_response(&target), transaction_response(&predecessor)]
+        })).await;
 
-        let response = self.client.get(url).send().await?;
-        let status = response.status();
-        let text = response.text().await?;
-        if !status.is_success() {
-            anyhow::bail!("TonHub API error {status}: {text}");
-        }
-        let response_data: BlockResponse = serde_json::from_str(&text)
-            .map_err(|e| anyhow::anyhow!("Failed to decode TonHub response: {e}. Body: {text}"))?;
+        let transactions = find_all_transactions_between(&client, &base_tx, 10).await?;
+        let request = server.await?;
+        let uri = request.split_whitespace().nth(1).unwrap();
+        let url = reqwest::Url::parse(&format!("http://localhost{uri}"))?;
+        let query = url
+            .query_pairs()
+            .into_owned()
+            .collect::<std::collections::BTreeMap<_, _>>();
+        expect![[r#"
+            (
+                "/api/v2/getTransactions",
+                Some(
+                    "10",
+                ),
+                Some(
+                    "true",
+                ),
+                [
+                    30,
+                    20,
+                ],
+            )
+        "#]]
+        .assert_debug_eq(&(
+            url.path(),
+            query.get("to_lt"),
+            query.get("archival"),
+            transactions.iter().map(|tx| tx.lt).collect::<Vec<_>>(),
+        ));
 
-        if !response_data.exist {
-            anyhow::bail!("Block {seqno} is out of scope");
+        // The first-block approximation uses an arbitrary LT cutoff just before the
+        // target because a true zerostate snapshot is unavailable.
+        let (client, server) = serve_response(
+            "200 OK",
+            json!({
+                "ok": true, "@extra": "", "result": [transaction_response(&target)]
+            }),
+        )
+        .await;
+        let transactions = find_all_transactions_between(&client, &base_tx, 29).await?;
+        server.await?;
+        expect![[r"
+            [
+                30,
+            ]
+        "]]
+        .assert_debug_eq(&transactions.iter().map(|tx| tx.lt).collect::<Vec<_>>());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn archive_history_rejects_incomplete_or_inconsistent_responses() -> anyhow::Result<()> {
+        let first = transaction_cell(10, None)?;
+        let second = transaction_cell(20, Some(&first))?;
+        let target = transaction_cell(30, Some(&second))?;
+        let base_tx = BaseTxInfo {
+            lt: 30,
+            hash: target.repr_hash().0,
+            address: StdAddr::new(0, HashBytes([0x11; 32])),
+            block: v3::BlockId {
+                workchain: 0,
+                shard: "8000000000000000".to_owned(),
+                seqno: 1,
+            },
+        };
+        let wrong_hash = transaction_cell(20, None)?;
+        let mut malformed = transaction_response(&target);
+        malformed["data"] = json!(Boc::encode_base64(Cell::empty_cell()));
+        let mut results = Vec::new();
+        for (name, rows) in [
+            ("empty", vec![]),
+            ("short page", vec![transaction_response(&target)]),
+            (
+                "gap",
+                vec![transaction_response(&target), transaction_response(&first)],
+            ),
+            (
+                "duplicate",
+                vec![transaction_response(&target), transaction_response(&target)],
+            ),
+            (
+                "wrong hash",
+                vec![
+                    transaction_response(&target),
+                    transaction_response(&wrong_hash),
+                ],
+            ),
+            (
+                "snapshot included",
+                vec![
+                    transaction_response(&target),
+                    transaction_response(&second),
+                    transaction_response(&first),
+                ],
+            ),
+            ("malformed BOC", vec![malformed]),
+        ] {
+            let (client, server) = serve_response(
+                "200 OK",
+                json!({ "ok": true, "@extra": "", "result": rows }),
+            )
+            .await;
+            let result = find_all_transactions_between(&client, &base_tx, 10).await;
+            server.await?;
+            results.push((name, result.unwrap_err().to_string()));
         }
-        response_data
-            .block
-            .ok_or_else(|| anyhow::anyhow!("Block info is missing in response"))
+        expect![[r#"
+            [
+                (
+                    "empty",
+                    "Incomplete TON Center history: missing transaction at LT 30",
+                ),
+                (
+                    "short page",
+                    "Incomplete TON Center history: missing transaction at LT 20",
+                ),
+                (
+                    "gap",
+                    "TON Center history does not match expected transaction at LT 20",
+                ),
+                (
+                    "duplicate",
+                    "TON Center history does not match expected transaction at LT 20",
+                ),
+                (
+                    "wrong hash",
+                    "TON Center history does not match expected transaction at LT 20",
+                ),
+                (
+                    "snapshot included",
+                    "TON Center history contains a transaction outside the requested account or LT range",
+                ),
+                (
+                    "malformed BOC",
+                    "Failed to parse TON Center transaction at LT 30",
+                ),
+            ]
+        "#]].assert_debug_eq(&results);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn cell_requests_preserve_api_errors_and_reject_missing_results() -> anyhow::Result<()> {
+        let mut results = Vec::new();
+        for (status, response) in [
+            (
+                "200 OK",
+                json!({"ok": false, "error": "archive unavailable", "code": 500}),
+            ),
+            (
+                "500 Internal Server Error",
+                json!({"ok": false, "error": "archive unavailable", "code": 500}),
+            ),
+            ("200 OK", json!({"ok": true, "@extra": ""})),
+            (
+                "200 OK",
+                json!({"ok": true, "@extra": "", "result": {"@type": "tvm.cell", "bytes": "invalid"}}),
+            ),
+        ] {
+            let (client, server) = serve_response(status, response).await;
+            let error = client.get_shard_account_cell(1, "0:11").await.unwrap_err();
+            server.await?;
+            results.push(format!("{error:#}"));
+        }
+        expect![[r#"
+            [
+                "TON Center getShardAccountCell error (200 OK): \"archive unavailable\"",
+                "TON Center getShardAccountCell error (500 Internal Server Error): \"archive unavailable\"",
+                "Failed to decode TON Center getShardAccountCell response: missing field `result`",
+                "Failed to decode shard account cell BOC data: unknown BOC tag",
+            ]
+        "#]].assert_debug_eq(&results);
+        Ok(())
+    }
+
+    #[test]
+    fn deserializes_toncenter_v3_tick_tock_without_credit_phase() {
+        // Tick-tock has neither credit_first nor credit_ph in TonCenter v3.
+        let value = serde_json::json!({
+            "type": "tick_tock",
+            "aborted": false,
+            "destroyed": false,
+            "is_tock": false,
+            "storage_ph": {
+                "storage_fees_collected": "0",
+                "status_change": "unchanged"
+            },
+            "compute_ph": {
+                "skipped": false,
+                "success": true,
+                "exit_code": 0
+            }
+        });
+
+        let description: v3::TransactionDescr = serde_json::from_value(value).unwrap();
+        let compute = description.compute_ph.unwrap();
+        expect_test::expect![[r#"
+            (
+                "tick_tock",
+                None,
+                Some(
+                    true,
+                ),
+                Some(
+                    0,
+                ),
+            )
+        "#]]
+        .assert_debug_eq(&(
+            description.kind,
+            description.credit_first,
+            compute.success,
+            compute.exit_code,
+        ));
+    }
+
+    #[test]
+    fn deserializes_toncenter_v3_transaction_with_skipped_compute_phase() {
+        let value = serde_json::json!({
+            "transactions": [{
+                "account": "0:F7E97472D4849F481F339A5490281B1AE5B99E8B1016C03EAF51484E5D7BABF1",
+                "hash": "6BOT/kLF43JNLlC5hACgFtni2TjHC9s2Beaig0EDe0w=",
+                "lt": "66023973000007",
+                "now": 1777378799,
+                "mc_block_seqno": 123,
+                "trace_id": "HVJuGGDRxhB6vGFpyLDfa7o0qlHIrSd3RRuLYG5falo=",
+                "prev_trans_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "prev_trans_lt": "0",
+                "orig_status": "active",
+                "end_status": "active",
+                "total_fees": "0",
+                "total_fees_extra_currencies": {},
+                "description": {
+                    "type": "ord",
+                    "aborted": true,
+                    "destroyed": false,
+                    "credit_first": true,
+                    "storage_ph": {
+                        "storage_fees_collected": "0",
+                        "status_change": "unchanged"
+                    },
+                    "credit_ph": {
+                        "credit": "1"
+                    },
+                    "compute_ph": {
+                        "skipped": true,
+                        "reason": "no_gas"
+                    }
+                },
+                "block_ref": {
+                    "workchain": 0,
+                    "shard": "8000000000000000",
+                    "seqno": 1
+                },
+                "account_state_before": {
+                    "hash": "before"
+                },
+                "account_state_after": {
+                    "hash": "after"
+                },
+                "emulated": false,
+                "finality": "finalized"
+            }],
+            "address_book": {}
+        });
+
+        let data: v3::TransactionsResponse = serde_json::from_value(value)
+            .expect("skipped compute phase response should deserialize");
+        let compute = data.transactions[0]
+            .description
+            .compute_ph
+            .as_ref()
+            .expect("compute phase should be present");
+
+        assert_eq!(compute.skipped, Some(true));
+        assert_eq!(compute.reason.as_deref(), Some("no_gas"));
+        assert_eq!(compute.success, None);
+        assert_eq!(compute.exit_code, None);
     }
 }

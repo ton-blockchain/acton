@@ -1,204 +1,67 @@
-import {useEffect, useRef, useState} from "react"
-import type {FC, ImgHTMLAttributes, SyntheticEvent} from "react"
+import {useEffect, useState} from "react"
+import type {FC, ImgHTMLAttributes} from "react"
 
-import {isRegisteredNsfwNft} from "../nftSafetyRegistry"
-
-import {TOKEN_PLACEHOLDER_IMAGE, deduplicateImageSources} from "./imageFallbacks"
+import {NFT_PLACEHOLDER_IMAGE, deduplicateImageSources} from "./imageFallbacks"
 
 interface NftImageProps
   extends Omit<ImgHTMLAttributes<HTMLImageElement>, "onError" | "src" | "srcSet"> {
   readonly sources: readonly string[]
   readonly blurred?: boolean
   readonly blurredClassName: string
-  readonly collectionName?: string
-  readonly onNsfw?: () => void
 }
 
 interface ResolvedNftImage {
   readonly src: string
-  readonly blurred: boolean
-  readonly hidden: boolean
-  readonly verified: boolean
+  readonly sourcesKey: string
 }
 
-const toHex = (value: ArrayBuffer): string =>
-  Array.from(new Uint8Array(value), byte => byte.toString(16).padStart(2, "0")).join("")
-
-const isGetgemsImage = (source: string): boolean => {
-  try {
-    const url = new URL(source)
-    return (
-      url.protocol === "https:" &&
-      (url.hostname === "getgems.io" || url.hostname.endsWith(".getgems.io"))
-    )
-  } catch {
-    return false
-  }
-}
-
-const getInitialImage = (
-  sources: readonly string[],
-  blurred: boolean,
-  collectionName: string | undefined,
-): ResolvedNftImage => {
-  const primarySource = sources[0]
-  if (!primarySource) {
-    return {src: TOKEN_PLACEHOLDER_IMAGE, blurred: false, hidden: false, verified: true}
-  }
-
-  const registered = sources.some(imageUrl => isRegisteredNsfwNft({imageUrl, collectionName}))
-  if (registered) {
-    return {src: TOKEN_PLACEHOLDER_IMAGE, blurred: false, hidden: true, verified: true}
-  }
-  if (blurred) {
-    return {src: primarySource, blurred: true, hidden: false, verified: false}
-  }
-  if (isGetgemsImage(primarySource)) {
-    return {src: primarySource, blurred: false, hidden: false, verified: false}
-  }
-
-  return {src: TOKEN_PLACEHOLDER_IMAGE, blurred: false, hidden: false, verified: true}
-}
-
+/** Keeps local artwork visible until a candidate loads, so failed URLs never flash a broken image. */
 export const NftImage: FC<NftImageProps> = ({
   sources,
   blurred = false,
   blurredClassName,
-  collectionName,
-  onNsfw,
   className = "",
   alt = "",
   ...imageProps
 }) => {
   const sourcesKey = deduplicateImageSources(sources).join("\u0000")
-  const onNsfwRef = useRef(onNsfw)
-  // react-doctor-disable-next-line react-doctor/no-ref-current-in-render -- keeps NSFW detection on the latest callback without restarting image verification
-  onNsfwRef.current = onNsfw
-  const [image, setImage] = useState<ResolvedNftImage>(() =>
-    getInitialImage(sources, blurred, collectionName),
-  )
+  const [image, setImage] = useState<ResolvedNftImage>()
+  const loadedSource = image?.sourcesKey === sourcesKey ? image.src : undefined
 
   useEffect(() => {
     const imageSources = sourcesKey ? sourcesKey.split("\u0000") : []
-    const immediateImage = getInitialImage(imageSources, blurred, collectionName)
-    setImage(immediateImage)
+    if (imageSources.length === 0) return
 
-    if (immediateImage.hidden) {
-      onNsfwRef.current?.()
-      return
-    }
-
-    if (
-      imageSources.length === 0 ||
-      immediateImage.blurred ||
-      immediateImage.src !== TOKEN_PLACEHOLDER_IMAGE
-    ) {
-      return
-    }
-
-    const controller = new AbortController()
-    let objectUrl: string | undefined
-
-    void (async () => {
-      for (const source of imageSources) {
-        if (isGetgemsImage(source)) {
-          setImage({src: source, blurred: false, hidden: false, verified: false})
-          return
-        }
-
-        try {
-          const response = await fetch(source, {
-            signal: controller.signal,
-            cache: "force-cache",
-          })
-          if (!response.ok) {
-            continue
-          }
-
-          const bytes = await response.arrayBuffer()
-          const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes)
-          const contentHash = toHex(digest)
-          const blob = new Blob([bytes], {
-            type: response.headers.get("content-type") || "application/octet-stream",
-          })
-          objectUrl = URL.createObjectURL(blob)
-
-          if (controller.signal.aborted) {
-            URL.revokeObjectURL(objectUrl)
-            objectUrl = undefined
-            return
-          }
-
-          if (isRegisteredNsfwNft({contentHash, collectionName})) {
-            URL.revokeObjectURL(objectUrl)
-            objectUrl = undefined
-            setImage({
-              src: TOKEN_PLACEHOLDER_IMAGE,
-              blurred: false,
-              hidden: true,
-              verified: true,
-            })
-            onNsfwRef.current?.()
-            return
-          }
-
-          setImage({src: objectUrl, blurred: false, hidden: false, verified: true})
-          return
-        } catch {
-          if (controller.signal.aborted) {
-            return
-          }
-        }
+    const candidate = new Image()
+    let sourceIndex = 0
+    candidate.onload = () => setImage({src: imageSources[sourceIndex], sourcesKey})
+    candidate.onerror = () => {
+      sourceIndex += 1
+      if (sourceIndex < imageSources.length) {
+        candidate.src = imageSources[sourceIndex]
       }
+    }
+    candidate.src = imageSources[sourceIndex]
 
-      // A cross-origin image may still be renderable even when the browser cannot
-      // download its bytes for verification. Let the native image element load it.
-      setImage({
-        src: imageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE,
-        blurred: false,
-        hidden: false,
-        verified: false,
-      })
-    })()
-
+    // A previous NFT must not replace the current image after its metadata or route changes.
     return () => {
-      controller.abort()
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl)
-      }
+      candidate.onload = null
+      candidate.onerror = null
     }
-  }, [blurred, collectionName, sourcesKey])
-
-  const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
-    if (image.verified) {
-      setImage({
-        src: TOKEN_PLACEHOLDER_IMAGE,
-        blurred: false,
-        hidden: false,
-        verified: true,
-      })
-      return
-    }
-
-    const imageSources = sourcesKey ? sourcesKey.split("\u0000") : []
-    const currentSource = event.currentTarget.getAttribute("src")
-    const currentIndex = currentSource ? imageSources.indexOf(currentSource) : -1
-    const nextSource = imageSources[currentIndex + 1]
-    setImage({
-      src: nextSource ?? TOKEN_PLACEHOLDER_IMAGE,
-      blurred: nextSource !== undefined && blurred,
-      hidden: false,
-      verified: false,
-    })
-  }
+  }, [sourcesKey])
 
   return (
     <img
       {...imageProps}
-      src={image.src}
+      src={loadedSource ?? NFT_PLACEHOLDER_IMAGE}
       alt={alt}
-      className={`${className}${image.blurred ? ` ${blurredClassName}` : ""}`}
-      onError={handleImageError}
+      className={`${className}${loadedSource && blurred ? ` ${blurredClassName}` : ""}`}
+      onError={event => {
+        if (event.currentTarget.getAttribute("src") === NFT_PLACEHOLDER_IMAGE) return
+
+        event.currentTarget.src = NFT_PLACEHOLDER_IMAGE
+        setImage(undefined)
+      }}
     />
   )
 }

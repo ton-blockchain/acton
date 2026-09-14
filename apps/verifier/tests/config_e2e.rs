@@ -45,7 +45,9 @@ fn example_config_toml_loads() {
         config.compiler_worker_path().to_string_lossy(),
         "compiler-worker/compile.mjs"
     );
-    assert_eq!(config.compiler_timeout(), Duration::from_secs(5));
+    assert_eq!(config.compiler_timeout(), Duration::from_secs(10));
+    assert_eq!(config.max_concurrent_compilations(), Some(1));
+    assert_eq!(config.max_request_bytes(), 512 * 1024);
 }
 
 #[test]
@@ -63,6 +65,129 @@ fn omitted_network_uses_testnet() {
     assert_eq!(config.logging_level(), "debug");
     assert_eq!(config.network().to_string(), "testnet");
     assert_eq!(config.toncenter_base_url(), "https://testnet.toncenter.com");
+    assert_eq!(config.compiler_timeout(), Duration::from_secs(10));
+    assert_eq!(config.max_concurrent_compilations(), Some(1));
+    assert_eq!(config.max_request_bytes(), 512 * 1024);
+    assert_eq!(
+        Config::default().compiler_timeout(),
+        Duration::from_secs(10)
+    );
+}
+
+#[test]
+fn compiler_timeout_can_be_overridden() {
+    let mut config_file = tempfile::NamedTempFile::new().expect("config file");
+    writeln!(
+        config_file,
+        "[compiler]\ntimeout_ms = 15000\nmax_concurrent_compilations = 3"
+    )
+    .expect("write config");
+    let config = Config::load_from_path(config_file.path()).expect("custom compiler config");
+    assert_eq!(config.compiler_timeout(), Duration::from_secs(15));
+    assert_eq!(config.max_concurrent_compilations(), Some(3));
+}
+
+#[test]
+fn minus_one_disables_the_compiler_concurrency_limit() {
+    let mut config_file = tempfile::NamedTempFile::new().expect("config file");
+    writeln!(config_file, "[compiler]\nmax_concurrent_compilations = -1").expect("write config");
+
+    let config = Config::load_from_path(config_file.path()).expect("unlimited concurrency");
+    assert_eq!(config.max_concurrent_compilations(), None);
+}
+
+#[test]
+fn invalid_compiler_concurrency_is_rejected() {
+    for value in [0, -2] {
+        let mut config_file = tempfile::NamedTempFile::new().expect("config file");
+        writeln!(
+            config_file,
+            "[compiler]\nmax_concurrent_compilations = {value}"
+        )
+        .expect("write config");
+
+        let error = Config::load_from_path(config_file.path()).expect_err("invalid limit");
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "compiler max_concurrent_compilations must be -1 or a positive integer, got {value}"
+            )
+        );
+    }
+}
+
+#[test]
+fn upload_request_limit_can_be_overridden() {
+    let mut config_file = tempfile::NamedTempFile::new().expect("config file");
+    writeln!(
+        config_file,
+        r"
+[upload_limits]
+max_request_bytes = 1000
+"
+    )
+    .expect("write config");
+
+    let config = Config::load_from_path(config_file.path()).expect("custom upload limits");
+    assert_eq!(config.max_request_bytes(), 1000);
+}
+
+#[test]
+fn docker_entrypoint_generates_default_and_overridden_compiler_settings() {
+    for (override_ms, concurrency, expected_timeout, expected_concurrency) in [
+        (None, None, 10, Some(1)),
+        (Some("15000"), Some("3"), 15, Some(3)),
+        (None, Some("-1"), 10, None),
+    ] {
+        let directory = tempfile::tempdir().expect("config directory");
+        let config_path = directory.path().join("config.toml");
+        let mut command = std::process::Command::new("sh");
+        command
+            .args(["docker/entrypoint.sh", "true"])
+            .env_clear()
+            .env("PATH", std::env::var_os("PATH").expect("PATH"))
+            .env("VERIFIER_CONFIG", &config_path);
+        if let Some(value) = override_ms {
+            command.env("VERIFIER_COMPILER_TIMEOUT_MS", value);
+        }
+        if let Some(value) = concurrency {
+            command.env("VERIFIER_COMPILER_MAX_CONCURRENT_COMPILATIONS", value);
+        }
+        let output = command.output().expect("run entrypoint");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let config = Config::load_from_path(&config_path).expect("generated config");
+        assert_eq!(
+            config.compiler_timeout(),
+            Duration::from_secs(expected_timeout)
+        );
+        assert_eq!(config.max_concurrent_compilations(), expected_concurrency);
+    }
+}
+
+#[test]
+fn docker_entrypoint_generates_upload_request_limit() {
+    let directory = tempfile::tempdir().expect("config directory");
+    let config_path = directory.path().join("config.toml");
+    let output = std::process::Command::new("sh")
+        .args(["docker/entrypoint.sh", "true"])
+        .env_clear()
+        .env("PATH", std::env::var_os("PATH").expect("PATH"))
+        .env("VERIFIER_CONFIG", &config_path)
+        .env("VERIFIER_UPLOAD_MAX_REQUEST_BYTES", "1000")
+        .output()
+        .expect("run entrypoint");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let config = Config::load_from_path(&config_path).expect("generated config");
+    assert_eq!(config.max_request_bytes(), 1000);
 }
 
 #[test]

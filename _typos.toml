@@ -22,6 +22,7 @@ extend-exclude = [
   "crates/ton-liteapi/src/tl/schemas/**",
   "crates/ton-indexer-liteserver/fixtures/mainnet-global.config.json",
   "packages/explorer-core/src/cell-inspector/block.tlb.generated.ts",
+  "packages/address-registry/src/jettons.json",
   "packages/address-registry/src/mainnet.json",
   "packages/address-registry/src/testnet.json",
 ]

@@ -117,7 +117,7 @@ If you opt into advanced options, Acton can then prompt for:
 
 - description
 - license
-- whether to install the default Git hooks when `git` is available
+- Git hooks: `pre-push` (default), `pre-commit`, or no hooks, when `git` is available
 - whether to include `AGENTS.md`
 
 If you skip advanced options, Acton keeps the default description `A TON
@@ -149,7 +149,7 @@ Depending on the selected template and options, Acton may also generate:
 - `[scripts]` aliases such as `deploy-emulation`, `deploy-testnet`, and
   template-specific management aliases in `Acton.toml`
 - frontend files for `--app`
-- `.githooks/pre-commit` for `--hooks`
+- `.githooks/pre-push` for `--hooks`, or `.githooks/pre-commit` for `--hooks=pre-commit`
 - `AGENTS.md` for `--agents`
 
 ## TypeScript App Layout

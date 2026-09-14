@@ -481,7 +481,7 @@ fn test_rpc_info_decodes_storage_from_verifier_abi() {
         .arg("--net")
         .arg("custom:mock")
         .arg("--raw")
-        .env("ACTON_NEW_VERIFY_BACKEND", &verifier_url)
+        .env("ACTON_VERIFY_BACKEND", &verifier_url)
         .env("ACTON_LOG_DIR", &log_dir)
         .run()
         .success()
@@ -509,6 +509,47 @@ fn test_rpc_info_decodes_storage_from_verifier_abi() {
         .lock()
         .expect("captured TON Center requests mutex should not be poisoned");
     assert_eq!(toncenter_captured.len(), 1);
+    drop(toncenter_captured);
+    drop(verifier_captured);
+
+    // Switching registries must not reuse the first registry's on-disk ABI.
+    let (other_toncenter, other_toncenter_handle, _) =
+        spawn_toncenter_v2_mock(vec![toncenter_v2_account_info_ok_response(
+            1_234_000_000,
+            &code_boc64,
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        )]);
+    let (other_verifier, other_verifier_handle, _) =
+        spawn_verifier_mock(vec![abi_response(&code_hash, &JsonValue::Null)]);
+    append_custom_network(
+        project.path(),
+        "other",
+        &format!("{other_toncenter}/api/v2"),
+    );
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("info")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("--net")
+        .arg("custom:other")
+        .arg("--raw")
+        .env("ACTON_VERIFY_BACKEND", &other_verifier)
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/rpc/verifier-cache-isolation.stdout.txt");
+    other_toncenter_handle
+        .join()
+        .expect("second TON Center mock");
+    other_verifier_handle
+        .join()
+        .expect("second verifier must be queried");
 }
 
 #[test]
@@ -1160,7 +1201,7 @@ fn test_rpc_trace_show_bodies_uses_verifier_abi_for_local_boc_without_abi() {
         .arg("--net")
         .arg("custom:mock")
         .arg("--show-bodies")
-        .env("ACTON_NEW_VERIFY_BACKEND", &verifier_url)
+        .env("ACTON_VERIFY_BACKEND", &verifier_url)
         .env("ACTON_LOG_DIR", &log_dir)
         .run()
         .success()

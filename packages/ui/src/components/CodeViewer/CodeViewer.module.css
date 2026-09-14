@@ -38,10 +38,10 @@
   background: var(--acton-color-code-chrome);
 }
 
-.desktopTreeToggle,
-.desktopTreeExpand {
+.desktopTreeToggle {
   appearance: none;
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   width: 1.75rem;
@@ -57,27 +57,17 @@
     color var(--acton-duration-fast) var(--acton-ease-standard);
 }
 
-.desktopTreeToggle {
-  position: absolute;
-  z-index: 2;
-  top: var(--acton-space-2);
-  right: var(--acton-space-2);
-}
-
-.desktopTreeToggle:hover,
-.desktopTreeExpand:hover {
+.desktopTreeToggle:hover {
   background: var(--acton-color-surface-hover);
   color: var(--acton-color-text);
 }
 
-.desktopTreeToggle:focus-visible,
-.desktopTreeExpand:focus-visible {
+.desktopTreeToggle:focus-visible {
   outline: 1px solid var(--acton-color-focus-ring);
   outline-offset: -1px;
 }
 
-.desktopTreeToggle svg,
-.desktopTreeExpand svg {
+.desktopTreeToggle svg {
   width: 1rem;
   height: 1rem;
   color: inherit;
@@ -348,8 +338,7 @@
     display: none;
   }
 
-  .desktopTreeToggle,
-  .desktopTreeExpand {
+  .desktopTreeToggle {
     display: none;
   }
 

@@ -1218,39 +1218,57 @@ fn test_new_nft_app_project_with_agents_flag() {
 
 #[test]
 fn test_new_empty_project_with_hooks_flag() {
-    let project = ProjectBuilder::new("new-empty-hooks")
-        .without_acton_toml()
-        .build();
+    use std::fmt::Write as _;
 
-    let output = project
-        .acton()
-        .arg("new")
-        .arg(&project.path().join("foobar").display().to_string())
-        .arg("--name")
-        .arg("hooks-project")
-        .arg("--description")
-        .arg("hooks description")
-        .arg("--template")
-        .arg("empty")
-        .arg("--license")
-        .arg("MIT")
-        .arg("--hooks")
-        .run()
-        .success();
+    let mut report = String::new();
+    for (flag, hook) in [
+        ("--hooks", "pre-push"),
+        ("--hooks=pre-push", "pre-push"),
+        ("--hooks=pre-commit", "pre-commit"),
+    ] {
+        let project = ProjectBuilder::new(&format!("new-empty-{hook}"))
+            .without_acton_toml()
+            .build();
 
-    output
-        .assert_contains("Created new Acton project")
-        .assert_contains("Template: empty")
-        .assert_contains("Git hooks: installed")
-        .assert_file_snapshot_matches(
-            "foobar/.githooks/pre-commit",
-            "integration/snapshots/hooks/test_hooks_new_default.pre-commit.txt",
-        );
+        let output = project
+            .acton()
+            .arg("new")
+            .arg(&project.path().join("foobar").display().to_string())
+            .arg("--name")
+            .arg("hooks-project")
+            .arg("--description")
+            .arg("hooks description")
+            .arg("--template")
+            .arg("empty")
+            .arg("--license")
+            .arg("MIT")
+            .arg(flag)
+            .run()
+            .success();
 
-    let project_dir = project.path().join("foobar");
-    assert_eq!(
-        git_config_get(&project_dir, "core.hooksPath").as_deref(),
-        Some(".githooks")
+        output
+            .assert_contains("Created new Acton project")
+            .assert_contains("Template: empty")
+            .assert_contains(&format!("Git hooks: {hook}"))
+            .assert_file_snapshot_matches(
+                &format!("foobar/.githooks/{hook}"),
+                "integration/snapshots/hooks/test_hooks_new_default.hook.txt",
+            );
+
+        let project_dir = project.path().join("foobar");
+        writeln!(
+            report,
+            "{flag}: installed={:?}, pre-push={}, pre-commit={}",
+            git_config_get(&project_dir, "core.hooksPath"),
+            project_dir.join(".githooks/pre-push").exists(),
+            project_dir.join(".githooks/pre-commit").exists(),
+        )
+        .unwrap();
+    }
+
+    crate::common::assertion().eq(
+        report.trim_end(),
+        snapbox::file!["snapshots/new/test_new_hook_selection.txt"],
     );
 }
 
@@ -1454,55 +1472,77 @@ fn test_new_templates_returns_machine_readable_json() {
 #[test]
 fn test_new_empty_project_prompts_for_hooks() {
     use expectrl::Eof;
+    use std::fmt::Write as _;
 
-    let project = ProjectBuilder::new("new-empty-hooks-interactive")
-        .without_acton_toml()
-        .build();
+    let mut report = String::new();
+    for (index, hook) in ["pre-push", "pre-commit", "none"].into_iter().enumerate() {
+        let project = ProjectBuilder::new(&format!("new-{hook}-interactive"))
+            .without_acton_toml()
+            .build();
 
-    let mut session = project
-        .acton()
-        .arg("new")
-        .arg(&project.path().join("foobar").display().to_string())
-        .arg("--name")
-        .arg("interactive-hooks")
-        .arg("--description")
-        .arg("interactive hooks description")
-        .arg("--template")
-        .arg("empty")
-        .arg("--license")
-        .arg("MIT")
-        .spawn_pty()
-        .set_expect_timeout(Some(Duration::from_secs(20)));
+        let mut session = project
+            .acton()
+            .arg("new")
+            .arg(&project.path().join("foobar").display().to_string())
+            .arg("--name")
+            .arg("interactive-hooks")
+            .arg("--description")
+            .arg("interactive hooks description")
+            .arg("--template")
+            .arg("empty")
+            .arg("--license")
+            .arg("MIT")
+            .spawn_pty()
+            .set_expect_timeout(Some(Duration::from_secs(20)));
 
-    session.expect("Include the TypeScript dApp?");
-    session.send_line("", "failed to keep default no-app choice");
-    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
-    session.send_line("y", "failed to open advanced options");
-    session.expect("Set up Git hooks to run checks before each commit?");
-    session.send_line("y", "failed to confirm Git hooks");
-    session.expect("Include AGENTS.md guidance for coding agents?");
-    session.send_line("", "failed to keep default no-agents choice");
-    session.expect("Created new Acton project");
-    session.expect("Project name: interactive-hooks");
-    session.expect("Description: interactive hooks description");
-    session.expect("Template: empty");
-    session.expect("Git hooks: installed");
-    session.expect("License: MIT");
-    session.expect("Created Acton.toml with project configuration");
-    session.expect("acton build");
-    session.expect("acton test");
-    session.expect(Eof);
-    session.assert_file_snapshot_matches(
-        "foobar/.githooks/pre-commit",
-        "integration/snapshots/hooks/test_hooks_new_default.pre-commit.txt",
+        session.expect("Include the TypeScript dApp?");
+        session.send_line("", "failed to keep default no-app choice");
+        session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+        session.send_line("y", "failed to open advanced options");
+        session.expect("Git hooks:");
+        for _ in 0..index {
+            session
+                .send("\u{1b}[B")
+                .expect("failed to navigate hook choices");
+        }
+        session.send_line("", "failed to select Git hook");
+        session.expect("Include AGENTS.md guidance for coding agents?");
+        session.send_line("", "failed to keep default no-agents choice");
+        session.expect("Created new Acton project");
+        session.expect("Project name: interactive-hooks");
+        session.expect("Description: interactive hooks description");
+        session.expect("Template: empty");
+        if hook != "none" {
+            session.expect(format!("Git hooks: {hook}"));
+        }
+        session.expect("License: MIT");
+        session.expect("Created Acton.toml with project configuration");
+        session.expect("acton build");
+        session.expect("acton test");
+        session.expect(Eof);
+        if hook != "none" {
+            session.assert_file_snapshot_matches(
+                &format!("foobar/.githooks/{hook}"),
+                "integration/snapshots/hooks/test_hooks_new_default.hook.txt",
+            );
+        }
+
+        let project_dir = project.path().join("foobar");
+        writeln!(
+            report,
+            "{hook}: installed={:?}, pre-push={}, pre-commit={}",
+            git_config_get(&project_dir, "core.hooksPath"),
+            project_dir.join(".githooks/pre-push").exists(),
+            project_dir.join(".githooks/pre-commit").exists(),
+        )
+        .unwrap();
+        assert!(!project_dir.join("AGENTS.md").exists());
+    }
+
+    crate::common::assertion().eq(
+        report.trim_end(),
+        snapbox::file!["snapshots/new/test_new_interactive_hook_selection.txt"],
     );
-
-    let project_dir = project.path().join("foobar");
-    assert_eq!(
-        git_config_get(&project_dir, "core.hooksPath").as_deref(),
-        Some(".githooks")
-    );
-    assert!(!project_dir.join("AGENTS.md").exists());
 }
 
 #[cfg(unix)]
@@ -1536,8 +1576,11 @@ fn test_new_empty_project_full_interactive_flow_without_flags() {
     );
     session.expect("License:");
     session.send_line("", "failed to accept default license");
-    session.expect("Set up Git hooks to run checks before each commit?");
-    session.send_line("", "failed to keep default no-hooks choice");
+    session.expect("Git hooks:");
+    session
+        .send("\u{1b}[B\u{1b}[B")
+        .expect("failed to select no hooks");
+    session.send_line("", "failed to confirm no-hooks choice");
     session.expect("Include AGENTS.md guidance for coding agents?");
     session.send_line("", "failed to keep default no-agents choice");
     session.expect("Created new Acton project");
@@ -1944,8 +1987,11 @@ fn test_new_empty_project_prompts_for_agents() {
     session.send_line("", "failed to keep default no-app choice");
     session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
     session.send_line("y", "failed to open advanced options");
-    session.expect("Set up Git hooks to run checks before each commit?");
-    session.send_line("", "failed to keep default no-hooks choice");
+    session.expect("Git hooks:");
+    session
+        .send("\u{1b}[B\u{1b}[B")
+        .expect("failed to select no hooks");
+    session.send_line("", "failed to confirm no-hooks choice");
     session.expect("Include AGENTS.md guidance for coding agents?");
     session.send_line("y", "failed to confirm AGENTS.md guidance");
     session.expect("Created new Acton project");

@@ -7,8 +7,8 @@ import {ParsedValueView} from "../src/components/ParsedValueView/ParsedValueView
 import {ThemeProvider} from "../src/components/Theme/ThemeProvider"
 
 describe("ParsedValueView", () => {
-  test("renders a Cell Inspector action for parsed cells", () => {
-    const markup = renderToStaticMarkup(
+  test("renders Cell Inspector actions for parsed cells and slices", () => {
+    const cellMarkup = renderToStaticMarkup(
       createElement(ParsedValueView, {
         value: {
           kind: "scalar",
@@ -19,8 +19,20 @@ describe("ParsedValueView", () => {
         onCellInspect: () => undefined,
       }),
     )
+    const sliceMarkup = renderToStaticMarkup(
+      createElement(ParsedValueView, {
+        value: {
+          kind: "scalar",
+          value: "Slice 012345…abcdef",
+          rawValue: "b5ee9c72",
+          typeName: "Slice",
+        },
+        onCellInspect: () => undefined,
+      }),
+    )
 
-    expect(markup).toContain('aria-label="Inspect cell"')
+    expect(cellMarkup).toContain('aria-label="Inspect cell"')
+    expect(sliceMarkup).toContain('aria-label="Inspect slice"')
   })
 
   test("renders only uint256 map keys as hexadecimal", () => {

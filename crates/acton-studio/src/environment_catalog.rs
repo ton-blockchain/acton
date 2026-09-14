@@ -327,6 +327,31 @@ impl EnvironmentRuntime for EnvironmentCatalogRuntime {
         self.managed.delete_snapshot(environment_id, snapshot_id)
     }
 
+    fn import_snapshot(
+        &self,
+        environment_id: &str,
+        name: Option<String>,
+        json: Vec<u8>,
+    ) -> EnvironmentRuntimeFuture<'_, EnvironmentSnapshot> {
+        if let Some(error) = lifecycle_unavailable(environment_id, "changed") {
+            return error;
+        }
+
+        self.managed.import_snapshot(environment_id, name, json)
+    }
+
+    fn export_snapshot(
+        &self,
+        environment_id: &str,
+        snapshot_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, Vec<u8>> {
+        if let Some(error) = lifecycle_unavailable(environment_id, "snapshotted") {
+            return error;
+        }
+
+        self.managed.export_snapshot(environment_id, snapshot_id)
+    }
+
     fn snapshot_operation(
         &self,
         environment_id: &str,

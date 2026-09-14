@@ -39,6 +39,7 @@ interface VirtualEnvironmentsPageProps {
   readonly isLoading: boolean
   readonly loadError?: string
   readonly walletNames: readonly string[]
+  readonly defaultStartupAccounts?: readonly string[]
   readonly onCreateOpenChange: (open: boolean) => void
   readonly onEnvironmentChange: (environment: StudioEnvironment) => void
   readonly onOpenEnvironment: (environment: StudioEnvironment) => void
@@ -52,6 +53,7 @@ export function VirtualEnvironmentsPage({
   isLoading,
   loadError,
   walletNames,
+  defaultStartupAccounts,
   onCreateOpenChange,
   onEnvironmentChange,
   onOpenEnvironment,
@@ -271,6 +273,7 @@ export function VirtualEnvironmentsPage({
         importSourceEnvironments={importSourceEnvironments}
         open={createOpen}
         walletNames={walletNames}
+        defaultStartupAccounts={defaultStartupAccounts}
         onCreated={handleCreated}
         onOpenChange={onCreateOpenChange}
       />

@@ -71,7 +71,7 @@ import {formatAddress, hashToHex} from "../components/utils"
 import type {TonClient} from "../api/client"
 import {waitForTraceTransactionHash} from "../api/waitForTraceTransactionHash"
 import {addressKey} from "../api/compilerAbi"
-import {resolveCompilerAbis} from "../api/compilerAbiResolver"
+import {getResolvedAccountAbi, resolveCompilerAbis} from "../api/compilerAbiResolver"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import {
   emulateRawMessageBoc,
@@ -777,8 +777,13 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
       if (!code || !data) throw new Error("The selected account state has no code or data")
 
       const codeHash = code.hash().toString("hex")
-      const records = await metadataRegistry.getCompilerAbis([codeHash])
-      return {data, abi: records[codeHash]?.compiler_abi}
+      const resolved = await resolveCompilerAbis({
+        client,
+        metadataRegistry,
+        addresses: [address],
+        additionalCodeHashes: [codeHash],
+      })
+      return {data, abi: resolved ? getResolvedAccountAbi(resolved, address, codeHash) : undefined}
     },
     [
       client,
@@ -994,7 +999,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
           if (latestAbiLoadRequest.current !== requestId) {
             return
           }
-          const abi = resolved?.abiByAddress.get(addressKey(address))
+          const abi = resolved ? getResolvedAccountAbi(resolved, address) : undefined
           if (!abi) {
             throw new Error(
               `No ABI found for the ${abiEndpoint === "source" ? "From" : "To"} contract.`,

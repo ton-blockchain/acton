@@ -11,7 +11,9 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ton-api = { workspace = true }
 ton-executor = { workspace = true }
+tasm-core = { workspace = true }
 tvm-logs = { workspace = true }
 tycho-types = { workspace = true }
 num-bigint = { workspace = true }
@@ -24,6 +26,14 @@ base64 = { workspace = true }
 ton-networks = { workspace = true }
 toncenter-keys = { workspace = true }
 log = { workspace = true }
+
+[dev-dependencies]
+expect-test = { workspace = true }
+tolk-compiler = { workspace = true }
+
+[[test]]
+name = "retrace"
+required-features = ["only_ci"]
 
 [features]
 only_ci = []

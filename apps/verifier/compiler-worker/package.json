@@ -6,7 +6,7 @@
   "scripts": {
     "generate-registry": "node scripts/generate-registry.mjs",
     "apply-patches": "node scripts/apply-patches.mjs",
-    "test": "node --test languages/*.test.mjs"
+    "test": "node --test languages/*.test.mjs scripts/*.test.mjs"
   },
   "dependencies": {
     "@ton-community/func-js": "0.9.1",

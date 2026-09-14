@@ -18,10 +18,11 @@ DESCRIPTION
        output directory. When compiler ABI is available, Acton also writes a
        contract ABI JSON file to the ABI output directory. When the contract
        config has an output path, Acton writes the compiled .boc file there.
-       Dependency helper files are emitted into the generated-code directory,
-       and optional Fift output can be written separately. Source registration
-       artifacts for local explorer source upload can also be written when
-       explicitly configured.
+       Use --output-boc to also export the code for every built contract into
+       one directory. Dependency helper files are emitted into the
+       generated-code directory, and optional Fift output can be written
+       separately. Source registration artifacts for local explorer source
+       upload can also be written when explicitly configured.
 
        Contracts with .boc sources are treated as precompiled inputs: Acton
        loads their code, includes them in dependency resolution, and skips code
@@ -61,6 +62,14 @@ OPTIONS
 
            Defaults to [build].output-abi when configured, otherwise
            build/abi/.
+
+       --output-boc dir
+           Directory for <contract-name>.boc files from compiled .tolk
+           contracts and precompiled .boc inputs.
+
+           Defaults to [build].output-boc when configured. If neither value is
+           set, Acton writes BoC files only to individual contract output
+           paths. When enabled, this export is additional to those paths.
 
        --output-fift dir
            Directory for compiled Fift output for .tolk contracts.
@@ -125,12 +134,15 @@ CONFIGURATION
            out-dir = "build"
            gen-dir = "gen"
            output-abi = "build/abi"
+           output-boc = "build/boc"
            output-fift = "build/fift"
            output-sources = "build/sources"
 
-       CLI flags override config values for the current invocation. For
-       dependency helpers, a per-dependency depends[].path still overrides the
-       resolved gen-dir for that helper file.
+       CLI flags override config values for the current invocation. Relative
+       output paths in the config resolve from the project root. Relative
+       output paths in CLI flags resolve from the current working directory.
+       For dependency helpers, a per-dependency depends[].path still overrides
+       the resolved gen-dir for that helper file.
 
 OUTPUTS
        Depending on command flags and project configuration, acton build may
@@ -142,6 +154,9 @@ OUTPUTS
           from types on a precompiled .boc contract
 
        o  the configured contract output .boc file
+
+       o  <output-boc>/<contract-name>.boc for compiled .tolk contracts and
+          precompiled .boc inputs
 
        o  <gen-dir>/<dependency>.code.tolk helper files for dependencies by
           default (or a dependency-specific custom path when depends[].path is
@@ -217,6 +232,7 @@ EXAMPLES
 
               acton build --out-dir artifacts --gen-dir artifacts/gen \
                                               --output-abi artifacts/abi \
+                                              --output-boc artifacts/boc \
                                               --output-fift artifacts/fift \
                                               --output-sources artifacts/sources
 

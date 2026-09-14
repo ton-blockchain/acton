@@ -16,8 +16,8 @@ Commands:
   rpc                 <COMMAND>           Inspect remote accounts and contracts
   verify              [CONTRACT_NAME]     Verify contract source on TON Verifier
   library             <COMMAND>           Publish and manage on-chain libraries
-  simulated-localnet  <COMMAND>           Run Acton's simplified TON development environment
-  full-localnet       <COMMAND>           Run and manage real TON development networks
+  simulated-localnet  <COMMAND>           Run an instant local TON simulation with minimal resource use
+  full-localnet       <COMMAND>           Run a complete local TON network with real validators and consensus
   retrace             <TX_HASH>           Replay a transaction trace by hash
 
   run                 <SCRIPT> [ARGS...]  Run a named script from Acton.toml

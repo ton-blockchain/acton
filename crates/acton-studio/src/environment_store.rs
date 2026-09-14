@@ -333,7 +333,7 @@ mod tests {
                 "accounts": [
                   "deployer"
                 ],
-                "blockIntervalMs": 1000,
+                "blockTimeMs": 1000,
                 "forkBlockNumber": 12345,
                 "forkNetwork": "testnet",
                 "kind": "actonSimulatedLocalnet",
@@ -346,7 +346,7 @@ mod tests {
               "resumeOnStartup": false
             }
             LOADED
-            environment-2 | Forked network | resume=false | {"kind":"actonSimulatedLocalnet","port":5401,"forkNetwork":"testnet","forkBlockNumber":12345,"accounts":["deployer"],"rateLimit":120,"responseDelayMs":15,"blockIntervalMs":1000,"noMining":false,"mineEmptyBlocks":true}
+            environment-2 | Forked network | resume=false | {"kind":"actonSimulatedLocalnet","port":5401,"forkNetwork":"testnet","forkBlockNumber":12345,"accounts":["deployer"],"rateLimit":120,"responseDelayMs":15,"blockTimeMs":1000,"noMining":false,"mineEmptyBlocks":true}
             next_id=3"#]]
         .assert_eq(&format!(
             "FILE\n{}LOADED\n{}\nnext_id={}",
@@ -383,7 +383,7 @@ mod tests {
         }
         names.sort();
 
-        expect![[r#"environment-1 | Persistent network | resume=true | {"kind":"actonSimulatedLocalnet","port":5401,"forkNetwork":"testnet","forkBlockNumber":12345,"accounts":["deployer"],"rateLimit":120,"responseDelayMs":15,"blockIntervalMs":1000,"noMining":false,"mineEmptyBlocks":true}
+        expect![[r#"environment-1 | Persistent network | resume=true | {"kind":"actonSimulatedLocalnet","port":5401,"forkNetwork":"testnet","forkBlockNumber":12345,"accounts":["deployer"],"rateLimit":120,"responseDelayMs":15,"blockTimeMs":1000,"noMining":false,"mineEmptyBlocks":true}
 files=environment.json"#]]
         .assert_eq(&format!(
             "{}\nfiles={}",
@@ -475,7 +475,7 @@ environment_store_unsupported_version: <workspace>/.studio/environments/environm
                 accounts: vec!["deployer".to_owned()],
                 rate_limit: Some(120),
                 response_delay_ms: Some(15),
-                block_interval_ms: Some(1_000),
+                block_time_ms: Some(1_000),
                 no_mining: false,
                 mine_empty_blocks: true,
             },

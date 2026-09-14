@@ -60,7 +60,7 @@ const VERIFIED_SOURCE_RESPONSES = new Map([
 test.describe("Verified contracts", () => {
   test.beforeEach(async ({page}) => {
     await prepareVisualPage(page, {app: "explorer"})
-    await page.route("https://verifier-staging.actonscan.com/api/v1/**", async route => {
+    await page.route("https://verifier-staging.ton.org/api/v1/**", async route => {
       const url = new URL(route.request().url())
       if (url.pathname.endsWith("/last_verified")) {
         const limit = Number(url.searchParams.get("limit") ?? 25)

@@ -7,6 +7,7 @@ use utoipa::OpenApi;
 use crate::{error::ErrorResponse, state::AppState};
 
 mod take_ticket;
+mod validation;
 mod verification;
 mod verify;
 

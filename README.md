@@ -56,7 +56,7 @@ Built for **humans**. Perfect for **AI**.
   libraries, custom networks, and explorer integration keep ongoing network
   operations in the same toolchain.
 - **Verify and understand on-chain activity.** The
-  [Acton Verifier](https://actonscan.com/verified?network=mainnet) publishes and
+  [TON Verifier](https://actonscan.com/verified?network=mainnet) publishes and
   checks contract source, the indexer processes network data, and
   [Actonscan](https://actonscan.com/) makes activity easy to follow on any
   network, including local environments.

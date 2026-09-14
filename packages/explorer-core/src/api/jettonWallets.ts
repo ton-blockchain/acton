@@ -3,6 +3,9 @@ import type {JettonMasterMetadata, JettonWallet} from "./types"
 
 import {toRawAddress} from "../components/utils"
 
+const MAINNET_USDT_MASTER_RAW_ADDRESS =
+  "0:b113a994b5024a16719f69139328eb759596c38a25f59028b146fecdc3621dfe"
+
 export async function loadJettonWalletsWithMasters(
   client: TonClient,
   ownerAddresses: readonly string[],
@@ -30,8 +33,19 @@ export async function loadJettonWalletsWithMasters(
   }))
 }
 
-export function sortJettonWalletsByAmount(wallets: readonly JettonWallet[]): JettonWallet[] {
-  return [...wallets].sort(compareJettonWalletAmount)
+/** Orders token wallets for user-facing lists, keeping mainnet USD₮ discoverable */
+export function sortJettonWalletsForDisplay(wallets: readonly JettonWallet[]): JettonWallet[] {
+  return [...wallets].sort(compareJettonWalletDisplayOrder)
+}
+
+function compareJettonWalletDisplayOrder(left: JettonWallet, right: JettonWallet): number {
+  const leftIsUsdt = toRawAddress(left.jetton) === MAINNET_USDT_MASTER_RAW_ADDRESS
+  const rightIsUsdt = toRawAddress(right.jetton) === MAINNET_USDT_MASTER_RAW_ADDRESS
+  if (leftIsUsdt !== rightIsUsdt) {
+    return leftIsUsdt ? -1 : 1
+  }
+
+  return compareJettonWalletAmount(left, right)
 }
 
 function compareJettonWalletAmount(left: JettonWallet, right: JettonWallet): number {

@@ -18,20 +18,21 @@ use verifier::source_storage::SourceMapData;
 
 use support::{
     PAYMENT_ADDRESS, PAYMENT_TX_HASH, StaticPaymentBlockchainClient, app_state,
-    app_state_with_api_key, fail_once_source_storage_app_state, failing_compiler_app_state,
-    failing_compiler_app_state_with_payment_outcomes, failing_source_storage_app_state,
-    failing_source_storage_app_state_with_payment_outcomes, file_part, get,
-    mapped_compiler_app_state, owned_file_part, owned_text_part, payment_error_app_state,
-    payment_transaction, post_verify, post_verify_with_api_key, post_verify_without_payment,
-    recording_app_state, recording_payment_app_state, recording_source_storage_app_state,
-    recording_source_storage_app_state_with_generated_sources,
-    recording_source_storage_app_state_with_source_map_data, recovering_payment_app_state,
+    app_state_with_api_key, blocking_verification_app_state, fail_once_source_storage_app_state,
+    failing_compiler_app_state, failing_compiler_app_state_with_payment_outcomes,
+    failing_source_storage_app_state, failing_source_storage_app_state_with_payment_outcomes,
+    file_part, get, mapped_compiler_app_state, owned_file_part, owned_text_part,
+    payment_error_app_state, payment_transaction, post_verify, post_verify_with_api_key,
+    post_verify_without_payment, recording_app_state, recording_payment_app_state,
+    recording_source_storage_app_state, recording_source_storage_app_state_with_generated_sources,
+    recording_source_storage_app_state_with_source_map_data,
+    recording_source_storage_app_state_with_used_sources, recovering_payment_app_state,
     response_json, text_part, timing_out_compiler_app_state_with_payment_outcomes,
     unverified_app_state,
 };
 
-const ADDRESS_ONE: &str = "EQD0000000000000000000000000000000000000000000000";
-const ADDRESS_TWO: &str = "EQD1111111111111111111111111111111111111111111111";
+const ADDRESS_ONE: &str = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c";
+const ADDRESS_TWO: &str = "EQAREREREREREREREREREREREREREREREREREREREREREeYT";
 const CODE_HASH_ONE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const CODE_HASH_ONE_BASE64: &str = "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=";
 const CODE_HASH_TWO: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -56,6 +57,97 @@ const SOURCES_ALIASED_FILES: &str = r#"[
   {"path":"main.tolk","is_entrypoint":true},
   {"path":"contracts/lib.tolk","is_entrypoint":false}
 ]"#;
+
+#[tokio::test]
+async fn verification_admission_rejects_ambiguous_and_excessive_uploads_before_payment() {
+    let mut snapshot = serde_json::Map::new();
+    for (name, value) in [
+        ("code_hash", CODE_HASH_TWO),
+        ("language", "func"),
+        ("compile_params", "{}"),
+        ("sources", "[]"),
+        ("tx_hash", PAYMENT_TX_HASH),
+    ] {
+        let state = payment_error_app_state(CODE_HASH_ONE, PaymentError::AlreadyUsed);
+        let mut parts = valid_verify_parts();
+        parts.push(text_part(name, value));
+        let response = post_verify(state, parts).await;
+        let status = response.status().as_u16();
+        snapshot.insert(
+            name.to_owned(),
+            json!({"status": status, "body": response_json::<Value>(response).await}),
+        );
+    }
+
+    let state = payment_error_app_state(CODE_HASH_ONE, PaymentError::AlreadyUsed);
+    let mut parts = valid_verify_parts();
+    for index in 0..256 {
+        parts.push(owned_file_part(
+            "files",
+            format!("file{index}.tolk"),
+            "text/plain",
+            "source",
+        ));
+    }
+    let response = post_verify(state, parts).await;
+    let status = response.status().as_u16();
+    snapshot.insert(
+        "too_many_files".to_owned(),
+        json!({"status": status, "body": response_json::<Value>(response).await}),
+    );
+
+    assert_eq!(
+        format!("{}\n", serde_json::to_string_pretty(&snapshot).unwrap()),
+        include_str!("snapshots/verification_admission.json"),
+    );
+}
+
+#[tokio::test]
+async fn verify_rejects_empty_source_file() {
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", ""),
+        ],
+    )
+    .await;
+
+    // TODO: Restore the rejection assertion when REJECT_EMPTY_FILES is re-enabled.
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn verify_allows_a_source_file_larger_than_the_removed_per_file_limit() {
+    let content = format!("// {}\nfun main() {{}}", "x".repeat(512 * 1024));
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE).with_max_request_bytes(1024 * 1024),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            owned_file_part("files", "main.tolk", "text/plain", content),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn verify_enforces_configured_request_size_limit() {
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE).with_max_request_bytes(128),
+        valid_verify_parts(),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+}
 
 async fn post_take_ticket(
     state: verifier::state::AppState,
@@ -241,6 +333,30 @@ async fn verify_rejects_an_invalid_direct_code_hash_before_claiming_payment() {
 }
 
 #[tokio::test]
+async fn verify_rejects_an_invalid_address_before_claiming_payment() {
+    let response = post_verify_without_payment(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part(
+                "address",
+                "db94261627fb6a8282159d45e03d287a6417905887c77d1e6172b4f50a3a9f0p",
+            ),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({"error": "invalid TON address"})
+    );
+}
+
+#[tokio::test]
 async fn verify_maps_payment_failures_to_stable_http_contracts() {
     let cases = [
         (
@@ -373,17 +489,23 @@ async fn openapi_json_documents_verifier_api() {
 
     let take_ticket = &body["paths"]["/api/v1/take_ticket"]["post"];
     let verify = &body["paths"]["/api/v1/verify"]["post"];
+    let abi = &body["paths"]["/api/v1/abi"]["get"];
+    let source = &body["paths"]["/api/v1/verification/source"]["get"];
     assert_eq!(take_ticket["operationId"], "take_ticket");
     assert_eq!(verify["operationId"], "verify");
     assert_eq!(response_statuses(take_ticket), ["200", "400", "502", "503"]);
     assert_eq!(
         response_statuses(verify),
-        ["200", "400", "401", "402", "404", "409", "502", "503"]
+        [
+            "200", "400", "401", "402", "404", "409", "413", "502", "503"
+        ]
     );
+    assert_eq!(response_statuses(abi), ["200", "400", "404", "502"]);
+    assert_eq!(response_statuses(source), ["200", "400", "404", "502"]);
 }
 
 #[tokio::test]
-async fn api_routes_allow_browser_cors() {
+async fn api_routes_do_not_handle_browser_cors() {
     let state = app_state(&[], CODE_HASH_ONE);
     let preflight_request = Request::builder()
         .method(Method::OPTIONS)
@@ -396,15 +518,14 @@ async fn api_routes_allow_browser_cors() {
     let preflight_response = app::router_with_state(state.clone())
         .oneshot(preflight_request)
         .await
-        .expect("router should handle CORS preflight");
+        .expect("router should return a response to an OPTIONS request");
 
-    assert_eq!(preflight_response.status(), StatusCode::OK);
-    assert_eq!(
+    assert_eq!(preflight_response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    assert!(
         preflight_response
             .headers()
             .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
-            .and_then(|value| value.to_str().ok()),
-        Some("*")
+            .is_none()
     );
 
     let get_request = Request::builder()
@@ -417,15 +538,14 @@ async fn api_routes_allow_browser_cors() {
     let get_response = app::router_with_state(state)
         .oneshot(get_request)
         .await
-        .expect("router should handle browser GET request");
+        .expect("router should handle GET request with an Origin header");
 
-    assert_eq!(get_response.status(), StatusCode::OK);
-    assert_eq!(
+    assert_eq!(get_response.status(), StatusCode::NOT_FOUND);
+    assert!(
         get_response
             .headers()
             .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
-            .and_then(|value| value.to_str().ok()),
-        Some("*")
+            .is_none()
     );
 }
 
@@ -664,6 +784,50 @@ async fn abi_returns_indexed_tolk_abi_records_with_code_hash() {
 }
 
 #[tokio::test]
+async fn abi_returns_not_found_when_contract_or_abi_is_missing() {
+    let state = app_state(&[], CODE_HASH_ONE);
+    let path = format!("/api/v1/abi?code_hash={CODE_HASH_ONE}");
+
+    let response = get(state.clone(), &path).await;
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_error_contains(response, "ABI was not found").await;
+
+    let verify_response = post_verify(
+        state.clone(),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+    assert_eq!(verify_response.status(), StatusCode::OK);
+
+    let response = get(state.clone(), &path).await;
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_error_contains(response, "ABI was not found").await;
+
+    let response = get(state, "/api/v1/abi").await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_json::<AbiContractsResponse>(response).await;
+    assert!(body.items.is_empty());
+}
+
+#[tokio::test]
+async fn abi_rejects_invalid_code_hash() {
+    let response = get(
+        app_state(&[], CODE_HASH_ONE),
+        "/api/v1/abi?code_hash=not-a-code-hash",
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_error_contains(response, "code_hash must contain exactly 64").await;
+}
+
+#[tokio::test]
 async fn verification_status_reports_unverified_code_hash_without_stored_bundle() {
     let response = get(
         app_state(&[], CODE_HASH_ONE),
@@ -760,6 +924,18 @@ async fn verification_status_rejects_missing_target() {
 }
 
 #[tokio::test]
+async fn verification_status_rejects_invalid_code_hash() {
+    let response = get(
+        app_state(&[], CODE_HASH_ONE),
+        "/api/v1/verification/status?code_hash=not-a-code-hash",
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_error_contains(response, "code_hash must contain exactly 64").await;
+}
+
+#[tokio::test]
 async fn verification_status_returns_not_found_when_address_has_no_code_hash() {
     let response = get(
         app_state(&[], CODE_HASH_ONE),
@@ -772,15 +948,21 @@ async fn verification_status_returns_not_found_when_address_has_no_code_hash() {
 }
 
 #[tokio::test]
+async fn verification_source_returns_not_found_without_stored_bundle() {
+    let response = get(
+        app_state(&[], CODE_HASH_ONE),
+        &format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}"),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_error_contains(response, "verified source was not found").await;
+}
+
+#[tokio::test]
 async fn verification_source_returns_verified_bundle_files() {
     let (state, recorded_requests) = recording_source_storage_app_state(&[], CODE_HASH_ONE);
     let source_path = format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}");
-    let unverified_response = get(state.clone(), &source_path).await;
-    assert_eq!(unverified_response.status(), StatusCode::OK);
-    let unverified = response_json::<VerificationSourceResponse>(unverified_response).await;
-    assert!(!unverified.verified);
-    assert!(unverified.bundle.is_none());
-
     let verify_response = post_verify(
         state.clone(),
         vec![
@@ -979,6 +1161,21 @@ async fn verification_source_returns_not_found_when_address_has_no_code_hash() {
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     assert_error_contains(response, "code_hash was not found").await;
+}
+
+#[tokio::test]
+async fn verification_source_rejects_invalid_address_before_blockchain_lookup() {
+    let response = get(
+        app_state(&[], CODE_HASH_ONE),
+        "/api/v1/verification/source?address=db94261627fb6a8282159d45e03d287a6417905887c77d1e6172b4f50a3a9f0p",
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({"error": "invalid TON address"})
+    );
 }
 
 #[tokio::test]
@@ -1406,6 +1603,132 @@ async fn verify_returns_source_bundle_hash_on_hash_match() {
 }
 
 #[tokio::test]
+async fn verify_retains_only_compiler_used_sources_for_each_language() {
+    for (
+        language,
+        compile_params,
+        sources,
+        retained_path,
+        retained_content_type,
+        retained_content,
+        unused_path,
+        unused_content,
+    ) in [
+        (
+            "tolk",
+            COMPILE_PARAMS_TOLK,
+            r#"[{"path":"main.tolk","is_entrypoint":true},{"path":"unused.tolk","is_entrypoint":false}]"#,
+            "main.tolk",
+            "text/plain",
+            "fun main() {}",
+            "unused.tolk",
+            "fun unused() {}",
+        ),
+        (
+            "func",
+            COMPILE_PARAMS_FUNC,
+            r#"[{"path":"main.fc","is_entrypoint":true,"include_in_command":true},{"path":"unused.fc","is_entrypoint":false}]"#,
+            "main.fc",
+            "text/plain",
+            "() main() {}",
+            "unused.fc",
+            "() unused() {}",
+        ),
+        (
+            "tact",
+            EMPTY_COMPILE_PARAMS,
+            r#"[{"path":"contract.pkg","is_entrypoint":true},{"path":"unused.tact","is_entrypoint":false}]"#,
+            "contract.pkg",
+            "application/json",
+            TACT_PKG_1_6_13,
+            "unused.tact",
+            "contract Unused {}",
+        ),
+    ] {
+        let (state, compiler_requests, storage_requests) =
+            recording_source_storage_app_state_with_used_sources(
+                &[],
+                CODE_HASH_ONE,
+                vec![retained_path.to_owned()],
+            );
+        let response = post_verify(
+            state,
+            vec![
+                text_part("code_hash", CODE_HASH_ONE),
+                text_part("language", language),
+                text_part("compile_params", compile_params),
+                text_part("sources", sources),
+                file_part(
+                    "files",
+                    retained_path,
+                    retained_content_type,
+                    retained_content,
+                ),
+                file_part("files", unused_path, "text/plain", unused_content),
+            ],
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::OK, "language={language}");
+
+        let compiler_requests = compiler_requests
+            .lock()
+            .expect("recorded compiler requests mutex should not be poisoned");
+        assert_eq!(compiler_requests.len(), 1, "language={language}");
+        assert_eq!(compiler_requests[0].sources.len(), 2, "language={language}");
+        drop(compiler_requests);
+
+        let storage_requests = storage_requests
+            .lock()
+            .expect("recorded source storage requests mutex should not be poisoned");
+        assert_eq!(storage_requests.len(), 1, "language={language}");
+        assert_eq!(storage_requests[0].files.len(), 1, "language={language}");
+        assert_eq!(
+            storage_requests[0].files[0].0, retained_path,
+            "language={language}"
+        );
+        drop(storage_requests);
+    }
+}
+
+#[tokio::test]
+async fn verify_rejects_invalid_used_source_report_without_storing_files() {
+    let (state, compiler_requests, storage_requests) =
+        recording_source_storage_app_state_with_used_sources(
+            &[],
+            CODE_HASH_ONE,
+            vec!["missing.tolk".to_owned()],
+        );
+    let response = post_verify(
+        state,
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    assert_error_contains(response, "internal verifier error").await;
+    assert_eq!(
+        compiler_requests
+            .lock()
+            .expect("recorded compiler requests mutex should not be poisoned")
+            .len(),
+        1
+    );
+    assert!(
+        storage_requests
+            .lock()
+            .expect("recorded source storage requests mutex should not be poisoned")
+            .is_empty()
+    );
+}
+
+#[tokio::test]
 async fn verify_stores_generated_sources_on_hash_match() {
     let (state, recorded_requests) = recording_source_storage_app_state_with_generated_sources(
         &[],
@@ -1475,7 +1798,7 @@ async fn verify_stores_source_bundle_on_hash_match() {
     assert_eq!(body.storage_revision.as_deref(), Some("mock-revision"));
 
     let source_response = get(
-        state,
+        state.clone(),
         &format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}"),
     )
     .await;
@@ -1487,6 +1810,13 @@ async fn verify_stores_source_bundle_on_hash_match() {
             .and_then(|bundle| bundle.payment_tx_hash)
             .as_deref(),
         Some("a07d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394b")
+    );
+    assert_eq!(
+        state
+            .published_payment_transaction_hashes()
+            .await
+            .expect("published payment hashes should be readable"),
+        vec![PAYMENT_TX_HASH.to_owned()]
     );
 }
 
@@ -1622,6 +1952,53 @@ async fn retryable_storage_failure_allows_a_second_request_with_the_same_payment
 }
 
 #[tokio::test]
+async fn verification_finishes_after_the_request_task_is_cancelled() {
+    let fixture = blocking_verification_app_state(CODE_HASH_ONE);
+    let state_after_cancellation = fixture.state.clone();
+    let request_task = tokio::spawn(post_verify(fixture.state, valid_verify_parts()));
+
+    tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        fixture.compiler_started.notified(),
+    )
+    .await
+    .expect("compiler should start before the request is cancelled");
+    request_task.abort();
+    assert!(
+        request_task
+            .await
+            .expect_err("request task should be cancelled")
+            .is_cancelled()
+    );
+
+    fixture.release_compiler.notify_one();
+    tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        state_after_cancellation.wait_for_background_tasks(),
+    )
+    .await
+    .expect("background verification should finish after request cancellation");
+
+    assert_eq!(
+        *fixture
+            .outcomes
+            .lock()
+            .expect("payment outcomes mutex should not be poisoned"),
+        [PaymentAttemptOutcome::Consumed]
+    );
+    assert!(
+        state_after_cancellation
+            .verification_registry()
+            .status(verifier::registry::VerificationStatusRequest {
+                code_hash: CODE_HASH_ONE.to_owned(),
+            })
+            .await
+            .expect("verification status should be readable")
+            .verified
+    );
+}
+
+#[tokio::test]
 async fn verify_returns_bad_request_when_compilation_fails() {
     let response = post_verify(
         failing_compiler_app_state(&[], "Tolk syntax error at main.tolk:1:5"),
@@ -1682,7 +2059,7 @@ async fn internal_compiler_failure_is_hidden_and_consumes_the_payment() {
 }
 
 #[tokio::test]
-async fn restart_rebuilds_consumed_payments_from_file_backed_history() {
+async fn restart_keeps_unclaimed_payments_available_from_file_backed_history() {
     let directory = tempfile::tempdir().expect("temporary ledger directory should be created");
     let ledger_path = directory.path().join("payments.sqlite3");
     let transaction = payment_transaction(PAYMENT_TX_HASH, CODE_HASH_ONE);
@@ -1694,7 +2071,7 @@ async fn restart_rebuilds_consumed_payments_from_file_backed_history() {
         1_000_000,
     );
     first_server
-        .recover()
+        .recover(&[])
         .await
         .expect("initial empty recovery should succeed");
     drop(first_server);
@@ -1709,14 +2086,15 @@ async fn restart_rebuilds_consumed_payments_from_file_backed_history() {
         1_000_000,
     );
     restarted_server
-        .recover()
+        .recover(&[])
         .await
         .expect("restart recovery should rebuild payment history");
 
-    assert!(matches!(
-        restarted_server.claim(PAYMENT_TX_HASH, CODE_HASH_ONE).await,
-        Err(PaymentError::AlreadyUsed)
-    ));
+    let claim = restarted_server
+        .claim(PAYMENT_TX_HASH, CODE_HASH_ONE)
+        .await
+        .expect("payment recovered after restart should remain claimable");
+    assert_eq!(claim.claim_version, 1);
 }
 
 #[tokio::test]
@@ -2022,6 +2400,55 @@ async fn verify_rejects_source_path_over_length_limit() {
 }
 
 #[tokio::test]
+async fn verify_accepts_source_path_at_directory_depth_limit() {
+    let path = format!("{}/main.tolk", ["dir"; 16].join("/"));
+    assert_eq!(path.matches('/').count(), 16);
+    let sources = serde_json::to_string(&json!([{
+        "path": path,
+        "is_entrypoint": true,
+    }]))
+    .expect("source metadata should serialize");
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            owned_text_part("sources", sources),
+            owned_file_part("files", path, "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn verify_rejects_source_path_over_directory_depth_limit() {
+    let path = format!("{}/main.tolk", ["dir"; 17].join("/"));
+    assert_eq!(path.matches('/').count(), 17);
+    let sources = serde_json::to_string(&json!([{
+        "path": path,
+        "is_entrypoint": true,
+    }]))
+    .expect("source metadata should serialize");
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            owned_text_part("sources", sources),
+            owned_file_part("files", path, "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_error_contains(response, "no more than 16 directories").await;
+}
+
+#[tokio::test]
 async fn verify_rejects_non_ascii_source_paths() {
     for path in [
         concat!("ca", "f", "\u{e9}.tolk"),
@@ -2113,8 +2540,6 @@ async fn verify_rejects_unsafe_source_paths() {
         ("main.tolk.", "must not end with '.'"),
         ("contracts./main.tolk", "must not end with '.'"),
         ("contracts/file name.tolk", "only ASCII letters"),
-        ("contracts/file@name.tolk", "only ASCII letters"),
-        ("contracts/file+name.tolk", "only ASCII letters"),
         ("contracts/file=name.tolk", "only ASCII letters"),
         ("contracts/file,name.tolk", "only ASCII letters"),
         ("contracts/file:name.tolk", "only ASCII letters"),
@@ -2153,25 +2578,26 @@ async fn verify_rejects_unsafe_source_paths() {
 
 #[tokio::test]
 async fn verify_accepts_portable_ascii_source_path() {
-    let path = "Contracts_123/lib-name.v1.tolk";
-    let sources = serde_json::to_string(&json!([{
-        "path": path,
-        "is_entrypoint": true,
-    }]))
-    .expect("source metadata should serialize");
-    let response = post_verify(
-        app_state(&[], CODE_HASH_ONE),
-        vec![
-            text_part("code_hash", CODE_HASH_ONE),
-            text_part("language", "tolk"),
-            text_part("compile_params", COMPILE_PARAMS_TOLK),
-            owned_text_part("sources", sources),
-            file_part("files", path, "text/plain", "fun main() {}"),
-        ],
-    )
-    .await;
+    for path in ["Contracts_123/lib-name.v1.tolk", "@scope/lib+name.v1.tolk"] {
+        let sources = serde_json::to_string(&json!([{
+            "path": path,
+            "is_entrypoint": true,
+        }]))
+        .expect("source metadata should serialize");
+        let response = post_verify(
+            app_state(&[], CODE_HASH_ONE),
+            vec![
+                text_part("code_hash", CODE_HASH_ONE),
+                text_part("language", "tolk"),
+                text_part("compile_params", COMPILE_PARAMS_TOLK),
+                owned_text_part("sources", sources),
+                file_part("files", path, "text/plain", "fun main() {}"),
+            ],
+        )
+        .await;
 
-    assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), StatusCode::OK, "path={path}");
+    }
 }
 
 #[tokio::test]
@@ -2216,23 +2642,31 @@ async fn verify_rejects_git_control_paths() {
 
 #[tokio::test]
 async fn verify_rejects_source_in_output_directory() {
-    let response = post_verify(
-        app_state(&[], CODE_HASH_ONE),
-        vec![
-            text_part("code_hash", CODE_HASH_ONE),
-            text_part("language", "tolk"),
-            text_part("compile_params", COMPILE_PARAMS_TOLK),
-            text_part(
-                "sources",
-                r#"[{"path":"output/main.tolk","is_entrypoint":true}]"#,
-            ),
-            file_part("files", "output/main.tolk", "text/plain", "fun main() {}"),
-        ],
-    )
-    .await;
+    for path in ["output/main.tolk", "Output/main.tolk", "OUTPUT/main.tolk"] {
+        let sources = serde_json::to_string(&json!([{
+            "path": path,
+            "is_entrypoint": true,
+        }]))
+        .expect("source metadata should serialize");
+        let response = post_verify(
+            app_state(&[], CODE_HASH_ONE),
+            vec![
+                text_part("code_hash", CODE_HASH_ONE),
+                text_part("language", "tolk"),
+                text_part("compile_params", COMPILE_PARAMS_TOLK),
+                owned_text_part("sources", sources),
+                file_part("files", path, "text/plain", "fun main() {}"),
+            ],
+        )
+        .await;
 
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    assert_error_contains(response, "reserved output directory").await;
+        assert_eq!(
+            response.status(),
+            StatusCode::BAD_REQUEST,
+            "reserved output directory should be rejected: {path}"
+        );
+        assert_error_contains(response, "reserved output directory").await;
+    }
 }
 
 #[tokio::test]

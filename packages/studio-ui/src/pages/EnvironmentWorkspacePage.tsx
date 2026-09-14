@@ -67,11 +67,9 @@ export function EnvironmentWorkspacePage({
     onShellChange({
       pageDescription,
       pageTitle: environment?.name ?? (isManaged ? "Virtual Environment" : "Network"),
-      rpcUrl: environment?.rpcUrl,
     })
   }, [
     environment?.name,
-    environment?.rpcUrl,
     environment?.status,
     canOpenWorkspace,
     isManaged,

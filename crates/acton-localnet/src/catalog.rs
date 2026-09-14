@@ -107,6 +107,49 @@ pub async fn create(root: &Path, request: CreateNetwork) -> Result<NetworkDirect
         }
     }
 
+    // Wallets and imported contracts share one genesis address space. Reject
+    // collisions before persisting a network or launching Docker.
+    if !request.startup_wallets.is_empty() {
+        let mut names = std::collections::BTreeSet::new();
+        for wallet in &request.startup_wallets {
+            if wallet.name.trim().is_empty() || !names.insert(&wallet.name) {
+                return Err(Error::invalid(
+                    "Startup wallet names must be nonempty and unique",
+                ));
+            }
+        }
+        let mut addresses = std::collections::BTreeSet::new();
+        for boc in request.imported_account_bocs.iter().chain(
+            request
+                .startup_wallets
+                .iter()
+                .map(|wallet| &wallet.shard_account_boc_hex),
+        ) {
+            let shard =
+                tycho_types::boc::BocRepr::decode_hex::<tycho_types::models::ShardAccount, _>(boc)
+                    .map_err(|error| {
+                        Error::invalid(format!("Invalid genesis ShardAccount: {error}"))
+                    })?;
+            let account = shard
+                .load_account()
+                .map_err(|error| Error::invalid(format!("Invalid genesis account: {error}")))?
+                .ok_or_else(|| Error::invalid("Genesis account is empty"))?;
+            if !matches!(&account.address, tycho_types::models::IntAddr::Std(address) if address.workchain == 0)
+                || !matches!(account.state, tycho_types::models::AccountState::Active(_))
+            {
+                return Err(Error::invalid(
+                    "Genesis wallets and imports must be active accounts in workchain 0",
+                ));
+            }
+            if !addresses.insert(account.address.to_string()) {
+                return Err(Error::invalid(format!(
+                    "Account {} was selected more than once for genesis",
+                    account.address
+                )));
+            }
+        }
+    }
+
     let existing = list(&root).await?;
     if existing.iter().any(|n| n.network.name == name) {
         return Err(Error::Conflict {
@@ -191,6 +234,7 @@ pub async fn create(root: &Path, request: CreateNetwork) -> Result<NetworkDirect
         block_time_ms: request.block_time_ms,
         election_time_seconds: request.election_time_seconds,
         imported_account_bocs: request.imported_account_bocs,
+        startup_wallets: request.startup_wallets,
     };
 
     let id = uuid::Uuid::new_v4().to_string();

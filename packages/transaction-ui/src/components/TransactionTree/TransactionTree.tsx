@@ -1,4 +1,5 @@
 import type {Address} from "@ton/core"
+import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import type React from "react"
 import {
   memo,
@@ -49,6 +50,7 @@ import {
 } from "../../lib/transaction"
 
 import {TransactionDetails} from "../TransactionDetails/TransactionDetails"
+import {ExternalOutMessageDetails} from "../TransactionDetails/ExternalOutMessageDetails"
 
 import {SmartTooltip} from "./SmartTooltip"
 import styles from "./TransactionTree.module.css"
@@ -56,6 +58,12 @@ import {useTooltip} from "./useTooltip"
 
 const EAGER_MESSAGE_BODY_DECODE_TRANSACTION_LIMIT = 50
 const MemoizedTransactionDetails = memo(TransactionDetails)
+
+interface TreeSelection {
+  readonly transactionId: string
+  // Dictionary keys distinguish even identical external-out messages from one transaction.
+  readonly externalMessageIndex?: number
+}
 
 interface EdgeTransactionTooltipData {
   readonly fromAddress: string | undefined
@@ -400,10 +408,10 @@ function TransactionTreeComponent({
     calculateOptimalPosition,
   } = useTooltip()
 
-  const [expandedTransactionId, setExpandedTransactionId] = useState<string | undefined>(
-    selectedTransactionId,
+  const [selection, setSelection] = useState<TreeSelection | undefined>(
+    selectedTransactionId ? {transactionId: selectedTransactionId} : undefined,
   )
-  const expandedTransactionIdRef = useRef(selectedTransactionId)
+  const selectionRef = useRef(selection)
   const triggerRectReference = useRef<DOMRect | undefined>(undefined)
   const treeContainerRef = useRef<HTMLDivElement | null>(null)
   const treeWrapperRef = useRef<HTMLDivElement | null>(null)
@@ -428,6 +436,15 @@ function TransactionTreeComponent({
     }
     return map
   }, [originatingTransaction, transactions])
+
+  const additionalAbis = useMemo(
+    () =>
+      [
+        ...allContracts.map(contract => contract.abi),
+        ...(compilerAbisByCodeHash?.values() ?? []),
+      ].filter((abi): abi is ContractABI => abi !== undefined),
+    [allContracts, compilerAbisByCodeHash],
+  )
 
   // react-d3-tree calls the node renderer for every node whenever its callback changes.
   // Keep event-only dependencies behind a committed ref so route changes and tooltip state do
@@ -458,9 +475,9 @@ function TransactionTreeComponent({
     transactionMap,
   ])
 
-  const updateExpandedTransaction = useCallback((id: string | undefined): void => {
-    expandedTransactionIdRef.current = id
-    setExpandedTransactionId(id)
+  const updateSelection = useCallback((nextSelection: TreeSelection | undefined): void => {
+    selectionRef.current = nextSelection
+    setSelection(nextSelection)
   }, [])
 
   const handleNodeClick = useCallback(
@@ -471,29 +488,43 @@ function TransactionTreeComponent({
       if (!transaction) return
 
       forceHideTooltip()
-      if (expandedTransactionIdRef.current === id) {
-        updateExpandedTransaction(undefined)
+      if (
+        selectionRef.current?.transactionId === id &&
+        selectionRef.current.externalMessageIndex === undefined
+      ) {
+        updateSelection(undefined)
         return
       }
 
-      updateExpandedTransaction(id)
+      updateSelection({transactionId: id})
       selectTransaction?.(transaction)
     },
-    [forceHideTooltip, updateExpandedTransaction],
+    [forceHideTooltip, updateSelection],
   )
 
   const handleExternalOutClick = useCallback(
-    (parentId: string): void => {
+    (parentId: string, messageIndex: number): void => {
       const {transactionMap: currentTransactionMap, onTransactionSelect: selectTransaction} =
         eventContextRef.current
       const parentTransaction = currentTransactionMap.get(parentId)
-      if (!parentTransaction || expandedTransactionIdRef.current === parentId) return
+      if (
+        parentTransaction?.transaction.outMessages.get(messageIndex)?.info.type !== "external-out"
+      )
+        return
 
       forceHideTooltip()
-      updateExpandedTransaction(parentId)
+      if (
+        selectionRef.current?.transactionId === parentId &&
+        selectionRef.current.externalMessageIndex === messageIndex
+      ) {
+        updateSelection(undefined)
+        return
+      }
+
+      updateSelection({transactionId: parentId, externalMessageIndex: messageIndex})
       selectTransaction?.(parentTransaction)
     },
-    [forceHideTooltip, updateExpandedTransaction],
+    [forceHideTooltip, updateSelection],
   )
 
   const handleTraceGapLoad = useCallback((): void => {
@@ -684,25 +715,22 @@ function TransactionTreeComponent({
       const id = tx.id
       const isActionHighlighted = highlightedTransactionIds?.has(id) ?? false
 
-      const externalOutMessage = [...tx.transaction.outMessages.values()].find(outMessage => {
-        return outMessage.info.type === "external-out"
-      })
+      const externalOutChildren: RawNodeDatum[] = []
+      for (const [messageIndex, message] of tx.transaction.outMessages) {
+        if (message.info.type !== "external-out") continue
 
-      const externalOutChildren =
-        externalOutMessage?.info.type === "external-out"
-          ? [
-              {
-                name: "",
-                attributes: {
-                  isExternalOut: true,
-                  parentId: id,
-                  destination: externalOutMessage.info.dest?.toString() ?? "External",
-                  createdLt: externalOutMessage.info.createdLt.toString(),
-                },
-                children: [],
-              },
-            ]
-          : []
+        externalOutChildren.push({
+          name: "",
+          attributes: {
+            isExternalOut: true,
+            parentId: id,
+            messageIndex,
+            destination: message.info.dest?.toString() ?? "External",
+            createdLt: message.info.createdLt.toString(),
+          },
+          children: [],
+        })
+      }
 
       return {
         name: addressName,
@@ -1075,12 +1103,13 @@ function TransactionTreeComponent({
 
       if (nodeDatum.attributes?.isExternalOut) {
         const parentId = nodeDatum.attributes.parentId as string
-        const externalOutAriaLabel = `External-out message from transaction ${parentId}`
+        const messageIndex = nodeDatum.attributes.messageIndex as number
+        const externalOutAriaLabel = `External-out message ${messageIndex} from transaction ${parentId}`
         const externalOutDestination = nodeDatum.attributes.destination as string
         const createdLt = nodeDatum.attributes.createdLt as string
 
         return (
-          <g>
+          <g data-external-message-id={`${parentId}:${messageIndex}`}>
             <foreignObject
               width="4"
               height="6"
@@ -1108,20 +1137,23 @@ function TransactionTreeComponent({
               role="button"
               tabIndex={0}
               aria-label={externalOutAriaLabel}
+              aria-pressed={false}
               fill="transparent"
               stroke="var(--acton-color-border)"
               strokeWidth={1}
               className={styles.nodeCircle}
               onClick={() => {
-                handleExternalOutClick(parentId)
+                handleExternalOutClick(parentId, messageIndex)
               }}
               onKeyDown={event => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault()
-                  handleExternalOutClick(parentId)
+                  handleExternalOutClick(parentId, messageIndex)
                 }
               }}
             />
+            {/* biome-ignore lint/a11y/noAriaHiddenOnFocusable: The SVG focus ring is decorative and cannot receive focus. */}
+            <circle r={20} className={styles.nodeFocusRing} aria-hidden="true" />
 
             <foreignObject
               width={TREE_EDGE_LABEL.width}
@@ -1224,6 +1256,8 @@ function TransactionTreeComponent({
             }}
             className={nodeCircleClassName}
           />
+          {/* biome-ignore lint/a11y/noAriaHiddenOnFocusable: The SVG focus ring is decorative and cannot receive focus. */}
+          <circle r={20} className={styles.nodeFocusRing} aria-hidden="true" />
 
           <text
             fill={
@@ -1328,14 +1362,22 @@ function TransactionTreeComponent({
   )
 
   useLayoutEffect(() => {
-    updateExpandedTransaction(selectedTransactionId)
-  }, [selectedTransactionId, updateExpandedTransaction])
+    // Selecting an external-out also selects its parent route. Preserve the message selection
+    // when the caller reflects that same parent back through selectedTransactionId.
+    if (selectedTransactionId !== selectionRef.current?.transactionId) {
+      updateSelection(selectedTransactionId ? {transactionId: selectedTransactionId} : undefined)
+    }
+  }, [selectedTransactionId, updateSelection])
 
-  const deferredExpandedTransactionId = useDeferredValue(expandedTransactionId)
+  const deferredSelection = useDeferredValue(selection)
   const selectedTransaction =
-    deferredExpandedTransactionId === expandedTransactionId && deferredExpandedTransactionId
-      ? transactionMap.get(deferredExpandedTransactionId)
+    deferredSelection === selection && deferredSelection
+      ? transactionMap.get(deferredSelection.transactionId)
       : undefined
+  const selectedMessage =
+    deferredSelection?.externalMessageIndex === undefined
+      ? undefined
+      : selectedTransaction?.transaction.outMessages.get(deferredSelection.externalMessageIndex)
 
   useLayoutEffect(() => {
     const wrapper = treeWrapperRef.current
@@ -1383,10 +1425,10 @@ function TransactionTreeComponent({
   useLayoutEffect(() => {
     const container = treeContainerRef.current
     const wrapper = treeWrapperRef.current
-    const selectedId = expandedTransactionId
+    const selectedId = selection?.transactionId
     selectedNodeRef.current?.classList.remove(styles.transactionNodeSelected)
     selectedNodeRef.current
-      ?.querySelector<SVGCircleElement>('circle[aria-label^="Transaction "]')
+      ?.querySelector<SVGCircleElement>('circle[role="button"]')
       ?.setAttribute("aria-pressed", "false")
     selectedNodeRef.current = null
 
@@ -1397,11 +1439,11 @@ function TransactionTreeComponent({
     // react-d3-tree invalidates every Node when its data changes. Selection is a visual overlay,
     // so update only the matching SVG group and keep the structural tree data immutable.
     const selectedNodeGroup = wrapper.querySelector<SVGGElement>(
-      `g[data-transaction-id="${CSS.escape(selectedId)}"]`,
+      selection.externalMessageIndex === undefined
+        ? `g[data-transaction-id="${CSS.escape(selectedId)}"]`
+        : `g[data-external-message-id="${CSS.escape(`${selectedId}:${selection.externalMessageIndex}`)}"]`,
     )
-    const selectedNode = selectedNodeGroup?.querySelector<SVGCircleElement>(
-      'circle[aria-label^="Transaction "]',
-    )
+    const selectedNode = selectedNodeGroup?.querySelector<SVGCircleElement>('circle[role="button"]')
     if (!selectedNodeGroup || !selectedNode) {
       return
     }
@@ -1430,7 +1472,7 @@ function TransactionTreeComponent({
     if (Math.abs(container.scrollLeft - nextScrollLeft) > 1) {
       container.scrollTo({left: nextScrollLeft})
     }
-  }, [expandedTransactionId, renderCustomNodeElement, treeData, treeLayout])
+  }, [selection, renderCustomNodeElement, treeData, treeLayout])
 
   useLayoutEffect(() => {
     const container = treeContainerRef.current
@@ -1521,23 +1563,35 @@ function TransactionTreeComponent({
       {selectedTransaction && (
         <div className={styles.transactionDetails}>
           <div className={styles.transactionDetailsCard}>
-            <MemoizedTransactionDetails
-              tx={selectedTransaction}
-              contracts={contracts}
-              compilerAbisByCodeHash={compilerAbisByCodeHash}
-              verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
-              resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
-              allContracts={allContracts}
-              onCellInspect={onCellInspect}
-              onContractClick={onContractClick}
-              renderSourceLocation={renderSourceLocation}
-              loadActions={loadActions}
-              renderMessageRouteAction={renderSelectedTransactionMessageRouteAction}
-              getBlockPath={getBlockPath}
-              onBlockClick={onBlockClick}
-            />
+            {selectedMessage?.info.type === "external-out" ? (
+              <ExternalOutMessageDetails
+                key={`${selectedTransaction.id}:${deferredSelection?.externalMessageIndex}`}
+                message={{...selectedMessage, info: selectedMessage.info}}
+                contracts={contracts}
+                additionalAbis={additionalAbis}
+                onCellInspect={onCellInspect}
+                onContractClick={onContractClick}
+                renderAddressChip={renderAddressChip}
+              />
+            ) : (
+              <MemoizedTransactionDetails
+                tx={selectedTransaction}
+                contracts={contracts}
+                compilerAbisByCodeHash={compilerAbisByCodeHash}
+                verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
+                resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
+                allContracts={allContracts}
+                onCellInspect={onCellInspect}
+                onContractClick={onContractClick}
+                renderSourceLocation={renderSourceLocation}
+                loadActions={loadActions}
+                renderMessageRouteAction={renderSelectedTransactionMessageRouteAction}
+                getBlockPath={getBlockPath}
+                onBlockClick={onBlockClick}
+              />
+            )}
           </div>
-          {renderSelectedTransactionExtra?.(selectedTransaction)}
+          {!selectedMessage && renderSelectedTransactionExtra?.(selectedTransaction)}
         </div>
       )}
     </div>

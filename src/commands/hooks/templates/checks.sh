@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+
+if ! command -v acton >/dev/null 2>&1; then
+    printf '%s\n' \
+        "${0##*/}: acton was not found in PATH" \
+        'Install Acton and add it to PATH in the environment that runs Git' \
+        'On Windows, run Git inside the WSL distribution where Acton is installed' \
+        "In VS Code, use 'WSL: Reopen Folder in WSL'" \
+        'See https://ton-blockchain.github.io/acton/docs/installation' >&2
+    exit 127
+fi
+
+acton check
+acton fmt --check

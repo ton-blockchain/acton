@@ -10,15 +10,12 @@ acton-verify --- Verify contract source code on the TON verifier service
 
 ## Description
 
-Verify that a deployed contract address matches the local source code for a
-contract from your project.
+Verify local contract source code with the TON verifier on TON testnet.
 
-The verification flow compiles local sources, prepares data for the verifier
-backend, collects the required signatures, and optionally submits the final
-verification transaction to the blockchain.
-
-With `--new`, Acton uses a testnet-only verifier. This flow requires a payment
-before a new source bundle is uploaded.
+The command compiles the local sources, requests a verification ticket, sends
+the required testnet payment, and uploads the source bundle. An optional
+deployed contract address can be used to check the compiled code hash before
+payment.
 
 ## Options
 
@@ -35,18 +32,19 @@ If omitted, Acton prompts when the project contains multiple contracts.
 {{#option "`--address` _address_" }}
 Deployed contract address to verify.
 
-If omitted, Acton prompts for it.
+If omitted, Acton verifies the compiled code hash without a separate deployed
+address check.
 {{/option}}
 
 {{#option "`--wallet` _wallet_" }}
-Wallet to use for the verification transaction.
+Testnet wallet to use for the verification payment.
 
 If omitted, Acton auto-selects the only configured wallet or prompts when
 multiple wallets are available.
 {{/option}}
 
 {{#option "`--tonconnect`" }}
-Use TON Connect wallet approval for the verification transaction.
+Use TON Connect wallet approval for the verification payment.
 
 Acton prints a native TON Connect QR code and a `tc://` link.
 
@@ -60,42 +58,20 @@ Currently defaults to `1.4.2`.
 {{/option}}
 
 {{#option "`--dry-run`" }}
-Run verification without submitting the final blockchain transaction.
-{{/option}}
-
-{{#option "`--new`" }}
-Use the Acton verifier with a TON testnet spam payment.
-
-This option conflicts with `--net`.
+Prepare verification without sending the payment or uploading sources.
 {{/option}}
 
 {{#option "`--payment-tx-hash` _payment-tx-hash_" }}
 Reuse a finalized testnet payment transaction.
 
-The transaction must contain the code hash from the current verification. This
-option requires `--new`.
-{{/option}}
-
-{{/options}}
-
-### Network Options
-
-{{#options}}
-
-{{#option "`--net` _network_" }}
-Network to verify against.
-
-Defaults to `testnet`.
-
-This option conflicts with `--new`. The Acton verifier always uses testnet.
+The transaction must contain the code hash from the current verification.
 {{/option}}
 
 {{/options}}
 
 ## TON Center API Keys
 
-Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
-`TONCENTER_TESTNET_API_KEY`, depending on `--net`.
+Testnet requests read `TONCENTER_TESTNET_API_KEY`.
 
 Acton loads `.env` automatically, so the simplest setup during project work is
 usually to keep these keys there and use shell environment variables only for
@@ -111,35 +87,20 @@ one-off overrides or CI.
 
 ## Process
 
-The built-in verifier flow consists of:
-
-1. compiling the local contract
-2. calculating the resulting code hash
-3. sending sources to a verifier backend
-4. collecting the required signatures
-5. optionally sending the final verification transaction
-
-Acton prepares the local compilation artifacts and uploads them to the
-verification service. The final deployed-code match is established by the
-verifier flow itself; `acton verify` does not first perform a separate local
-on-chain code-hash comparison against the target address before upload.
-
-With `--new`, the process is:
-
 1. Compile the local contract and compute its code hash.
 2. Request a ticket from `/api/v1/take_ticket`.
 3. Stop successfully if the code hash is already verified.
-4. Get wallet approval for the returned testnet amount and address.
-5. Send the payment with the returned code-hash comment.
-6. Wait for the finalized recipient transaction.
-7. Upload the sources and recipient transaction hash to `/api/v1/verify`.
+4. If `--address` is set, compare its deployed code hash with the compiled code.
+5. Get wallet approval for the returned testnet amount and address.
+6. Send the payment with the returned code-hash comment.
+7. Wait for the finalized recipient transaction.
+8. Upload the sources and recipient transaction hash to `/api/v1/verify`.
 
 ## Prerequisites
 
 - a `.tolk` contract source in the current project
-- testnet funds when `--new` is used without `--dry-run`
-- a supported built-in verifier network: `testnet` or `mainnet`
-- verifier backend availability for the selected network
+- testnet funds when `--dry-run` is not used
+- TON verifier availability
 - a configured wallet or TON Connect wallet, funded when not using `--dry-run`
 - reproducible compiler settings that match the deployed contract
 
@@ -158,9 +119,8 @@ With `--new`, the process is:
 
 - only `.tolk` sources can be verified
 - precompiled `.boc` contracts cannot be verified
-- `localnet` and `custom:<name>` are not supported by verifier backends
-- `--new` always uses testnet and does not accept `--net`
-- each new `--new` verification payment contains the code hash in its comment
+- verification always uses TON testnet
+- each verification payment contains the code hash in its comment
 - one payment transaction can authorize only one verification attempt
 - verification requires a funded local or TON Connect wallet when not using
   `--dry-run`
@@ -169,9 +129,7 @@ With `--new`, the process is:
 
 ## Cost And Backend Notes
 
-- when `--dry-run` is not used, the final verification transaction sends
-  `0.1 GRAM` in the built-in verifier flow
-- with `--new`, the ticket defines the minimum testnet payment amount
+- the ticket defines the minimum testnet payment amount
 - if the verifier backend reports that the contract is already verified, Acton
   exits successfully without sending another transaction
 - on successful verification, Acton prints a verifier link for the contract
@@ -180,128 +138,82 @@ With `--new`, the process is:
 
 The verification flow also supports backend/debug environment overrides:
 
-- `ACTON_VERIFY_BACKEND` overrides only the initial `/source` backend used for
-  source upload
-- `ACTON_VERIFY_BACKENDS` replaces the later signer `/sign` backend list
-- `ACTON_NEW_VERIFY_BACKEND` overrides the Acton verifier used by `--new`
-- `ACTON_VERIFY_DEBUG` enables verbose verification diagnostics by presence
-  alone
+- `ACTON_VERIFY_BACKEND` overrides the TON verifier backend
 
 Backend override values are trimmed and normalized, including removal of a
 trailing `/`.
 
-With `ACTON_VERIFY_DEBUG`, Acton prints:
-
-- compiler version
-- collected source files
-- active source-backend override
-- active signer-backend override list
-
-Example: debug source upload against a custom backend:
+Example: use a local verifier backend:
 
 ```acton-cli
 ACTON_VERIFY_BACKEND=http://127.0.0.1:8080 \
-ACTON_VERIFY_DEBUG=1 \
-acton verify Counter --address EQDt7LL... --net mainnet --dry-run
-```
-
-Example: separate source upload from signer backends:
-
-```acton-cli
-ACTON_VERIFY_BACKEND=http://127.0.0.1:8080 \
-ACTON_VERIFY_BACKENDS=http://127.0.0.1:8081,http://127.0.0.1:8082 \
-acton verify Counter --address EQDt7LL... --net mainnet --dry-run
+acton verify Counter --dry-run
 ```
 
 ## Dry Run
 
-For the built-in verifier, `--dry-run` uploads sources and collects signatures.
-It skips the final blockchain transaction.
-
-With `--new`, `--dry-run` requests a ticket and prepares the source request. It
+`--dry-run` requests a ticket and prepares the source request. It
 does not send a payment or upload sources.
 
 ## TON Connect
 
-Use `--tonconnect` to approve the final verification transaction through a TON
+Use `--tonconnect` to approve the verification payment through a TON
 Connect wallet instead of a wallet configured in `wallets.toml`:
 
 ```bash
-acton verify Counter --address EQDt7LL... --net mainnet --tonconnect
-```
-
-With `--new`, do not pass `--net`:
-
-```bash
-acton verify Counter --new --tonconnect
+acton verify Counter --tonconnect
 ```
 
 Acton prints a native TON Connect QR code and a `tc://` link.
 
 ## Retries And Failure Hints
 
-- source upload is attempted up to 8 times total (initial try plus up to
-  7 retries) for transient transport failures and backend 5xx responses
+- source upload is attempted up to 8 times total for transient transport
+  failures and explicitly retryable verifier errors
 - retry backoff grows from 1 second to 7 seconds between attempts
 - backend error responses are printed with the response body when available
-- 5xx failures suggest retrying later and using `ACTON_VERIFY_DEBUG=1`
-- backend problems can also be narrowed down by pointing
-  `ACTON_VERIFY_BACKEND` at a specific endpoint
-- with `--new`, only an explicitly retryable source storage failure permits
-  reuse of the same payment
-- other `--new` results after the payment claim consume the payment, including
-  generic internal failures
+- only an explicitly retryable source storage failure permits reuse of the
+  same payment
+- other results after the payment claim consume the payment, including generic
+  internal failures
 
 ## Exit Status
 
 - `0`: Verification completed successfully, including successful dry runs and
   flows where the backend decides that no final transaction is needed.
-- `1`: Compilation failed, the verifier backend rejected the request, not
-  enough signatures were collected, wallet resolution failed, or a blockchain
-  transaction failed.
+- `1`: Compilation failed, the verifier rejected the request, wallet resolution
+  failed, or the payment transaction failed.
 
 ## Examples
 
-1. Verify on testnet:
+1. Verify with a configured testnet wallet:
+
+   ```bash
+   acton verify Counter --wallet deployer
+   ```
+
+2. Check a deployed contract address before payment:
 
    ```bash
    acton verify Counter --address EQDt7LL...
    ```
 
-2. Verify on mainnet:
-
-   ```bash
-   acton verify Counter --address UQDt7LL... --net mainnet
-   ```
-
-3. Use a specific wallet:
-
-   ```bash
-   acton verify Counter --address EQDt7LL... --wallet deployer
-   ```
-
-4. Test the flow without sending the final transaction:
+3. Prepare verification without sending payment:
 
    ```bash
    acton verify Counter --address EQDt7LL... --dry-run
    ```
 
-5. Verify with an explicit compiler version:
+4. Verify with an explicit compiler version:
 
    ```bash
    acton verify Counter --address EQDt7LL... --compiler-version 1.2.0
    ```
 
-6. Use the Acton testnet verifier:
+5. Retry an upload with an existing finalized payment:
 
    ```bash
-   acton verify Counter --new --wallet deployer
-   ```
-
-7. Retry an upload with an existing finalized payment:
-
-   ```bash
-   acton verify Counter --new --payment-tx-hash '<transaction-hash>'
+   acton verify Counter --payment-tx-hash '<transaction-hash>'
    ```
 
 ## See Also

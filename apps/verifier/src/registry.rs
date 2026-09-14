@@ -54,6 +54,8 @@ pub trait VerificationRegistry: Send + Sync + 'static {
         &self,
         request: AbiContractsRequest,
     ) -> Result<AbiContractsReceipt, RegistryError>;
+
+    async fn payment_transaction_hashes(&self) -> Result<Vec<String>, RegistryError>;
 }
 
 pub type SharedVerificationRegistry = Arc<dyn VerificationRegistry>;
@@ -285,6 +287,11 @@ impl VerificationRegistry for SourceVerificationRegistry {
             .await?;
 
         Ok(AbiContractsReceipt { items: page.items })
+    }
+
+    async fn payment_transaction_hashes(&self) -> Result<Vec<String>, RegistryError> {
+        self.ensure_current().await?;
+        Ok(self.verification_index.payment_transaction_hashes().await?)
     }
 }
 

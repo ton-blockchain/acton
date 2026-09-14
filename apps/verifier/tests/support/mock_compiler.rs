@@ -4,6 +4,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use tokio::sync::Notify;
 use verifier::compilers::{
     CompileGeneratedSource, CompileOutput, CompileRequest, CompilerError, CompilerService,
 };
@@ -19,6 +20,7 @@ impl MockCompilerService {
         Self {
             result: MockCompilerResult::Ok {
                 code_hash: code_hash.to_owned(),
+                used_source_paths: None,
                 generated_sources: Vec::new(),
                 source_map: None,
             },
@@ -33,6 +35,7 @@ impl MockCompilerService {
         Self {
             result: MockCompilerResult::Ok {
                 code_hash: code_hash.to_owned(),
+                used_source_paths: None,
                 generated_sources,
                 source_map: None,
             },
@@ -44,6 +47,7 @@ impl MockCompilerService {
         Self {
             result: MockCompilerResult::Ok {
                 code_hash: code_hash.to_owned(),
+                used_source_paths: None,
                 generated_sources: Vec::new(),
                 source_map: Some(source_map),
             },
@@ -63,6 +67,35 @@ impl MockCompilerService {
     pub fn timing_out(timeout_ms: u128) -> Self {
         Self {
             result: MockCompilerResult::Timeout { timeout_ms },
+            recorded_requests: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    pub fn blocking(code_hash: &str) -> (Self, Arc<Notify>, Arc<Notify>) {
+        let started = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+        (
+            Self {
+                result: MockCompilerResult::Blocked {
+                    code_hash: code_hash.to_owned(),
+                    started: Arc::clone(&started),
+                    release: Arc::clone(&release),
+                },
+                recorded_requests: Arc::new(Mutex::new(Vec::new())),
+            },
+            started,
+            release,
+        )
+    }
+
+    pub fn with_used_source_paths(code_hash: &str, used_source_paths: Vec<String>) -> Self {
+        Self {
+            result: MockCompilerResult::Ok {
+                code_hash: code_hash.to_owned(),
+                used_source_paths: Some(used_source_paths),
+                generated_sources: Vec::new(),
+                source_map: None,
+            },
             recorded_requests: Arc::new(Mutex::new(Vec::new())),
         }
     }
@@ -92,6 +125,7 @@ impl MockCompilerService {
 enum MockCompilerResult {
     Ok {
         code_hash: String,
+        used_source_paths: Option<Vec<String>>,
         generated_sources: Vec<CompileGeneratedSource>,
         source_map: Option<SourceMapData>,
     },
@@ -100,6 +134,11 @@ enum MockCompilerResult {
     },
     Timeout {
         timeout_ms: u128,
+    },
+    Blocked {
+        code_hash: String,
+        started: Arc<Notify>,
+        release: Arc<Notify>,
     },
     ByCompiler(BTreeMap<(String, String), String>),
 }
@@ -119,10 +158,12 @@ impl CompilerService for MockCompilerService {
         match &self.result {
             MockCompilerResult::Ok {
                 code_hash,
+                used_source_paths,
                 generated_sources,
                 source_map,
             } => Ok(CompileOutput {
                 code_hash: code_hash.clone(),
+                used_source_paths: used_source_paths.clone(),
                 generated_sources: generated_sources.clone(),
                 source_map: source_map.clone(),
             }),
@@ -132,6 +173,20 @@ impl CompilerService for MockCompilerService {
             MockCompilerResult::Timeout { timeout_ms } => Err(CompilerError::Timeout {
                 timeout_ms: *timeout_ms,
             }),
+            MockCompilerResult::Blocked {
+                code_hash,
+                started,
+                release,
+            } => {
+                started.notify_one();
+                release.notified().await;
+                Ok(CompileOutput {
+                    code_hash: code_hash.clone(),
+                    used_source_paths: None,
+                    generated_sources: Vec::new(),
+                    source_map: None,
+                })
+            }
             MockCompilerResult::ByCompiler(code_hashes) => {
                 let code_hash = code_hashes.get(&compiler).ok_or_else(|| {
                     CompilerError::CompileFailed(format!(
@@ -141,6 +196,7 @@ impl CompilerService for MockCompilerService {
                 })?;
                 Ok(CompileOutput {
                     code_hash: code_hash.clone(),
+                    used_source_paths: None,
                     generated_sources: Vec::new(),
                     source_map: None,
                 })

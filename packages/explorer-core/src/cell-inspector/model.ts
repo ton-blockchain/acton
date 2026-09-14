@@ -53,6 +53,7 @@ export type ParserEngine =
   | "abi-registry"
   | "custom-tlb"
   | "standard-comment"
+  | "domain-parser"
   | "block-tlb"
   | "tvm-disassembly"
   | "raw-cell-tree"
@@ -70,6 +71,7 @@ export type ParserProvenanceSource =
   | "abi-registry"
   | "user-schema"
   | "ton-standard"
+  | "ton-domain"
   | "canonical-block-tlb"
   | "fallback"
 

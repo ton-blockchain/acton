@@ -1,10 +1,11 @@
-use crate::commands::verify::new_verifier_backend;
+use crate::commands::verify::verifier_backend;
 use crate::http::blocking_client_builder;
 use crate::paths::build_cache_dir;
 use acton_config::config::project_root;
 use anyhow::{Context, anyhow};
 use log::debug;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -40,7 +41,8 @@ pub(super) fn find_abi(code_hash: &str) -> anyhow::Result<Option<Arc<ContractABI
         return Ok(None);
     };
 
-    let cache_path = cache_file_path(project_root(), &code_hash);
+    let backend = verifier_backend();
+    let cache_path = cache_file_path(project_root(), &backend, &code_hash);
     let now = unix_timestamp();
     let cached = read_cache_entry(&cache_path, &code_hash);
     if cached
@@ -50,7 +52,7 @@ pub(super) fn find_abi(code_hash: &str) -> anyhow::Result<Option<Arc<ContractABI
         return Ok(cached.map(|entry| Arc::new(entry.abi)));
     }
 
-    match fetch_abi(&code_hash) {
+    match fetch_abi(&backend, &code_hash) {
         Ok(Some(abi)) => {
             let entry = VerifierAbiCacheEntry {
                 schema_version: VERIFIER_ABI_CACHE_SCHEMA_VERSION,
@@ -80,8 +82,7 @@ pub(super) fn find_abi(code_hash: &str) -> anyhow::Result<Option<Arc<ContractABI
     }
 }
 
-fn fetch_abi(code_hash: &str) -> anyhow::Result<Option<ContractABI>> {
-    let backend = new_verifier_backend();
+fn fetch_abi(backend: &str, code_hash: &str) -> anyhow::Result<Option<ContractABI>> {
     let abi_endpoint = format!("{backend}/api/v1/abi");
     let url = format!("{abi_endpoint}?code_hash={code_hash}");
 
@@ -91,7 +92,11 @@ fn fetch_abi(code_hash: &str) -> anyhow::Result<Option<ContractABI>> {
         .context("Failed to build verifier HTTP client")?
         .get(url)
         .send()
-        .context("Failed to fetch ABI from verifier")?
+        .context("Failed to fetch ABI from verifier")?;
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(None);
+    }
+    let response = response
         .error_for_status()
         .context("Verifier returned an error while fetching ABI")?;
     let payload = response
@@ -111,9 +116,13 @@ fn fetch_abi(code_hash: &str) -> anyhow::Result<Option<ContractABI>> {
         .map_err(|err| anyhow!("Verifier returned an invalid compiler ABI: {err}"))
 }
 
-fn cache_file_path(root: &Path, code_hash: &str) -> PathBuf {
+fn cache_file_path(root: &Path, backend: &str, code_hash: &str) -> PathBuf {
+    // A local or staging registry must not reuse metadata from a different
+    // source registry, including the stale-cache fallback during outages.
+    let backend_hash = hex::encode(Sha256::digest(backend.as_bytes()));
     build_cache_dir(root)
         .join(VERIFIER_ABI_CACHE_SUBDIR)
+        .join(backend_hash)
         .join(format!("{code_hash}.json"))
 }
 
@@ -193,13 +202,15 @@ mod tests {
 
     #[test]
     fn cache_path_is_under_project_build_cache() {
-        let path = cache_file_path(Path::new("/tmp/acton-project"), &"a".repeat(64));
+        let root = Path::new("/tmp/acton-project");
+        let hash = "a".repeat(64);
+        let path = cache_file_path(root, "https://verifier.example", &hash);
+        assert!(path.starts_with(root.join("build/cache/verifier-abi")));
         assert_eq!(
-            path,
-            PathBuf::from(
-                "/tmp/acton-project/build/cache/verifier-abi/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json"
-            )
+            path.file_name().and_then(|name| name.to_str()),
+            Some(format!("{hash}.json").as_str())
         );
+        assert_ne!(path, cache_file_path(root, "http://localhost:3000", &hash));
     }
 
     #[test]

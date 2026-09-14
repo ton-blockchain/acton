@@ -2,8 +2,8 @@ name: Cleanup Ubicloud Actions Cache
 
 on:
   schedule:
-    # 00:00 Europe/Moscow every 3rd day of the month (21:00 UTC)
-    - cron: "0 21 */3 * *"
+    # Daily at 00:00 Europe/Moscow (21:00 UTC)
+    - cron: "0 21 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -15,7 +15,7 @@ on:
         description: Delete entries if last_accessed_at is older than this many days
         required: false
         type: number
-        default: 1
+        default: 2
       created_days:
         description: Delete entries if last_accessed_at is missing and created_at is older than this many days
         required: false
@@ -61,7 +61,7 @@ jobs:
         # language=Bash
         run: |
           args=(
-            run -p xtask -- ubicloud-cleanup
+            run -p xtask -- ubicloud-cleanup --summary
             --project "${UBICLOUD_PROJECT_ID}"
             --installation "${GITHUB_INSTALLATION}"
             --repository "${GITHUB_REPOSITORY_NAME}"

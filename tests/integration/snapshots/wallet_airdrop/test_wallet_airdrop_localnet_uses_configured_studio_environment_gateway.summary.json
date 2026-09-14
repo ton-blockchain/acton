@@ -1,0 +1,8 @@
+{
+  "request_sequence": [
+    "GET /api/v1/environments/full-localnet-1/rpc/api/v2/getAddressInformation",
+    "POST /api/v1/environments/full-localnet-1/rpc/acton_fundAccount",
+    "GET /api/v1/environments/full-localnet-1/rpc/api/v2/getAddressInformation"
+  ],
+  "success_message": true
+}

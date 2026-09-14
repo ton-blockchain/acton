@@ -48,11 +48,14 @@ export function WalletMessageBodyEditor({
   const [args, setArgs] = useState<unknown>({})
   const [revision, setRevision] = useState(0)
   const latest = useRef({value, onChange})
-  latest.current = {value, onChange}
   const preservedBody = useRef(value)
   const options = useMemo(() => (abi ? listAbiMessageBuilderOptions(abi, "internal") : []), [abi])
   const symbols = useMemo(() => (abi ? createAbiMessageSymbols(abi) : undefined), [abi])
   const selected = options.find(option => option.id === messageId)
+
+  useEffect(() => {
+    latest.current = {value, onChange}
+  }, [value, onChange])
 
   useEffect(() => {
     if (mode !== "abi") return

@@ -9,6 +9,9 @@ display-name = "Fanout"
 src = "contracts/fanout.tolk"
 depends = []
 
+[contracts.ExtOutDemo]
+src = "contracts/ext-out-demo.tolk"
+
 [import-mappings]
 acton = ".acton"
 contracts = "contracts"

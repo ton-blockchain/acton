@@ -35,8 +35,8 @@ fn prev_blocks_info_serializes_real_c7_tuple_shape() -> anyhow::Result<()> {
         file_hash: [0; 32],
     };
 
-    let encoded =
-        PrevBlocksInfo::new(vec![latest], key_block, vec![sparse]).to_stack_entry_boc_base64()?;
+    let encoded = PrevBlocksInfo::new(vec![latest], key_block, Some(vec![sparse]))
+        .to_stack_entry_boc_base64()?;
     let cell = Boc::decode_base64(&encoded)?;
     let mut parser = cell.as_slice_allow_exotic();
     let TupleItem::Tuple(Tuple(fields)) = tvm_ffi::serde::parse_tuple_item(&mut parser)? else {

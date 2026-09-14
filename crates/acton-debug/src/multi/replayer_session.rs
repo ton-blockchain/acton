@@ -184,6 +184,7 @@ impl ReplayerDebugSession {
                 | (Some("net"), "sendExternal")
                 | (Some("testing"), "processSingleTraceStep")
                 | (Some("testing"), "createTraceIterationCursor")
+                | (Some("testing"), "createExternalTraceIterationCursor")
                 | (Some("TxCursor"), "isDone")
                 | (Some("TxCursor"), "close")
                 | (Some("TxCursor"), "executeN")

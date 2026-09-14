@@ -215,6 +215,7 @@ async fn check_blacklist(
     match state.blacklist.check(subjects).await {
         Ok(Some(entry)) => {
             warn!(
+                source = entry.source.as_str(),
                 subject = %entry.subject,
                 reason = %entry.reason,
                 expires_at = ?entry.expires_at,

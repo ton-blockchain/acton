@@ -25,7 +25,7 @@ import {useLocalnetRuntime} from "../../LocalnetRuntimeProvider"
 import type {TonClient} from "@acton/explorer-core/api/client"
 import type {LocalnetContract} from "@acton/explorer-core/api/types"
 import {ExplorerAddressChip} from "@acton/explorer-core/components/ExplorerAddressChip"
-import {formatAddress} from "@acton/explorer-core/components/utils"
+import {formatAddress, toRawAddress} from "@acton/explorer-core/components/utils"
 import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
 import {useAddressFormat} from "@acton/explorer-core/hooks/useNetworkInfo"
 import {localnetContractPath, useLocalnetRoutes} from "../../routes"
@@ -228,7 +228,7 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
                     </DataTableCell>
                     <DataTableCell>
                       <ExplorerAddressChip
-                        address={contract.address}
+                        address={toRawAddress(contract.address)}
                         resolveName={false}
                         onAddressClick={openExplorer}
                       />

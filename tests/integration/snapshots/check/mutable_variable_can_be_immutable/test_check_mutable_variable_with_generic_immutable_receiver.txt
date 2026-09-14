@@ -1,0 +1,17 @@
+warning[E002]: variable can be immutable
+  --> [ROOT]/contracts/main[LINE]
+  |
+7 |                 var cs = "0001".hexToSlice();
+  |                     ^^ can be made val
+
+help: use `val` instead
+  --> [ROOT]/contracts/main[LINE]
+  |
+7 |                 var cs = "0001".hexToSlice();
+  |                 ^^^ val
+
+
+1 issue can be fixed automatically, rerun with --fix flag.
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E002

@@ -27,4 +27,24 @@ describe("address name resolution", () => {
       ),
     ).toEqual([{address: "0:custom", name: "Treasury wallet"}])
   })
+
+  test("finds tokens by symbol and normalizes the tether sign", () => {
+    const tokens = [
+      {
+        address: "0:usdt",
+        kind: "token" as const,
+        name: "Tether USD",
+        symbol: "USD₮",
+      },
+      {
+        address: "0:not",
+        kind: "token" as const,
+        name: "Notcoin",
+        symbol: "NOT",
+      },
+    ]
+
+    expect(searchAddressNames(tokens, "usdt", 6)).toEqual([tokens[0]])
+    expect(searchAddressNames(tokens, "not", 6)).toEqual([tokens[1]])
+  })
 })

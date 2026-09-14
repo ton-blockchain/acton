@@ -15,11 +15,16 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use ton::ton_core::traits::tlb::TLB;
 use ton::ton_core::types::TonAddress;
 use ton::ton_wallet::{Mnemonic, TonWallet, WALLET_ID_DEFAULT, WORDLIST_EN_SET, WalletVersion};
 use ton_retrace::Network;
 
 const WALLET_MESSAGE_TTL_SECONDS: u64 = 600;
+
+/// Initial funding shared by simulated startup and full-localnet genesis wallets.
+pub const STARTUP_ACCOUNT_BALANCE_NANOGRAMS: u128 = 100_000_000_000;
+
 const KEYRING_SERVICE: &str = "ton.acton.wallet";
 const TEST_KEYRING_DIR_ENV: &str = "ACTON_TEST_KEYRING_DIR"; // integration tests only
 
@@ -345,6 +350,71 @@ pub fn open_wallets(
     }
 
     Ok(open_wallets)
+}
+
+/// Freezes selected project wallets' public state for a new full localnet.
+///
+/// Keys remain in Acton; resuming the network does not repeat funding or deployment.
+pub fn prepare_localnet_wallets(
+    config: &ActonConfig,
+    names: &[String],
+) -> anyhow::Result<Vec<acton_localnet::StartupWallet>> {
+    use tycho_types::{
+        boc::{Boc, BocRepr},
+        cell::{HashBytes, Lazy},
+        models::{
+            Account, AccountState, CurrencyCollection, IntAddr, OptionalAccount, ShardAccount,
+            StateInit,
+        },
+    };
+
+    if names.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let wallets = open_selected_wallets(config, names, &Network::Localnet)?;
+    let mut addresses = std::collections::BTreeSet::new();
+    wallets
+        .into_iter()
+        .map(|(name, wallet)| {
+            anyhow::ensure!(
+                wallet.wallet.address.workchain == 0,
+                "Startup wallet '{name}' must be in workchain 0 for Full localnet"
+            );
+
+            let address = wallet.address();
+            anyhow::ensure!(
+                addresses.insert(address.clone()),
+                "Startup wallet '{name}' duplicates address {address}"
+            );
+
+            let code = WalletVersion::get_code(wallet.wallet.version)?;
+            let data = WalletVersion::get_default_data(
+                wallet.wallet.version,
+                &wallet.wallet.key_pair,
+                wallet.wallet.wallet_id,
+            )?;
+            let account = ShardAccount {
+                account: Lazy::new(&OptionalAccount(Some(Account {
+                    address: IntAddr::Std(address),
+                    storage_stat: Default::default(),
+                    last_trans_lt: 0,
+                    balance: CurrencyCollection::new(STARTUP_ACCOUNT_BALANCE_NANOGRAMS),
+                    state: AccountState::Active(StateInit {
+                        code: Some(Boc::decode(code.to_boc()?)?),
+                        data: Some(Boc::decode(data.to_boc()?)?),
+                        ..Default::default()
+                    }),
+                })))?,
+                last_trans_hash: HashBytes::ZERO,
+                last_trans_lt: 0,
+            };
+            Ok(acton_localnet::StartupWallet {
+                name,
+                shard_account_boc_hex: BocRepr::encode_hex(account)?,
+            })
+        })
+        .collect()
 }
 
 pub fn open_selected_wallets(

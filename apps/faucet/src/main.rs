@@ -15,6 +15,7 @@ use faucet_valkey::{
 use github_auth::GitHubAuth;
 use handlers::CreateClaim;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
+use sqlx::SqlitePool;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -110,7 +111,23 @@ async fn main() -> anyhow::Result<()> {
     let blacklist = BlacklistStore::setup(pool.clone())
         .await
         .context("Failed to setup antifraud blacklist")?;
-    info!("Initialized antifraud blacklist");
+    let active_bans = blacklist
+        .active_entries()
+        .await
+        .context("Failed to load active antifraud bans")?;
+    info!(
+        active_bans = active_bans.len(),
+        "Initialized antifraud blacklist"
+    );
+    for ban in active_bans {
+        info!(
+            source = ban.source.as_str(),
+            subject = %ban.subject,
+            reason = %ban.reason,
+            expires_at = ?ban.expires_at,
+            "Active antifraud ban"
+        );
+    }
     let storage_config = SqliteConfig::new(std::any::type_name::<CreateClaim>());
     let storage = SqliteStorage::new_with_callback(&config.database.url, &storage_config);
     info!("Initialized claim storage");
@@ -135,6 +152,7 @@ async fn main() -> anyhow::Result<()> {
 
     let shared_state = AppState {
         storage: storage.clone(),
+        database: pool,
         wallet: Arc::new(wallet),
         client: client.clone(),
         pow: Pow::new(config.pow.difficulty),
@@ -154,23 +172,13 @@ async fn main() -> anyhow::Result<()> {
         .data(worker_state)
         .build(send_claim);
 
-    let frontend_url = shared_state
-        .config
-        .github_auth
-        .enabled
-        .then_some(shared_state.config.github_auth.frontend_url.as_str());
-    let cors =
-        handlers::airdrop_cors_layer(frontend_url).context("Failed to configure browser CORS")?;
     let proxy = shared_state.config.server.proxy.clone();
-    let app = handlers::router(shared_state)
-        .layer(
-            ServiceBuilder::new()
-                .layer(middleware::from_fn(enter_request_span))
-                .layer(middleware::from_fn_with_state(proxy, insert_client_ip))
-                .layer(GovernorLayer::default()),
-        )
-        // Preflight requests must not consume the stricter per-claim rate limit.
-        .layer(cors);
+    let app = handlers::router(shared_state).layer(
+        ServiceBuilder::new()
+            .layer(middleware::from_fn(enter_request_span))
+            .layer(middleware::from_fn_with_state(proxy, insert_client_ip))
+            .layer(GovernorLayer::default()),
+    );
 
     let listener = tokio::net::TcpListener::bind(&bind_addr)
         .await
@@ -294,6 +302,7 @@ async fn shutdown_signal() {
 #[derive(Clone)]
 pub(crate) struct AppState {
     pub(crate) storage: SqliteStorage<CreateClaim, JsonCodec<CompactType>, HookCallbackListener>,
+    pub(crate) database: SqlitePool,
     wallet: Arc<Wallet>,
     client: Arc<ToncenterClient>,
     pub(crate) pow: Pow,

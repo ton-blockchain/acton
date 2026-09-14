@@ -11,6 +11,7 @@ import {
   Star,
 } from "lucide-react"
 import {useNavigate, useParams} from "react-router"
+import {Cell} from "@ton/core"
 import {
   BlockChip,
   BooleanValue,
@@ -39,11 +40,12 @@ import {
   RelativeTime,
   shortenMiddle,
   formatToncenterBlockId,
+  useToast,
 } from "@acton/ui"
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
 
-import {buildToncoinBlockDownloadUrl, type RawBlockNetwork, type TonClient} from "../api/client"
+import type {RawBlockNetwork, TonClient} from "../api/client"
 import {
   loadBlockTransactionsPage,
   type BlockTransactionListItem,
@@ -285,6 +287,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
     seqno: string
   }>()
   const navigate = useNavigate()
+  const {showToast} = useToast()
   const {network, nodeInfo} = useNetworkInfo()
   const {isFavorite: isFavoriteBlock, toggleFavorite: toggleFavoriteBlock} = useFavoriteBlocks()
   const routes = useExplorerRoutePaths()
@@ -313,6 +316,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
     hasMoreTransactions: false,
   })
   const [blockCreatorName, setBlockCreatorName] = useState<string>()
+  const [isDownloading, setIsDownloading] = useState(false)
   const isLoadingMoreTransactionsRef = useRef(false)
 
   useEffect(() => {
@@ -393,9 +397,9 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
             block.fees_collected === undefined)
             ? client
                 .getRawBlockBoc(block)
-                .then(async cell => {
+                .then(async boc => {
                   const {parseBlockMetadata} = await import("../cell-inspector/blockParser")
-                  return parseBlockMetadata(cell)
+                  return parseBlockMetadata(Cell.fromBoc(boc)[0])
                 })
                 .catch(() => undefined)
             : Promise.resolve(undefined)
@@ -564,6 +568,35 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
     [state.transactions],
   )
   const blockActions = state.block ? getBlockActions(state.block, publicBlockNetwork) : undefined
+  const downloadBlock = async () => {
+    const block = state.block
+    if (!block || isDownloading) return
+
+    setIsDownloading(true)
+    try {
+      const boc = await client.getRawBlockBoc(block)
+      const blob = new Blob([new Uint8Array(boc)], {type: "application/octet-stream"})
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      try {
+        link.href = url
+        link.download = `block_${block.workchain}_${block.shard}_${block.seqno}.boc`
+        document.body.append(link)
+        link.click()
+      } finally {
+        link.remove()
+        URL.revokeObjectURL(url)
+      }
+    } catch (error) {
+      showToast({
+        title: "Failed to download block",
+        description: error instanceof Error ? error.message : "Could not fetch the block BoC",
+        variant: "error",
+      })
+    } finally {
+      setIsDownloading(false)
+    }
+  }
   const favoriteBlock = state.block
     ? {
         workchain: state.block.workchain,
@@ -675,20 +708,16 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
 
             {state.block && blockActions ? (
               <div className={styles.blockHeaderActions} aria-label="Block actions">
-                {publicBlockNetwork && blockActions.downloadUrl ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    leadingIcon={<Download size={14} />}
-                    onClick={() => {
-                      const {downloadUrl} = blockActions
-                      if (downloadUrl) globalThis.location.assign(downloadUrl)
-                    }}
-                  >
-                    Download
-                  </Button>
-                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  leadingIcon={<Download size={14} />}
+                  loading={isDownloading}
+                  onClick={() => void downloadBlock()}
+                >
+                  Download
+                </Button>
                 {publicBlockNetwork || showConfigAction ? (
                   <Button
                     type="button"
@@ -1770,7 +1799,6 @@ function getBlockActions(
   block: V3Block,
   rawBlockNetwork: RawBlockNetwork | undefined,
 ): {
-  readonly downloadUrl?: string
   readonly configSeqno?: number
   readonly tonscanUrl: string
   readonly toncoinUrl: string
@@ -1783,9 +1811,6 @@ function getBlockActions(
       ? "https://test-explorer.toncoin.org"
       : "https://explorer.toncoin.org"
   return {
-    downloadUrl: rawBlockNetwork
-      ? buildToncoinBlockDownloadUrl(toncoinOrigin, block)?.toString()
-      : undefined,
     configSeqno: getConfigSeqno(block),
     tonscanUrl: `${tonscanOrigin}/block/${block.workchain}:${block.shard}:${block.seqno}`,
     toncoinUrl: `${toncoinOrigin}/search?workchain=${block.workchain}&shard=${encodeURIComponent(block.shard)}&seqno=${block.seqno}`,

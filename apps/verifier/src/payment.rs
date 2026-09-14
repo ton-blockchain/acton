@@ -51,12 +51,13 @@ pub trait PaymentVerifier: Send + Sync + 'static {
     fn quote(&self, code_hash: &str) -> PaymentQuote;
     fn is_ready(&self) -> bool;
 
-    /// Rebuilds replay state from the payment wallet history.
+    /// Rebuilds replay state from the payment wallet history and marks payments
+    /// referenced by published source bundles as consumed.
     ///
     /// # Errors
     ///
     /// Returns an error when history or ledger access fails.
-    async fn recover(&self) -> Result<(), PaymentError>;
+    async fn recover(&self, published_transaction_hashes: &[String]) -> Result<(), PaymentError>;
 
     /// Validates and reserves one payment transaction.
     ///
@@ -300,13 +301,15 @@ impl PaymentVerifier for OnchainPaymentVerifier {
         self.ready.load(Ordering::Acquire)
     }
 
-    async fn recover(&self) -> Result<(), PaymentError> {
+    async fn recover(&self, published_transaction_hashes: &[String]) -> Result<(), PaymentError> {
         self.ready.store(false, Ordering::Release);
         let payments = self.load_history().await?;
-        self.ledger.merge_with_consumed(&payments)?;
+        self.ledger
+            .merge_recovered(&payments, published_transaction_hashes)?;
         self.ready.store(true, Ordering::Release);
         tracing::info!(
             payment_count = payments.len(),
+            published_payment_count = published_transaction_hashes.len(),
             payment_address = %self.payment_address,
             "payment ledger recovered from testnet history"
         );
@@ -502,12 +505,16 @@ impl PaymentLedger {
         }
     }
 
-    fn merge_with_consumed(&self, payments: &[RecoveredPayment]) -> Result<(), PaymentError> {
+    fn merge_recovered(
+        &self,
+        payments: &[RecoveredPayment],
+        published_transaction_hashes: &[String],
+    ) -> Result<(), PaymentError> {
         let now = now_unix_seconds()?;
         let mut connection = self.connection()?;
         let transaction = connection.transaction()?;
         transaction.execute(
-            "update payment_transactions set state = 'consumed', updated_at = ?1",
+            "update payment_transactions set state = 'retryable', updated_at = ?1 where state = 'processing'",
             [u64_to_i64("updated_at", now)?],
         )?;
         for payment in payments {
@@ -516,13 +523,12 @@ impl PaymentLedger {
                 insert into payment_transactions (
                   transaction_hash, code_hash, amount_nano, lt, transaction_time,
                   state, updated_at, claim_version
-                ) values (?1, ?2, ?3, ?4, ?5, 'consumed', ?6, 0)
+                ) values (?1, ?2, ?3, ?4, ?5, 'retryable', ?6, 0)
                 on conflict(transaction_hash) do update set
                   code_hash = excluded.code_hash,
                   amount_nano = excluded.amount_nano,
                   lt = excluded.lt,
                   transaction_time = excluded.transaction_time,
-                  state = 'consumed',
                   updated_at = excluded.updated_at
                 ",
                 params![
@@ -533,6 +539,16 @@ impl PaymentLedger {
                     u64_to_i64("transaction_time", payment.transaction_time)?,
                     u64_to_i64("updated_at", now)?,
                 ],
+            )?;
+        }
+        for transaction_hash in published_transaction_hashes {
+            transaction.execute(
+                r"
+                update payment_transactions
+                set state = 'consumed', updated_at = ?2
+                where transaction_hash = ?1
+                ",
+                params![transaction_hash, u64_to_i64("updated_at", now)?],
             )?;
         }
         transaction.commit()?;
@@ -937,7 +953,7 @@ fn load_aligned_bytes(slice: &mut CellSlice<'_>) -> Option<Vec<u8>> {
 
 #[derive(Debug, Error)]
 pub enum PaymentError {
-    #[error("the Acton verifier supports only TON testnet")]
+    #[error("the TON verifier supports only TON testnet")]
     UnsupportedNetwork,
     #[error("missing required verifier configuration: {0}")]
     MissingConfiguration(&'static str),
@@ -1297,7 +1313,7 @@ mod tests {
             transaction: payment(returned_hash, CODE_HASH, 10),
         }));
         verifier
-            .recover()
+            .recover(&[])
             .await
             .expect("empty payment history recovery should succeed");
 
@@ -1309,7 +1325,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn recovery_consumes_funded_protocol_payments_and_ignores_dust() {
+    async fn recovery_makes_funded_protocol_payments_claimable_and_ignores_dust() {
         let full_payment = payment("full-payment", CODE_HASH, 10);
         let insufficient_payment = payment("insufficient-payment", OTHER_CODE_HASH, 1);
         let verifier = verifier(
@@ -1318,7 +1334,7 @@ mod tests {
         );
 
         verifier
-            .recover()
+            .recover(&[])
             .await
             .expect("payment history recovery should succeed");
 
@@ -1346,11 +1362,12 @@ mod tests {
             drop(connection);
             (full_state, dust_state)
         };
-        assert_eq!(recovered_state, ("consumed".to_owned(), None));
-        assert!(matches!(
-            verifier.claim("full-payment", CODE_HASH).await,
-            Err(PaymentError::AlreadyUsed)
-        ));
+        assert_eq!(recovered_state, ("retryable".to_owned(), None));
+        let claim = verifier
+            .claim("full-payment", CODE_HASH)
+            .await
+            .expect("a recovered payment should remain claimable");
+        assert_eq!(claim.claim_version, 1);
         assert!(matches!(
             verifier
                 .claim("insufficient-payment", OTHER_CODE_HASH)
@@ -1360,10 +1377,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn recovery_consumes_a_payment_referenced_by_a_published_bundle() {
+        let published_payment = payment("published-payment", CODE_HASH, 10);
+        let verifier = verifier(vec![published_payment.clone()], vec![published_payment]);
+
+        verifier
+            .recover(&["published-payment".to_owned()])
+            .await
+            .expect("payment history recovery should reconcile published bundles");
+
+        let state = verifier
+            .ledger
+            .connection()
+            .expect("payment ledger should be readable")
+            .query_row(
+                "select state from payment_transactions where transaction_hash = ?1",
+                ["published-payment"],
+                |row| row.get::<_, String>(0),
+            )
+            .expect("published payment should be present in the ledger");
+        assert_eq!(state, "consumed");
+        assert!(matches!(
+            verifier.claim("published-payment", CODE_HASH).await,
+            Err(PaymentError::AlreadyUsed)
+        ));
+    }
+
+    #[tokio::test]
     async fn payment_can_retry_only_after_a_server_failure() {
         let verifier = verifier(Vec::new(), vec![payment("new-payment", CODE_HASH, 10)]);
         verifier
-            .recover()
+            .recover(&[])
             .await
             .expect("empty payment history recovery should succeed");
 
@@ -1398,7 +1442,7 @@ mod tests {
         let (verifier, lookup_count) =
             verifier_with_lookup_count(Vec::new(), vec![payment("bounded-payment", CODE_HASH, 10)]);
         verifier
-            .recover()
+            .recover(&[])
             .await
             .expect("empty payment history recovery should succeed");
 
@@ -1427,7 +1471,7 @@ mod tests {
     async fn expired_processing_lease_allows_the_payment_to_retry() {
         let verifier = verifier(Vec::new(), vec![payment("leased-payment", CODE_HASH, 10)]);
         verifier
-            .recover()
+            .recover(&[])
             .await
             .expect("empty payment history recovery should succeed");
         let stale_claim = verifier
@@ -1466,7 +1510,7 @@ mod tests {
         let (verifier, lookup_count) =
             verifier_with_lookup_count(Vec::new(), vec![payment("known-payment", CODE_HASH, 10)]);
         verifier
-            .recover()
+            .recover(&[])
             .await
             .expect("empty payment history recovery should succeed");
 
@@ -1492,16 +1536,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn empty_recovery_consumes_and_preserves_known_replay_state() {
+    async fn recovery_releases_interrupted_payments_and_preserves_attempt_counts() {
         let verifier = verifier(
             Vec::new(),
             vec![
                 payment("processing-payment", CODE_HASH, 10),
                 payment("retryable-payment", CODE_HASH, 10),
+                payment("consumed-payment", CODE_HASH, 10),
             ],
         );
         verifier
-            .recover()
+            .recover(&[])
             .await
             .expect("initial empty recovery should succeed");
         let processing = verifier
@@ -1515,17 +1560,30 @@ mod tests {
         verifier
             .finish(&retryable, PaymentAttemptOutcome::Retryable)
             .expect("payment should become retryable");
+        let consumed = verifier
+            .claim("consumed-payment", CODE_HASH)
+            .await
+            .expect("consumed payment should be reserved");
+        verifier
+            .finish(&consumed, PaymentAttemptOutcome::Consumed)
+            .expect("payment should become consumed");
 
         verifier
-            .recover()
+            .recover(&[])
             .await
             .expect("empty recovery should preserve local replay state");
+        let recovered_processing = verifier
+            .claim("processing-payment", CODE_HASH)
+            .await
+            .expect("an interrupted processing payment should be claimable after recovery");
+        let recovered_retryable = verifier
+            .claim("retryable-payment", CODE_HASH)
+            .await
+            .expect("a retryable payment should remain claimable after recovery");
+        assert_eq!(recovered_processing.claim_version, 2);
+        assert_eq!(recovered_retryable.claim_version, 2);
         assert!(matches!(
-            verifier.claim("processing-payment", CODE_HASH).await,
-            Err(PaymentError::AlreadyUsed)
-        ));
-        assert!(matches!(
-            verifier.claim("retryable-payment", CODE_HASH).await,
+            verifier.claim("consumed-payment", CODE_HASH).await,
             Err(PaymentError::AlreadyUsed)
         ));
         assert!(matches!(
@@ -1533,17 +1591,17 @@ mod tests {
             Err(PaymentError::LedgerInvariant)
         ));
 
-        let consumed_count = verifier
+        let processing_count = verifier
             .ledger
             .connection()
             .expect("payment ledger should be readable")
             .query_row(
-                "select count(*) from payment_transactions where state = 'consumed'",
+                "select count(*) from payment_transactions where state = 'processing'",
                 [],
                 |row| row.get::<_, usize>(0),
             )
-            .expect("consumed count should be readable");
-        assert_eq!(consumed_count, 2);
+            .expect("processing count should be readable");
+        assert_eq!(processing_count, 2);
     }
 
     #[tokio::test]
@@ -1553,7 +1611,7 @@ mod tests {
             vec![payment("other-code-payment", OTHER_CODE_HASH, 10)],
         );
         verifier
-            .recover()
+            .recover(&[])
             .await
             .expect("empty payment history recovery should succeed");
 
@@ -1600,7 +1658,7 @@ mod tests {
             let transaction_hash = invalid.hash.clone();
             let verifier = verifier(Vec::new(), vec![invalid]);
             verifier
-                .recover()
+                .recover(&[])
                 .await
                 .expect("empty payment history recovery should succeed");
             assert!(matches!(
@@ -1612,7 +1670,7 @@ mod tests {
         let small_payment_verifier =
             verifier(Vec::new(), vec![payment("small-payment", CODE_HASH, 9)]);
         small_payment_verifier
-            .recover()
+            .recover(&[])
             .await
             .expect("empty payment history recovery should succeed");
         assert!(matches!(
@@ -1639,7 +1697,7 @@ mod tests {
             .value = None;
         let missing_amount_verifier = verifier(Vec::new(), vec![missing_amount]);
         missing_amount_verifier
-            .recover()
+            .recover(&[])
             .await
             .expect("empty payment history recovery should succeed");
         assert!(matches!(
@@ -1662,21 +1720,21 @@ mod tests {
         let verifier = verifier(history, Vec::new());
 
         verifier
-            .recover()
+            .recover(&[])
             .await
             .expect("paginated payment history recovery should succeed");
 
-        let consumed_count = verifier
+        let retryable_count = verifier
             .ledger
             .connection()
             .expect("payment ledger should be readable")
             .query_row(
-                "select count(*) from payment_transactions where state = 'consumed'",
+                "select count(*) from payment_transactions where state = 'retryable'",
                 [],
                 |row| row.get::<_, usize>(0),
             )
-            .expect("consumed payment count should be readable");
-        assert_eq!(consumed_count, HISTORY_PAGE_SIZE + 1);
+            .expect("retryable payment count should be readable");
+        assert_eq!(retryable_count, HISTORY_PAGE_SIZE + 1);
     }
 
     #[tokio::test]
@@ -1691,7 +1749,7 @@ mod tests {
         }));
 
         assert!(matches!(
-            verifier.recover().await,
+            verifier.recover(&[]).await,
             Err(PaymentError::HistoryChangedDuringRecovery)
         ));
         assert!(!verifier.is_ready());
@@ -1714,7 +1772,7 @@ mod tests {
         }));
 
         assert!(matches!(
-            verifier.recover().await,
+            verifier.recover(&[]).await,
             Err(PaymentError::HistoryChangedDuringRecovery)
         ));
         assert!(!verifier.is_ready());
@@ -1735,7 +1793,7 @@ mod tests {
         );
 
         assert!(matches!(
-            verifier.recover().await,
+            verifier.recover(&[]).await,
             Err(PaymentError::HistoryChangedDuringRecovery)
         ));
         assert!(!verifier.is_ready());

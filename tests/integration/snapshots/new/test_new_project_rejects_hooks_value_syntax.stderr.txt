@@ -1,5 +1,4 @@
-error: unexpected value 'false' for '--hooks' found; no more were expected
-
-Usage: acton new <PATH|--name <NAME>|--description <DESCRIPTION>|--template <TEMPLATE>|--license <LICENSE>|--app|--hooks|--agents|--overwrite|--templates>
+error: invalid value 'false' for '--hooks[=<HOOK>]'
+  [possible values: pre-push, pre-commit]
 
 For more information, try '--help'.

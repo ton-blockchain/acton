@@ -6,9 +6,10 @@ import {
   Disclosure,
   Input,
   Select,
+  Tooltip,
   useToast,
 } from "@acton/ui"
-import {Plus} from "lucide-react"
+import {Info, Plus, X} from "lucide-react"
 import {type FormEvent, useEffect, useRef, useState} from "react"
 
 import {
@@ -26,11 +27,15 @@ import {WalletNamesInput} from "./WalletNamesInput"
 
 import styles from "./CreateEnvironmentDialog.module.css"
 
+const FULL_LOCALNET_DOCKER_NOTICE_DISMISSED_STORAGE_KEY =
+  "acton-studio:full-localnet-docker-notice-dismissed"
+
 interface CreateEnvironmentDialogProps {
   readonly environments: readonly StudioEnvironment[]
   readonly importSourceEnvironments: readonly StudioEnvironment[]
   readonly open: boolean
   readonly walletNames: readonly string[]
+  readonly defaultStartupAccounts?: readonly string[]
   readonly onCreated: (environment: StudioEnvironment) => void
   readonly onOpenChange: (open: boolean) => void
 }
@@ -38,13 +43,12 @@ interface CreateEnvironmentDialogProps {
 interface EnvironmentFormState {
   readonly kind: "actonSimulatedLocalnet" | "fullTonNetwork"
   readonly name: string
-  readonly port: string
   readonly forkNetwork: string
   readonly forkBlockNumber: string
   readonly accounts: readonly string[]
   readonly rateLimit: string
   readonly responseDelayMs: string
-  readonly blockIntervalMs: string
+  readonly blockTimeMs: string
   readonly fullTonBlockTimeMs: string
   readonly fullTonElectionTimeSeconds: string
   readonly noMining: boolean
@@ -57,6 +61,7 @@ export function CreateEnvironmentDialog({
   importSourceEnvironments,
   open,
   walletNames,
+  defaultStartupAccounts,
   onCreated,
   onOpenChange,
 }: CreateEnvironmentDialogProps) {
@@ -64,22 +69,35 @@ export function CreateEnvironmentDialog({
   const simulatedDefaultName = defaultEnvironmentName("actonSimulatedLocalnet", environments)
   const fullDefaultName = defaultEnvironmentName("fullTonNetwork", environments)
   const [form, setForm] = useState<EnvironmentFormState>(() =>
-    createInitialForm(simulatedDefaultName),
+    createInitialForm(simulatedDefaultName, defaultStartupAccounts),
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDockerNoticeDismissed, setIsDockerNoticeDismissed] = useState(
+    () =>
+      globalThis.localStorage.getItem(FULL_LOCALNET_DOCKER_NOTICE_DISMISSED_STORAGE_KEY) === "true",
+  )
   const nextImportedAccountId = useRef(1)
+  const wasOpen = useRef(false)
+  const hasInitializedAccounts = useRef(false)
 
   useEffect(() => {
-    if (open) {
-      setForm(createInitialForm(simulatedDefaultName))
+    if (open && !wasOpen.current) {
+      setForm(createInitialForm(simulatedDefaultName, defaultStartupAccounts))
       nextImportedAccountId.current = 1
+      hasInitializedAccounts.current = defaultStartupAccounts !== undefined
+    } else if (open && !hasInitializedAccounts.current && defaultStartupAccounts !== undefined) {
+      // Workspace info can arrive after opening; only prefill accounts that are still untouched.
+      setForm(current => ({...current, accounts: [...new Set(defaultStartupAccounts)]}))
+      hasInitializedAccounts.current = true
     }
-  }, [open, simulatedDefaultName])
+    wasOpen.current = open
+  }, [open, simulatedDefaultName, defaultStartupAccounts])
 
   const updateForm = <Key extends keyof EnvironmentFormState>(
     key: Key,
     value: EnvironmentFormState[Key],
   ) => {
+    if (key === "accounts") hasInitializedAccounts.current = true
     setForm(current => ({...current, [key]: value}))
   }
 
@@ -171,7 +189,6 @@ export function CreateEnvironmentDialog({
           form.kind === "actonSimulatedLocalnet"
             ? {
                 kind: "actonSimulatedLocalnet",
-                port: optionalPositiveInteger(form.port, "Local port"),
                 forkNetwork: form.forkNetwork || undefined,
                 forkBlockNumber: form.forkNetwork
                   ? optionalPositiveInteger(form.forkBlockNumber, "Fork block")
@@ -179,12 +196,13 @@ export function CreateEnvironmentDialog({
                 accounts: form.accounts,
                 rateLimit: optionalPositiveInteger(form.rateLimit, "Rate limit"),
                 responseDelayMs: optionalPositiveInteger(form.responseDelayMs, "Response delay"),
-                blockIntervalMs: optionalPositiveInteger(form.blockIntervalMs, "Block interval"),
+                blockTimeMs: optionalPositiveInteger(form.blockTimeMs, "Block time"),
                 noMining: form.noMining,
                 mineEmptyBlocks: form.noMining ? false : form.mineEmptyBlocks,
               }
             : {
                 kind: "fullTonNetwork",
+                accounts: form.accounts,
                 blockTimeMs: optionalPositiveInteger(
                   form.fullTonBlockTimeMs,
                   "Block time",
@@ -251,9 +269,35 @@ export function CreateEnvironmentDialog({
           <Select
             label="Environment type"
             description={
-              form.kind === "actonSimulatedLocalnet"
-                ? "Fast local TON environment with compatible blocks, APIs, forks, mining controls, and time travel; Acton's custom simplified implementation, not a real TON network"
-                : "Runs a complete local TON network and full indexer, supports actions, and reproduces full-node API behavior, but starts more slowly and uses more memory and disk space"
+              form.kind === "actonSimulatedLocalnet" ? (
+                <>
+                  Starts instantly, uses very few system resources, and provides TON-compatible
+                  blocks, TON Center-compatible v2/v3 APIs, forks, mining controls, and time travel
+                  without validators or consensus. Use{" "}
+                  <button
+                    type="button"
+                    className={styles.environmentTypeLink}
+                    onClick={() => updateKind("fullTonNetwork")}
+                  >
+                    Full localnet
+                  </button>{" "}
+                  for real TON validators and full-node behavior
+                </>
+              ) : (
+                <>
+                  Runs real TON validators, the TON Center v2 API, and a v3 indexer for validator,
+                  full-node, and indexed chain workflows, but starts more slowly and uses more
+                  resources. Use{" "}
+                  <button
+                    type="button"
+                    className={styles.environmentTypeLink}
+                    onClick={() => updateKind("actonSimulatedLocalnet")}
+                  >
+                    Simulated localnet
+                  </button>{" "}
+                  for instant, lightweight development, forks, and deterministic network control
+                </>
+              )
             }
             value={form.kind}
             autoFocus
@@ -262,6 +306,39 @@ export function CreateEnvironmentDialog({
             <option value="actonSimulatedLocalnet">Simulated localnet</option>
             <option value="fullTonNetwork">Full localnet</option>
           </Select>
+
+          {form.kind === "fullTonNetwork" && !isDockerNoticeDismissed ? (
+            <div className={styles.dockerRequirement}>
+              <Info size={14} aria-hidden="true" />
+              <span>
+                Docker must be installed and running; the first launch downloads the 200 MB{" "}
+                <a
+                  href="https://github.com/ton-blockchain/acton/pkgs/container/localton"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  localton
+                </a>{" "}
+                image
+              </span>
+              <Tooltip content="Don't show again">
+                <button
+                  type="button"
+                  className={styles.dockerRequirementDismiss}
+                  aria-label="Don't show again"
+                  onClick={() => {
+                    setIsDockerNoticeDismissed(true)
+                    globalThis.localStorage.setItem(
+                      FULL_LOCALNET_DOCKER_NOTICE_DISMISSED_STORAGE_KEY,
+                      "true",
+                    )
+                  }}
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </Tooltip>
+            </div>
+          ) : undefined}
 
           <Input
             label="Name"
@@ -276,16 +353,6 @@ export function CreateEnvironmentDialog({
           {form.kind === "actonSimulatedLocalnet" ? (
             <>
               <div className={styles.formGrid}>
-                <Input
-                  label="Local port"
-                  description="Leave empty to select the first available port"
-                  type="number"
-                  min={1}
-                  max={65_535}
-                  placeholder="Automatic"
-                  value={form.port}
-                  onChange={event => updateForm("port", event.target.value)}
-                />
                 <Select
                   label="Initial state"
                   description="Start clean or fork an existing TON network"
@@ -314,7 +381,11 @@ export function CreateEnvironmentDialog({
                 onChange={values => updateForm("accounts", values)}
               />
 
-              <Disclosure label="Network and mining" contentClassName={styles.advancedContent}>
+              <Disclosure
+                className={styles.compactDisclosure}
+                label="Network and mining"
+                contentClassName={styles.advancedContent}
+              >
                 <div className={styles.formGrid}>
                   <Input
                     label="Rate limit"
@@ -337,14 +408,14 @@ export function CreateEnvironmentDialog({
                     onChange={event => updateForm("responseDelayMs", event.target.value)}
                   />
                   <Input
-                    label="Block interval"
-                    description="Leave empty to use the Acton project setting"
+                    label="Block time"
+                    description="Target interval between automatic blocks; ignored with manual mining"
                     suffix="ms"
                     type="number"
                     min={1}
                     placeholder="Project default"
-                    value={form.blockIntervalMs}
-                    onChange={event => updateForm("blockIntervalMs", event.target.value)}
+                    value={form.blockTimeMs}
+                    onChange={event => updateForm("blockTimeMs", event.target.value)}
                   />
                 </div>
                 <div className={styles.checkboxGroup}>
@@ -366,6 +437,11 @@ export function CreateEnvironmentDialog({
             </>
           ) : (
             <div className={styles.fullTonFields}>
+              <WalletNamesInput
+                values={form.accounts}
+                walletNames={walletNames}
+                onChange={values => updateForm("accounts", values)}
+              />
               <AccountImportEditor
                 accounts={form.importedAccounts}
                 sources={availableImportSources(importSourceEnvironments)}
@@ -373,7 +449,11 @@ export function CreateEnvironmentDialog({
                 onChange={updateImportedAccount}
                 onRemove={removeImportedAccount}
               />
-              <Disclosure label="Network timing" contentClassName={styles.advancedContent}>
+              <Disclosure
+                className={styles.compactDisclosure}
+                label="Network timing"
+                contentClassName={styles.advancedContent}
+              >
                 <div className={styles.formGrid}>
                   <Input
                     label="Block time"
@@ -421,17 +501,16 @@ export function CreateEnvironmentDialog({
   )
 }
 
-function createInitialForm(name: string): EnvironmentFormState {
+function createInitialForm(name: string, accounts: readonly string[] = []): EnvironmentFormState {
   return {
     kind: "actonSimulatedLocalnet",
     name,
-    port: "",
     forkNetwork: "",
     forkBlockNumber: "",
-    accounts: [],
+    accounts: [...new Set(accounts)],
     rateLimit: "",
     responseDelayMs: "",
-    blockIntervalMs: "",
+    blockTimeMs: "",
     fullTonBlockTimeMs: "",
     fullTonElectionTimeSeconds: "",
     noMining: false,

@@ -89,11 +89,11 @@
 .attachedToTabs.shellWithoutTabs .rawBlock {
   border: 0;
   border-radius: 0;
-  background: var(--acton-color-surface-raised);
+  background: var(--acton-color-surface);
 }
 
 .attachedToTabs .view {
-  background: var(--acton-color-surface-raised);
+  background: var(--acton-color-surface);
 }
 
 .rawBlock > div {

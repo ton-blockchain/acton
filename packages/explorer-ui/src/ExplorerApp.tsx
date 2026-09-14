@@ -1,3 +1,4 @@
+import {FaucetPage} from "@acton/faucet-ui"
 import {Checkbox, Input, Popover, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
 import {
   createVerifierApi,
@@ -37,7 +38,6 @@ import {TonClient} from "@acton/explorer-core/api/client"
 import {getBundledCompilerAbis} from "@acton/explorer-core/api/compilerAbiCatalog"
 import {AddressBookProvider} from "@acton/explorer-core/hooks/useAddressBook"
 import {ExplorerRoutesProvider} from "@acton/explorer-core/hooks/useExplorerRoutes"
-import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
 import {StaticNetworkInfoProvider} from "@acton/explorer-core/hooks/StaticNetworkInfoProvider"
 import {BrowserMetadataRegistry} from "@acton/explorer-core/metadata/browserRegistry"
 import {BundledAbiRegistry} from "@acton/explorer-core/metadata/bundledAbiRegistry"
@@ -66,7 +66,7 @@ import actonScanLogo from "./assets/acton-scan-logo-dark.svg"
 import actonScanTestnetLogo from "./assets/acton-scan-testnet-logo-dark.svg"
 import {DeveloperExplorerBanner} from "./components/DeveloperExplorerBanner"
 import {EXPLORER_NETWORK_QUERY_PARAM, explorerNetworkSearch} from "./explorerNetworkUrl"
-import {FaucetPage} from "./faucet/FaucetPage"
+import {AddressConverterPage} from "./pages/AddressConverterPage"
 import {AbiCatalogPage, AbiDetailsPage} from "./pages/abi-pages"
 import {SourceCatalogPage} from "./pages/SourceCatalogPage"
 import {ValidatorsPage} from "./pages/ValidatorsPage"
@@ -95,7 +95,7 @@ type NetworkFormMode =
 const EXPLORER_NETWORK_STORAGE_KEY = "explorerNetwork"
 const EXPLORER_CUSTOM_NETWORKS_STORAGE_KEY = "explorerCustomNetworks"
 const ACTON_VERIFIER_API = createVerifierApi({
-  baseUrl: "https://verifier-staging.actonscan.com/api/v1",
+  baseUrl: "https://verifier-staging.ton.org/api/v1",
 })
 const DEFAULT_CUSTOM_NETWORK_NAME = "Devnet"
 const SHARED_NETWORK_NAME_QUERY_PARAM = "network.name"
@@ -871,7 +871,6 @@ const MobileHeaderRouteSync: FC<{readonly onNavigate: () => void}> = ({onNavigat
 }
 
 const DesktopMoreMenu: FC = () => {
-  const routes = useExplorerRoutePaths()
   const [open, setOpen] = useState(false)
   const closeMenu = () => setOpen(false)
 
@@ -895,60 +894,79 @@ const DesktopMoreMenu: FC = () => {
       onOpenChange={setOpen}
       triggerAsChild
       contentClassName={styles.desktopMorePopover}
+      maxWidth="min(572px, calc(100vw - 32px))"
       content={
         <nav className={styles.desktopMoreMenu} aria-label="More explorer navigation">
-          <Link className={styles.desktopMoreItem} to="/tokens" onClick={closeMenu}>
-            <span className={styles.desktopMoreItemCopy}>
-              <span className={styles.desktopMoreItemTitle}>Tokens</span>
-              <span className={styles.desktopMoreItemDescription}>Discover active tokens</span>
-            </span>
-          </Link>
-          <Link className={styles.desktopMoreItem} to={routes.configPath()} onClick={closeMenu}>
-            <span className={styles.desktopMoreItemCopy}>
-              <span className={styles.desktopMoreItemTitle}>Config</span>
-              <span className={styles.desktopMoreItemDescription}>
-                Read protocol parameters and limits
+          <section className={styles.desktopMoreColumn} aria-labelledby="more-explorer-heading">
+            <h2 id="more-explorer-heading" className={styles.desktopMoreHeading}>
+              Explorer
+            </h2>
+            <Link className={styles.desktopMoreItem} to="/tokens" onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>Tokens</span>
+                <span className={styles.desktopMoreItemDescription}>Discover active tokens</span>
               </span>
-            </span>
-          </Link>
-          <Link className={styles.desktopMoreItem} to="/elections" onClick={closeMenu}>
-            <span className={styles.desktopMoreItemCopy}>
-              <span className={styles.desktopMoreItemTitle}>Elections</span>
-              <span className={styles.desktopMoreItemDescription}>
-                Follow validator elections and rounds
+            </Link>
+            <Link className={styles.desktopMoreItem} to="/abi" onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>ABI</span>
+                <span className={styles.desktopMoreItemDescription}>
+                  Look up get methods and message types
+                </span>
               </span>
-            </span>
-          </Link>
-          <Link className={styles.desktopMoreItem} to="/faucet" onClick={closeMenu}>
-            <span className={styles.desktopMoreItemCopy}>
-              <span className={styles.desktopMoreItemTitle}>Faucet</span>
-              <span className={styles.desktopMoreItemDescription}>Get GRAM for TON Testnet</span>
-            </span>
-          </Link>
-          <Link className={styles.desktopMoreItem} to="/cell" onClick={closeMenu}>
-            <span className={styles.desktopMoreItemCopy}>
-              <span className={styles.desktopMoreItemTitle}>Cell Inspector</span>
-              <span className={styles.desktopMoreItemDescription}>
-                Inspect and decode TON cells
+            </Link>
+            <Link className={styles.desktopMoreItem} to="/sources" onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>Sources</span>
+                <span className={styles.desktopMoreItemDescription}>
+                  Manage contract source artifacts
+                </span>
               </span>
-            </span>
-          </Link>
-          <Link className={styles.desktopMoreItem} to="/emulate" onClick={closeMenu}>
-            <span className={styles.desktopMoreItemCopy}>
-              <span className={styles.desktopMoreItemTitle}>Emulator</span>
-              <span className={styles.desktopMoreItemDescription}>
-                Emulate transactions locally
+            </Link>
+            <Link className={styles.desktopMoreItem} to="/verified" onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>Verified contracts</span>
+                <span className={styles.desktopMoreItemDescription}>
+                  Browse verified on-chain source code
+                </span>
               </span>
-            </span>
-          </Link>
-          <Link className={styles.desktopMoreItem} to="/verified" onClick={closeMenu}>
-            <span className={styles.desktopMoreItemCopy}>
-              <span className={styles.desktopMoreItemTitle}>Verified contracts</span>
-              <span className={styles.desktopMoreItemDescription}>
-                Browse verified on-chain source code
+            </Link>
+          </section>
+          <section className={styles.desktopMoreColumn} aria-labelledby="more-tools-heading">
+            <h2 id="more-tools-heading" className={styles.desktopMoreHeading}>
+              Tools
+            </h2>
+            <Link className={styles.desktopMoreItem} to="/faucet" onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>Faucet</span>
+                <span className={styles.desktopMoreItemDescription}>Get GRAM for TON Testnet</span>
               </span>
-            </span>
-          </Link>
+            </Link>
+            <Link className={styles.desktopMoreItem} to="/address-converter" onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>Address Converter</span>
+                <span className={styles.desktopMoreItemDescription}>
+                  Convert raw and friendly TON addresses
+                </span>
+              </span>
+            </Link>
+            <Link className={styles.desktopMoreItem} to="/cell" onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>Cell Inspector</span>
+                <span className={styles.desktopMoreItemDescription}>
+                  Inspect and decode TON cells
+                </span>
+              </span>
+            </Link>
+            <Link className={styles.desktopMoreItem} to="/emulate" onClick={closeMenu}>
+              <span className={styles.desktopMoreItemCopy}>
+                <span className={styles.desktopMoreItemTitle}>Emulator</span>
+                <span className={styles.desktopMoreItemDescription}>
+                  Emulate transactions locally
+                </span>
+              </span>
+            </Link>
+          </section>
         </nav>
       }
     >
@@ -1267,11 +1285,11 @@ export const ExplorerApp: FC = () => {
                           <Link className={styles.navLink} to="/blocks">
                             Blocks
                           </Link>
-                          <Link className={styles.navLink} to="/abi">
-                            ABI
+                          <Link className={styles.navLink} to="/elections">
+                            Elections
                           </Link>
-                          <Link className={styles.navLink} to="/sources">
-                            Sources
+                          <Link className={styles.navLink} to="/config">
+                            Config
                           </Link>
                           <DesktopMoreMenu />
                         </nav>
@@ -1389,6 +1407,9 @@ export const ExplorerApp: FC = () => {
                               <Link to="/verified" onClick={closeMobileHeaderPanels}>
                                 Verified contracts
                               </Link>
+                              <Link to="/address-converter" onClick={closeMobileHeaderPanels}>
+                                Address Converter
+                              </Link>
                               <Link to="/cell" onClick={closeMobileHeaderPanels}>
                                 Cell Inspector
                               </Link>
@@ -1463,6 +1484,7 @@ export const ExplorerApp: FC = () => {
                         element={<StatisticsPage api={ACTON_VERIFIER_API} />}
                       />
                       <Route path="/verified/:target" element={<VerifiedContractRoute />} />
+                      <Route path="/address-converter" element={<AddressConverterPage />} />
                       <Route path="/cell" element={<CellInspectorExplorerPage />} />
                       <Route path="/emulate" element={<EmulateExplorerPage client={client} />} />
                       <Route path="/favorites" element={<FavoriteAccountsPage client={client} />} />

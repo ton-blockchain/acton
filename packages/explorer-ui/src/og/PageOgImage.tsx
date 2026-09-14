@@ -12,6 +12,7 @@ export type PageOgKey =
   | "verified"
   | "verified-statistics"
   | "verified-contract"
+  | "address-converter"
   | "cell"
   | "emulate"
   | "favorites"
@@ -124,6 +125,16 @@ const PAGE_OG_PREVIEWS: Record<PageOgKey, PageOgPreview> = {
     metadataDescription:
       "Review verified source code, compiler metadata, and source bundles for a TON contract on actonscan.",
   },
+  "address-converter": {
+    key: "address-converter",
+    title: "Address Converter",
+    badge: "TON addresses",
+    description:
+      "Convert TON addresses for wallets and APIs, and check their workchain and testnet flag",
+    metadataTitle: "TON Address Converter · actonscan",
+    metadataDescription:
+      "Convert TON addresses for wallets and APIs, and check their workchain and testnet flag on actonscan.",
+  },
   cell: {
     key: "cell",
     title: "Cell Inspector",
@@ -191,6 +202,8 @@ export function pageOgPreviewForPath(pathname: string): PageOgPreview | undefine
       return PAGE_OG_PREVIEWS.verified
     case "/verified/statistics":
       return PAGE_OG_PREVIEWS["verified-statistics"]
+    case "/address-converter":
+      return PAGE_OG_PREVIEWS["address-converter"]
     case "/cell":
       return PAGE_OG_PREVIEWS.cell
     case "/emulate":

@@ -33,6 +33,15 @@ Directory for contract ABI JSON files.
 Defaults to `[build].output-abi` when configured, otherwise `build/abi/`.
 {{/option}}
 
+{{#option "`--output-boc` _dir_" }}
+Directory for `<contract-name>.boc` files from compiled `.tolk` contracts and
+precompiled `.boc` inputs.
+
+Defaults to `[build].output-boc` when configured. If neither value is set,
+Acton writes BoC files only to individual contract `output` paths.
+When enabled, this export is additional to those paths.
+{{/option}}
+
 {{#option "`--output-fift` _dir_" }}
 Directory for compiled Fift output for `.tolk` contracts.
 

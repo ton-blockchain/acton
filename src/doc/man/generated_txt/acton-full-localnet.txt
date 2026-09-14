@@ -1,0 +1,522 @@
+ACTON-FULL-LOCALNET(1)
+
+NAME
+       acton-full-localnet — Run and manage a local TON network with real
+       validators
+
+SYNOPSIS
+       acton full-localnet [options] command
+
+DESCRIPTION
+       Full localnet runs TON validators, consensus, elections, and a TON
+       Center v2/v3 API stack in Docker. Use it to develop contracts and
+       applications that depend on full-node behavior or indexed chain data.
+
+       Each named network has its own blockchain, ports, nodes, and snapshots.
+       Acton manages the Docker containers and a local control service. The CLI
+       works independently of Acton Studio.
+
+       The network starts with a genesis validator. You can add full nodes and
+       validators while it runs. Local funds are measured in GRAM.
+
+       Use acton simulated-localnet for fast local execution, public-network
+       forks, or manual control of blocks and time. Full localnet uses real TON
+       block production and requires more CPU, memory, disk space, and startup
+       time.
+
+QUICK START
+       Install Docker Desktop or Docker Engine with Compose v2. Start the
+       engine and check that these commands succeed:
+
+           docker info
+           docker compose version
+
+       Start a network in the current project:
+
+           acton full-localnet start dev
+
+       Acton creates the network, downloads missing images, starts the
+       containers, and waits for the node and APIs to become ready. The first
+       start can take several minutes. The command prints the network ID and
+       endpoint URLs.
+
+       Keep this terminal open while you work. Press Ctrl-C to stop the network
+       gracefully. To run it in the background instead, use:
+
+           acton full-localnet start dev --detach
+           acton full-localnet status dev
+           acton full-localnet stop dev
+
+       Run acton full-localnet start dev again to resume the saved blockchain.
+
+SELECTING A NETWORK
+       Most subcommands accept a network name or ID. Names are scoped to the
+       state directory. Use acton full-localnet list to find saved networks.
+
+       When you omit the network, Acton selects the only saved network. If
+       several networks exist, an interactive terminal shows a selector.
+       Non-interactive commands and --json require an explicit name or ID when
+       selection is ambiguous.
+
+       If no networks exist, start without a name creates one named localnet.
+       An unused name passed to start creates a separate network.
+
+       For node and snapshot commands, put the network before the nested
+       action:
+
+           acton full-localnet node dev add worker
+           acton full-localnet snapshot dev list
+
+       The operation command selects its network with --network:
+
+           acton full-localnet operation <OPERATION_ID> --network dev
+
+OPTIONS
+       --state-dir path
+           Directory containing network definitions, control-service records,
+           and logs. The default is .acton-localnet inside the resolved project
+           root.
+
+           Use the same directory for subsequent commands that manage these
+           networks. Blockchain databases and snapshot archives are stored in
+           Docker volumes.
+
+       --json
+           Print machine-readable results and disable interactive progress and
+           selection. This option does not make operations asynchronous. Use
+           start --detach when a script must continue after startup.
+
+           Network records include id, name, status, endpoints, nodes,
+           operation, snapshotOperation, and error. Inspect status to determine
+           whether a saved network is running.
+
+SUBCOMMANDS
+   acton full-localnet start
+       Create or resume a network and wait for its APIs.
+
+      Synopsis
+          acton full-localnet start [name] [options]
+
+          If this command launches the control service, it stays in the
+          foreground until shutdown. Ctrl-C stops the service and network
+          gracefully. If a service already manages the network, start returns
+          when the network is ready.
+
+          Creation options apply only to a new network. To restart an existing
+          network, pass its name without those options. To change its initial
+          accounts, ports, or genesis timing, create a network with a different
+          name.
+
+      Options
+          --detach
+              Leave a newly started control service and network running in the
+              background after readiness checks finish. Use stop to shut them
+              down later.
+
+          --port-base port
+              First of five consecutive host ports for Config, Admin, API v2,
+              API v3, and the observability dashboard, in that order.
+
+              Acton automatically selects an available range starting at 19000
+              when omitted. Saved networks reserve their assigned ports even
+              while stopped.
+
+          --block-time-ms ms
+              Target interval between blocks, in milliseconds. The value must
+              be greater than zero. The bundled Localton image defaults to 1000
+              ms.
+
+              Actual block timing depends on consensus and available resources.
+              This option sets the target in the initial network configuration.
+
+          --election-time-seconds seconds
+              Validator round duration, in seconds. The minimum is 4 seconds.
+              The bundled Localton image defaults to 120 seconds.
+
+              This value also sets the initial election windows and stake
+              freeze period. With 120 seconds, elections open 90 seconds before
+              the validator set changes and close 30 seconds before the change.
+
+          --accounts name[,name…]_
+              Project wallets to initialize and fund with 100 GRAM each.
+              Defaults to [localnet].accounts in Acton.toml. An explicit list
+              replaces the configuration list. See Startup Accounts for wallet
+              setup and persistence.
+
+          --accounts-file path
+              JSON file containing an array of hexadecimal ShardAccount BoCs to
+              import into the initial blockchain state. See Account Imports for
+              the format.
+
+   acton full-localnet create
+       Save a stopped network definition without starting Docker containers.
+       Use this when you want to reserve the name, ports, and genesis inputs
+       before the first start.
+
+      Synopsis
+          acton full-localnet create [name] [options]
+
+          Accepts the creation options documented under start: --port-base,
+          --block-time-ms, --election-time-seconds, --accounts, and
+          --accounts-file. The default name is localnet. Wallets and import
+          files are read when the definition is created.
+
+              acton full-localnet create staging --port-base 19100
+              acton full-localnet start staging --detach
+
+   acton full-localnet list
+       List saved network definitions as a JSON array. This command works while
+       Docker is stopped and does not start any services.
+
+      Synopsis
+          acton full-localnet list
+
+          Use status to check a network’s current runtime state.
+
+   acton full-localnet status
+       Show network status, endpoint URLs, and state location. With --json, the
+       record also includes nodes, operations, configuration, and diagnostic
+       details.
+
+      Synopsis
+          acton full-localnet status [network]
+
+          This command can inspect a network while its control service is
+          stopped. It does not start the network. Endpoint URLs remain in the
+          record while the corresponding services are stopped.
+
+   acton full-localnet stop
+       Stop the selected network and its control service gracefully. Blockchain
+       data and snapshots remain available for the next start.
+
+      Synopsis
+          acton full-localnet stop [network]
+
+   acton full-localnet shutdown
+       Shut down the selected network and its control service. Like stop, this
+       command preserves persistent data and waits for shutdown to finish.
+
+      Synopsis
+          acton full-localnet shutdown [network]
+
+   acton full-localnet delete
+       Delete the network’s containers, blockchain volumes, and snapshot
+       archives. This removes the network from the list of available networks.
+
+      Synopsis
+          acton full-localnet delete [network] [--yes]
+
+          The command asks for confirmation in an interactive terminal. Pass
+          --yes to confirm deletion in a script. Use stop when you intend to
+          resume the network later.
+
+   acton full-localnet logs
+       Show the last lines of the saved network operation log. This command
+       reads the log once and exits. It also works when the control service is
+       stopped.
+
+      Synopsis
+          acton full-localnet logs [network] [--tail lines]
+
+          --tail defaults to 100 lines. With --json, the result is an object
+          with a logs string.
+
+              acton full-localnet logs dev --tail 200
+
+   acton full-localnet node
+       Manage additional full nodes and validator participation. Start the
+       network before managing its nodes. Use status --json to find node IDs.
+       The genesis validator belongs to the network and cannot be removed with
+       node remove.
+
+      Synopsis
+          acton full-localnet node [network] command
+
+      Subcommands
+          o  add <name> [--validator] joins a new full node and prints its ID.
+             With --validator, the node also participates in validator
+             elections.
+
+          o  enter-validation <id> enables election participation for an
+             existing node.
+
+          o  leave-validation <id> disables future election participation. The
+             node continues its duties until it leaves the elected validator
+             sets.
+
+          o  remove <id> --yes [--force] deletes an additional node and its
+             state. Normally, a validator must first leave validation and exit
+             both the current and next elected sets. --force bypasses this
+             check and can disrupt consensus.
+
+          Election changes take effect through TON election rounds. Completion
+          of enter-validation does not mean the node has already become an
+          elected validator. Use the observability dashboard to inspect
+          election membership.
+
+              acton full-localnet node dev add validator-b --validator
+              acton full-localnet status dev --json
+              acton full-localnet node dev leave-validation <NODE_ID>
+
+          After the node leaves both elected sets, remove it:
+
+              acton full-localnet node dev remove <NODE_ID> --yes
+
+   acton full-localnet snapshot
+       Save and restore the blockchain state and node topology. Full localnet
+       snapshots are compressed archives of node databases stored in Docker
+       volumes.
+
+      Synopsis
+          acton full-localnet snapshot [network] command
+
+      Subcommands
+          o  list prints saved snapshots with their IDs, names, creation times,
+             block information, and sizes.
+
+          o  create [name] saves a snapshot. If the network is running, Acton
+             stops its nodes, creates the archives, then starts it again. If
+             already stopped, it remains stopped. The optional name labels the
+             saved state.
+
+          o  restore <id> --yes replaces the current blockchain state and node
+             topology with the saved state. Acton stops the network, restores
+             the archives, resets the indexer, and waits for startup and API
+             readiness.
+
+          o  delete <id> --yes removes one saved snapshot’s archives and
+             metadata.
+
+          Use the snapshot ID returned by create or list for restore and
+          delete. The display name is a label, not an identifier.
+
+          Snapshot commands also work when the control service is stopped.
+          Acton starts a temporary service and closes it when the command
+          finishes. After a restore through this temporary service, the network
+          is stopped again. Run start to continue working with it.
+
+          Creation and restoration can take several minutes. Allow disk space
+          for the current databases, compressed archives, and temporary restore
+          backups. Restoration rebuilds indexed data from the saved blockchain.
+
+              acton full-localnet snapshot dev create before-upgrade
+              acton full-localnet snapshot dev list
+              acton full-localnet snapshot dev restore <SNAPSHOT_ID> --yes
+
+   acton full-localnet operation
+       Inspect a saved operation or wait for it to finish. Operations record
+       progress phases, timing, results, and errors for network changes.
+
+      Synopsis
+          acton full-localnet operation id [--network network] [--wait]
+
+          Without --wait, this command prints the saved operation record as
+          JSON. With --wait, it waits for a running operation and exits with an
+          error if the operation fails. Waiting requires the operation’s
+          control service to be running.
+
+          Find operation IDs in JSON command results or the network’s JSON
+          status. Startup, node changes, and snapshot commands already wait for
+          their operations.
+
+              acton full-localnet operation <OPERATION_ID> --network dev --wait
+
+STARTUP ACCOUNTS
+       Create a development wallet, then select it when you create the network:
+
+           acton wallet new --name deployer --local
+           acton full-localnet start dev --accounts deployer --detach
+
+       For several wallets, use a comma-separated list:
+
+           acton full-localnet start wallets --accounts deployer,alice,bob --detach
+
+       You can set the default CLI selection in Acton.toml:
+
+           [localnet]
+           accounts = ["deployer", "alice", "bob"]
+
+       Wallets must exist in Acton’s wallet configuration. Acton resolves
+       their initial state and gives each selected wallet 100 GRAM in the
+       zerostate. This is the blockchain’s initial state, before block
+       production begins.
+
+       Restarts use the saved state. They do not replenish spent balances or
+       reread the account selection. Use a snapshot to restore a prepared test
+       balance, or create a new network for a different initial selection.
+
+       The [localnet].accounts default applies to CLI creation. Studio uses the
+       wallet selection submitted in its creation form. Full localnet timing
+       and ports come from the creation flags above, rather than other
+       [localnet] settings.
+
+ACCOUNT IMPORTS
+       Use --accounts-file to include existing contract states in the
+       zerostate. The file must contain a JSON array of strings. Each string is
+       a complete hexadecimal ShardAccount BoC, including the account’s code,
+       data, and balance.
+
+       An address, a base64 string, or a contract data cell alone is not a
+       ShardAccount import. Supply active basechain accounts with distinct
+       addresses. Imported accounts and startup wallets share the same initial
+       address space.
+
+           acton full-localnet start imported --accounts-file accounts.json --detach
+
+       Imports copy account state into a new local blockchain. They do not load
+       public-network transaction history or fetch later changes from that
+       network. Imported balances come from the supplied account state.
+
+CONNECTING SCRIPTS AND APPLICATIONS
+       Read the endpoint URLs from start or status. With --port-base 19000,
+       Acton assigns these endpoints:
+
+       o  Config: http://127.0.0.1:19000 for network configuration and the
+          faucet.
+
+       o  Admin: http://127.0.0.1:19001 for Localton administration.
+
+       o  API v2: http://127.0.0.1:19002/api/v2 for TON Center v2 queries and
+          message submission.
+
+       o  API v3: http://127.0.0.1:19003/api/v3 for indexed transactions and
+          account data.
+
+       o  Dashboard: http://127.0.0.1:19004 for node health, synchronization,
+          and elections.
+
+       The ports bind to loopback. Use a local Docker engine so Acton can reach
+       these endpoints. Port assignments belong to the saved network, so use
+       its reported URLs when several networks exist.
+
+       To target this network with Acton scripts, add its API URLs to
+       Acton.toml:
+
+           [networks.localnet]
+           api.v2 = "http://127.0.0.1:19002/api/v2"
+           api.v3 = "http://127.0.0.1:19003/api/v3"
+
+       Then run your deployment script with the local network selected:
+
+           acton script --net localnet scripts/deploy.tolk
+
+       For an additional named connection, use [networks.dev] with the same
+       fields and select it with --net custom:dev. The network global ID is -3,
+       which is also Acton’s default for custom networks.
+
+       You can check the APIs directly:
+
+           curl --fail http://127.0.0.1:19002/api/v2/getMasterchainInfo
+           curl --fail http://127.0.0.1:19003/api/v3/masterchainInfo
+
+PERSISTENCE AND DOCKER
+       Acton stores network definitions and logs under
+       .acton-localnet/networks/ in the project. --state-dir selects another
+       catalog. Each network directory contains its configuration, service
+       records, operation records, and startup logs.
+
+       Docker volumes hold the live blockchain databases, indexer data, and
+       snapshot archives. Copying .acton-localnet alone does not back up the
+       network. Use the snapshot commands for local restore points.
+
+       The Docker target is selected from DOCKER_CONTEXT, then DOCKER_HOST,
+       then the active Docker context. Acton saves the target and image when it
+       prepares the deployment. Restarts reuse that identity to find the
+       correct containers and volumes. Changing the active context does not
+       move an existing network.
+
+       ACTON_LOCALNET_IMAGE selects a custom Localton image for a new
+       deployment. It must provide the Localton commands and APIs expected by
+       this Acton version. The default is the versioned Localton image bundled
+       with Acton.
+
+AUTOMATION
+       Use an explicit name, a separate state directory, --json, and --detach
+       for automated jobs. Wait for start to succeed before sending API
+       requests.
+
+           acton full-localnet --state-dir /tmp/acton-ci --json \
+             start ci --port-base 19200 --detach
+           acton full-localnet --state-dir /tmp/acton-ci --json status ci
+           acton full-localnet --state-dir /tmp/acton-ci stop ci
+
+       For a fresh blockchain per job, choose a unique network name and delete
+       that network during job cleanup:
+
+           acton full-localnet --state-dir /tmp/acton-ci delete ci --yes
+
+       Successful start output is a network record. Mutating commands return an
+       operation record in JSON mode. Progress and diagnostics go to stderr.
+       Check the exit status before using a result as a successful operation.
+
+TROUBLESHOOTING
+   Docker or image startup fails
+       Check docker info, docker compose version, and docker context ls. Verify
+       that the selected engine is running and accessible to your user. For an
+       image download failure, check the registry and connection details in the
+       reported error. The first start needs access to download missing images.
+
+       After fixing Docker or the connection, retry start with the existing
+       name. Keep its creation options out of the restart command.
+
+   A port range is unavailable
+       Another process or saved network already uses the requested range.
+       Choose five free consecutive ports with --port-base when creating a new
+       network. For an existing network, stop the conflicting process before
+       restarting it.
+
+   Genesis options are rejected
+       The name identifies an existing network. Run start <name> to resume it,
+       or use a new name to apply different initial accounts or timing.
+
+   Startup or restore is taking too long
+       Inspect status and the operation log:
+
+           acton full-localnet status dev --json
+           acton full-localnet logs dev --tail 200
+
+       Check available Docker disk space and memory. Startup includes readiness
+       checks for the TON node and APIs. Restore also rebuilds the indexer. Use
+       the dashboard URL from status to inspect synchronization progress.
+
+   The control service stopped unexpectedly
+       Use status and logs to inspect the saved network. Startup errors include
+       the full log path. The network directory also contains service.log and
+       launcher logs for failures before node startup.
+
+       Retry start <name> after resolving the reported problem. If snapshot
+       recovery fails, preserve the reported files and logs for diagnosis.
+       Acton blocks startup while an incomplete restore could leave
+       inconsistent node data.
+
+EXIT STATUS
+       o  0: The command completed successfully. For status, a stopped network
+          is a valid result. Inspect the JSON status field to check readiness.
+
+       o  Nonzero: Argument parsing, network selection, startup, or an
+          operation failed. operation --wait also fails when the saved
+          operation has failed.
+
+DISPLAY OPTIONS
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+PROJECT OPTIONS
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+SEE ALSO
+       acton(1), acton-simulated-localnet(1), acton-wallet(1), acton-script(1),
+       acton-rpc(1)
+

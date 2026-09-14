@@ -63,6 +63,7 @@ import {
 } from "../../lib/rawBoc"
 
 import {ActionsSummary} from "./ActionsSummary"
+import {renderSectionCopyActions} from "./sectionCopyActions"
 import styles from "./TransactionDetails.module.css"
 
 export interface TransactionDetailsProps {
@@ -85,39 +86,6 @@ export interface TransactionDetailsProps {
     blockRef: TransactionBlockRef,
     event: React.MouseEvent<HTMLElement>,
   ) => void
-}
-
-interface RawCopyAction {
-  readonly value: string | undefined
-  readonly label: string
-  readonly caption: string
-}
-
-function renderSectionCopyActions(
-  actions: readonly RawCopyAction[],
-): React.JSX.Element | undefined {
-  const availableActions = actions.filter(
-    (action): action is RawCopyAction & {readonly value: string} => action.value !== undefined,
-  )
-  if (availableActions.length === 0) {
-    return undefined
-  }
-
-  return (
-    <div className={styles.sectionCopyActions}>
-      {availableActions.map(action => (
-        <CopyInlineButton
-          key={action.label}
-          className={styles.sectionCopyButton}
-          value={action.value}
-          label={`Copy ${action.label}`}
-          copiedLabel={`Copied ${action.label}`}
-        >
-          {action.caption}
-        </CopyInlineButton>
-      ))}
-    </div>
-  )
 }
 
 export function TransactionDetails(props: TransactionDetailsProps): React.JSX.Element {
@@ -308,7 +276,7 @@ function TransactionDetailsContent({
       : storageDiff.status === "unchanged"
         ? "Intact"
         : "Changed"
-  const hasStorageAbi = targetAbi !== undefined
+  const hasStorageAbi = targetAbi?.storage?.storage_ty_idx !== undefined
   const storageUnavailableLabel = hasStorageAbi
     ? "Storage data not loaded"
     : "Storage data unavailable"
@@ -457,7 +425,7 @@ function TransactionDetailsContent({
                 </div>
               </div>
               {sendMode !== undefined && (
-                <div className={styles.multiColumnItem}>
+                <div className={`${styles.multiColumnItem} ${styles.sendModeItem}`}>
                   <div className={styles.multiColumnItemTitle}>Send Mode</div>
                   <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
                     <SendModeViewer mode={sendMode} />

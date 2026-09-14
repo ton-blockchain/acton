@@ -1,0 +1,4 @@
+Error: In simple:
+
+Failed to create directory for BoC file blocked/boc: Not a directory ([OS_ERROR])
+Build failed with 1 error

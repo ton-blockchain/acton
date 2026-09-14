@@ -1,7 +1,7 @@
 import {Archive, Boxes, FlaskConical, Plus} from "lucide-react"
 import {lazy, Suspense, useCallback, useEffect, useState} from "react"
 import {useLocation, useNavigate, useSearchParams} from "react-router"
-import {Button, CopyButton, ToastProvider, useToast} from "@acton/ui"
+import {Button, ToastProvider, useToast} from "@acton/ui"
 
 import {ImportAccountsAction, ImportAccountsActionContext} from "./components/ImportAccountsAction"
 import {StudioShell} from "./components/StudioShell"
@@ -214,8 +214,7 @@ function StudioWorkspace({
           current.pageDescription === state.pageDescription &&
           current.pageTitle === state.pageTitle &&
           current.headerActions === state.headerActions &&
-          current.primaryAction === state.primaryAction &&
-          current.rpcUrl === state.rpcUrl
+          current.primaryAction === state.primaryAction
         ) {
           return current
         }
@@ -299,35 +298,24 @@ function StudioWorkspace({
         headerMode={hasSelectedTestRun ? "hidden" : "visible"}
         headerActions={
           environmentRoute ? (
-            <>
-              {activeEnvironmentShell?.headerActions ? (
-                activeEnvironmentShell.headerActions
-              ) : activeEnvironmentShell?.primaryAction ? (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  leadingIcon={
-                    activeEnvironmentShell.primaryAction.icon === "plus" ? (
-                      <Plus size={16} aria-hidden="true" />
-                    ) : (
-                      <Archive size={16} aria-hidden="true" />
-                    )
-                  }
-                  onClick={activeEnvironmentShell.primaryAction.onClick}
-                >
-                  {activeEnvironmentShell.primaryAction.label}
-                </Button>
-              ) : activeEnvironmentShell?.rpcUrl ? (
-                <CopyButton
-                  value={activeEnvironmentShell.rpcUrl}
-                  label="Copy RPC endpoint"
-                  copiedLabel="RPC endpoint copied"
-                  size="sm"
-                >
-                  Copy RPC
-                </CopyButton>
-              ) : undefined}
-            </>
+            activeEnvironmentShell?.headerActions ? (
+              activeEnvironmentShell.headerActions
+            ) : activeEnvironmentShell?.primaryAction ? (
+              <Button
+                variant="primary"
+                size="sm"
+                leadingIcon={
+                  activeEnvironmentShell.primaryAction.icon === "plus" ? (
+                    <Plus size={16} aria-hidden="true" />
+                  ) : (
+                    <Archive size={16} aria-hidden="true" />
+                  )
+                }
+                onClick={activeEnvironmentShell.primaryAction.onClick}
+              >
+                {activeEnvironmentShell.primaryAction.label}
+              </Button>
+            ) : undefined
           ) : activePath === "/" ? (
             <>
               <Button
@@ -464,6 +452,9 @@ function StudioWorkspace({
             isLoading={environmentsState.isLoading}
             loadError={environmentsState.error}
             walletNames={studioInfo?.workspace?.walletNames ?? []}
+            defaultStartupAccounts={
+              studioInfo ? (studioInfo.workspace?.defaultStartupAccounts ?? []) : undefined
+            }
             onCreateOpenChange={setIsEnvironmentCreateOpen}
             onEnvironmentChange={environmentsState.setEnvironment}
             onOpenEnvironment={openEnvironment}

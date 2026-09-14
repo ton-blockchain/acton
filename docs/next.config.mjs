@@ -20,7 +20,7 @@ function resolveBaseUrl() {
     return `${repoUrl}/${repoName}`
   }
 
-  return "http://localhost:3000"
+  return "http://127.0.0.1:3000"
 }
 
 function resolveBasePath() {

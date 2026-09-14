@@ -164,6 +164,12 @@ pub(crate) fn configuration(
         block_time_ms: network.config.block_time_ms,
         election_time_seconds: network.config.election_time_seconds,
         imported_accounts,
+        accounts: network
+            .config
+            .startup_wallets
+            .iter()
+            .map(|wallet| wallet.name.clone())
+            .collect(),
         nodes: network.nodes.clone(),
     }
 }

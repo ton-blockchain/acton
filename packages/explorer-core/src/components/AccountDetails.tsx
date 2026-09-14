@@ -116,8 +116,8 @@ import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 
 import {ExplorerAddressChip} from "./ExplorerAddressChip"
 import {
-  getImageSources,
-  NFT_IMAGE_SOURCE_KEYS,
+  getNftImageSources,
+  NFT_PLACEHOLDER_IMAGE,
   replaceBrokenImageWithFallback,
 } from "./imageFallbacks"
 import {Nfts, NftsSkeleton} from "./Nfts"
@@ -486,6 +486,13 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
     [activeTab, transactionAddresses, actionAddresses],
   )
   const metadataRegistry = useMetadataRegistry()
+  const resolveVerifiedSourceByCodeHash = useCallback(
+    async (codeHash: string) => {
+      const source = await metadataRegistry.getSource({codeHash})
+      return source.verified && source.bundle ? source : undefined
+    },
+    [metadataRegistry],
+  )
   const messageNamesByAddress = useMessageNamesByAddress({
     client,
     metadataRegistry,
@@ -1370,64 +1377,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
             </div>
           )}
         </div>
-      ) : activeTab === "items" && showItemsTab ? (
-        <div className={styles.tokensContent}>
-          {collectionItemsLoading ? (
-            <NftsSkeleton />
-          ) : (
-            <Nfts
-              items={collectionItems}
-              emptyLabel="No collection items found"
-              searchLabel="Search collection items"
-              onAddressClick={onAddressClick}
-            />
-          )}
-          {showLoadMoreCollectionItems && onLoadMoreCollectionItems && (
-            <div ref={collectionItemsLoadMoreRef} className={styles.listLoadMore}>
-              {collectionItemsLoadMoreError ? (
-                <span className={styles.listLoadMoreError} role="alert">
-                  {collectionItemsLoadMoreError}
-                </span>
-              ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onLoadMoreCollectionItems}
-                disabled={collectionItemsLoadingMore}
-              >
-                {collectionItemsLoadingMore
-                  ? "Loading..."
-                  : collectionItemsLoadMoreError
-                    ? "Retry"
-                    : "Load more"}
-              </Button>
-            </div>
-          )}
-        </div>
-      ) : activeTab === "nfts" && showNftsTab ? (
-        <div className={styles.tokensContent}>
-          <Nfts items={nftItems} onAddressClick={onAddressClick} />
-          {showLoadMoreNfts && onLoadMoreNfts && (
-            <div ref={nftsLoadMoreRef} className={styles.listLoadMore}>
-              {nftsLoadMoreError ? (
-                <span className={styles.listLoadMoreError} role="alert">
-                  {nftsLoadMoreError}
-                </span>
-              ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onLoadMoreNfts}
-                disabled={nftsLoadingMore}
-              >
-                {nftsLoadingMore ? "Loading..." : nftsLoadMoreError ? "Retry" : "Load more"}
-              </Button>
-            </div>
-          )}
-        </div>
-      ) : activeTab === "holders" ? (
+      ) : activeTab === "items" || activeTab === "nfts" ? null : activeTab === "holders" ? (
         <div className={styles.historyContent}>
           {holdersLoading ? (
             <HoldersSkeleton />
@@ -1537,14 +1487,89 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                 compilerAbiError={compilerAbiError}
                 verifiedSource={verifiedSource}
                 verifiedSourceLoading={verifiedSourceLoading}
+                resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
                 onContractClick={onAddressClick}
               />
             </Suspense>
           )}
         </div>
       )}
+      {showItemsTab && (
+        <NftTabPanel key={`items-${ownerAddress}`} active={activeTab === "items"}>
+          <div className={styles.tokensContent}>
+            {collectionItemsLoading ? (
+              <NftsSkeleton />
+            ) : (
+              <Nfts
+                items={collectionItems}
+                emptyLabel="No collection items found"
+                searchLabel="Search collection items"
+                onAddressClick={onAddressClick}
+              />
+            )}
+            {showLoadMoreCollectionItems && onLoadMoreCollectionItems && (
+              <div ref={collectionItemsLoadMoreRef} className={styles.listLoadMore}>
+                {collectionItemsLoadMoreError ? (
+                  <span className={styles.listLoadMoreError} role="alert">
+                    {collectionItemsLoadMoreError}
+                  </span>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onLoadMoreCollectionItems}
+                  disabled={collectionItemsLoadingMore}
+                >
+                  {collectionItemsLoadingMore
+                    ? "Loading..."
+                    : collectionItemsLoadMoreError
+                      ? "Retry"
+                      : "Load more"}
+                </Button>
+              </div>
+            )}
+          </div>
+        </NftTabPanel>
+      )}
+      {showNftsTab && (
+        <NftTabPanel key={`nfts-${ownerAddress}`} active={activeTab === "nfts"}>
+          <div className={styles.tokensContent}>
+            <Nfts items={nftItems} onAddressClick={onAddressClick} />
+            {showLoadMoreNfts && onLoadMoreNfts && (
+              <div ref={nftsLoadMoreRef} className={styles.listLoadMore}>
+                {nftsLoadMoreError ? (
+                  <span className={styles.listLoadMoreError} role="alert">
+                    {nftsLoadMoreError}
+                  </span>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onLoadMoreNfts}
+                  disabled={nftsLoadingMore}
+                >
+                  {nftsLoadingMore ? "Loading..." : nftsLoadMoreError ? "Retry" : "Load more"}
+                </Button>
+              </div>
+            )}
+          </div>
+        </NftTabPanel>
+      )}
     </section>
   )
+}
+
+/** Mounts NFT lists on first use and retains their image fallbacks and search while hidden. */
+function NftTabPanel({active, children}: {readonly active: boolean; readonly children: ReactNode}) {
+  const [visited, setVisited] = useState(active)
+
+  useEffect(() => {
+    if (active) setVisited(true)
+  }, [active])
+
+  return active || visited ? <div hidden={!active}>{children}</div> : null
 }
 
 function isBuiltInTab(value: string): value is Tabs {
@@ -1725,7 +1750,9 @@ function HistoryTextValue({
         className={className}
         label={line.label}
         imageSrc={line.imageSources[0]}
-        onImageError={event => replaceBrokenImageWithFallback(event, line.imageSources)}
+        onImageError={event =>
+          replaceBrokenImageWithFallback(event, line.imageSources, NFT_PLACEHOLDER_IMAGE)
+        }
         ariaLabel={address && onAddressClick ? `Open ${line.fullLabel}` : undefined}
         title={address && onAddressClick ? `Open ${line.fullLabel}` : line.fullLabel}
         onClick={
@@ -3705,7 +3732,7 @@ function actionNftValueLine(
     name ??
     (isNonEmptyString(itemIndex) ? `NFT #${shortenMiddle(itemIndex, {start: 6, end: 6})}` : "NFT")
 
-  const imageSources = getImageSources(tokenInfo, NFT_IMAGE_SOURCE_KEYS)
+  const imageSources = tokenInfo?.is_nsfw === true ? [] : getNftImageSources(tokenInfo)
   return {
     kind: "nft",
     label,

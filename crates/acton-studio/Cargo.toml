@@ -29,6 +29,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 ton = { workspace = true }
 ton-api = { workspace = true }
+ton-localnet = { workspace = true }
 toncenter-keys = { workspace = true }
 tower-http = { workspace = true, features = ["fs"] }
 tracing = { workspace = true }

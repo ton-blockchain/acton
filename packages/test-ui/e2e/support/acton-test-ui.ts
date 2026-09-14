@@ -136,7 +136,10 @@ const jettonSmokeFilter = [
   unionStorageTestName,
 ].join("|")
 const profiledJettonFilter = "owner can send jettons"
-const fanoutGraphFilter = fanoutGraphVisualScenarios.map(({testName}) => testName).join("|")
+const fanoutGraphFilter = [
+  ...fanoutGraphVisualScenarios.map(({testName}) => testName),
+  "inspect external-out messages",
+].join("|")
 
 const unionStorageContractSource = `contract UnionStorage {
     author: "Acton"

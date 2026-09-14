@@ -19,7 +19,7 @@
   },
   "runtime": {
     "auto_mining": false,
-    "block_interval_ms": 50,
+    "block_time_ms": 50,
     "rate_limit_rps": null
   },
   "startup_wallet": {

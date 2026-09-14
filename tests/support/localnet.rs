@@ -111,8 +111,8 @@ impl<'a> LocalnetBuilder<'a> {
             .arg("start")
             .arg("--port")
             .arg(port.to_string());
-        if !args.iter().any(|arg| arg == "--block-interval-ms") {
-            cmd.arg("--block-interval-ms").arg("50");
+        if !args.iter().any(|arg| arg == "--block-time-ms") {
+            cmd.arg("--block-time-ms").arg("50");
         }
         cmd.args(&args)
             .current_dir(&current_dir)

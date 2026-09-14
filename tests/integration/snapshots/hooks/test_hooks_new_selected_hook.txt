@@ -1,0 +1,15 @@
+pre-push, default: ["pre-push"]
+Created default pre-push hook in .githooks
+Run `acton hooks install` to enable it.
+
+pre-push, empty: ["pre-push"]
+Created empty pre-push hook in .githooks
+Run `acton hooks install` to enable it.
+
+pre-commit, default: ["pre-commit"]
+Created default pre-commit hook in .githooks
+Run `acton hooks install` to enable it.
+
+pre-commit, empty: ["pre-commit"]
+Created empty pre-commit hook in .githooks
+Run `acton hooks install` to enable it.

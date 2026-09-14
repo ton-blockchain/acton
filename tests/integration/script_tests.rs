@@ -4035,7 +4035,7 @@ fun main() {
 
     let node = project
         .localnet()
-        .args(["--accounts", "deployer", "--block-interval-ms", "2000"])
+        .args(["--accounts", "deployer", "--block-time-ms", "2000"])
         .start();
     append_localnet_network(project.path(), &format!("{}/api/v2", node.base_url()));
 

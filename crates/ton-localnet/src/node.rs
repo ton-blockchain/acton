@@ -886,7 +886,7 @@ impl Node {
             last_mc_blocks_100.push(origin_block);
         }
 
-        PrevBlocksInfo::new(last_mc_blocks, prev_key_block, last_mc_blocks_100)
+        PrevBlocksInfo::new(last_mc_blocks, prev_key_block, Some(last_mc_blocks_100))
     }
 
     #[must_use]
@@ -4620,6 +4620,8 @@ mod tests {
             .collect::<Vec<_>>();
         let sparse_seqnos = info
             .last_mc_blocks_100
+            .as_ref()
+            .expect("localnet includes TVM 9 history")
             .iter()
             .map(|block| block.seqno)
             .collect::<Vec<_>>();

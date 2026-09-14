@@ -647,7 +647,7 @@ The configuration API on port `18000` provides these routes:
 - `GET /localhost.global.config.json` returns the global configuration.
 - `GET /config` returns the same global configuration.
 - `POST /faucet` sends one development grant to a node-owned wallet.
-- `GET /live` and `GET /healthz` return liveness data.
+- `GET /livez` and `GET /healthz` return liveness data.
 
 The administrative API on port `18001` provides these routes:
 

@@ -22,12 +22,14 @@ interface CodeCellDetailsProps {
   readonly cell: ParsedCodeCell
   readonly verifiedSourcesByCodeHash?: ReadonlyMap<string, ContractVerifiedSource>
   readonly resolveVerifiedSourceByCodeHash?: ResolveVerifiedSourceByCodeHash
+  readonly verificationUrl?: string
 }
 
 export function CodeCellDetails({
   cell,
   verifiedSourcesByCodeHash,
   resolveVerifiedSourceByCodeHash,
+  verificationUrl,
 }: CodeCellDetailsProps) {
   const code = useMemo(() => {
     try {
@@ -78,6 +80,7 @@ export function CodeCellDetails({
         codeBoc={code.bocBase64}
         defaultFileTreeVisible={false}
         verifiedSource={cachedSource ?? lookupSource}
+        verificationUrl={verificationUrl}
         compact
       />
     </div>

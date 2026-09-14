@@ -1417,28 +1417,6 @@
   white-space: nowrap;
 }
 
-.settingsBadges {
-  max-width: 56%;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.settingsBadge {
-  min-height: 24px;
-  padding: 3px 8px;
-  border: 1px solid var(--acton-color-border-control);
-  border-radius: 999px;
-  background: var(--acton-color-surface);
-  color: var(--acton-color-text);
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.76rem;
-  font-weight: 550;
-}
-
 .settingsInlineError {
   padding: 10px 18px;
   border-bottom: 1px solid var(--acton-color-border);
@@ -2043,120 +2021,6 @@
   background: var(--acton-color-surface);
 }
 
-.checkpointDialogContent,
-.stateConfirmationContent {
-  padding-top: 3px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.checkpointCreateRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-}
-
-.checkpointError {
-  color: var(--acton-color-status-failed-text);
-  font-size: 0.82rem;
-  line-height: 1.35;
-}
-
-.checkpointList {
-  max-height: min(360px, 48vh);
-  border: 1px solid var(--acton-color-border);
-  border-radius: 10px;
-  background: var(--acton-color-surface-raised);
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
-}
-
-.checkpointRow {
-  min-height: 58px;
-  padding: 8px 10px 8px 12px;
-  border-top: 1px solid var(--acton-color-border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.checkpointRow:first-child {
-  border-top: 0;
-}
-
-.checkpointIdentity {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.checkpointIdentity strong {
-  color: var(--acton-color-text);
-  font-size: 0.86rem;
-  font-weight: 650;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.checkpointIdentity span,
-.stateFileIdentity span {
-  color: var(--acton-color-text-muted);
-  font-size: 0.78rem;
-}
-
-.checkpointActions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex: 0 0 auto;
-}
-
-.checkpointLoading {
-  min-height: 88px;
-  padding: 20px;
-  color: var(--acton-color-text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.84rem;
-  text-align: center;
-}
-
-.stateFileSummary {
-  padding: 2px 0 4px;
-  color: var(--acton-color-text-muted);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.stateFileSummary > svg {
-  flex: 0 0 auto;
-}
-
-.stateFileIdentity {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.stateFileIdentity strong {
-  color: var(--acton-color-text);
-  font-size: 0.86rem;
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-.stateFileIdentity .stateFileError {
-  color: var(--acton-color-status-failed-text);
-}
-
 .assetModalContent,
 .timeModalContent {
   display: flex;
@@ -2692,7 +2556,6 @@
   .settingsEditableControl,
   .settingsNumberControl,
   .settingsCopyValue,
-  .settingsBadges,
   .settingsValueWithAction,
   .settingsTextValue,
   .settingsCodeValue {
@@ -2701,7 +2564,6 @@
   }
 
   .settingsCopyValue,
-  .settingsBadges,
   .settingsValueWithAction {
     justify-content: flex-start;
   }
@@ -3098,19 +2960,6 @@
 }
 
 @media (max-width: 520px) {
-  .checkpointCreateRow {
-    grid-template-columns: 1fr;
-  }
-
-  .checkpointRow {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .checkpointActions {
-    width: 100%;
-  }
-
   .timeAdvancePresets {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

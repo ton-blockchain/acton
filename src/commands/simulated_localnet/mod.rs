@@ -28,16 +28,9 @@ use tycho_types::models::{
     OwnedMessage, StdAddr,
 };
 
-const STARTUP_ACCOUNT_TOPUP_NANOGRAMS: u128 = 100_000_000_000; // 100 GRAM
 const STARTUP_DEPLOY_TRANSFER_NANOGRAMS: u128 = 50_000_000; // 0.05 GRAM
 pub(crate) const LOCALNET_AUTH_TOKEN_ENV: &str = LOCALNET_API_KEY_ENV;
-pub use snapshot::{
-    simulated_localnet_checkpoint_clear_cmd, simulated_localnet_checkpoint_create_cmd,
-    simulated_localnet_checkpoint_delete_cmd, simulated_localnet_checkpoint_export_cmd,
-    simulated_localnet_checkpoint_import_cmd, simulated_localnet_checkpoint_list_cmd,
-    simulated_localnet_checkpoint_restore_cmd, simulated_localnet_state_dump_cmd,
-    simulated_localnet_state_load_cmd,
-};
+pub use snapshot::{SnapshotCommand, simulated_localnet_snapshot_cmd};
 pub use status::simulated_localnet_status_cmd;
 
 #[allow(clippy::too_many_arguments)]
@@ -49,11 +42,10 @@ pub async fn simulated_localnet_start_cmd(
     accounts: Vec<String>,
     rate_limit: Option<u32>,
     response_delay_ms: Option<u64>,
-    block_interval_ms: u64,
+    block_time_ms: u64,
     no_mining: bool,
     mine_empty_blocks: bool,
-    load_state: Option<String>,
-    dump_state: Option<String>,
+    snapshots_dir: Option<std::path::PathBuf>,
     require_auth: bool,
     liteapi: bool,
     liteapi_port: Option<u16>,
@@ -66,15 +58,8 @@ pub async fn simulated_localnet_start_cmd(
         "             It provides TON-compatible blocks, LiteAPI, TON Center v2/v3, Streaming API, and Emulate API"
     );
 
-    if load_state.is_some() && db_path.is_some() {
-        anyhow::bail!(
-            "{} cannot be used together with {} for now",
-            "--load-state".yellow(),
-            "--db-path".yellow(),
-        );
-    }
-    if block_interval_ms == 0 {
-        anyhow::bail!("localnet block interval must be greater than 0");
+    if block_time_ms == 0 {
+        anyhow::bail!("localnet block time must be greater than 0");
     }
 
     let (state_source, fork_network, fork_block_number) = if let Some(network) = fork_net {
@@ -91,26 +76,30 @@ pub async fn simulated_localnet_start_cmd(
         (StateSource::Local, None, None)
     };
 
+    let snapshots = match snapshots_dir {
+        Some(path) => ton_localnet::snapshots::SnapshotStore::new(
+            acton_config::config::project_root().join(path),
+        ),
+        None => db_path.as_ref().map_or_else(
+            || {
+                ton_localnet::snapshots::SnapshotStore::new(
+                    acton_config::config::project_root()
+                        .join(format!(".acton/simulated-localnet/{port}/snapshots")),
+                )
+            },
+            |path| ton_localnet::snapshots::SnapshotStore::for_database(std::path::Path::new(path)),
+        ),
+    };
     let node = Arc::new(Localnet::new(
         state_source,
         db_path.clone(),
-        Duration::from_millis(block_interval_ms),
+        snapshots,
+        Duration::from_millis(block_time_ms),
         !no_mining,
         LocalnetMiningMode {
             skip_empty_blocks: !mine_empty_blocks,
         },
     ));
-    if let Some(path) = load_state.as_deref() {
-        node.load_state_from_path(path.to_owned())
-            .await
-            .with_context(|| format!("Failed to load state snapshot from {path}"))?;
-        println!(
-            "      {} state from {}",
-            "Loaded".green().bold(),
-            path.dimmed()
-        );
-    }
-
     let startup_accounts = setup_startup_accounts(&node, &accounts, no_mining).await?;
     let auth_token = require_auth.then(simulated_localnet_auth_token);
     let run_result = run_server(
@@ -129,19 +118,6 @@ pub async fn simulated_localnet_start_cmd(
         },
     )
     .await;
-
-    if run_result.is_ok()
-        && let Some(path) = dump_state.as_deref()
-    {
-        node.dump_state_to_path(path.to_owned())
-            .await
-            .with_context(|| format!("Failed to dump state snapshot to {path}"))?;
-        println!(
-            "       {} state to {}",
-            "Saved".green().bold(),
-            path.dimmed()
-        );
-    }
 
     if let Err(error) = run_result {
         return match error {
@@ -172,7 +148,8 @@ async fn setup_startup_accounts(
     accounts: &[String],
     manual_mining: bool,
 ) -> anyhow::Result<Vec<StartupAccount>> {
-    if accounts.is_empty() {
+    // Studio sends --accounts "" for an explicit empty selection, including in wallet-free projects.
+    if accounts.iter().all(|name| name.trim().is_empty()) {
         return Ok(Vec::new());
     }
 
@@ -204,7 +181,7 @@ async fn setup_startup_accounts(
                 address.as_str().dimmed(),
             );
         } else {
-            node.faucet(address.clone(), STARTUP_ACCOUNT_TOPUP_NANOGRAMS)
+            node.faucet(address.clone(), wallets::STARTUP_ACCOUNT_BALANCE_NANOGRAMS)
                 .await
                 .with_context(|| format!("Failed to top up wallet '{wallet_name}'"))?;
             if manual_mining {

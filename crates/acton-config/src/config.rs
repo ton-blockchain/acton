@@ -463,6 +463,8 @@ pub struct BuildSettings {
     pub gen_dir: Option<String>,
     /// Directory where per-contract ABI JSON files are saved
     pub output_abi: Option<String>,
+    /// Optional directory for additional `BoC` exports; relative paths resolve from the project root.
+    pub output_boc: Option<String>,
     /// Directory where per-contract compiled Fift files are saved
     pub output_fift: Option<String>,
     /// Directory where per-contract source registration artifacts are saved
@@ -520,7 +522,7 @@ pub struct LocalnetSettings {
     pub response_delay_ms: Option<u64>,
     /// Localnet block production interval in milliseconds
     #[schemars(range(min = 1))]
-    pub block_interval_ms: Option<u64>,
+    pub block_time_ms: Option<u64>,
     /// Disable automatic localnet block production
     pub no_mining: Option<bool>,
     /// Mine blocks even when there are no pending messages
@@ -2215,6 +2217,7 @@ version = "0.1.0"
 out-dir = "artifacts/build"
 gen-dir = "artifacts/gen"
 output-abi = "build/abi"
+output-boc = "build/boc"
 output-fift = "build/fift"
 output-sources = "build/sources"
 "#;
@@ -2224,6 +2227,7 @@ output-sources = "build/sources"
         assert_eq!(build.out_dir.as_deref(), Some("artifacts/build"));
         assert_eq!(build.gen_dir.as_deref(), Some("artifacts/gen"));
         assert_eq!(build.output_abi.as_deref(), Some("build/abi"));
+        assert_eq!(build.output_boc.as_deref(), Some("build/boc"));
         assert_eq!(build.output_fift.as_deref(), Some("build/fift"));
         assert_eq!(build.output_sources.as_deref(), Some("build/sources"));
     }
@@ -2329,7 +2333,7 @@ fork-block-number = 1234567
 accounts = ["deployer", "user"]
 rate-limit = 3
 response-delay-ms = 300
-block-interval-ms = 250
+block-time-ms = 250
 no-mining = true
 mine-empty-blocks = true
 "#;
@@ -2346,7 +2350,7 @@ mine-empty-blocks = true
         );
         assert_eq!(localnet.rate_limit, Some(3));
         assert_eq!(localnet.response_delay_ms, Some(300));
-        assert_eq!(localnet.block_interval_ms, Some(250));
+        assert_eq!(localnet.block_time_ms, Some(250));
         assert_eq!(localnet.no_mining, Some(true));
         assert_eq!(localnet.mine_empty_blocks, Some(true));
     }

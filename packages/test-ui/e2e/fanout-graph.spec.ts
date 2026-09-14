@@ -1,4 +1,5 @@
 import type {Page} from "@playwright/test"
+import {Cell, loadMessage} from "@ton/core"
 
 import {
   expect,
@@ -129,7 +130,7 @@ const expectStableGraphScreenshot = async (page: Page, name: string) => {
 
 const openFanoutGraphScenario = async (
   page: Page,
-  scenario: (typeof fanoutGraphVisualScenarios)[number],
+  scenario: {readonly testName: string; readonly traceName: string},
 ) => {
   await page.getByRole("button", {name: new RegExp(escapeRegExp(scenario.testName))}).click()
   await expect(page.getByTestId("test-details-title")).toContainText(scenario.testName)
@@ -166,7 +167,7 @@ test.describe("Fanout graph visual snapshots", () => {
   }
 })
 
-test("external-out graph node selects its parent transaction", async ({fanoutGraphUi, page}) => {
+test("external-out graph node opens its message details", async ({fanoutGraphUi, page}) => {
   await page.goto(fanoutGraphUi.baseUrl)
 
   const scenario = fanoutGraphVisualScenarios.find(
@@ -180,31 +181,79 @@ test("external-out graph node selects its parent transaction", async ({fanoutGra
 
   const selectedNode = page.locator('circle[aria-label^="Transaction "][aria-pressed="true"]')
   const externalOutNode = page.getByRole("button", {
-    name: /^External-out message from transaction /,
+    name: /^External-out message \d+ from transaction /,
   })
 
   await expect(externalOutNode).toBeVisible()
   const externalOutLabel = await externalOutNode.getAttribute("aria-label")
-  const parentTransactionId = externalOutLabel?.replace(
-    "External-out message from transaction ",
-    "",
-  )
+  const parentTransactionId = externalOutLabel?.split(" from transaction ")[1]
   if (!parentTransactionId) {
     throw new Error("External-out node does not identify its parent transaction")
   }
   await externalOutNode.click()
 
-  await expect(page.getByText("Message Route", {exact: true})).toBeVisible()
+  const details = page.getByRole("region", {name: "External-out message", exact: true})
+  await expect(details).toBeVisible()
+  await expect(details).toContainText("ExternalLogNotice")
+  await expect(externalOutNode).toHaveAttribute("aria-pressed", "true")
+  await expect(selectedNode).toHaveCount(0)
+
+  await page.getByRole("button", {name: `Transaction ${parentTransactionId}`, exact: true}).click()
+  await expect(details).toHaveCount(0)
   await expect(selectedNode).toHaveAttribute("aria-label", `Transaction ${parentTransactionId}`)
+  await expect(externalOutNode).toHaveAttribute("aria-pressed", "false")
 
-  await page
-    .getByRole("button", {name: /^Transaction /})
-    .nth(1)
-    .click()
-  const selectedOther = await selectedNode.getAttribute("aria-label")
+  await externalOutNode.focus()
+  await page.keyboard.press("Enter")
+  await expect(details).toBeVisible()
+  await expect(externalOutNode).toHaveAttribute("aria-pressed", "true")
 
-  await externalOutNode.click()
+  await page.keyboard.press("Space")
+  await expect(details).toHaveCount(0)
+  await expect(externalOutNode).toHaveAttribute("aria-pressed", "false")
+})
 
-  await expect(page.getByText("Message Route", {exact: true})).toBeVisible()
-  await expect(selectedNode).not.toHaveAttribute("aria-label", selectedOther ?? "")
+test("each external-out node opens its own body", async ({fanoutGraphUi, page}) => {
+  await page.goto(fanoutGraphUi.baseUrl)
+  await openFanoutGraphScenario(page, {
+    testName: "inspect external-out messages",
+    traceName: "Two external-out messages",
+  })
+
+  const externalOutNodes = page.getByRole("button", {name: /^External-out message /})
+  await expect(externalOutNodes).toHaveCount(2)
+  const details = page.getByRole("region", {name: "External-out message", exact: true})
+
+  await externalOutNodes.nth(0).click()
+  await expect(details).toContainText("PaymentSent")
+  await expect(details).toContainText("0x71000002")
+  await expect(details).toContainText("1250000000")
+  await expect(details.getByRole("button", {name: "Copy raw body", exact: true})).toBeVisible()
+
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"])
+  await details.getByText("Message Data", {exact: true}).locator("..").hover()
+  await details.getByRole("button", {name: "Copy raw body", exact: true}).click()
+  const bodyBoc = await page.evaluate(() => navigator.clipboard.readText())
+  await details.getByRole("button", {name: "Copy raw message", exact: true}).click()
+  const messageBoc = await page.evaluate(() => navigator.clipboard.readText())
+  const body = Cell.fromBoc(Buffer.from(bodyBoc, "hex"))[0]
+  const messageCell = Cell.fromBoc(Buffer.from(messageBoc, "hex"))[0]
+  const message = loadMessage(messageCell.beginParse())
+  expect(message.info.type).toBe("external-out")
+  expect(message.body.equals(body)).toBe(true)
+  expect(body.beginParse().loadUint(32)).toBe(0x71_00_00_02)
+
+  // The second log has dictionary key 2 because an internal message occupies key 1.
+  await expect(externalOutNodes.nth(1)).toHaveAttribute("aria-label", /^External-out message 2 /)
+  await externalOutNodes.nth(1).click()
+  await expect(details.getByText("unknown", {exact: true})).toBeVisible()
+  await expect(details).toContainText("Cell(")
+  await expect(details).toContainText("External<16:48879>")
+  await expect(details).not.toContainText("PaymentSent")
+  await expect(externalOutNodes.nth(0)).toHaveAttribute("aria-pressed", "false")
+  await expect(externalOutNodes.nth(1)).toHaveAttribute("aria-pressed", "true")
+
+  await externalOutNodes.nth(0).click()
+  await expect(details).toContainText("PaymentSent")
+  await expect(details.getByText("unknown", {exact: true})).toHaveCount(0)
 })

@@ -1632,6 +1632,10 @@
     "name": "DeDust Pool: TON/USDT"
   },
   {
+    "address": "0:3f8988b7aa85fc5740aabfda67c282b31a5580f2f6191cd3f73fb3babf0ca44c",
+    "name": "MixPay"
+  },
+  {
     "address": "0:3f931d963b27575b361460ed433fcd1a1e5e328652c6621c633c0b513cd8cc81",
     "name": "Tama Gadgets"
   },
@@ -1749,11 +1753,11 @@
   },
   {
     "address": "0:4a1c20bc9a6f9294f75f1c87a7f383a8b73a483a2e6dcb3630ddbe78b3ccad00",
-    "name": "ByBit 11"
+    "name": "Bybit 10"
   },
   {
     "address": "0:4a1f3ebcc66bdcefa90245bdf541a50ada1c688a487534b1587abffd93038834",
-    "name": "ByBit 2"
+    "name": "Bybit 2"
   },
   {
     "address": "0:4a9df5a2a628a865e81559ef1cff8903233a5d5448c726e7b339adb2f2bac6b1",
@@ -1980,6 +1984,10 @@
     "name": "Max Crown"
   },
   {
+    "address": "0:651fce7150d484a87867287cee91d5a1fc58f85b19e5a8bba4893de0e6adb068",
+    "name": "Omniston DEX Bridge"
+  },
+  {
     "address": "0:659dbf460831a72795c4a9a9872fb4a3e7fd302783068dae53e8f2a5c150084a",
     "name": "Flipster Deposit"
   },
@@ -2165,7 +2173,7 @@
   },
   {
     "address": "0:7d133d4e425c8e00de015513a44e66e6d163b21e71720aec7579965e5de28c55",
-    "name": "ByBit"
+    "name": "Bybit 8"
   },
   {
     "address": "0:7e30fc2b7751ba58a3642f3fd59d5e96a810ddd78d8a310bfe8353bef10500df",
@@ -2181,7 +2189,7 @@
   },
   {
     "address": "0:7f97f36dda3f7dedc9e12f8c09c4f89e7fbc17527ab3f67de4c3b155297a56e4",
-    "name": "ByBit 7"
+    "name": "Bybit 7"
   },
   {
     "address": "0:80d4123841167ca989ac912443cc99a4b9c1a87584536427ff6fd85c92395ae9",
@@ -2234,6 +2242,10 @@
   {
     "address": "0:84f340259fc61f95d9d02f058cbce7e5a0b1a098f6347860c9cfdb9f1b7811ba",
     "name": "Loot Bags"
+  },
+  {
+    "address": "0:8510c7b1812e3676195a4604a628947bde79ae491732547ba63aee12fb6343f9",
+    "name": "GRM DEX"
   },
   {
     "address": "0:852443f8599fe6a5da34fe43049ac4e0beb3071bb2bfb56635ea9421287c283a",
@@ -2381,7 +2393,7 @@
   },
   {
     "address": "0:99fbb6a40b0fddbe5fd0e71cab896a825dd5ae6c83dbb8deda0d09735f8e696b",
-    "name": "ByBit 9"
+    "name": "Bybit 11"
   },
   {
     "address": "0:9a582c23266b8ea47eb71118a3c040d42b230b2266fecffe2d3cd390c0922c35",
@@ -2422,6 +2434,10 @@
   {
     "address": "0:9da3ec1a58079fa6d8b07bb3115a654bdf2c503a2f3593fc88ddce02eb267a19",
     "name": "Playbox"
+  },
+  {
+    "address": "0:9da971af38d2f03abdf308d5f91636a97e5a2b07a66c39d71d7cbae3b032eddc",
+    "name": "Tolya"
   },
   {
     "address": "0:9e4d224e3d73ff492bce8c82d8fa4ba2e1b187526b1af94ed35cfe038d400d4e",
@@ -2561,7 +2577,7 @@
   },
   {
     "address": "0:ae62a192da96e266161a702cc9f6de91c0c3441f17ceba51bc442dfb2031a30a",
-    "name": "ByBit 4"
+    "name": "Bybit 4"
   },
   {
     "address": "0:ae8d2c366caef744c50282061a06b3fbadc190a85e5d482344731a19f96f8266",
@@ -2797,7 +2813,7 @@
   },
   {
     "address": "0:c3f1da8ecda8f8cd42bace224ea3f1b6971eaa7f54c492d4d190527b4f573f7c",
-    "name": "ByBit 1"
+    "name": "Bybit 1"
   },
   {
     "address": "0:c3f99ec4f68ef9a820dc029bd797d21603e087db5ad2d88d4285b6aa041e37fa",
@@ -2901,7 +2917,7 @@
   },
   {
     "address": "0:cd525c15904d7b4027eae08b318624260f371ce8c9f4fcca0cdb7b583854107c",
-    "name": "ByBit 3"
+    "name": "Bybit 3"
   },
   {
     "address": "0:cd872fa7c5816052acdf5332260443faec9aacc8c21cca4d92e7f47034d11892",
@@ -3097,7 +3113,7 @@
   },
   {
     "address": "0:e33ef85d174eb457c072d1ee10215b69ab9b64192f7421302ab1c8e26b7ad4bd",
-    "name": "ByBit 6"
+    "name": "Bybit 6"
   },
   {
     "address": "0:e3b375a5f71ea17bec125d3a88f6483575ee909b16010eefed9b64fe9b0d64e5",
@@ -3105,7 +3121,7 @@
   },
   {
     "address": "0:e3ce05c4da977132c24a3b102da8b5fbf2ea9173337b49de346e4a4b057f7579",
-    "name": "ByBit 5"
+    "name": "Bybit 5"
   },
   {
     "address": "0:e49dcb89dbaecfcb71262f65c037b62c48d40c52ef2ef861ec5bd8d5963707f1",
@@ -3244,6 +3260,10 @@
     "name": "STON.fi DEX"
   },
   {
+    "address": "0:f0e5e2ebc4b9e4166c3641f49ac8972343890fd8a756e3649cde04a208a85acb",
+    "name": "Omniston Fee Vault"
+  },
+  {
     "address": "0:f0f44efb4627d8e5cf595f35c83b5f94f46f3e6d162bd765b540364c5fc08a29",
     "name": "TONAPI gas proxy"
   },
@@ -3277,7 +3297,7 @@
   },
   {
     "address": "0:f2dc1860686cd658987e2bed8216532d8c004460dadea907cc7d4ad7236c496b",
-    "name": "ByBit 10"
+    "name": "Bybit 9"
   },
   {
     "address": "0:f33f5a1e309236c21fd412b9d522e24a6a6ef3745c01f7ec7d731bc0f844c334",

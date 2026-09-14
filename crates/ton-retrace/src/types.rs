@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
+use ton_api::toncenter::v3;
 use tycho_types::cell::Cell;
 use tycho_types::models::{IntAddr, OutAction, StdAddr};
 
@@ -19,141 +19,9 @@ pub struct BaseTxInfo {
     pub hash: [u8; 32],
     /// Contract address that issued / owns the transaction.
     pub address: StdAddr,
+    /// Indexed shard-block locator used to load the header required for replay.
+    pub block: v3::BlockId,
 }
-
-// --- TON Center v3 API Types ---
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct TransactionData {
-    pub transactions: Vec<Transaction>,
-    pub address_book: HashMap<String, AddressBookEntry>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AddressBookEntry {
-    pub user_friendly: String,
-    pub domain: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct Transaction {
-    pub account: String,
-    pub hash: String,
-    pub lt: String,
-    pub now: u64,
-    pub mc_block_seqno: u64,
-    pub trace_id: String,
-    pub prev_trans_hash: String,
-    pub prev_trans_lt: String,
-    pub orig_status: String,
-    pub end_status: String,
-    pub total_fees: String,
-    pub total_fees_extra_currencies: HashMap<String, serde_json::Value>,
-    pub description: Description,
-    pub block_ref: BlockRef,
-    pub account_state_before: AccountState,
-    pub account_state_after: AccountState,
-    pub emulated: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct Description {
-    #[serde(rename = "type")]
-    pub desc_type: String,
-    pub aborted: bool,
-    pub destroyed: bool,
-    pub credit_first: bool,
-    pub storage_ph: Option<StoragePhase>,
-    pub credit_ph: Option<CreditPhase>,
-    pub compute_ph: Option<ComputePhase>,
-    pub action: Option<ActionPhase>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct StoragePhase {
-    pub storage_fees_collected: String,
-    pub status_change: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CreditPhase {
-    pub credit: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ComputePhase {
-    #[serde(default)]
-    pub skipped: Option<bool>,
-    #[serde(default)]
-    pub success: Option<bool>,
-    #[serde(default)]
-    pub msg_state_used: Option<bool>,
-    #[serde(default)]
-    pub account_activated: Option<bool>,
-    #[serde(default)]
-    pub gas_fees: Option<String>,
-    #[serde(default)]
-    pub gas_used: Option<String>,
-    #[serde(default)]
-    pub gas_limit: Option<String>,
-    #[serde(default)]
-    pub gas_credit: Option<String>,
-    #[serde(default)]
-    pub mode: Option<i32>,
-    #[serde(default)]
-    pub exit_code: Option<i32>,
-    #[serde(default)]
-    pub exit_arg: Option<i32>,
-    #[serde(default)]
-    pub vm_steps: Option<u32>,
-    #[serde(default)]
-    pub vm_init_state_hash: Option<String>,
-    #[serde(default)]
-    pub vm_final_state_hash: Option<String>,
-    #[serde(default)]
-    pub reason: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ActionPhase {
-    pub success: bool,
-    pub valid: bool,
-    pub no_funds: bool,
-    pub status_change: String,
-    pub result_code: i32,
-    pub tot_actions: i32,
-    pub spec_actions: i32,
-    pub skipped_actions: i32,
-    pub msgs_created: i32,
-    pub action_list_hash: String,
-    pub tot_msg_size: TotalMsgSize,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct TotalMsgSize {
-    pub cells: String,
-    pub bits: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct BlockRef {
-    pub workchain: i32,
-    pub shard: String,
-    pub seqno: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AccountState {
-    pub hash: String,
-    pub balance: Option<String>,
-    pub extra_currencies: Option<HashMap<String, serde_json::Value>>,
-    pub account_status: Option<String>,
-    pub frozen_hash: Option<String>,
-    pub data_hash: Option<String>,
-    pub code_hash: Option<String>,
-}
-
-// --- Retrace Internal Types ---
 
 /// Detailed information about the compute phase of a transaction.
 ///
@@ -196,7 +64,10 @@ pub enum ComputeInfo {
     },
 }
 
-/// Information about the incoming message that triggered the transaction.
+/// Contract address and incoming message details for a retraced transaction.
+///
+/// Tick-tock transactions have no incoming message: only `contract` is populated.
+/// The transaction kind is available in [`TraceEmulatedTx::raw`].
 ///
 /// # Example
 ///
@@ -206,9 +77,9 @@ pub enum ComputeInfo {
 /// ```
 #[derive(Debug, Clone)]
 pub struct TraceInMessage {
-    /// Sender address (None for external messages).
+    /// Sender address (None for external-in and tick-tock transactions).
     pub sender: Option<IntAddr>,
-    /// Contract address that received the message.
+    /// Address of the contract whose transaction was replayed.
     pub contract: IntAddr,
     /// Amount of nanograms sent with the message.
     pub amount: Option<u64>,
@@ -272,7 +143,7 @@ pub struct TraceMoneyResult {
 /// # Example
 ///
 /// ```ignore
-/// let result = retrace(Network::Mainnet, hash, libs).await?;
+/// let result = retrace(Network::Mainnet, hash, libs, &Default::default()).await?;
 /// if result.state_update_hash_ok {
 ///     println!("Deterministic replay verified!");
 /// }
@@ -285,165 +156,10 @@ pub struct TraceResult {
     pub code_cell: Option<Cell>,
     /// The code cell as stored in the account state (may be an exotic library cell).
     pub original_code_cell: Option<Cell>,
-    /// Information about the message that triggered this transaction.
+    /// Contract address and message details; tick-tock has no sender, amount or opcode.
     pub in_msg: TraceInMessage,
     /// Detailed breakdown of balances and fees.
     pub money: TraceMoneyResult,
     /// Full details of the emulated transaction execution results.
     pub emulated_tx: TraceEmulatedTx,
-}
-
-// --- Blocks API ---
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct BlocksResponse {
-    pub blocks: Vec<Block>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct Block {
-    pub after_merge: bool,
-    pub after_split: bool,
-    pub before_split: bool,
-    pub created_by: String,
-    pub end_lt: String,
-    pub file_hash: String,
-    pub flags: u32,
-    pub gen_catchain_seqno: u32,
-    pub gen_utime: String,
-    pub global_id: i32,
-    pub key_block: bool,
-    pub master_ref_seqno: Option<u32>,
-    pub masterchain_block_ref: BlockRef,
-    pub min_ref_mc_seqno: Option<u32>,
-    pub prev_blocks: Vec<BlockRef>,
-    pub prev_key_block_seqno: u32,
-    pub rand_seed: String,
-    pub root_hash: String,
-    pub seqno: u32,
-    pub shard: String,
-    pub start_lt: String,
-    pub tx_count: u32,
-    pub validator_list_hash_short: i64,
-    pub version: u32,
-    pub vert_seqno: u32,
-    pub vert_seqno_incr: bool,
-    pub want_merge: bool,
-    pub want_split: bool,
-    pub workchain: i32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ShardInfo {
-    pub workchain: i32,
-    pub shard: String,
-    pub seqno: u32,
-    pub transactions: Vec<BaseTxInfoShort>,
-    #[serde(rename = "fileHash")]
-    pub file_hash: String,
-    #[serde(rename = "rootHash")]
-    pub root_hash: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct BaseTxInfoShort {
-    pub lt: String,
-    pub hash: String,
-    pub account: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct BlockInfo {
-    pub shards: Vec<ShardInfo>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RawTransaction {
-    pub block: RawTransactionBlock,
-    pub tx: tycho_types::models::Transaction,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RawTransactionBlock {
-    pub workchain: i32,
-    pub seqno: u32,
-    pub shard: String,
-    #[serde(rename = "rootHash")]
-    pub root_hash: String,
-    #[serde(rename = "fileHash")]
-    pub file_hash: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct TransactionTransactionsResponse {
-    pub blocks: Vec<RawTransactionBlock>,
-    pub boc: String,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn deserializes_toncenter_v3_transaction_with_skipped_compute_phase() {
-        let value = serde_json::json!({
-            "transactions": [{
-                "account": "0:F7E97472D4849F481F339A5490281B1AE5B99E8B1016C03EAF51484E5D7BABF1",
-                "hash": "6BOT/kLF43JNLlC5hACgFtni2TjHC9s2Beaig0EDe0w=",
-                "lt": "66023973000007",
-                "now": 1777378799,
-                "mc_block_seqno": 123,
-                "trace_id": "HVJuGGDRxhB6vGFpyLDfa7o0qlHIrSd3RRuLYG5falo=",
-                "prev_trans_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-                "prev_trans_lt": "0",
-                "orig_status": "active",
-                "end_status": "active",
-                "total_fees": "0",
-                "total_fees_extra_currencies": {},
-                "description": {
-                    "type": "ord",
-                    "aborted": true,
-                    "destroyed": false,
-                    "credit_first": true,
-                    "storage_ph": {
-                        "storage_fees_collected": "0",
-                        "status_change": "unchanged"
-                    },
-                    "credit_ph": {
-                        "credit": "1"
-                    },
-                    "compute_ph": {
-                        "skipped": true,
-                        "reason": "no_gas"
-                    }
-                },
-                "block_ref": {
-                    "workchain": 0,
-                    "shard": "-9223372036854775808",
-                    "seqno": 1
-                },
-                "account_state_before": {
-                    "hash": "before"
-                },
-                "account_state_after": {
-                    "hash": "after"
-                },
-                "emulated": false
-            }],
-            "address_book": {}
-        });
-
-        let data: TransactionData = serde_json::from_value(value)
-            .expect("skipped compute phase response should deserialize");
-        let compute = data.transactions[0]
-            .description
-            .compute_ph
-            .as_ref()
-            .expect("compute phase should be present");
-
-        assert_eq!(compute.skipped, Some(true));
-        assert_eq!(compute.reason.as_deref(), Some("no_gas"));
-        assert_eq!(compute.success, None);
-        assert_eq!(compute.exit_code, None);
-    }
 }

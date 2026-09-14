@@ -7,14 +7,16 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./jettons.json": "./src/jettons.json",
     "./mainnet.json": "./src/mainnet.json",
     "./testnet.json": "./src/testnet.json"
   },
   "scripts": {
     "fmt": "biome format --write .",
     "fmt:check": "biome format .",
-    "generate": "bun run generate:base && bun run generate:networks",
+    "generate": "bun run generate:base && bun run generate:jettons && bun run generate:networks",
     "generate:base": "bun scripts/generate-base.ts",
+    "generate:jettons": "bun scripts/generate-jettons.ts",
     "generate:networks": "bun scripts/generate-networks.ts",
     "lint": "biome check --formatter-enabled=false .",
     "lint:fix": "biome check --formatter-enabled=false --write .",

@@ -225,6 +225,47 @@ fn test_check_mutable_variable_can_be_immutable_with_call_of_mutable_method() {
 
 #[test]
 #[named]
+fn test_check_mutable_variable_with_generic_mutating_receiver() {
+    run_simple_test(
+        "mutable_variable_can_be_immutable",
+        r#"
+            type Slice<T> = slice
+
+            @inline
+            fun Slice<T>.load(self): T {
+                var this = self;
+                return this.loadAny<T>();
+            }
+
+            fun main(): int {
+                return ("0001".hexToSlice() as Slice<uint16>).load();
+            }
+        "#,
+        function_name!(),
+    );
+}
+
+#[test]
+#[named]
+fn test_check_mutable_variable_with_generic_immutable_receiver() {
+    run_simple_test(
+        "mutable_variable_can_be_immutable",
+        r#"
+            fun slice.peek<T>(self): T {
+                return T.fromSlice(self);
+            }
+
+            fun main(): int {
+                var cs = "0001".hexToSlice();
+                return cs.peek<uint16>();
+            }
+        "#,
+        function_name!(),
+    );
+}
+
+#[test]
+#[named]
 fn test_check_mutable_variable_can_be_immutable_with_call_of_unresolved_method() {
     let name = function_name!();
     let project = ProjectBuilder::new(name)

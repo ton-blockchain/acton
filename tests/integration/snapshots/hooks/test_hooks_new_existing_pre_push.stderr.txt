@@ -1,0 +1,1 @@
+Error: Found existing hook at [ROOT]/.githooks/pre-push. Delete it before running `acton hooks new`.

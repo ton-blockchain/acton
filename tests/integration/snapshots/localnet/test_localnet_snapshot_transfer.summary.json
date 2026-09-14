@@ -1,0 +1,25 @@
+{
+  "export": {
+    "ok": true,
+    "seqno": 1,
+    "state_head_seqno": 1
+  },
+  "import": {
+    "balance_unchanged": true,
+    "new_id": true,
+    "ok": true,
+    "seqno_unchanged": true
+  },
+  "mutate": {
+    "balance": "1000000000",
+    "fund_ok": true,
+    "later_snapshot_saved": true,
+    "seqno": 2
+  },
+  "restore": {
+    "balance": "1000000000000000000",
+    "ok": true,
+    "saved_snapshot_count": 3,
+    "seqno": 1
+  }
+}

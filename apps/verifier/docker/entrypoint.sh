@@ -103,7 +103,12 @@ write_generated_config() {
         printf '[compiler]\n'
         write_optional_string node_bin "${VERIFIER_COMPILER_NODE_BIN:-node}"
         write_optional_string worker_path "${VERIFIER_COMPILER_WORKER_PATH:-/app/compiler-worker/compile.mjs}"
-        write_optional_int timeout_ms "${VERIFIER_COMPILER_TIMEOUT_MS:-5000}"
+        write_optional_int timeout_ms "${VERIFIER_COMPILER_TIMEOUT_MS:-10000}"
+        write_optional_int max_concurrent_compilations "${VERIFIER_COMPILER_MAX_CONCURRENT_COMPILATIONS:-1}"
+        printf '\n'
+
+        printf '[upload_limits]\n'
+        write_optional_int max_request_bytes "${VERIFIER_UPLOAD_MAX_REQUEST_BYTES:-524288}"
     } > "$config_path"
 }
 

@@ -1,16 +1,15 @@
 ---
 title: "Snapshots and Settings"
-description: "Save and restore Full localnet state, inspect environment configuration, tune supported runtime behavior, and delete environments"
+description: "Save and restore localnet state, inspect environment configuration, tune supported runtime behavior, and delete environments"
 ---
 
 Managed environments expose configuration and lifecycle controls through the settings icon at the
-bottom of the environment sidebar. Full localnet additionally exposes cold snapshots for returning
-the validator and indexer stack to a known state.
+bottom of the environment sidebar. Both Simulated and Full localnet have a **Snapshots** page
+for returning the environment to a known state.
 
 ## Full localnet snapshots
 
-Open **Snapshots** and select **Create snapshot**. Enter a name that describes the scenario or
-checkpoint, then confirm creation.
+Open **Snapshots** and select **Create snapshot**. Enter a name that describes the scenario, then confirm creation.
 
 <figure className="theme-image my-6">
   <img
@@ -54,8 +53,21 @@ that they are ready.
 Select the delete action in the row and confirm. This removes the saved archive, not the current
 running state.
 
-Snapshots can be large. Delete checkpoints that are no longer needed and keep enough disk space for
+Snapshots can be large. Delete snapshots that are no longer needed and keep enough disk space for
 both the compressed archive and working state during creation or restore.
+
+## Simulated localnet snapshots
+
+Open **Snapshots** to create a named snapshot of accounts, block and transaction history,
+registered metadata, pending messages, and virtual time. Each snapshot is a JSON file
+that survives node and Studio restarts. Creation and restore keep a running node online.
+
+Use **Import snapshot** to add a saved JSON file without changing the environment.
+The download action exports the selected saved snapshot. Restore is a separate action.
+
+The inventory remains available when the environment is stopped. A snapshot made while
+stopped contains the persisted chain state; capture a running node to include pending
+messages and virtual time. Restoring a stopped environment starts it.
 
 ## General settings
 
@@ -75,7 +87,6 @@ For a Simulated localnet it also shows:
 
 - assigned runtime port
 - clean or forked initial state and selected block
-- startup accounts
 - current response delay and rate limit
 
 For a Full localnet it shows the validator count and the V2, V3, Admin, and Config endpoints that are
@@ -90,7 +101,7 @@ scenario needs a different startup rate configuration.
 Mining settings appear only for a running Simulated localnet:
 
 - whether automatic mining is enabled
-- automatic block interval
+- automatic block time
 - whether empty blocks are created
 
 Toggle **Mine empty blocks** when time and block progression must continue without pending messages.

@@ -19,8 +19,8 @@
   },
   "overrides": {
     "minimatch": "10.2.5",
-    "postcss": "8.5.18",
-    "sharp": "0.35.3"
+    "postcss": "8.5.23",
+    "sharp": "0.35.4"
   },
   "dependencies": {
     "@orama/orama": "^3.1.18",
@@ -37,7 +37,7 @@
     "json-schema-typed": "^8.0.2",
     "lucide-react": "^0.555.0",
     "mermaid": "^11.15.0",
-    "next": "16.2.12",
+    "next": "16.3.3",
     "ogl": "^1.0.11",
     "react": "19.2.0",
     "react-dom": "19.2.0",

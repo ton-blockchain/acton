@@ -112,7 +112,7 @@ fn openapi_documents_config_and_admin_routes() {
         "/localhost.global.config.json",
         "/config",
         "/faucet",
-        "/live",
+        "/livez",
         "/healthz",
     ] {
         assert!(

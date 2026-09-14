@@ -1,11 +1,14 @@
-use std::sync::Arc;
+use std::{future::Future, sync::Arc};
 
 use thiserror::Error;
+use tokio::task::JoinHandle;
+use tokio_util::task::TaskTracker;
+use tracing::instrument::WithSubscriber;
 
 use crate::{
     blockchain::{BlockchainClient, ToncenterClient},
     compilers::{CompilerService, NodeCompilerService},
-    config::Config,
+    config::{Config, DEFAULT_MAX_REQUEST_BYTES},
     payment::{OnchainPaymentVerifier, PaymentError, PaymentVerifier},
     registry::{SourceVerificationRegistry, VerificationRegistry},
     registry_index::{SqliteVerificationIndex, VerificationIndexError},
@@ -20,6 +23,8 @@ pub struct AppState {
     verification_registry: Arc<dyn VerificationRegistry>,
     verification_service: VerificationService,
     payment_verifier: Arc<dyn PaymentVerifier>,
+    max_request_bytes: usize,
+    background_tasks: TaskTracker,
 }
 
 impl AppState {
@@ -44,7 +49,8 @@ impl AppState {
             verification_registry,
             payment_verifier,
         )
-        .with_api_key(config.api_key()))
+        .with_api_key(config.api_key())
+        .with_max_request_bytes(config.max_request_bytes()))
     }
 
     #[must_use]
@@ -60,6 +66,8 @@ impl AppState {
             verification_registry,
             verification_service: VerificationService::new(blockchain_client),
             payment_verifier,
+            max_request_bytes: DEFAULT_MAX_REQUEST_BYTES,
+            background_tasks: TaskTracker::new(),
         }
     }
 
@@ -67,6 +75,17 @@ impl AppState {
     pub fn with_api_key(mut self, api_key: Option<&str>) -> Self {
         self.api_key = api_key.map(ToOwned::to_owned);
         self
+    }
+
+    #[must_use]
+    pub const fn with_max_request_bytes(mut self, max_request_bytes: usize) -> Self {
+        self.max_request_bytes = max_request_bytes;
+        self
+    }
+
+    #[must_use]
+    pub const fn max_request_bytes(&self) -> usize {
+        self.max_request_bytes
     }
 
     #[must_use]
@@ -112,9 +131,40 @@ impl AppState {
     /// # Errors
     ///
     /// Returns an error when blockchain history or the payment ledger is unavailable.
-    pub async fn recover_payment_history(&self) -> Result<(), StateError> {
-        self.payment_verifier.recover().await?;
+    pub async fn recover_payment_history(
+        &self,
+        published_transaction_hashes: &[String],
+    ) -> Result<(), StateError> {
+        self.payment_verifier
+            .recover(published_transaction_hashes)
+            .await?;
         Ok(())
+    }
+
+    /// Returns payments referenced by source bundles in the current Git revision.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the registry index is unavailable.
+    pub async fn published_payment_transaction_hashes(&self) -> Result<Vec<String>, StateError> {
+        Ok(self
+            .verification_registry
+            .payment_transaction_hashes()
+            .await?)
+    }
+
+    pub(crate) fn spawn_background_task<F>(&self, task: F) -> JoinHandle<F::Output>
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        self.background_tasks.spawn(task.with_current_subscriber())
+    }
+
+    /// Closes the tracker and waits for background verification tasks to finish.
+    pub async fn wait_for_background_tasks(&self) {
+        self.background_tasks.close();
+        self.background_tasks.wait().await;
     }
 }
 

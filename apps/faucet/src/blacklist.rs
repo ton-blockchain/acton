@@ -3,6 +3,7 @@ use sqlx::{QueryBuilder, Row, Sqlite, SqlitePool};
 
 static STATIC_BLACKLIST_SUBJECTS: &[&str] =
     &["wallet:0:ff3b559e33e89c318f092281b383248443c8afbe84a9812a20954b1ab9ae98"];
+const STATIC_BLACKLIST_REASON: &str = "address is unavailable";
 
 #[derive(Clone)]
 pub(crate) struct BlacklistStore {
@@ -11,9 +12,25 @@ pub(crate) struct BlacklistStore {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct BlacklistMatch {
+    pub(crate) source: BlacklistSource,
     pub(crate) subject: String,
     pub(crate) reason: String,
     pub(crate) expires_at: Option<i64>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum BlacklistSource {
+    Static,
+    Database,
+}
+
+impl BlacklistSource {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Static => "static",
+            Self::Database => "database",
+        }
+    }
 }
 
 impl BlacklistStore {
@@ -85,10 +102,46 @@ impl BlacklistStore {
         };
 
         Ok(Some(BlacklistMatch {
+            source: BlacklistSource::Database,
             subject: row.try_get("subject")?,
             reason: row.try_get("reason")?,
             expires_at: row.try_get("expires_at")?,
         }))
+    }
+
+    pub(crate) async fn active_entries(&self) -> anyhow::Result<Vec<BlacklistMatch>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT subject, reason, expires_at
+            FROM antifraud_blacklist
+            WHERE expires_at IS NULL OR expires_at > unixepoch()
+            ORDER BY created_at ASC, subject ASC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to list active antifraud blacklist entries")?;
+
+        let mut entries = STATIC_BLACKLIST_SUBJECTS
+            .iter()
+            .map(|subject| BlacklistMatch {
+                source: BlacklistSource::Static,
+                subject: (*subject).to_string(),
+                reason: STATIC_BLACKLIST_REASON.to_string(),
+                expires_at: None,
+            })
+            .collect::<Vec<_>>();
+
+        for row in rows {
+            entries.push(BlacklistMatch {
+                source: BlacklistSource::Database,
+                subject: row.try_get("subject")?,
+                reason: row.try_get("reason")?,
+                expires_at: row.try_get("expires_at")?,
+            });
+        }
+
+        Ok(entries)
     }
 }
 
@@ -97,8 +150,9 @@ fn static_blacklist_match(subjects: &[&str], blacklist: &[&str]) -> Option<Black
         .iter()
         .find(|subject| blacklist.contains(subject))?;
     Some(BlacklistMatch {
+        source: BlacklistSource::Static,
         subject: (*subject).to_string(),
-        reason: "address is unavailable".to_string(),
+        reason: STATIC_BLACKLIST_REASON.to_string(),
         expires_at: None,
     })
 }
@@ -108,7 +162,8 @@ mod tests {
     use sqlx::sqlite::SqlitePoolOptions;
 
     use super::{
-        BlacklistMatch, BlacklistStore, STATIC_BLACKLIST_SUBJECTS, static_blacklist_match,
+        BlacklistMatch, BlacklistSource, BlacklistStore, STATIC_BLACKLIST_REASON,
+        STATIC_BLACKLIST_SUBJECTS, static_blacklist_match,
     };
 
     async fn store() -> BlacklistStore {
@@ -129,8 +184,9 @@ mod tests {
                 STATIC_BLACKLIST_SUBJECTS,
             ),
             Some(BlacklistMatch {
+                source: BlacklistSource::Static,
                 subject: blacklisted_wallet.to_string(),
-                reason: "address is unavailable".to_string(),
+                reason: STATIC_BLACKLIST_REASON.to_string(),
                 expires_at: None,
             })
         );
@@ -156,6 +212,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(entry.subject, "device-uid:test");
+        assert_eq!(entry.source, BlacklistSource::Database);
         assert_eq!(entry.reason, "automated abuse");
         assert_eq!(entry.expires_at, None);
     }
@@ -174,5 +231,48 @@ mod tests {
         .unwrap();
 
         assert_eq!(store.check(&["client-ip:192.0.2.1"]).await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn lists_static_and_active_database_entries() {
+        let store = store().await;
+        sqlx::query(
+            r#"
+            INSERT INTO antifraud_blacklist (subject, reason, expires_at)
+            VALUES
+                ('device-uid:active', 'automated abuse', NULL),
+                ('client-ip:192.0.2.1', 'temporary abuse', unixepoch() + 60),
+                ('client-ip:192.0.2.2', 'expired abuse', unixepoch() - 1)
+            "#,
+        )
+        .execute(&store.pool)
+        .await
+        .unwrap();
+
+        let entries = store.active_entries().await.unwrap();
+
+        assert_eq!(entries.len(), 3);
+        assert_eq!(
+            entries[0],
+            BlacklistMatch {
+                source: BlacklistSource::Static,
+                subject: STATIC_BLACKLIST_SUBJECTS[0].to_string(),
+                reason: STATIC_BLACKLIST_REASON.to_string(),
+                expires_at: None,
+            }
+        );
+        assert_eq!(entries[1].source, BlacklistSource::Database);
+        assert_eq!(entries[1].subject, "client-ip:192.0.2.1");
+        assert_eq!(entries[1].reason, "temporary abuse");
+        assert!(entries[1].expires_at.is_some());
+        assert_eq!(
+            entries[2],
+            BlacklistMatch {
+                source: BlacklistSource::Database,
+                subject: "device-uid:active".to_string(),
+                reason: "automated abuse".to_string(),
+                expires_at: None,
+            }
+        );
     }
 }

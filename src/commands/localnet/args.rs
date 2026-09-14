@@ -25,7 +25,8 @@ pub struct LocalnetArgs {
 /// stopping a network always preserves its blockchain and snapshot volumes.
 #[derive(Subcommand)]
 pub enum LocalnetCommand {
-    #[command(about = "Run the localnet HTTP service in the foreground")]
+    // Process launchers use this entry point; users manage the network through start/stop.
+    #[command(hide = true, about = "Run the localnet HTTP service in the foreground")]
     Serve {
         network: Option<String>,
 
@@ -143,6 +144,14 @@ pub struct CreateOptions {
         help = "JSON file containing an array of hexadecimal ShardAccount BoCs"
     )]
     pub accounts_file: Option<PathBuf>,
+
+    #[arg(
+        long,
+        value_delimiter = ',',
+        help = "Project wallets to initialize and fund with 100 GRAM (default: [localnet].accounts)",
+        value_name = "NAME[,NAME...]"
+    )]
+    pub accounts: Option<Vec<String>>,
 }
 
 /// Topology mutations follow the network's normal TON election lifecycle.

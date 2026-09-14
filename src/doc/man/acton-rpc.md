@@ -34,10 +34,10 @@ The command works without a project manifest for raw remote inspection.
 When Acton can resolve a local project and finds a contract with the same
 compiled `code_hash`, it also prints the matched contract name and decodes the
 account storage using the local compiler ABI. If no local match exists, Acton
-falls back to the bundled ABI catalog and then the Acton verifier API.
+falls back to the bundled ABI catalog and then the TON verifier API.
 Successful verifier ABI responses are cached in `build/cache/verifier-abi` for
 24 hours. If the verifier is unavailable, an expired cache entry is still used
-when available. Set `ACTON_NEW_VERIFY_BACKEND` to override the verifier backend,
+when available. Set `ACTON_VERIFY_BACKEND` to override the verifier backend,
 for example when running the verifier locally.
 
 ## Subcommands

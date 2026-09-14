@@ -86,7 +86,6 @@ interface CollectiblePreview {
   readonly image?: string
   readonly imageSources?: readonly string[]
   readonly blurred?: boolean
-  readonly collectionName?: string
   readonly name?: string
 }
 
@@ -632,7 +631,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                                     alt={item.name || "NFT"}
                                     className={styles.collectibleThumbImage}
                                     blurredClassName={styles.blurredImage}
-                                    collectionName={item.collectionName}
                                     blurred={item.blurred}
                                   />
                                 </span>

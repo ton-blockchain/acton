@@ -1,15 +1,13 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     path::{Component, Path},
+    time::Instant,
 };
 
 use axum::{
     Json,
     body::Bytes,
-    extract::{
-        Multipart as MultipartExtractor, State,
-        multipart::{Field, Multipart},
-    },
+    extract::{Multipart as MultipartExtractor, State, multipart::Multipart},
     http::HeaderMap,
     response::IntoResponse,
 };
@@ -18,8 +16,10 @@ use serde_json::{Value, json};
 use utoipa::ToSchema;
 
 use crate::{
-    blockchain::{is_valid_code_hash, is_valid_hash, normalize_code_hash, normalize_hash},
-    compilers::{CompileGeneratedSource, CompileRequest, CompileSource},
+    blockchain::{is_valid_hash, normalize_code_hash, normalize_hash},
+    compilers::{
+        CompileGeneratedSource, CompileOutput, CompileRequest, CompileSource, CompilerError,
+    },
     error::ApiError,
     payment::PaymentAttemptOutcome,
     registry::VerifiedBundleRequest,
@@ -33,8 +33,13 @@ use crate::{
 };
 
 mod languages;
+mod upload_limits;
+
+use super::validation;
 
 const API_KEY_HEADER: &str = "x-verifier-key";
+const ALLOWED_SOURCE_PATH_PUNCTUATION: [u8; 6] = *b"/._-@+";
+const MAX_SOURCE_DIRECTORY_DEPTH: usize = 16;
 const MAX_SOURCE_PATH_CHARS: usize = 128;
 
 #[utoipa::path(
@@ -53,6 +58,7 @@ const MAX_SOURCE_PATH_CHARS: usize = 128;
         (status = 402, description = "Payment is missing or invalid", body = crate::error::ErrorResponse),
         (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
         (status = 409, description = "Payment is already used or in progress", body = crate::error::ErrorResponse),
+        (status = 413, description = "The request exceeds the configured upload limit", body = crate::error::ErrorResponse),
         (status = 502, description = "Compiler, blockchain, payment provider, or source storage failure", body = crate::error::ErrorResponse),
         (status = 503, description = "Payment history recovery is in progress", body = crate::error::ErrorResponse)
     ),
@@ -82,51 +88,35 @@ async fn handle_multipart(
     let mut verified_at = None;
     let mut tx_hash = None;
     let mut files = Vec::new();
+    let mut seen_fields = BTreeSet::new();
 
-    while let Some(field) = multipart
-        .next_field()
-        .await
-        .map_err(|err| ApiError::bad_request(err.to_string()))?
-    {
+    while let Some(field) = multipart.next_field().await.map_err(ApiError::from)? {
+        if let Some(name) = field.name()
+            && name != "files"
+            && !seen_fields.insert(name.to_owned())
+        {
+            return Err(ApiError::bad_request(format!(
+                "duplicate multipart field: {name}"
+            )));
+        }
         match field.name() {
             Some("address") => {
-                address = Some(
-                    field
-                        .text()
-                        .await
-                        .map_err(|err| ApiError::bad_request(err.to_string()))?,
-                );
+                address = Some(field.text().await.map_err(ApiError::from)?);
             }
             Some("code_hash") => {
-                code_hash = Some(
-                    field
-                        .text()
-                        .await
-                        .map_err(|err| ApiError::bad_request(err.to_string()))?,
-                );
+                code_hash = Some(field.text().await.map_err(ApiError::from)?);
             }
             Some("language") => {
-                language = Some(
-                    field
-                        .text()
-                        .await
-                        .map_err(|err| ApiError::bad_request(err.to_string()))?,
-                );
+                language = Some(field.text().await.map_err(ApiError::from)?);
             }
             Some("compile_params") => {
-                let raw_params = field
-                    .text()
-                    .await
-                    .map_err(|err| ApiError::bad_request(err.to_string()))?;
+                let raw_params = field.text().await.map_err(ApiError::from)?;
                 compile_params = serde_json::from_str(&raw_params).map_err(|err| {
                     ApiError::bad_request(format!("invalid compile_params JSON: {err}"))
                 })?;
             }
             Some("sources") => {
-                let raw_sources = field
-                    .text()
-                    .await
-                    .map_err(|err| ApiError::bad_request(err.to_string()))?;
+                let raw_sources = field.text().await.map_err(ApiError::from)?;
                 sources = Some(
                     serde_json::from_str::<Vec<SourceMetadata>>(&raw_sources).map_err(|err| {
                         ApiError::bad_request(format!("invalid sources JSON: {err}"))
@@ -134,25 +124,18 @@ async fn handle_multipart(
                 );
             }
             Some("verified_at") => {
-                let value = field
-                    .text()
-                    .await
-                    .map_err(|err| ApiError::bad_request(err.to_string()))?;
+                let value = field.text().await.map_err(ApiError::from)?;
                 let verified_at_millis = value
                     .parse::<u64>()
                     .map_err(|err| ApiError::bad_request(format!("invalid verified_at: {err}")))?;
                 verified_at = Some(verified_at_millis / 1_000);
             }
             Some("tx_hash") => {
-                tx_hash = Some(
-                    field
-                        .text()
-                        .await
-                        .map_err(|err| ApiError::bad_request(err.to_string()))?,
-                );
+                tx_hash = Some(field.text().await.map_err(ApiError::from)?);
             }
             Some("files") => {
-                files.push(read_file_part(field).await?);
+                upload_limits::ensure_file_slot(files.len())?;
+                files.push(upload_limits::read_file_part(field).await?);
             }
             _ => {}
         }
@@ -169,18 +152,8 @@ async fn handle_multipart(
         ));
     }
 
-    let code_hash = match non_empty_text(code_hash) {
-        Some(code_hash) => {
-            let code_hash = normalize_code_hash(code_hash.trim());
-            if !is_valid_code_hash(&code_hash) {
-                return Err(ApiError::bad_request(
-                    "code_hash must contain exactly 64 hexadecimal characters".to_owned(),
-                ));
-            }
-            Some(code_hash)
-        }
-        None => None,
-    };
+    let address = validation::optional_address(address)?;
+    let code_hash = validation::optional_code_hash(code_hash)?;
 
     let language = language
         .filter(|value| !value.trim().is_empty())
@@ -191,10 +164,7 @@ async fn handle_multipart(
         ));
     }
 
-    let target = VerificationTarget {
-        address: non_empty_text(address),
-        code_hash,
-    };
+    let target = VerificationTarget { address, code_hash };
 
     let resolved_target = state.verification_service().resolve_target(target).await?;
     if let Some(bundle) = state
@@ -238,28 +208,55 @@ async fn handle_multipart(
         .as_ref()
         .map(|claim| claim.transaction_hash.clone());
 
-    let result = verify_unverified(
-        state,
-        resolved_target,
-        language,
-        compile_params,
-        sources,
-        files,
-        verified_at,
-        payment_tx_hash,
-    )
-    .await;
+    let task_state = state.clone();
+    let task = state.spawn_background_task(async move {
+        let started = Instant::now();
+        let target_hash = resolved_target.code_hash.clone();
+        tracing::info!(
+            operation = "verify",
+            target = %target_hash,
+            outcome = "started",
+            "verification started"
+        );
+        let result = verify_unverified(
+            &task_state,
+            resolved_target,
+            language,
+            compile_params,
+            sources,
+            files,
+            verified_at,
+            payment_tx_hash,
+        )
+        .await;
 
-    if let Some(claim) = payment_claim {
-        let outcome = if result.as_ref().is_err_and(ApiError::is_payment_retryable) {
-            PaymentAttemptOutcome::Retryable
+        let result = if let Some(claim) = payment_claim {
+            let outcome = if result.as_ref().is_err_and(ApiError::is_payment_retryable) {
+                PaymentAttemptOutcome::Retryable
+            } else {
+                PaymentAttemptOutcome::Consumed
+            };
+            match task_state.payment_verifier().finish(&claim, outcome) {
+                Ok(()) => result,
+                Err(error) => Err(ApiError::from(error)),
+            }
         } else {
-            PaymentAttemptOutcome::Consumed
+            result
         };
-        state.payment_verifier().finish(&claim, outcome)?;
-    }
 
-    result
+        tracing::info!(
+            operation = "verify",
+            target = %target_hash,
+            duration_ms = started.elapsed().as_millis(),
+            outcome = if result.is_ok() { "completed" } else { "failed" },
+            "verification finished"
+        );
+
+        result
+    });
+
+    task.await
+        .map_err(|error| ApiError::internal(format!("verification task failed: {error}")))?
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -273,36 +270,33 @@ async fn verify_unverified(
     verified_at: Option<u64>,
     payment_tx_hash: Option<String>,
 ) -> Result<Json<VerifyResponse>, ApiError> {
-    let compile_input = prepare_compile_input(&language, &compile_params, sources, files)?;
-    let compiled = state
-        .compiler_service()
-        .compile(CompileRequest {
-            language: compile_input.language.clone(),
-            compiler_version: compile_input.compiler_version.clone(),
-            entrypoint: compile_input.entrypoint.clone(),
-            import_mappings: compile_input.import_mappings.clone(),
-            compile_params: compile_params.clone(),
-            sources: compile_input.compile_sources,
-        })
-        .await?;
+    let CompileInput {
+        configuration,
+        sources: mut retained_sources,
+    } = prepare_compile_input(&language, &compile_params, sources, files)?;
+    let compiled = run_compiler(
+        state,
+        &configuration,
+        &compile_params,
+        retained_sources.clone(),
+    )
+    .await?;
     let compiled_code_hash = normalize_code_hash(&compiled.code_hash);
-    let compiled_source_map_data = compiled.source_map.clone();
     let mut verification_result =
         VerificationResult::from_hashes(&resolved_target.code_hash, &compiled_code_hash);
     let (source_bundle_hash, storage_revision) = match verification_result {
         VerificationResult::Match => {
-            let mut stored_sources = compile_input.sources.clone();
-            let mut storage_files = compile_input.storage_files.clone();
-            merge_generated_sources(
-                &mut stored_sources,
-                &mut storage_files,
-                compiled.generated_sources,
-            )?;
+            if let Some(used_source_paths) = compiled.used_source_paths.clone() {
+                retained_sources = select_used_sources(&retained_sources, &used_source_paths)?;
+            }
+
+            let mut storage_files = storage_files_from_sources(&retained_sources);
+            merge_generated_sources(&mut storage_files, compiled.generated_sources)?;
             let source_bundle_hash = compute_source_bundle_hash(SourceBundleInput {
                 compiler: SourceBundleCompiler {
-                    language: &compile_input.language,
-                    version: &compile_input.compiler_version,
-                    entrypoint: &compile_input.entrypoint,
+                    language: &configuration.language,
+                    version: &configuration.compiler_version,
+                    entrypoint: &configuration.entrypoint,
                     params: &compile_params,
                 },
                 sources: storage_files
@@ -325,13 +319,13 @@ async fn verify_unverified(
                     payment_tx_hash,
                     verified_at,
                     compiler: CompilerMetadata {
-                        language: compile_input.language.clone(),
-                        version: compile_input.compiler_version.clone(),
-                        entrypoint: compile_input.entrypoint.clone(),
+                        language: configuration.language.clone(),
+                        version: configuration.compiler_version.clone(),
+                        entrypoint: configuration.entrypoint.clone(),
                         params: compile_params.clone(),
                     },
                     files: storage_files,
-                    source_map: compiled_source_map_data,
+                    source_map: compiled.source_map,
                 })
                 .await?;
             if !stored.storage.created {
@@ -348,14 +342,14 @@ async fn verify_unverified(
         }
     };
 
-    print_verify_request(
-        &resolved_target,
-        &compile_input.language,
-        &compile_params,
-        &compile_input.sources,
-        &compiled_code_hash,
-        source_bundle_hash.as_deref(),
-        verification_result,
+    tracing::info!(
+        operation = "verify",
+        target = %resolved_target.code_hash,
+        language = %configuration.language,
+        compiled_code_hash = %compiled_code_hash,
+        source_bundle_hash,
+        outcome = %verification_result,
+        "verification result"
     );
 
     Ok(Json(VerifyResponse {
@@ -367,18 +361,88 @@ async fn verify_unverified(
     }))
 }
 
-fn non_empty_text(value: Option<String>) -> Option<String> {
-    value.filter(|value| !value.trim().is_empty())
+async fn run_compiler(
+    state: &AppState,
+    configuration: &CompileConfiguration,
+    compile_params: &Value,
+    sources: Vec<CompileSource>,
+) -> Result<CompileOutput, CompilerError> {
+    state
+        .compiler_service()
+        .compile(CompileRequest {
+            language: configuration.language.clone(),
+            compiler_version: configuration.compiler_version.clone(),
+            entrypoint: configuration.entrypoint.clone(),
+            import_mappings: configuration.import_mappings.clone(),
+            compile_params: compile_params.clone(),
+            sources,
+        })
+        .await
 }
 
-async fn read_file_part(field: Field<'_>) -> Result<ReceivedFile, ApiError> {
-    let file_name = field.file_name().map(ToOwned::to_owned);
-    let content = field
-        .bytes()
-        .await
-        .map_err(|err| ApiError::bad_request(err.to_string()))?;
+fn select_used_sources(
+    sources: &[CompileSource],
+    used_source_paths: &[String],
+) -> Result<Vec<CompileSource>, CompilerError> {
+    if used_source_paths.is_empty() {
+        return Err(CompilerError::InvalidOutput(
+            "used_source_paths must contain at least one source".to_owned(),
+        ));
+    }
+    if used_source_paths
+        .windows(2)
+        .any(|paths| paths[0] >= paths[1])
+    {
+        return Err(CompilerError::InvalidOutput(
+            "used_source_paths must be sorted and duplicate-free".to_owned(),
+        ));
+    }
 
-    Ok(ReceivedFile { file_name, content })
+    let available_paths = sources
+        .iter()
+        .map(|source| source.path.as_str())
+        .collect::<BTreeSet<_>>();
+    for path in used_source_paths {
+        if !available_paths.contains(path.as_str()) {
+            return Err(CompilerError::InvalidOutput(format!(
+                "used_source_paths contains a path absent from the compiler request: {path}"
+            )));
+        }
+    }
+
+    let used_paths = used_source_paths
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let selected = sources
+        .iter()
+        .filter(|source| used_paths.contains(source.path.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    if selected.len() != used_source_paths.len() {
+        return Err(CompilerError::InvalidOutput(
+            "used_source_paths could not be mapped to compiler sources".to_owned(),
+        ));
+    }
+
+    Ok(selected)
+}
+
+fn storage_files_from_sources(sources: &[CompileSource]) -> Vec<SourceStorageFile> {
+    sources
+        .iter()
+        .map(|source| SourceStorageFile {
+            path: source.path.clone(),
+            content: source.content.clone(),
+            include_in_command: source.include_in_command,
+            is_stdlib: source.is_stdlib,
+            has_include_directives: source.has_include_directives,
+        })
+        .collect()
+}
+
+fn non_empty_text(value: Option<String>) -> Option<String> {
+    value.filter(|value| !value.trim().is_empty())
 }
 
 fn prepare_compile_input(
@@ -397,25 +461,15 @@ fn prepare_compile_input(
     let import_mappings = language_input.import_mappings;
     validate_import_mappings(&import_mappings)?;
     let compile_sources = build_compile_sources(&sources, files)?;
-    let storage_files = compile_sources
-        .iter()
-        .map(|source| SourceStorageFile {
-            path: source.path.clone(),
-            content: source.content.clone(),
-            include_in_command: source.include_in_command,
-            is_stdlib: source.is_stdlib,
-            has_include_directives: source.has_include_directives,
-        })
-        .collect();
 
     Ok(CompileInput {
-        language,
-        compiler_version,
-        import_mappings,
-        entrypoint,
-        compile_sources,
-        sources,
-        storage_files,
+        configuration: CompileConfiguration {
+            language,
+            compiler_version,
+            import_mappings,
+            entrypoint,
+        },
+        sources: compile_sources,
     })
 }
 
@@ -427,16 +481,21 @@ fn validate_source_path(path: &str) -> Result<(), ApiError> {
     }
 
     validate_relative_path("source path", path)?;
+    if path.bytes().filter(|character| *character == b'/').count() > MAX_SOURCE_DIRECTORY_DEPTH {
+        return Err(ApiError::bad_request(format!(
+            "source path must contain no more than {MAX_SOURCE_DIRECTORY_DEPTH} directories"
+        )));
+    }
     validate_source_path_components(path)?;
     validate_source_extension_count(path)
 }
 
 fn validate_source_path_components(path: &str) -> Result<(), ApiError> {
     if !path.bytes().all(|character| {
-        character.is_ascii_alphanumeric() || matches!(character, b'/' | b'.' | b'_' | b'-')
+        character.is_ascii_alphanumeric() || ALLOWED_SOURCE_PATH_PUNCTUATION.contains(&character)
     }) {
         return Err(ApiError::bad_request(
-            "source path components may contain only ASCII letters, numbers, '.', '_' and '-'"
+            "source path components may contain only ASCII letters, numbers, '.', '_', '-', '@' and '+'"
                 .to_owned(),
         ));
     }
@@ -617,7 +676,6 @@ fn build_compile_sources(
 }
 
 fn merge_generated_sources(
-    sources: &mut Vec<SourceMetadata>,
     files: &mut Vec<SourceStorageFile>,
     generated_sources: Vec<CompileGeneratedSource>,
 ) -> Result<(), ApiError> {
@@ -640,19 +698,8 @@ fn merge_generated_sources(
                 has_include_directives: None,
             }),
         }
-
-        if !sources.iter().any(|source| source.path == generated.path) {
-            sources.push(SourceMetadata {
-                path: generated.path,
-                is_entrypoint: false,
-                include_in_command: None,
-                is_stdlib: None,
-                has_include_directives: None,
-            });
-        }
     }
 
-    sources.sort_by(|left, right| left.path.cmp(&right.path));
     files.sort_by(|left, right| left.path.cmp(&right.path));
 
     Ok(())
@@ -669,43 +716,16 @@ impl<'a> SourceBundleSource<'a> {
     }
 }
 
-fn print_verify_request(
-    target: &ResolvedVerificationTarget,
-    language: &str,
-    compile_params: &Value,
-    sources: &[SourceMetadata],
-    compiled_code_hash: &str,
-    source_bundle_hash: Option<&str>,
-    verification_result: VerificationResult,
-) {
-    println!("verification request");
-    println!("address: {}", target.address.as_deref().unwrap_or("<none>"));
-    println!("code_hash: {}", target.code_hash);
-    println!("compiled_code_hash: {compiled_code_hash}");
-    println!(
-        "source_bundle_hash: {}",
-        source_bundle_hash.unwrap_or("<none>")
-    );
-    println!("verification_result: {verification_result}");
-    println!("language: {language}");
-    println!("compile_params: {compile_params}");
-
-    for source in sources {
-        println!(
-            "source: path={} is_entrypoint={}",
-            source.path, source.is_entrypoint
-        );
-    }
+struct CompileInput {
+    configuration: CompileConfiguration,
+    sources: Vec<CompileSource>,
 }
 
-struct CompileInput {
+struct CompileConfiguration {
     language: String,
     compiler_version: String,
     import_mappings: BTreeMap<String, String>,
     entrypoint: String,
-    compile_sources: Vec<CompileSource>,
-    sources: Vec<SourceMetadata>,
-    storage_files: Vec<SourceStorageFile>,
 }
 
 #[derive(Debug)]
@@ -802,7 +822,19 @@ impl std::fmt::Display for VerificationResult {
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_relative_path, validate_source_path};
+    use super::{select_used_sources, validate_relative_path, validate_source_path};
+    use crate::compilers::{CompileSource, CompilerError};
+
+    fn compile_source(path: &str) -> CompileSource {
+        CompileSource {
+            path: path.to_owned(),
+            content: path.to_owned(),
+            is_entrypoint: path == "main.tolk",
+            include_in_command: None,
+            is_stdlib: None,
+            has_include_directives: None,
+        }
+    }
 
     #[test]
     fn source_path_rejects_control_characters() {
@@ -829,6 +861,38 @@ mod tests {
                 validate_relative_path("import mapping target", path).is_err(),
                 "import mapping path should be rejected: {path:?}"
             );
+        }
+    }
+
+    #[test]
+    fn used_source_selection_preserves_only_reported_sources() {
+        let sources = [
+            compile_source("z.tolk"),
+            compile_source("main.tolk"),
+            compile_source("unused.tolk"),
+        ];
+        let selected =
+            select_used_sources(&sources, &["main.tolk".to_owned(), "z.tolk".to_owned()])
+                .expect("valid worker paths should be selected");
+
+        assert_eq!(selected.len(), 2);
+        assert_eq!(selected[0].path, "z.tolk");
+        assert_eq!(selected[1].path, "main.tolk");
+    }
+
+    #[test]
+    fn used_source_selection_rejects_malformed_worker_output() {
+        let sources = [compile_source("main.tolk"), compile_source("unused.tolk")];
+        for paths in [
+            Vec::new(),
+            vec!["unused.tolk".to_owned(), "main.tolk".to_owned()],
+            vec!["main.tolk".to_owned(), "main.tolk".to_owned()],
+            vec!["missing.tolk".to_owned()],
+        ] {
+            assert!(matches!(
+                select_used_sources(&sources, &paths),
+                Err(CompilerError::InvalidOutput(_))
+            ));
         }
     }
 }

@@ -16,7 +16,9 @@ const TESTNET_TONCENTER_BASE_URL: &str = "https://testnet.toncenter.com";
 const LOCALNET_TONCENTER_BASE_URL: &str = "http://127.0.0.1:5411";
 const DEFAULT_COMPILER_NODE_BIN: &str = "node";
 const DEFAULT_COMPILER_WORKER_PATH: &str = "compiler-worker/compile.mjs";
-const DEFAULT_COMPILER_TIMEOUT_MS: u64 = 5_000;
+const DEFAULT_COMPILER_TIMEOUT_MS: u64 = 10_000;
+const DEFAULT_MAX_CONCURRENT_COMPILATIONS: usize = 1;
+pub(crate) const DEFAULT_MAX_REQUEST_BYTES: usize = 512 * 1024;
 const DEFAULT_SOURCE_REPOSITORY_REMOTE: &str = "origin";
 const DEFAULT_SOURCE_REPOSITORY_STORAGE_ROOT: &str = "sources";
 const DEFAULT_SOURCE_REPOSITORY_COMMIT_ENABLED: bool = true;
@@ -49,6 +51,8 @@ pub struct Config {
     compiler_node_bin: String,
     compiler_worker_path: PathBuf,
     compiler_timeout: Duration,
+    max_concurrent_compilations: Option<usize>,
+    max_request_bytes: usize,
 }
 
 impl Config {
@@ -56,8 +60,8 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// Returns an error if the config file cannot be read, parsed as TOML, or
-    /// selects a network other than testnet.
+    /// Returns an error if the config file cannot be read, parsed as TOML,
+    /// selects a network other than testnet, or has an invalid compiler limit.
     pub fn load() -> Result<Self, ConfigError> {
         let path = env::var_os(CONFIG_PATH_ENV)
             .map_or_else(|| PathBuf::from(DEFAULT_CONFIG_PATH), PathBuf::from);
@@ -69,8 +73,8 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// Returns an error if the config file cannot be read, parsed as TOML, or
-    /// selects a network other than testnet.
+    /// Returns an error if the config file cannot be read, parsed as TOML,
+    /// selects a network other than testnet, or has an invalid compiler limit.
     pub fn load_from_path(path: impl AsRef<Path>) -> Result<Self, ConfigError> {
         let path = path.as_ref();
         let raw_config = fs::read_to_string(path).map_err(|source| ConfigError::Read {
@@ -83,7 +87,7 @@ impl Config {
                 source,
             })?;
 
-        let config = file.into_config();
+        let config = file.into_config()?;
         if config.network != TonNetwork::Testnet {
             return Err(ConfigError::UnsupportedNetwork {
                 network: config.network,
@@ -199,6 +203,16 @@ impl Config {
     pub const fn compiler_timeout(&self) -> Duration {
         self.compiler_timeout
     }
+
+    #[must_use]
+    pub const fn max_concurrent_compilations(&self) -> Option<usize> {
+        self.max_concurrent_compilations
+    }
+
+    #[must_use]
+    pub const fn max_request_bytes(&self) -> usize {
+        self.max_request_bytes
+    }
 }
 
 impl Default for Config {
@@ -225,6 +239,8 @@ impl Default for Config {
             compiler_node_bin: DEFAULT_COMPILER_NODE_BIN.to_owned(),
             compiler_worker_path: PathBuf::from(DEFAULT_COMPILER_WORKER_PATH),
             compiler_timeout: Duration::from_millis(DEFAULT_COMPILER_TIMEOUT_MS),
+            max_concurrent_compilations: Some(DEFAULT_MAX_CONCURRENT_COMPILATIONS),
+            max_request_bytes: DEFAULT_MAX_REQUEST_BYTES,
         }
     }
 }
@@ -273,6 +289,8 @@ pub enum ConfigError {
     },
     #[error("unsupported network {network}: verifier supports only testnet")]
     UnsupportedNetwork { network: TonNetwork },
+    #[error("compiler max_concurrent_compilations must be -1 or a positive integer, got {value}")]
+    InvalidCompilerConcurrency { value: i64 },
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -293,11 +311,27 @@ struct ConfigFile {
     payment: PaymentConfig,
     #[serde(default)]
     compiler: CompilerConfig,
+    #[serde(default)]
+    upload_limits: UploadLimitsConfig,
 }
 
 impl ConfigFile {
-    fn into_config(self) -> Config {
-        Config {
+    fn into_config(self) -> Result<Config, ConfigError> {
+        let max_concurrent_compilations = match self
+            .compiler
+            .max_concurrent_compilations
+            .unwrap_or(DEFAULT_MAX_CONCURRENT_COMPILATIONS as i64)
+        {
+            -1 => None,
+            value if value > 0 => {
+                let value = usize::try_from(value)
+                    .map_err(|_| ConfigError::InvalidCompilerConcurrency { value })?;
+                Some(value)
+            }
+            value => return Err(ConfigError::InvalidCompilerConcurrency { value }),
+        };
+
+        Ok(Config {
             bind_addr: self.server.bind_addr.unwrap_or_else(default_bind_addr),
             api_key: self.server.api_key.filter(|api_key| !api_key.is_empty()),
             logging_level: self
@@ -356,7 +390,12 @@ impl ConfigFile {
                     .timeout_ms
                     .unwrap_or(DEFAULT_COMPILER_TIMEOUT_MS),
             ),
-        }
+            max_concurrent_compilations,
+            max_request_bytes: self
+                .upload_limits
+                .request
+                .unwrap_or(DEFAULT_MAX_REQUEST_BYTES),
+        })
     }
 }
 
@@ -411,6 +450,13 @@ struct CompilerConfig {
     node_bin: Option<String>,
     worker_path: Option<PathBuf>,
     timeout_ms: Option<u64>,
+    max_concurrent_compilations: Option<i64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct UploadLimitsConfig {
+    #[serde(rename = "max_request_bytes")]
+    request: Option<usize>,
 }
 
 const fn default_bind_addr() -> SocketAddr {

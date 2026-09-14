@@ -5,7 +5,7 @@ use tolk_resolver::resolve_index::LocalDefId;
 use tolk_resolver::{
     AstNodeSpanExt, FileDb, FileId, ProjectIndex, Resolved, Span, SymbolId, SymbolKind,
 };
-use tolk_syntax::{Assign, Call, CallArgument, DotAccess, SetAssign, TryFromNode};
+use tolk_syntax::{Assign, Call, CallArgument, SetAssign, TryFromNode};
 use tolk_ty::{TypeDb, WorkspaceBodyTypes};
 
 mod constant_evaluator;
@@ -145,13 +145,16 @@ impl AnalysisDb {
                         usage_flags = UseFlags::WRITE | UseFlags::MUTATE;
                         break;
                     }
-                } else if let Ok(dot) = DotAccess::try_from_node(node)
-                    && let Some(call) = node.parent().and_then(|p| Call::try_from_node(p).ok())
+                } else if let Ok(call) = Call::try_from_node(node)
+                    && let Some(qualifier) = call.callee_qualifier()
                     && let Some(callee) = call.callee_identifier()
-                    && (dot.is_obj(&usage_node) || callee.span() == usage.span)
+                    && (qualifier.span().contains(usage.span.start())
+                        || callee.span() == usage.span)
                     && let Some(decl) = file.find_symbol_at(usage_node.start_byte())
                     && let Some(inference) = inference.get(&decl.id)
                 {
+                    // Inspect the call through the syntax helpers so explicit type arguments
+                    // cannot hide receiver mutations behind a generic-instantiation node.
                     let resolved = inference.resolve(callee.span());
 
                     if let Some(resolved) = resolved

@@ -79,12 +79,18 @@ interactive mode prompts for this choice. Non\-interactive mode leaves the app
 layout disabled unless \fB\-\-app\fR is passed explicitly.
 .RE
 .sp
-\fB\-\-hooks\fR
+\fB\-\-hooks[=\fR\fIhook\fR\fB]\fR
 .RS 4
-Create and install the default project\-local Git hooks.
+Create and install a project\-local Git hook with \fBacton check\fR and \fBacton fmt \-\-check\fR\&.
+.sp
+Possible values: \fBpre\-push\fR, \fBpre\-commit\fR
+.sp
+\fB\-\-hooks\fR creates \fB\&.githooks/pre\-push\fR\&. Use \fB\-\-hooks=pre\-commit\fR to run checks
+before each commit. An explicit value must use \fB=\fR\&.
 .sp
 If \fBgit\fR is available and \fB\-\-hooks\fR is not provided, interactive mode offers
-this choice after you opt into advanced options. Non\-interactive mode leaves
+the choices \fBpre\-push\fR, \fBpre\-commit\fR, and no hooks after you opt into advanced
+options. The selector defaults to \fBpre\-push\fR\&. Non\-interactive mode leaves
 hooks disabled unless \fB\-\-hooks\fR is passed explicitly.
 .RE
 .sp
@@ -286,7 +292,7 @@ If you opt into advanced options, Acton can then prompt for:
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'whether to install the default Git hooks when \fBgit\fR is available
+\h'-04'\(bu\h'+03'Git hooks: \fBpre\-push\fR (default), \fBpre\-commit\fR, or no hooks, when \fBgit\fR is available
 .RE
 .sp
 .RS 4
@@ -355,7 +361,7 @@ template\-specific management aliases in \fBActon.toml\fR
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB\&.githooks/pre\-commit\fR for \fB\-\-hooks\fR
+\h'-04'\(bu\h'+03'\fB\&.githooks/pre\-push\fR for \fB\-\-hooks\fR, or \fB\&.githooks/pre\-commit\fR for \fB\-\-hooks=pre\-commit\fR
 .RE
 .sp
 .RS 4

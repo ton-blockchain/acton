@@ -34,7 +34,7 @@ When running from scripts or CI, pass `--template` explicitly.
 Pass flags to skip prompts:
 
 - `--app` — add a React and Vite frontend; supported by all templates.
-- `--hooks` — install a pre-commit hook under `.githooks/` and set `core.hooksPath`.
+- `--hooks` — install a pre-push hook under `.githooks/` and set `core.hooksPath`. Use `--hooks=pre-commit` for checks before each commit.
 - `--agents` — copy the template's `AGENTS.md` into the project root.
 
 In non-interactive mode, these options are disabled unless their flags are passed explicitly.

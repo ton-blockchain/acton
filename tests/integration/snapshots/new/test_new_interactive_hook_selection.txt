@@ -1,0 +1,3 @@
+pre-push: installed=Some(".githooks"), pre-push=true, pre-commit=false
+pre-commit: installed=Some(".githooks"), pre-push=false, pre-commit=true
+none: installed=None, pre-push=false, pre-commit=false

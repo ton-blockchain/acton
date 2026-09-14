@@ -1,6 +1,7 @@
 import {Address, Cell, Dictionary, ExternalAddress} from "@ton/core"
 import type {SymTable} from "@ton/tolk-abi-to-typescript"
 
+import {toParsedValue} from "../../lib/toParsedValue"
 import {
   formatTolkDocComment,
   formatTolkIdentifier,
@@ -22,6 +23,7 @@ export type FormattedAbiDecodedValue =
   | {readonly kind: "plain"; readonly value: string}
   | {readonly kind: "tolk"; readonly value: string}
 
+/** Formats get-method results for display, using ABI types to retain enum member names. */
 export function formatAbiDecodedValue(
   decoded: unknown,
   symbols: SymTable,
@@ -29,7 +31,13 @@ export function formatAbiDecodedValue(
 ): FormattedAbiDecodedValue {
   const displayValue = decodedDisplayValue(decoded)
   if (isPlainDecodedValue(displayValue)) {
-    return {kind: "plain", value: String(displayValue)}
+    return {
+      kind: "plain",
+      value:
+        typeof displayValue === "bigint"
+          ? formatDecodedTolkNode(displayValue, symbols, returnTyIdx, 0)
+          : String(displayValue),
+    }
   }
   return {
     kind: "tolk",
@@ -83,9 +91,12 @@ function formatDecodedTolkNode(
 
   if (Array.isArray(value)) {
     if (value.length === 0) return "[]"
-    const itemTyIdx = tyIdx === undefined ? undefined : getCollectionItemTyIdx(symbols, tyIdx)
     return `[\n${value
-      .map(item => `${nextPad}${formatDecodedTolkNode(item, symbols, itemTyIdx, indent + 1)}`)
+      .map((item, index) => {
+        const itemTyIdx =
+          tyIdx === undefined ? undefined : getCollectionItemTyIdx(symbols, tyIdx, index)
+        return `${nextPad}${formatDecodedTolkNode(item, symbols, itemTyIdx, indent + 1)}`
+      })
       .join("\n")}\n${pad}]`
   }
 
@@ -117,6 +128,12 @@ function formatDecodedTolkNode(
       })
       .join("\n")
     return `${typeName ? `${typeName} ` : ""}{\n${body}\n${pad}}`
+  }
+
+  if (typeof value === "bigint" && tyIdx !== undefined) {
+    // Share enum lookup and alias/nullable resolution with parsed message and storage values.
+    const parsed = toParsedValue(value, {symbols, tyIdx})
+    if (parsed.kind === "scalar") return parsed.value
   }
 
   return formatDecodedTolkScalar(value)
@@ -160,7 +177,11 @@ function getStructFields(symbols: SymTable, tyIdx: number): Map<string, StructFi
   }
 }
 
-function getCollectionItemTyIdx(symbols: SymTable, tyIdx: number): number | undefined {
+function getCollectionItemTyIdx(
+  symbols: SymTable,
+  tyIdx: number,
+  index: number,
+): number | undefined {
   const ty = tryTyByIdx(symbols, tyIdx)
   if (!ty) return undefined
 
@@ -169,11 +190,16 @@ function getCollectionItemTyIdx(symbols: SymTable, tyIdx: number): number | unde
     case "lispListOf":
     case "cellOf":
       return ty.inner_ty_idx
+    case "tensor":
+    case "shapedTuple":
+      return ty.items_ty_idx[index]
     case "nullable":
-      return getCollectionItemTyIdx(symbols, ty.inner_ty_idx)
+      return getCollectionItemTyIdx(symbols, ty.inner_ty_idx, index)
     case "AliasRef": {
       const targetTyIdx = tryAliasTargetTyIdx(symbols, tyIdx)
-      return targetTyIdx === undefined ? undefined : getCollectionItemTyIdx(symbols, targetTyIdx)
+      return targetTyIdx === undefined
+        ? undefined
+        : getCollectionItemTyIdx(symbols, targetTyIdx, index)
     }
     default:
       return undefined

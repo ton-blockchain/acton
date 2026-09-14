@@ -434,7 +434,6 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
           client={client}
           environment={environment}
           isAdvanceTimeOpen={isTimeModalOpen}
-          latestBlockSeqno={latestBlockSeqno}
           onAdvanceTime={openTimeAdvanceModal}
           onOpenMiningSettings={() => void navigate(localnetRoutes.path("/settings"))}
           onFund={() => void navigate(localnetRoutes.path("/faucet"))}

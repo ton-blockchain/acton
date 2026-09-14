@@ -257,6 +257,7 @@ dependencies = [
  "tokio",
  "ton",
  "ton-api",
+ "ton-localnet",
  "toncenter-keys",
  "tower 0.5.2",
  "tower-http",
@@ -5964,6 +5965,7 @@ dependencies = [
  "tvm-ffi",
  "tycho-types",
  "url",
+ "uuid",
 ]
 
 [[package]]
@@ -5990,12 +5992,16 @@ version = "1.1.0"
 dependencies = [
  "anyhow",
  "base64",
+ "expect-test",
  "log",
  "num-bigint",
  "reqwest",
  "serde",
  "serde_json",
+ "tasm-core",
  "tokio",
+ "tolk-compiler",
+ "ton-api",
  "ton-executor",
  "ton-networks",
  "toncenter-keys",

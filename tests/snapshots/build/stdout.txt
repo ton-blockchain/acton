@@ -14,6 +14,7 @@ Options:
       --project-root <PATH>   Path to project root
       --gen-dir <DIR>         Output directory for generated dependency files (default: gen/)
       --output-abi <DIR>      Directory to save contract ABI JSON files (default: build/abi/)
+      --output-boc <DIR>      Directory to save contract BoC files
       --output-fift <DIR>     Directory to save compiled Fift files
       --output-sources <DIR>  Directory to save source registration artifacts
       --info                  Show compiled contract info

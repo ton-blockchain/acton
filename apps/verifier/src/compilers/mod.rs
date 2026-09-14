@@ -5,12 +5,16 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 use tokio::{
-    io::AsyncWriteExt,
+    io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     process::Command,
+    sync::Semaphore,
     time::{self, Duration},
 };
 
 use crate::{config::Config, source_storage::SourceMapData};
+
+const MAX_WORKER_STDOUT_BYTES: usize = 16 * 1024 * 1024;
+const MAX_WORKER_STDERR_BYTES: usize = 64 * 1024;
 
 #[async_trait]
 pub trait CompilerService: Send + Sync + 'static {
@@ -21,6 +25,7 @@ pub struct NodeCompilerService {
     node_bin: String,
     worker_path: PathBuf,
     timeout: Duration,
+    compilation_slots: Option<Semaphore>,
 }
 
 impl NodeCompilerService {
@@ -30,6 +35,7 @@ impl NodeCompilerService {
             node_bin: config.compiler_node_bin().to_owned(),
             worker_path: config.compiler_worker_path().to_path_buf(),
             timeout: config.compiler_timeout(),
+            compilation_slots: config.max_concurrent_compilations().map(Semaphore::new),
         }
     }
 }
@@ -37,6 +43,16 @@ impl NodeCompilerService {
 #[async_trait]
 impl CompilerService for NodeCompilerService {
     async fn compile(&self, request: CompileRequest) -> Result<CompileOutput, CompilerError> {
+        let _permit = if let Some(slots) = &self.compilation_slots {
+            Some(
+                slots
+                    .acquire()
+                    .await
+                    .map_err(|_| CompilerError::ConcurrencyLimiterClosed)?,
+            )
+        } else {
+            None
+        };
         let input = serde_json::to_vec(&request).map_err(CompilerError::SerializeInput)?;
         let worker_path = dunce::canonicalize(&self.worker_path).map_err(|source| {
             CompilerError::ResolveWorkerPath {
@@ -62,42 +78,82 @@ impl CompilerService for NodeCompilerService {
             .map_err(CompilerError::Spawn)?;
 
         let mut stdin = child.stdin.take().ok_or(CompilerError::MissingStdin)?;
-        stdin
-            .write_all(&input)
-            .await
-            .map_err(CompilerError::WriteStdin)?;
-        drop(stdin);
+        let stdout = child.stdout.take().ok_or(CompilerError::MissingOutput)?;
+        let stderr = child.stderr.take().ok_or(CompilerError::MissingOutput)?;
 
-        let output = time::timeout(self.timeout, child.wait_with_output())
-            .await
-            .map_err(|_| CompilerError::Timeout {
-                timeout_ms: self.timeout.as_millis(),
-            })?
-            .map_err(CompilerError::Wait)?;
+        // Drain both pipes while sending sources: a worker can fill its output pipe
+        // before reading stdin. The deadline covers this exchange as well as compilation.
+        let execution = time::timeout(self.timeout, async {
+            tokio::try_join!(
+                async {
+                    stdin
+                        .write_all(&input)
+                        .await
+                        .map_err(CompilerError::WriteStdin)?;
+                    drop(stdin);
+                    Ok(())
+                },
+                read_worker_output(stdout, MAX_WORKER_STDOUT_BYTES, "stdout"),
+                read_worker_output(stderr, MAX_WORKER_STDERR_BYTES, "stderr"),
+                async { child.wait().await.map_err(CompilerError::Wait) },
+            )
+        })
+        .await
+        .map_err(|_| CompilerError::Timeout {
+            timeout_ms: self.timeout.as_millis(),
+        })
+        .and_then(std::convert::identity);
 
-        if !output.status.success() {
+        if execution.is_err() {
+            // Reap the child before releasing this request's resources.
+            let _ = child.kill().await;
+        }
+        let ((), stdout, stderr, status) = execution?;
+
+        if !status.success() {
             return Err(CompilerError::WorkerFailed {
-                status: output.status,
-                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+                status,
+                stderr: String::from_utf8_lossy(&stderr).into_owned(),
             });
         }
 
-        let output = serde_json::from_slice::<WorkerOutput>(&output.stdout)
+        let output = serde_json::from_slice::<WorkerOutput>(&stdout)
             .map_err(CompilerError::DeserializeOutput)?;
 
         match output {
             WorkerOutput::Ok {
                 code_hash,
+                used_source_paths,
                 generated_sources,
                 source_map,
             } => Ok(CompileOutput {
                 code_hash,
+                used_source_paths,
                 generated_sources,
                 source_map,
             }),
             WorkerOutput::CompileError { error } => Err(CompilerError::CompileFailed(error)),
         }
     }
+}
+
+// Compiler diagnostics and generated metadata are untrusted in size, even for
+// a small source upload. Stop collecting as soon as either pipe exceeds its budget.
+async fn read_worker_output(
+    reader: impl AsyncRead + Unpin,
+    limit: usize,
+    stream: &'static str,
+) -> Result<Vec<u8>, CompilerError> {
+    let mut bytes = Vec::new();
+    reader
+        .take(limit as u64 + 1)
+        .read_to_end(&mut bytes)
+        .await
+        .map_err(CompilerError::Wait)?;
+    if bytes.len() > limit {
+        return Err(CompilerError::OutputTooLarge { stream, limit });
+    }
+    Ok(bytes)
 }
 
 fn isolated_command(program: &str) -> Command {
@@ -125,7 +181,7 @@ pub struct CompileRequest {
     pub sources: Vec<CompileSource>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct CompileSource {
     pub path: String,
     pub content: String,
@@ -137,6 +193,7 @@ pub struct CompileSource {
 
 pub struct CompileOutput {
     pub code_hash: String,
+    pub used_source_paths: Option<Vec<String>>,
     pub generated_sources: Vec<CompileGeneratedSource>,
     pub source_map: Option<SourceMapData>,
 }
@@ -153,6 +210,8 @@ enum WorkerOutput {
     Ok {
         code_hash: String,
         #[serde(default)]
+        used_source_paths: Option<Vec<String>>,
+        #[serde(default)]
         generated_sources: Vec<CompileGeneratedSource>,
         source_map: Option<SourceMapData>,
     },
@@ -165,6 +224,8 @@ enum WorkerOutput {
 pub enum CompilerError {
     #[error("failed to serialize compiler input: {0}")]
     SerializeInput(serde_json::Error),
+    #[error("compiler concurrency limiter is closed")]
+    ConcurrencyLimiterClosed,
     #[error("failed to resolve compiler worker path {path}: {source}")]
     ResolveWorkerPath {
         path: PathBuf,
@@ -176,6 +237,10 @@ pub enum CompilerError {
     Spawn(std::io::Error),
     #[error("compiler worker stdin was not available")]
     MissingStdin,
+    #[error("compiler worker output pipe was not available")]
+    MissingOutput,
+    #[error("compiler worker {stream} exceeded {limit} bytes")]
+    OutputTooLarge { stream: &'static str, limit: usize },
     #[error("failed to write compiler worker stdin: {0}")]
     WriteStdin(std::io::Error),
     #[error("compiler worker timed out after {timeout_ms} ms")]
@@ -186,6 +251,8 @@ pub enum CompilerError {
     WorkerFailed { status: ExitStatus, stderr: String },
     #[error("failed to parse compiler worker output: {0}")]
     DeserializeOutput(serde_json::Error),
+    #[error("invalid compiler worker output: {0}")]
+    InvalidOutput(String),
     #[error("compile error: {0}")]
     CompileFailed(String),
 }
@@ -193,6 +260,130 @@ pub enum CompilerError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn compiler_waits_for_an_available_compilation_slot() {
+        let service = NodeCompilerService {
+            node_bin: "node".to_owned(),
+            worker_path: PathBuf::from("missing-worker.mjs"),
+            timeout: Duration::from_secs(1),
+            compilation_slots: Some(Semaphore::new(1)),
+        };
+        let occupied_slot = service
+            .compilation_slots
+            .as_ref()
+            .expect("test compiler must have a compilation limiter")
+            .acquire()
+            .await
+            .expect("compilation limiter must be open");
+        let compilation = service.compile(CompileRequest {
+            language: "tolk".to_owned(),
+            compiler_version: "1.4.2".to_owned(),
+            entrypoint: "main.tolk".to_owned(),
+            import_mappings: BTreeMap::new(),
+            compile_params: Value::Null,
+            sources: Vec::new(),
+        });
+        tokio::pin!(compilation);
+
+        assert!(
+            time::timeout(Duration::from_millis(20), compilation.as_mut())
+                .await
+                .is_err(),
+            "a second compilation must wait while the only slot is occupied"
+        );
+
+        drop(occupied_slot);
+        let result = time::timeout(Duration::from_secs(1), compilation)
+            .await
+            .expect("compilation must resume after the slot is released");
+        assert!(matches!(
+            result,
+            Err(CompilerError::ResolveWorkerPath { .. })
+        ));
+    }
+
+    // Exercise the real process boundary: mocks cannot reproduce a full stdin
+    // pipe or a worker that writes output before it reads the request.
+    async fn run_worker_script(
+        script: &str,
+        timeout: Duration,
+    ) -> Result<CompileOutput, CompilerError> {
+        let directory = tempfile::tempdir().expect("worker directory");
+        let worker_path = directory.path().join("worker.mjs");
+        std::fs::write(&worker_path, script).expect("worker script");
+        let service = NodeCompilerService {
+            node_bin: "node".to_owned(),
+            worker_path,
+            timeout,
+            compilation_slots: Some(Semaphore::new(1)),
+        };
+        time::timeout(
+            Duration::from_secs(5),
+            service.compile(CompileRequest {
+                language: "tolk".to_owned(),
+                compiler_version: "1.4.2".to_owned(),
+                entrypoint: "main.tolk".to_owned(),
+                import_mappings: BTreeMap::new(),
+                compile_params: Value::Null,
+                sources: vec![CompileSource {
+                    path: "main.tolk".to_owned(),
+                    content: "x".repeat(1024 * 1024),
+                    is_entrypoint: true,
+                    include_in_command: None,
+                    is_stdlib: None,
+                    has_include_directives: None,
+                }],
+            }),
+        )
+        .await
+        .expect("compiler must enforce its own deadline")
+    }
+
+    #[tokio::test]
+    async fn worker_deadline_covers_blocked_stdin() {
+        let result =
+            run_worker_script("setInterval(() => {}, 1000)", Duration::from_millis(100)).await;
+        assert!(matches!(result, Err(CompilerError::Timeout { .. })));
+    }
+
+    #[tokio::test]
+    async fn worker_output_limits_abort_both_streams() {
+        for stream in ["stdout", "stderr"] {
+            let script = format!(
+                "process.{stream}.write('x'.repeat(17 * 1024 * 1024)); setInterval(() => {{}}, 1000)"
+            );
+            let result = run_worker_script(&script, Duration::from_secs(3)).await;
+            assert!(
+                matches!(result, Err(CompilerError::OutputTooLarge { stream: actual, .. }) if actual == stream)
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn worker_drains_output_while_sending_sources() {
+        let result = run_worker_script(
+            r"
+            process.stdout.write(' '.repeat(1024 * 1024), () => {
+                let input = '';
+                process.stdin.on('data', chunk => input += chunk);
+                process.stdin.on('end', () => {
+                    const request = JSON.parse(input);
+                    process.stdout.write(JSON.stringify({
+                        status: 'ok',
+                        code_hash: String(request.sources[0].content.length),
+                        used_source_paths: ['main.tolk']
+                    }));
+                });
+            });
+            ",
+            Duration::from_secs(3),
+        )
+        .await
+        .expect("full duplex exchange must complete");
+        assert_eq!(result.code_hash, "1048576");
+        assert_eq!(result.used_source_paths, Some(vec!["main.tolk".to_owned()]));
+    }
 
     #[tokio::test]
     async fn isolated_command_resolves_executable_and_clears_environment() {

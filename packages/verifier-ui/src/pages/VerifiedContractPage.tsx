@@ -73,6 +73,10 @@ function DetailRow({
 const compilerTagSources: Readonly<
   Record<string, {readonly repositoryUrl: string; readonly tagPrefix: string}>
 > = {
+  func: {
+    repositoryUrl: "https://github.com/ton-community/func-js-bin",
+    tagPrefix: "v",
+  },
   tact: {
     repositoryUrl: "https://github.com/tact-lang/tact",
     tagPrefix: "v",
@@ -83,8 +87,36 @@ const compilerTagSources: Readonly<
   },
 }
 
+const compilerTagOverrides: Readonly<Record<string, Readonly<Record<string, string | null>>>> = {
+  tolk: {
+    "0.6.0": null,
+    "0.7.0": "tolk0.7",
+    "0.8.0": "tolk-0.8",
+    "0.9.0": "tolk-0.9",
+    "0.10.0": "tolk-0.10",
+    "0.11.0": null,
+  },
+}
+
+function compilerTag(language: string, version: string, tagPrefix: string): string | undefined {
+  const override = compilerTagOverrides[language]?.[version]
+  if (override === null) {
+    return undefined
+  }
+  if (override !== undefined) {
+    return override
+  }
+
+  if (version.startsWith(tagPrefix)) {
+    return version
+  }
+
+  return `${tagPrefix}${version}`
+}
+
 function compilerVersionUrl(language: string, version: string): string | undefined {
-  const source = compilerTagSources[language.trim().toLowerCase()]
+  const normalizedLanguage = language.trim().toLowerCase()
+  const source = compilerTagSources[normalizedLanguage]
   const normalizedVersion = version.trim()
   if (!source) {
     return undefined
@@ -93,9 +125,10 @@ function compilerVersionUrl(language: string, version: string): string | undefin
     return undefined
   }
 
-  const tag = normalizedVersion.startsWith(source.tagPrefix)
-    ? normalizedVersion
-    : `${source.tagPrefix}${normalizedVersion}`
+  const tag = compilerTag(normalizedLanguage, normalizedVersion, source.tagPrefix)
+  if (tag === undefined) {
+    return undefined
+  }
   return `${source.repositoryUrl}/releases/tag/${encodeURIComponent(tag)}`
 }
 

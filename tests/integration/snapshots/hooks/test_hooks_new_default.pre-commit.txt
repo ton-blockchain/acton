@@ -1,4 +1,0 @@
-#!/bin/sh
-set -e
-acton check
-acton fmt --check

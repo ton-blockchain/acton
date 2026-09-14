@@ -25,7 +25,7 @@ export const studioPages: readonly StudioPage[] = [
   },
   {
     path: "/tests",
-    label: "Tests",
+    label: "Local tests",
     shortDescription: "Run Acton tests and inspect failures, traces, gas data and history",
     icon: FlaskConical,
   },

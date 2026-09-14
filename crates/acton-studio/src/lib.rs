@@ -10,7 +10,7 @@ use axum::body::Body;
 use axum::extract::{DefaultBodyLimit, Path as AxumPath, Query, Request, State};
 #[cfg(not(debug_assertions))]
 use axum::http::Uri;
-use axum::http::header::{CONTENT_LENGTH, CONTENT_TYPE, LOCATION};
+use axum::http::header::{CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE, LOCATION};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{any, get, post};
@@ -107,6 +107,7 @@ pub struct StudioWorkspace {
     name: String,
     root: PathBuf,
     wallet_names: Vec<String>,
+    default_startup_accounts: Vec<String>,
 }
 
 impl StudioWorkspace {
@@ -115,12 +116,21 @@ impl StudioWorkspace {
             name: name.into(),
             root: root.into(),
             wallet_names: Vec::new(),
+            default_startup_accounts: Vec::new(),
         }
     }
 
     #[must_use]
     pub fn with_wallet_names(mut self, wallet_names: Vec<String>) -> Self {
         self.wallet_names = wallet_names;
+        self
+    }
+
+    /// Supplies the create form's initial selection, never defaults for runtime requests.
+    /// Studio must honor an explicitly cleared selection independently of project CLI settings.
+    #[must_use]
+    pub fn with_default_startup_accounts(mut self, accounts: Vec<String>) -> Self {
+        self.default_startup_accounts = accounts;
         self
     }
 
@@ -320,6 +330,7 @@ impl StudioServer {
                     .map(|workspace| WorkspaceInfo {
                         name: workspace.name.clone(),
                         wallet_names: workspace.wallet_names.clone(),
+                        default_startup_accounts: workspace.default_startup_accounts.clone(),
                     }),
             },
             contract_registry: self.contract_registry.clone(),
@@ -411,6 +422,14 @@ impl StudioServer {
             .route(
                 "/environments/{environment_id}/snapshots",
                 get(list_environment_snapshots).post(create_environment_snapshot),
+            )
+            .route(
+                "/environments/{environment_id}/snapshots/import",
+                post(import_environment_snapshot).layer(DefaultBodyLimit::max(256 * 1024 * 1024)),
+            )
+            .route(
+                "/environments/{environment_id}/snapshots/{snapshot_id}/download",
+                get(export_environment_snapshot),
             )
             .route(
                 "/environments/{environment_id}/snapshots/{snapshot_id}",
@@ -529,6 +548,9 @@ pub struct WorkspaceInfo {
     pub name: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub wallet_names: Vec<String>,
+    /// Suggested create-form selection; submitted environment accounts remain authoritative.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub default_startup_accounts: Vec<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -768,11 +790,31 @@ async fn resolve_full_ton_account_imports(
     request: &mut CreateEnvironmentRequest,
 ) -> Result<(), StudioApiError> {
     let CreateEnvironmentConfig::FullTonNetwork {
-        imported_accounts, ..
+        imported_accounts,
+        accounts,
+        startup_wallets,
+        ..
     } = &mut request.config
     else {
         return Ok(());
     };
+
+    // Resolve wallet names before remote imports or Docker work so an invalid
+    // project wallet cannot leave a partially created environment behind.
+    *startup_wallets = state
+        .wallet_runtime
+        .prepare_localnet_accounts(accounts.clone())
+        .await
+        .map_err(|error| {
+            StudioApiError(EnvironmentRuntimeError::InvalidRequest {
+                code: "startup_wallet_invalid",
+                message: error.to_string(),
+            })
+        })?;
+    *accounts = startup_wallets
+        .iter()
+        .map(|wallet| wallet.name.clone())
+        .collect();
 
     resolve_account_imports(state, imported_accounts).await
 }
@@ -1142,6 +1184,69 @@ async fn list_environment_snapshots(
         .await
         .map(Json)
         .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/snapshots/import",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("name" = Option<String>, Query, description = "Snapshot display name")
+    ),
+    request_body(content = String, content_type = "application/json"),
+    responses(
+        (status = 201, description = "Snapshot imported without restoring state", body = EnvironmentSnapshot),
+        (status = 409, description = "Snapshot import is unavailable", body = StudioApiErrorBody),
+        (status = 500, description = "Snapshot could not be imported", body = StudioApiErrorBody)
+    ),
+    tag = "snapshots"
+)]
+async fn import_environment_snapshot(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+    Query(request): Query<CreateEnvironmentSnapshotRequest>,
+    body: axum::body::Bytes,
+) -> Result<(StatusCode, Json<EnvironmentSnapshot>), StudioApiError> {
+    state
+        .environment_runtime
+        .import_snapshot(&environment_id, request.name, body.to_vec())
+        .await
+        .map(|snapshot| (StatusCode::CREATED, Json(snapshot)))
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}/snapshots/{snapshot_id}/download",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("snapshot_id" = String, Path, description = "Snapshot ID")
+    ),
+    responses(
+        (status = 200, description = "Saved JSON snapshot", content_type = "application/json", body = String),
+        (status = 409, description = "Snapshot export is unavailable", body = StudioApiErrorBody),
+        (status = 500, description = "Snapshot could not be exported", body = StudioApiErrorBody)
+    ),
+    tag = "snapshots"
+)]
+async fn export_environment_snapshot(
+    State(state): State<StudioState>,
+    AxumPath((environment_id, snapshot_id)): AxumPath<(String, String)>,
+) -> Result<Response, StudioApiError> {
+    let json = state
+        .environment_runtime
+        .export_snapshot(&environment_id, &snapshot_id)
+        .await
+        .map_err(StudioApiError)?;
+
+    Ok((
+        [
+            (CONTENT_TYPE, "application/json"),
+            (CONTENT_DISPOSITION, "attachment; filename=snapshot.json"),
+        ],
+        json,
+    )
+        .into_response())
 }
 
 #[utoipa::path(

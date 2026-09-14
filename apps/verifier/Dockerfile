@@ -12,6 +12,7 @@ RUN bun install --frozen-lockfile --filter @acton/verifier-ui \
 FROM rust:1.97.1-slim-bookworm AS rust-builder
 
 WORKDIR /build/apps/verifier
+ARG VCS_REF=unknown
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential pkg-config ca-certificates git libssl-dev \
@@ -21,7 +22,7 @@ COPY apps/verifier/Cargo.toml apps/verifier/Cargo.lock apps/verifier/rust-toolch
 COPY apps/verifier/src ./src
 COPY --from=frontend-builder /workspace/packages/verifier-ui/dist /build/packages/verifier-ui/dist
 
-RUN cargo build --release --locked
+RUN VERIFIER_GIT_HASH="${VCS_REF}" cargo build --release --locked
 
 FROM node:22-bookworm-slim AS compiler-worker
 
@@ -29,8 +30,8 @@ WORKDIR /compiler-worker
 
 COPY apps/verifier/compiler-worker/package.json apps/verifier/compiler-worker/package-lock.json apps/verifier/compiler-worker/.npmrc ./
 COPY apps/verifier/compiler-worker/scripts ./scripts
-RUN npm ci --omit=dev
-RUN npm run apply-patches
+RUN npm ci --omit=dev \
+    && npm run apply-patches
 
 COPY apps/verifier/compiler-worker/compile.mjs ./compile.mjs
 COPY apps/verifier/compiler-worker/languages ./languages
@@ -59,7 +60,8 @@ COPY --chown=node:node --from=compiler-worker /compiler-worker /app/compiler-wor
 COPY apps/verifier/docker/entrypoint.sh /usr/local/bin/verifier-entrypoint
 
 RUN chmod +x /usr/local/bin/verifier-entrypoint \
-    && mkdir -p /etc/verifier /var/lib/verifier/source-repo /var/lib/verifier/registry-index \
+    && mkdir -p /etc/verifier /var/lib/verifier/source-repo /var/lib/verifier/registry-index /var/lib/verifier/payment-ledger \
+    && chmod 0700 /var/lib/verifier/source-repo /var/lib/verifier/registry-index /var/lib/verifier/payment-ledger \
     && chown -R node:node /etc/verifier /var/lib/verifier
 
 USER node
@@ -77,7 +79,7 @@ ENV VERIFIER_CONFIG=/etc/verifier/config.toml \
     VERIFIER_REGISTRY_INDEX_PATH=/var/lib/verifier/registry-index/registry-index.sqlite3 \
     VERIFIER_COMPILER_NODE_BIN=/usr/local/bin/node \
     VERIFIER_COMPILER_WORKER_PATH=/app/compiler-worker/compile.mjs \
-    VERIFIER_COMPILER_TIMEOUT_MS=5000
+    VERIFIER_COMPILER_TIMEOUT_MS=10000
 
 EXPOSE 3000
 

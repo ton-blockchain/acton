@@ -42,7 +42,14 @@ pub(super) fn render_compose(image: &str, config: &NetworkConfig, nodes: &[Node]
         )
         .replace(
             "__LOCALTON_IMPORTED_ACCOUNTS__",
-            &render_imported_account_args(&config.imported_account_bocs),
+            &render_imported_account_args(
+                config.imported_account_bocs.iter().chain(
+                    config
+                        .startup_wallets
+                        .iter()
+                        .map(|wallet| &wallet.shard_account_boc_hex),
+                ),
+            ),
         )
         .replace("__LOCALTON_JOIN_VOLUMES__", &render_join_volumes(nodes))
         .replace("__LOCALTON_JOIN_NODES__", &render_join_nodes(image, nodes))
@@ -84,10 +91,48 @@ fn render_join_volumes(nodes: &[Node]) -> String {
         .join("\n  ")
 }
 
-fn render_imported_account_args(imported_account_bocs: &[String]) -> String {
+fn render_imported_account_args<'a>(
+    imported_account_bocs: impl Iterator<Item = &'a String>,
+) -> String {
     imported_account_bocs
-        .iter()
         .flat_map(|boc| ["- --add-account".to_owned(), format!("- \"{boc}\"")])
         .collect::<Vec<_>>()
         .join("\n      ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::StartupWallet;
+
+    #[test]
+    fn genesis_contains_imports_and_startup_wallets_after_reload() {
+        let config = NetworkConfig {
+            port_base: 19000,
+            ports: None,
+            block_time_ms: None,
+            election_time_seconds: None,
+            imported_account_bocs: vec!["aabb".into()],
+            startup_wallets: vec![StartupWallet {
+                name: "deployer".into(),
+                shard_account_boc_hex: "ccdd".into(),
+            }],
+        };
+        let saved = serde_json::to_string(&config).unwrap();
+        let restored = serde_json::from_str(&saved).unwrap();
+        let compose = render_compose("localton", &restored, &[]);
+        let accounts = compose
+            .lines()
+            .skip_while(|line| !line.contains("--add-account"))
+            .take(4)
+            .map(str::trim)
+            .collect::<Vec<_>>()
+            .join("\n");
+        expect_test::expect![[r#"
+            - --add-account
+            - "aabb"
+            - --add-account
+            - "ccdd""#]]
+        .assert_eq(&accounts);
+    }
 }

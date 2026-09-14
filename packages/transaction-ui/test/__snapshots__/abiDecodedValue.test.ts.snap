@@ -1,5 +1,53 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
+exports[`ABI decoded value formats a get-method result with enum member 1`] = `"Status.Active (1)"`;
+
+exports[`ABI decoded value formats a get-method result with zero enum member 1`] = `"Status.Idle (0)"`;
+
+exports[`ABI decoded value formats a get-method result with negative enum member 1`] = `"Status.Failed (-1)"`;
+
+exports[`ABI decoded value formats a get-method result with large enum member 1`] = `"Status.Large (9007199254740993)"`;
+
+exports[`ABI decoded value formats a get-method result with unknown enum value 1`] = `"Status(42)"`;
+
+exports[`ABI decoded value formats a get-method result with nullable enum 1`] = `"Status.Active (1)"`;
+
+exports[`ABI decoded value formats a get-method result with null enum 1`] = `"null"`;
+
+exports[`ABI decoded value formats a get-method result with nullable enum alias 1`] = `"Status.Active (1)"`;
+
+exports[`ABI decoded value formats a get-method result with ordinary integer 1`] = `"1"`;
+
+exports[`ABI decoded value formats a get-method result with enum array 1`] = `
+"[
+    Status.Idle (0)
+    Status.Active (1)
+]"
+`;
+
+exports[`ABI decoded value formats a get-method result with enum tuple 1`] = `
+"[
+    Status.Active (1)
+    1
+    Status.Idle (0)
+]"
+`;
+
+exports[`ABI decoded value formats a get-method result with enum tensor 1`] = `
+"[
+    Status.Active (1)
+    1
+    Status.Idle (0)
+]"
+`;
+
+exports[`ABI decoded value formats a get-method result with enum struct field 1`] = `
+"StatusReply {
+    status: Status.Active (1)
+    count: 1
+}"
+`;
+
 exports[`ABI decoded value renders a decoded struct as Tolk initialization 1`] = `
 "GetTradeFeeReply {
     tradeFeeNumerator: 100

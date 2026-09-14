@@ -26,7 +26,7 @@ const TONKEEPER_WALLET_JS_BRIDGE_KEY = "tonkeeper"
 
 function getWalletOrigin(): string {
   if (globalThis.location === undefined) {
-    return "http://localhost:3006"
+    return "http://127.0.0.1:3006"
   }
 
   return globalThis.location.origin

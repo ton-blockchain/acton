@@ -5,6 +5,7 @@ import type {V3TransactionListItem} from "../api/types"
 
 import {
   collectTransactionListAddresses,
+  collectTransactionListAbiAddresses,
   type MessageNamesByAddress,
   useMessageNamesByAddress,
 } from "./useMessageNamesByAddress"
@@ -18,8 +19,16 @@ export function useTransactionMessageNames(
   readonly messageNamesByAddress: MessageNamesByAddress
 } {
   const addresses = useMemo(() => collectTransactionListAddresses(transactions), [transactions])
+  const abiAddresses = useMemo(
+    () => collectTransactionListAbiAddresses(transactions),
+    [transactions],
+  )
   const metadataRegistry = useMetadataRegistry()
-  const messageNamesByAddress = useMessageNamesByAddress({client, metadataRegistry, addresses})
+  const messageNamesByAddress = useMessageNamesByAddress({
+    client,
+    metadataRegistry,
+    addresses: abiAddresses,
+  })
 
   return {addresses, messageNamesByAddress}
 }

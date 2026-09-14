@@ -10,12 +10,18 @@ export async function compileTolk(input) {
   const sources = buildSourceMap(input.sources);
   const importMappings = buildImportMappings(input.import_mappings);
   const entrypointFileName = normalizeSourcePath(input.entrypoint);
+  const entrypoint = readSource(entrypointFileName, sources, importMappings);
+  const usedSourcePaths = new Set([entrypoint.path]);
   const includeSourceMapData = supportsSourceMapData(input.compiler_version);
   const { runTolkCompiler } = await importTolk(input.compiler_version);
   const result = await runTolkCompiler({
     entrypointFileName,
     pathMappings: pathMappingsObject(importMappings),
-    fsReadCallback: (requestedPath) => readSourceContent(requestedPath, sources, importMappings),
+    fsReadCallback: (requestedPath) => {
+      const source = readSource(requestedPath, sources, importMappings);
+      usedSourcePaths.add(source.path);
+      return source.content;
+    },
     withSourceMapData: includeSourceMapData,
   });
 
@@ -26,18 +32,19 @@ export async function compileTolk(input) {
   return {
     status: "ok",
     code_hash: String(result.codeHashHex).toLowerCase(),
+    used_source_paths: [...usedSourcePaths].sort(),
     generated_sources: generatedSources(entrypointFileName, result),
     source_map: includeSourceMapData ? buildSourceMapData(result) : undefined,
   };
 }
 
-function readSourceContent(requestedPath, sources, importMappings) {
+function readSource(requestedPath, sources, importMappings) {
   const resolvedPath = resolveSourcePath(requestedPath, sources, importMappings);
   const content = sources.get(resolvedPath);
   if (content === undefined) {
     throw new Error(`source was not provided: ${requestedPath}`);
   }
-  return content;
+  return { path: resolvedPath, content };
 }
 
 function generatedSources(entrypointFileName, result) {

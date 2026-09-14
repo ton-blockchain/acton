@@ -1,6 +1,6 @@
 import {KeyRound, Shield} from "lucide-react"
 import {TlbCellViewer} from "@acton/transaction-ui"
-import {AddressChip, GramAmount, RawDataBlock, useToast} from "@acton/ui"
+import {GramAmount, RawDataBlock, useToast} from "@acton/ui"
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 import type {
@@ -13,7 +13,8 @@ import type {
 
 import {fetchStudioWallets, type EnvironmentConfig, type StudioWallet} from "../../studioApi"
 import styles from "./TonConnectRequestDialog.module.css"
-import {normalizeAddress} from "@acton/explorer-core/components/utils"
+import {ExplorerAddressChip} from "@acton/explorer-core/components/ExplorerAddressChip"
+import {normalizeAddress, toRawAddress} from "@acton/explorer-core/components/utils"
 import {useAddressFormat} from "@acton/explorer-core/hooks/useNetworkInfo"
 
 import {addProjectWalletToKit, createWalletKit} from "./kit"
@@ -891,12 +892,11 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
               <div key={`${message.address}-${index}`} className={styles.messageItem}>
                 <span className={styles.messageIndex}>#{index + 1}</span>
                 <div>
-                  <AddressChip
-                    address={normalizeAddress(message.address, addressFormat)}
+                  <ExplorerAddressChip
+                    address={toRawAddress(message.address)}
+                    className={styles.messageAddress}
+                    resolveName={false}
                     variant="plain"
-                    onCopyError={error =>
-                      showErrorToast("Copy failed", error, "Failed to copy address")
-                    }
                   />
                   <div className={styles.messageValue}>
                     <GramAmount value={message.amount} />

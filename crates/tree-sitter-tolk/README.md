@@ -15,10 +15,11 @@ tree-sitter generate
 
 (will change `src/`).
 
-To play with parser, you can run interactive playground:
+To build the WASM parser and open the playground, run in `crates/tree-sitter-tolk`:
 
 ```bash
-yarn play
+npx tree-sitter build --wasm
+npm start
 ```
 
 To manually test, create `tmp.tolk` with some content, and run:
@@ -42,12 +43,12 @@ tree-sitter highlight tmp.tolk
 
 produces colored output, just a pleasant feature, so keep this file up to date also.
 
-Finally, to build wasm, run **in the project folder**:
+To build only the WASM parser, run in `crates/tree-sitter-tolk`:
 
 ```bash
-yarn grammar:wasm
+npx tree-sitter build --wasm --output tree-sitter-tolk.wasm
 ```
 
-On finish, `tree-sitter-tolk.wasm` will be saved into the `server/` folder.
+The command writes `tree-sitter-tolk.wasm` to that directory.
 
 Don't forget to run/update JS tests after modifying grammar!

@@ -44,11 +44,17 @@ interactive mode prompts for this choice. Non-interactive mode leaves the app
 layout disabled unless `--app` is passed explicitly.
 {{/option}}
 
-{{#option "`--hooks`" }}
-Create and install the default project-local Git hooks.
+{{#option "`--hooks[=`_hook_`]`" }}
+Create and install a project-local Git hook with `acton check` and `acton fmt --check`.
+
+Possible values: `pre-push`, `pre-commit`
+
+`--hooks` creates `.githooks/pre-push`. Use `--hooks=pre-commit` to run checks
+before each commit. An explicit value must use `=`.
 
 If `git` is available and `--hooks` is not provided, interactive mode offers
-this choice after you opt into advanced options. Non-interactive mode leaves
+the choices `pre-push`, `pre-commit`, and no hooks after you opt into advanced
+options. The selector defaults to `pre-push`. Non-interactive mode leaves
 hooks disabled unless `--hooks` is passed explicitly.
 {{/option}}
 

@@ -256,6 +256,7 @@ fn full_ton_environment(base_url: &str) -> StudioEnvironment {
             block_time_ms: None,
             election_time_seconds: None,
             imported_accounts: Vec::new(),
+            accounts: Vec::new(),
             nodes: Vec::new(),
         },
         EnvironmentEndpoints {
@@ -280,7 +281,7 @@ fn localnet_environment(base_url: &str) -> StudioEnvironment {
             accounts: Vec::new(),
             rate_limit: None,
             response_delay_ms: None,
-            block_interval_ms: None,
+            block_time_ms: None,
             no_mining: false,
             mine_empty_blocks: false,
         },

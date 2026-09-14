@@ -3,12 +3,10 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    blockchain::{is_valid_code_hash, normalize_code_hash},
-    error::ApiError,
-    payment::PaymentError,
-    registry::VerifiedBundleRequest,
-    state::AppState,
+    error::ApiError, payment::PaymentError, registry::VerifiedBundleRequest, state::AppState,
 };
+
+use super::validation;
 
 #[utoipa::path(
     post,
@@ -27,12 +25,7 @@ pub async fn handler(
     State(state): State<AppState>,
     Json(request): Json<TakeTicketRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let code_hash = normalize_code_hash(request.code_hash.trim());
-    if !is_valid_code_hash(&code_hash) {
-        return Err(ApiError::bad_request(
-            "code_hash must contain exactly 64 hexadecimal characters".to_owned(),
-        ));
-    }
+    let code_hash = validation::code_hash(&request.code_hash)?;
 
     if let Some(bundle) = state
         .verification_registry()

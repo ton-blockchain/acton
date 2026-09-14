@@ -4,7 +4,8 @@
 //! # Overview
 //!
 //! `retrace` allows developers to download a specific transaction from the TON
-//! network (mainnet or testnet) and replay it locally with full VM verbosity.
+//! network (mainnet, testnet, localnet, or a custom network) and replay it locally
+//! with full VM verbosity.
 //! It is useful for debugging smart contracts, analyzing transaction failures,
 //! and verifying on‑chain behavior.
 //!
@@ -24,6 +25,14 @@
 //!
 //! *   `TONCENTER_MAINNET_API_KEY`: Your `TON Center` mainnet V3 API key.
 //! *   `TONCENTER_TESTNET_API_KEY`: Your `TON Center` testnet V3 API key.
+//! *   `ACTON_LOCALNET_AUTH_TOKEN`: Token for a protected localnet API.
+//! *   `<NETWORK>_API_KEY`: Key for a custom network, using the normalized uppercase name.
+//!
+//! Supply localnet and custom endpoints in the `custom_networks` argument using
+//! [`CustomNetworkUrls`]. Replay requires both V2 and V3 APIs, including historical
+//! account state, transaction BOCs, and block configuration. V2 and V3 can use
+//! different hosts and path prefixes. Public network endpoints are resolved by
+//! `ton-networks`, including its configured overrides.
 //!
 //! # Main Entry Points
 //!
@@ -44,7 +53,7 @@
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
 //!     let hash = "3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41";
-//!     let result = retrace(Network::Mainnet, hash, Default::default()).await?;
+//!     let result = retrace(Network::Mainnet, hash, Default::default(), &Default::default()).await?;
 //!
 //!     if result.state_update_hash_ok {
 //!         println!("Retrace successful!");
@@ -63,7 +72,7 @@
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
 //!     let hash = "3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41";
-//!     let result = retrace(Network::Mainnet, hash, Default::default()).await?;
+//!     let result = retrace(Network::Mainnet, hash, Default::default(), &Default::default()).await?;
 //!
 //!     let trace = Trace::new(&result.emulated_tx.vm_logs, None);
 //!     for step in trace.steps {
@@ -92,7 +101,7 @@
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
 //!     let hash = "...";
-//!     let result = retrace(Network::Mainnet, hash, Default::default()).await?;
+//!     let result = retrace(Network::Mainnet, hash, Default::default(), &Default::default()).await?;
 //!
 //!     // 1. Actions queued by the contract (from VM logs)
 //!     let trace = Trace::new(&result.emulated_tx.vm_logs, None);
@@ -114,9 +123,6 @@ mod remote;
 mod runner;
 mod types;
 
-#[cfg(all(test, feature = "only_ci"))]
-mod tests;
-
 pub mod trace;
 
 pub use crate::runner::{Network, retrace, retrace_base_tx};
@@ -124,3 +130,4 @@ pub use crate::types::{
     BaseTxInfo, ComputeInfo, TraceEmulatedTx, TraceInMessage, TraceMoneyResult, TraceResult,
 };
 pub use methods::find_base_tx_by_hash;
+pub use ton_networks::CustomNetworkUrls;

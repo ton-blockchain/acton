@@ -7,6 +7,7 @@ use crate::support::project::Project;
 use acton_studio::StudioInfo;
 
 mod reporting;
+mod snapshots;
 mod start;
 mod test_runs;
 
@@ -27,12 +28,21 @@ impl StudioCliProcess {
 
             let port_arg = port.to_string();
             let url = format!("http://127.0.0.1:{port}");
-            let child = project
-                .acton()
-                .current_dir(project.path())
-                .args(["studio", "--port", &port_arg, "--no-open"])
-                .spawn()
+            let command = project.acton().current_dir(project.path()).args([
+                "studio",
+                "--port",
+                &port_arg,
+                "--no-open",
+            ]);
+
+            // Model a real terminal: Ctrl+C targets Studio's foreground process
+            // group, including managed children that fail to isolate themselves.
+            #[cfg(unix)]
+            let child = command
+                .spawn_in_new_process_group()
                 .expect("Studio CLI process must start");
+            #[cfg(not(unix))]
+            let child = command.spawn().expect("Studio CLI process must start");
             let mut studio = Self {
                 child: Some(child),
                 url,
@@ -130,9 +140,10 @@ impl StudioCliProcess {
             .expect("Studio CLI process must be available");
         let status = Command::new("kill")
             .arg("-INT")
-            .arg(child.id().to_string())
+            .arg("--")
+            .arg(format!("-{}", child.id()))
             .status()
-            .expect("SIGINT must be sent to Studio CLI");
+            .expect("SIGINT must be sent to Studio process group");
         assert!(status.success(), "kill -INT failed with status {status}");
 
         let deadline = Instant::now() + STUDIO_STOP_TIMEOUT;
@@ -163,6 +174,13 @@ impl StudioCliProcess {
             String::from_utf8_lossy(&output.stderr).into_owned(),
             snapbox::file!["../../snapshots/studio/graceful_shutdown.stderr.txt"],
         );
+
+        let child_shutdown_messages = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .filter(|line| line.contains("Acton simulated localnet gracefully"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        expect_test::expect![""].assert_eq(&child_shutdown_messages);
     }
 }
 

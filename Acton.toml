@@ -34,7 +34,7 @@ port = 3010
 accounts = []
 
 [networks.localnet]
-api = { v2 = "http://localhost:3010/api/v2", v3 = "http://localhost:3010/api/v3" }
+api = { v2 = "http://127.0.0.1:3010/api/v2", v3 = "http://127.0.0.1:3010/api/v3" }
 
 [import-mappings]
 acton = ".acton"

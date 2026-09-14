@@ -31,6 +31,9 @@ mod overlays;
 #[path = "localnet_command/shutdown.rs"]
 mod shutdown;
 
+#[path = "localnet_command/snapshots.rs"]
+mod snapshots;
+
 #[path = "localnet_command/studio.rs"]
 mod studio;
 

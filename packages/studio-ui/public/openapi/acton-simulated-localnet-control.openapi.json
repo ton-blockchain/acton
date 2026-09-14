@@ -188,7 +188,7 @@
         "tags": ["Localnet Control"],
         "operationId": "getVerifiedSource",
         "summary": "Get verified contract source",
-        "description": "Proxies Acton verifier source lookup by address or code hash and returns the verified source bundle when the contract is confirmed.",
+        "description": "Proxies TON verifier source lookup by address or code hash and returns the verified source bundle when the contract is confirmed.",
         "parameters": [
           {
             "name": "address",
@@ -358,38 +358,82 @@
         }
       }
     },
-    "/acton_dumpState": {
-      "get": {
-        "tags": ["Localnet Control"],
-        "operationId": "dumpState",
-        "summary": "Download local state",
-        "description": "Returns the current live localnet state as a JSON document.",
-        "responses": {
-          "200": {
-            "description": "Current localnet state.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StateFile"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/acton_loadState": {
+    "/acton_createSnapshot": {
       "post": {
         "tags": ["Localnet Control"],
-        "operationId": "loadState",
-        "summary": "Load local state",
-        "description": "Replaces the current node state from the request body and clears all checkpoints.",
+        "operationId": "createSnapshot",
+        "summary": "Create snapshot",
+        "description": "Saves the current state as a persistent JSON snapshot without stopping the node. The returned ID identifies the saved file.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/StateFile"
+                "$ref": "#/components/schemas/CreateSnapshotRequest"
+              },
+              "example": {
+                "name": "before-upgrade"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SnapshotResponse"
+          }
+        }
+      }
+    },
+    "/acton_listSnapshots": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "listSnapshots",
+        "summary": "List snapshots",
+        "description": "Lists saved JSON snapshots, including snapshots from earlier node runs.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SnapshotListResponse"
+          }
+        }
+      }
+    },
+    "/acton_restoreSnapshot": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "restoreSnapshot",
+        "summary": "Restore snapshot",
+        "description": "Restores state in the node mutation queue without restarting the process or deleting any saved snapshots.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnapshotRequest"
+              },
+              "example": {
+                "id": "f25d4568-af6a-4f5f-a857-ebcf90648a9f"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SnapshotResponse"
+          }
+        }
+      }
+    },
+    "/acton_deleteSnapshot": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "deleteSnapshot",
+        "summary": "Delete snapshot",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnapshotRequest"
               }
             }
           }
@@ -401,114 +445,14 @@
         }
       }
     },
-    "/acton_createCheckpoint": {
-      "post": {
-        "tags": ["Localnet Control"],
-        "operationId": "createCheckpoint",
-        "summary": "Create checkpoint",
-        "description": "Creates a named in-memory checkpoint for the current localnet state.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateCheckpointRequest"
-              },
-              "example": {
-                "name": "before-upgrade",
-                "force": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/CheckpointResponse"
-          }
-        }
-      }
-    },
-    "/acton_listCheckpoints": {
+    "/acton_exportSnapshot": {
       "get": {
         "tags": ["Localnet Control"],
-        "operationId": "listCheckpoints",
-        "summary": "List checkpoints",
-        "description": "Lists named in-memory checkpoints in the current localnet process.",
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/CheckpointListResponse"
-          }
-        }
-      }
-    },
-    "/acton_restoreCheckpoint": {
-      "post": {
-        "tags": ["Localnet Control"],
-        "operationId": "restoreCheckpoint",
-        "summary": "Restore checkpoint",
-        "description": "Restores a checkpoint without deleting it or checkpoints created after it.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CheckpointRequest"
-              },
-              "example": {
-                "name": "before-upgrade"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/CheckpointResponse"
-          }
-        }
-      }
-    },
-    "/acton_deleteCheckpoint": {
-      "post": {
-        "tags": ["Localnet Control"],
-        "operationId": "deleteCheckpoint",
-        "summary": "Delete checkpoint",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CheckpointRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/CheckpointResponse"
-          }
-        }
-      }
-    },
-    "/acton_clearCheckpoints": {
-      "post": {
-        "tags": ["Localnet Control"],
-        "operationId": "clearCheckpoints",
-        "summary": "Clear checkpoints",
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/ClearCheckpointsResponse"
-          }
-        }
-      }
-    },
-    "/acton_exportCheckpoint": {
-      "get": {
-        "tags": ["Localnet Control"],
-        "operationId": "exportCheckpoint",
-        "summary": "Download checkpoint",
+        "operationId": "exportSnapshot",
+        "summary": "Download snapshot",
         "parameters": [
           {
-            "name": "name",
+            "name": "id",
             "in": "query",
             "required": true,
             "schema": {
@@ -519,7 +463,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Checkpoint state file.",
+            "description": "Snapshot state file.",
             "content": {
               "application/json": {
                 "schema": {
@@ -528,31 +472,23 @@
               }
             }
           }
-        }
+        },
+        "description": "Downloads the selected saved JSON file without capturing new state."
       }
     },
-    "/acton_importCheckpoint": {
+    "/acton_importSnapshot": {
       "post": {
         "tags": ["Localnet Control"],
-        "operationId": "importCheckpoint",
-        "summary": "Import checkpoint",
+        "operationId": "importSnapshot",
+        "summary": "Import snapshot",
         "parameters": [
           {
             "name": "name",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string",
               "minLength": 1
-            }
-          },
-          {
-            "name": "force",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false
             }
           }
         ],
@@ -568,9 +504,10 @@
         },
         "responses": {
           "200": {
-            "$ref": "#/components/responses/CheckpointResponse"
+            "$ref": "#/components/responses/SnapshotResponse"
           }
-        }
+        },
+        "description": "Validates and saves a JSON snapshot under a new ID without changing the running state. An optional name overrides the name in the file."
       }
     },
     "/acton_setConfig": {
@@ -1060,7 +997,7 @@
         }
       },
       "VerifiedSourceResponse": {
-        "description": "Successful wrapped response with the source bundle returned by the Acton verifier.",
+        "description": "Successful wrapped response with the source bundle returned by the TON verifier.",
         "content": {
           "application/json": {
             "schema": {
@@ -1219,8 +1156,8 @@
           }
         }
       },
-      "CheckpointResponse": {
-        "description": "Successful checkpoint response.",
+      "SnapshotResponse": {
+        "description": "Successful snapshot response.",
         "content": {
           "application/json": {
             "schema": {
@@ -1232,7 +1169,7 @@
                   "type": "object",
                   "properties": {
                     "result": {
-                      "$ref": "#/components/schemas/CheckpointResult"
+                      "$ref": "#/components/schemas/SnapshotResult"
                     }
                   }
                 }
@@ -1241,8 +1178,8 @@
           }
         }
       },
-      "CheckpointListResponse": {
-        "description": "Successful checkpoint list response.",
+      "SnapshotListResponse": {
+        "description": "Successful snapshot list response.",
         "content": {
           "application/json": {
             "schema": {
@@ -1256,35 +1193,7 @@
                     "result": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/CheckpointResult"
-                      }
-                    }
-                  }
-                }
-              ]
-            }
-          }
-        }
-      },
-      "ClearCheckpointsResponse": {
-        "description": "Successful checkpoint clear response.",
-        "content": {
-          "application/json": {
-            "schema": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/SuccessEnvelope"
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "result": {
-                      "type": "object",
-                      "properties": {
-                        "deleted": {
-                          "type": "integer",
-                          "minimum": 0
-                        }
+                        "$ref": "#/components/schemas/SnapshotResult"
                       }
                     }
                   }
@@ -1741,13 +1650,31 @@
       },
       "StateFile": {
         "type": "object",
-        "required": ["globals"],
-        "additionalProperties": true,
+        "required": ["format_version", "id", "created_at", "state"],
         "properties": {
-          "globals": {
+          "format_version": {
+            "type": "integer",
+            "enum": [1]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "integer"
+          },
+          "fork_network": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
             "type": "object",
             "additionalProperties": true,
-            "description": "Serialized localnet chain globals."
+            "description": "Complete serialized node snapshot"
           }
         }
       },
@@ -1946,45 +1873,52 @@
           }
         }
       },
-      "CreateCheckpointRequest": {
+      "CreateSnapshotRequest": {
         "type": "object",
-        "required": ["name"],
         "properties": {
           "name": {
             "type": "string",
-            "minLength": 1,
-            "description": "Checkpoint name."
+            "nullable": true,
+            "maxLength": 128,
+            "description": "Optional display name"
+          }
+        }
+      },
+      "SnapshotRequest": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SnapshotResult": {
+        "type": "object",
+        "required": ["id", "name", "created_at", "block_seqno", "size_bytes"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
           },
-          "force": {
-            "type": "boolean",
-            "default": false,
-            "description": "Overwrite an existing checkpoint with the same name."
-          }
-        }
-      },
-      "CheckpointRequest": {
-        "type": "object",
-        "required": ["name"],
-        "properties": {
           "name": {
             "type": "string",
-            "minLength": 1,
-            "description": "Checkpoint name."
-          }
-        }
-      },
-      "CheckpointResult": {
-        "type": "object",
-        "required": ["name", "block_seqno"],
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Checkpoint name."
+            "nullable": true
+          },
+          "created_at": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix creation time in seconds"
           },
           "block_seqno": {
             "type": "integer",
+            "minimum": 0
+          },
+          "size_bytes": {
+            "type": "integer",
             "minimum": 0,
-            "description": "Latest block seqno captured by the checkpoint."
+            "description": "Size of the saved JSON file"
           }
         }
       },

@@ -76,6 +76,157 @@ fn studio_start_serves_workspace_and_registers_for_reporting() {
 
 #[cfg(unix)]
 #[test]
+fn studio_startup_accounts_use_the_submitted_selection_instead_of_cli_defaults() {
+    use crate::support::toncenter::DEPLOYER_WALLET_CONFIG;
+    use expect_test::expect;
+    use serde_json::{Value, json};
+    use std::time::{Duration, Instant};
+
+    let project = ProjectBuilder::new("studio-startup-selection").build();
+    std::fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("public fixture wallet");
+    let manifest_path = project.path().join("Acton.toml");
+    let mut manifest = std::fs::read_to_string(&manifest_path).expect("manifest");
+    manifest.push_str("\n[localnet]\naccounts = [\"deployer\"]\n");
+    std::fs::write(manifest_path, manifest).expect("CLI startup defaults");
+
+    let names = |payload: &Value| {
+        payload["result"]
+            .as_array()
+            .expect("startup accounts array")
+            .iter()
+            .map(|wallet| wallet["name"].clone())
+            .collect::<Vec<_>>()
+    };
+
+    // Direct CLI starts still inherit project defaults when --accounts is omitted.
+    let cli_node = project.localnet().arg("--no-mining").start();
+    let cli_accounts = names(&cli_node.get_json("/acton_getStartupAccounts"));
+    cli_node.stop();
+
+    let mut studio = StudioCliProcess::start(&project);
+    let form_defaults = studio
+        .wait_for_info()
+        .workspace
+        .expect("project workspace")
+        .default_startup_accounts;
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .expect("Studio client");
+    let mut environments = Vec::new();
+
+    for selected in [Vec::<String>::new(), vec!["deployer".to_owned()]] {
+        let created: Value = client
+            .post(format!("{}/api/v1/environments", studio.url()))
+            .json(&json!({
+                "name": "Selected wallets",
+                "config": {
+                    "kind": "actonSimulatedLocalnet",
+                    "accounts": selected,
+                    "noMining": true,
+                },
+            }))
+            .send()
+            .expect("create request")
+            .error_for_status()
+            .expect("create accepted")
+            .json()
+            .expect("created environment");
+        let id = created["id"].as_str().expect("environment ID");
+        let url = format!("{}/api/v1/environments/{id}", studio.url());
+        let startup_accounts = || {
+            let deadline = Instant::now() + Duration::from_secs(20);
+            loop {
+                let environment: Value = client
+                    .get(&url)
+                    .send()
+                    .expect("environment request")
+                    .error_for_status()
+                    .expect("environment response")
+                    .json()
+                    .expect("environment JSON");
+                match environment["status"].as_str() {
+                    Some("running") => break,
+                    Some("failed") => panic!("startup failed: {environment}"),
+                    _ if Instant::now() >= deadline => panic!("startup timed out: {environment}"),
+                    _ => std::thread::sleep(Duration::from_millis(50)),
+                }
+            }
+            let payload: Value = client
+                .get(format!("{url}/rpc/acton_getStartupAccounts"))
+                .send()
+                .expect("startup accounts request")
+                .error_for_status()
+                .expect("startup accounts response")
+                .json()
+                .expect("startup accounts JSON");
+            names(&payload)
+        };
+        let initial = startup_accounts();
+
+        // Saved Studio selections remain authoritative on subsequent process launches.
+        for action in ["stop", "restart"] {
+            client
+                .post(format!("{url}/{action}"))
+                .send()
+                .expect("lifecycle request")
+                .error_for_status()
+                .expect("lifecycle accepted");
+        }
+        environments.push(json!({
+            "selected": selected,
+            "initial": initial,
+            "restarted": startup_accounts(),
+        }));
+        client
+            .delete(&url)
+            .send()
+            .expect("delete request")
+            .error_for_status()
+            .expect("environment removed");
+    }
+    studio.stop();
+
+    expect![[r#"
+        {
+          "cliAccounts": [
+            "deployer"
+          ],
+          "environments": [
+            {
+              "initial": [],
+              "restarted": [],
+              "selected": []
+            },
+            {
+              "initial": [
+                "deployer"
+              ],
+              "restarted": [
+                "deployer"
+              ],
+              "selected": [
+                "deployer"
+              ]
+            }
+          ],
+          "formDefaults": [
+            "deployer"
+          ]
+        }"#]]
+    .assert_eq(
+        &serde_json::to_string_pretty(&json!({
+            "cliAccounts": cli_accounts,
+            "formDefaults": form_defaults,
+            "environments": environments,
+        }))
+        .expect("startup selection summary"),
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn studio_start_rejects_a_second_instance_for_the_same_project() {
     let project = ProjectBuilder::new("studio-duplicate-instance").build();
     let mut first = StudioCliProcess::start(&project);

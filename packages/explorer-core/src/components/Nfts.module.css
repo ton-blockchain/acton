@@ -116,13 +116,16 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 10px 12px 11px;
-  background: var(--acton-color-surface-raised);
+  gap: 4px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--acton-color-surface-raised) 94%, var(--acton-color-text));
 }
 
-.collectionName,
-.nftMetaLine {
+:global([data-theme="light"]) .nftInfo {
+  background: var(--acton-color-surface-row);
+}
+
+.collectionName {
   min-width: 0;
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
@@ -131,8 +134,7 @@
 }
 
 .collectionName,
-.nftName,
-.nftAddress {
+.nftName {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -143,16 +145,6 @@
   font-size: var(--acton-font-size-sm);
   font-weight: 650;
   line-height: 1.25;
-}
-
-.nftMetaLine {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.nftAddress {
-  min-width: 0;
 }
 
 .empty {

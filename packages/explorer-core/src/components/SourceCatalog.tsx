@@ -314,7 +314,12 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
                         />
                         <p className={styles.localNote}>
                           <CircleAlert size={15} />
-                          <span>Source artifacts remain in this virtual environment</span>
+                          <span>
+                            Run <code>acton build --output-sources build/sources</code> in your
+                            project root, then upload a generated <code>.source.json</code> file
+                            from <code>build/sources</code>; source artifacts remain in this virtual
+                            environment
+                          </span>
                         </p>
                         <button
                           type="submit"

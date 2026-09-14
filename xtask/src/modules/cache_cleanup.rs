@@ -1,12 +1,14 @@
 use std::env;
+use std::fs::OpenOptions;
+use std::io::Write;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use clap::Args;
 
 const CI_ENV: &str = "CI";
 
-pub(crate) const DEFAULT_LAST_ACCESSED_DELETE_AFTER_DAYS: i64 = 1;
+pub(crate) const DEFAULT_LAST_ACCESSED_DELETE_AFTER_DAYS: i64 = 2;
 pub(crate) const DEFAULT_CREATED_DELETE_AFTER_DAYS: i64 = 3;
 
 #[derive(Args, Debug, Clone, Copy)]
@@ -19,6 +21,12 @@ pub(crate) struct CacheCleanupOptions {
         help = "Show which cache entries would be deleted without deleting them. Defaults to `true` outside CI and `false` in CI when omitted"
     )]
     pub(crate) dry_run: Option<bool>,
+
+    #[arg(
+        long = "summary",
+        help = "Append a Markdown cleanup report to GITHUB_STEP_SUMMARY even outside CI. Enabled by default in CI"
+    )]
+    pub(crate) summary: bool,
 
     #[arg(
         long = "last-accessed-days",
@@ -63,6 +71,7 @@ pub(crate) struct ActionsCacheEntry {
 }
 
 pub(crate) fn run_cache_cleanup<F>(
+    provider: &str,
     options: CacheCleanupOptions,
     entries: Vec<ActionsCacheEntry>,
     mut delete_entry: F,
@@ -85,38 +94,112 @@ where
 
     print_prune_plan(dry_run, &policy, &to_delete, &to_keep);
 
+    let mut deleted_count = 0;
+    let result = (|| {
+        if dry_run {
+            println!();
+            println!("Dry run: no cache entries were deleted.");
+            return Ok(());
+        }
+
+        if to_delete.is_empty() {
+            println!();
+            println!("No cache entries to delete.");
+            return Ok(());
+        }
+
+        println!();
+        println!("Deleting {} cache entries...", to_delete.len());
+
+        for entry in &to_delete {
+            delete_entry(entry)?;
+            deleted_count += 1;
+            println!("Deleted {}  {}  {}", entry.id, entry.branch, entry.key);
+        }
+
+        let deleted_size = total_entries_size(&to_delete);
+        let kept_size = total_entries_size(&to_keep);
+        let total_cache_size = deleted_size + kept_size;
+
+        println!();
+        println!(
+            "Deleted {} cache entries, freed {} of {} total, kept {}.",
+            to_delete.len(),
+            human_size(deleted_size),
+            human_size(total_cache_size),
+            to_keep.len()
+        );
+
+        Ok(())
+    })();
+
+    if (options.summary || is_ci)
+        && let Err(error) = append_step_summary(
+            provider,
+            dry_run,
+            &to_delete,
+            &to_keep,
+            deleted_count,
+            result.is_ok(),
+        )
+    {
+        eprintln!("Warning: failed to write cache cleanup summary: {error:#}");
+    }
+
+    result
+}
+
+fn append_step_summary(
+    provider: &str,
+    dry_run: bool,
+    to_delete: &[ActionsCacheEntry],
+    to_keep: &[ActionsCacheEntry],
+    deleted_count: usize,
+    success: bool,
+) -> Result<()> {
+    let Some(path) = env::var_os("GITHUB_STEP_SUMMARY") else {
+        return Ok(());
+    };
+
+    let mut summary = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .context("failed to open GITHUB_STEP_SUMMARY")?;
+
+    let status = if success { "success" } else { "failure" };
+    writeln!(summary, "\n## {provider} Actions cache cleanup\n")?;
+    writeln!(summary, "- Status: {status}")?;
+    writeln!(summary, "- Dry run: {dry_run}\n")?;
+    writeln!(summary, "| Cache entries | Count | Size |")?;
+    writeln!(summary, "| --- | ---: | ---: |")?;
+
+    let found_count = to_delete.len() + to_keep.len();
+    let planned_size = total_entries_size(to_delete);
+    let found_size = planned_size + total_entries_size(to_keep);
+    let deleted_size = total_entries_size(&to_delete[..deleted_count]);
+    for (label, count, size) in [
+        ("Found", found_count, found_size),
+        ("Planned for deletion", to_delete.len(), planned_size),
+        ("Deleted (freed)", deleted_count, deleted_size),
+        (
+            "Remaining",
+            found_count - deleted_count,
+            found_size - deleted_size,
+        ),
+    ] {
+        writeln!(summary, "| {label} | {count} | {} |", human_size(size))?;
+    }
+    writeln!(summary)?;
+
     if dry_run {
-        println!();
-        println!("Dry run: no cache entries were deleted.");
-        return Ok(());
+        writeln!(summary, "Dry run: no cache entries were deleted.\n")?;
+    } else if !success {
+        writeln!(
+            summary,
+            "Cleanup stopped after an error. See the cleanup step logs for details.\n"
+        )?;
     }
-
-    if to_delete.is_empty() {
-        println!();
-        println!("No cache entries to delete.");
-        return Ok(());
-    }
-
-    println!();
-    println!("Deleting {} cache entries...", to_delete.len());
-
-    for entry in &to_delete {
-        delete_entry(entry)?;
-        println!("Deleted {}  {}  {}", entry.id, entry.branch, entry.key);
-    }
-
-    let deleted_size = total_entries_size(&to_delete);
-    let kept_size = total_entries_size(&to_keep);
-    let total_cache_size = deleted_size + kept_size;
-
-    println!();
-    println!(
-        "Deleted {} cache entries, freed {} of {} total, kept {}.",
-        to_delete.len(),
-        human_size(deleted_size),
-        human_size(total_cache_size),
-        to_keep.len()
-    );
 
     Ok(())
 }

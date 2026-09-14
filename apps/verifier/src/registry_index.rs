@@ -61,6 +61,8 @@ pub trait VerificationIndex: Send + Sync + 'static {
         &self,
         query: IndexedAbiContractsQuery,
     ) -> Result<IndexedAbiContractsPage, VerificationIndexError>;
+
+    async fn payment_transaction_hashes(&self) -> Result<Vec<String>, VerificationIndexError>;
 }
 
 pub type SharedVerificationIndex = Arc<dyn VerificationIndex>;
@@ -555,6 +557,24 @@ impl VerificationIndex for SqliteVerificationIndex {
         drop(connection);
 
         Ok(IndexedAbiContractsPage { items })
+    }
+
+    async fn payment_transaction_hashes(&self) -> Result<Vec<String>, VerificationIndexError> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            r"
+            select distinct payment_tx_hash
+            from verified_bundles
+            where payment_tx_hash is not null
+            order by payment_tx_hash
+            ",
+        )?;
+        let hashes = statement
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<Vec<String>, _>>()?;
+        drop(statement);
+        drop(connection);
+        Ok(hashes)
     }
 }
 

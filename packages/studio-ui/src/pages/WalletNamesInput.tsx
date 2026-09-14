@@ -10,7 +10,7 @@ export function WalletNamesInput({values, walletNames, onChange}: WalletNamesInp
   return (
     <MultiValueInput
       label="Startup accounts"
-      description="Wallets from the Acton project to create when the environment starts"
+      description="Initialize selected project wallets and fund each with 100 GRAM"
       placeholder={walletNames.length > 0 ? "Search wallets" : "No wallets configured"}
       values={values}
       options={walletNames}

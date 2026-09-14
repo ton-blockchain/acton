@@ -436,9 +436,26 @@
   cursor: pointer;
 }
 
+.nodeCircle:focus {
+  outline: none;
+}
+
+.nodeFocusRing {
+  visibility: hidden;
+  pointer-events: none;
+  fill: none;
+  stroke: var(--acton-color-focus-ring);
+  stroke-width: 2px;
+}
+
+.nodeCircle:focus-visible + .nodeFocusRing {
+  visibility: visible;
+}
+
 .transactionNodeSelected:not(.transactionNodeFailed, .transactionNodeActionHighlighted)
   .nodeCircle {
   fill: var(--acton-color-text);
+  stroke: var(--acton-color-text);
 }
 
 .transactionNodeSelected:not(.transactionNodeFailed, .transactionNodeActionHighlighted) .nodeText {
@@ -455,11 +472,6 @@
 
 .failedBadge {
   pointer-events: none;
-}
-
-.nodeCircle:focus-visible {
-  outline: 2px solid var(--acton-color-focus-ring);
-  outline-offset: 2px;
 }
 
 .nodeText {
