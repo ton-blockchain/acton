@@ -118,6 +118,7 @@ impl Activity {
             "removingNode" => ("Removing", "the node container and state"),
             "enteringElections" => ("Enabling", "validator participation in future elections"),
             "leavingElections" => ("Disabling", "validator participation in future elections"),
+            "configuringOverlays" => ("Configuring", "private overlays"),
             _ => ("Preparing", action(&operation.kind)),
         };
 
@@ -144,6 +145,7 @@ impl Activity {
             "removingNode" => ("Removed", "the node container and state"),
             "enteringElections" => ("Enabled", "validator participation in future elections"),
             "leavingElections" => ("Disabled", "validator participation in future elections"),
+            "configuringOverlays" => ("Configured", "private overlays"),
             _ => ("Prepared", action(kind)),
         };
         eprintln!(
@@ -169,6 +171,7 @@ pub(super) fn action(kind: &str) -> &str {
         "removeNode" => "node removal",
         "enterValidation" => "validator election entry",
         "leaveValidation" => "validator election exit",
+        "configureOverlays" => "private overlay configuration",
         "createSnapshot" => "snapshot creation",
         "restoreSnapshot" => "snapshot restoration",
         "deleteSnapshot" => "snapshot deletion",

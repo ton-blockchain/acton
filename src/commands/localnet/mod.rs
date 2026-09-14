@@ -4,6 +4,7 @@ mod args;
 mod delete;
 mod inspect;
 mod output;
+mod overlays;
 mod progress;
 mod selection;
 mod service;
@@ -58,6 +59,7 @@ async fn run(args: LocalnetArgs) -> anyhow::Result<()> {
         | LocalnetCommand::Delete { network, .. }
         | LocalnetCommand::Logs { network, .. }
         | LocalnetCommand::Node { network, .. }
+        | LocalnetCommand::Overlays { network, .. }
         | LocalnetCommand::Snapshot { network, .. }
         | LocalnetCommand::Operation { network, .. }
         | LocalnetCommand::Shutdown { network } => network.as_deref(),
@@ -158,6 +160,7 @@ async fn execute(client: &Client, command: LocalnetCommand, json: bool) -> anyho
 
             output::mutate(client, method, &path, body, json).await
         }
+        LocalnetCommand::Overlays { config, .. } => overlays::run(client, config, json).await,
         LocalnetCommand::Snapshot { command, .. } => {
             let base = "/v1/network/snapshots".to_owned();
             let (method, path, body) = match command {

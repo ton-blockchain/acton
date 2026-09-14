@@ -200,6 +200,7 @@ pub async fn create(root: &Path, request: CreateNetwork) -> Result<NetworkDirect
         endpoints: config.endpoints(),
         config,
         nodes: Vec::new(),
+        overlay_config: Default::default(),
         state: None,
         status: Status::Stopped,
         operation: None,

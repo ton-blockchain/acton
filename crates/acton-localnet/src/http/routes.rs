@@ -28,6 +28,10 @@ pub(super) fn router() -> Router<ApiState> {
                 .layer(DefaultBodyLimit::max(16 * 1024 * 1024)),
         )
         .route("/v1/network/config", post(update_config))
+        .route(
+            "/v1/network/overlays",
+            get(overlays).put(configure_overlays),
+        )
         .route("/v1/network/activity", get(activity).put(save_activity))
         .route("/v1/network/activity/start", post(start_activity))
         .route("/v1/network/activity/stop", post(stop_activity))
@@ -101,6 +105,17 @@ async fn update_config(
     Json(request): Json<crate::UpdateNetworkConfig>,
 ) -> Result<(StatusCode, Json<Operation>), Error> {
     accepted(state, Action::UpdateConfig(request)).await
+}
+
+async fn overlays(State(state): State<ApiState>) -> Json<crate::OverlayConfig> {
+    Json(state.runtime.get().await.overlay_config)
+}
+
+async fn configure_overlays(
+    State(state): State<ApiState>,
+    Json(request): Json<crate::OverlayConfig>,
+) -> Result<(StatusCode, Json<Operation>), Error> {
+    accepted(state, Action::ConfigureOverlays(request)).await
 }
 
 async fn network_health(

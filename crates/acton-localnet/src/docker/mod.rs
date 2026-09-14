@@ -61,6 +61,7 @@ mod compose;
 mod descriptor;
 mod diagnostics;
 mod nodes;
+mod overlays;
 mod prerequisites;
 mod process;
 mod progress;

@@ -50,7 +50,11 @@ impl Context {
         }
 
         self.phase("startingContainers").await?;
-        let result = self.start_containers(driver).await;
+        let result = async {
+            self.start_containers(driver).await?;
+            self.reconcile_overlays(driver).await
+        }
+        .await;
         if let Err(error) = result {
             return match driver.stop().await {
                 Ok(()) => Err(error),
@@ -188,7 +192,18 @@ impl Runtime {
         {
             let mut record = entry.record.write().await;
             match result {
-                Ok(status) => record.status = status,
+                Ok(status) => {
+                    // A killed owner may have applied only part of an overlay
+                    // update. Keep start actionable even while Docker is alive:
+                    // start reconciles every node with the saved configuration.
+                    record.status = if status == Status::Running
+                        && entry.data_dir.join("overlays-recovery").exists()
+                    {
+                        Status::Failed
+                    } else {
+                        status
+                    };
+                }
                 Err(error) => {
                     record.status = Status::Unknown;
                     record.error = Some(error.to_string());

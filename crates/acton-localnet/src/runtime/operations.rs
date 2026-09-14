@@ -20,6 +20,7 @@ pub(crate) enum Action {
     RestoreSnapshot { id: String },
     DeleteSnapshot { id: String },
     UpdateConfig(crate::UpdateNetworkConfig),
+    ConfigureOverlays(crate::OverlayConfig),
 }
 
 impl Action {
@@ -38,6 +39,7 @@ impl Action {
             Self::RestoreSnapshot { .. } => "restoreSnapshot",
             Self::DeleteSnapshot { .. } => "deleteSnapshot",
             Self::UpdateConfig(_) => "updateConfig",
+            Self::ConfigureOverlays(_) => "configureOverlays",
         }
     }
 }
@@ -80,6 +82,10 @@ impl Runtime {
         let guard = Arc::clone(&entry.mutation)
             .try_lock_owned()
             .map_err(|_| Error::busy())?;
+        if let Action::ConfigureOverlays(config) = &action {
+            let network = entry.record.read().await;
+            super::overlays::validate_update(&network, config)?;
+        }
         let operation = Operation {
             id: uuid::Uuid::new_v4().to_string(),
             kind: action.kind().to_owned(),
@@ -333,8 +339,10 @@ impl Context {
                 self.observe(&driver, driver.stop()).await?;
                 self.entry.record.write().await.status = Status::Stopped;
                 self.phase("creatingArchive").await?;
-                let nodes = self.entry.record.read().await.nodes.clone();
-                let result = driver.create_snapshot(name.as_deref(), &nodes).await;
+                let network = self.entry.record.read().await.clone();
+                let result = driver
+                    .create_snapshot(name.as_deref(), &network.nodes, &network.overlay_config)
+                    .await;
                 let restarted = if restart && !*self.runtime.inner.closing.borrow() {
                     self.start(&driver).await
                 } else {
@@ -352,12 +360,15 @@ impl Context {
                 self.entry.record.write().await.status = Status::Stopped;
                 self.phase("restoringState").await?;
                 let result = async {
-                    let nodes = self.entry.record.read().await.nodes.clone();
-                    let (snapshot, restored_nodes) = driver.restore_snapshot(&id, &nodes).await?;
+                    let network = self.entry.record.read().await.clone();
+                    let (snapshot, restored_nodes, overlay_config) = driver
+                        .restore_snapshot(&id, &network.nodes, &network.overlay_config)
+                        .await?;
                     self.phase("resettingIndexer").await?;
                     driver.reset_indexer().await?;
                     driver.write_compose(&restored_nodes).await?;
                     self.entry.record.write().await.nodes = restored_nodes.clone();
+                    self.entry.record.write().await.overlay_config = overlay_config;
                     self.publish().await?;
                     driver.finish_snapshot_restore(&restored_nodes).await?;
                     Ok(snapshot)
@@ -390,6 +401,9 @@ impl Context {
             Action::UpdateConfig(_) => {
                 unreachable!("config updates are handled before materializing Docker")
             }
+            Action::ConfigureOverlays(config) => {
+                return self.configure_overlays(&driver, config).await;
+            }
         }
 
         Ok(Value::Null)
@@ -401,9 +415,10 @@ impl Context {
         &mut self,
         driver: &crate::docker::DockerNetwork,
     ) -> Result<(), Error> {
-        if let Some(nodes) = driver.recover_snapshot().await? {
+        if let Some((nodes, overlay_config)) = driver.recover_snapshot().await? {
             let mut record = self.entry.record.write().await;
             record.nodes.clone_from(&nodes);
+            record.overlay_config = overlay_config;
             record.status = Status::Stopped;
             drop(record);
             self.publish().await?;

@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::OverlayConfig;
+
 /// Immutable genesis settings and host ports.
 ///
 /// Account `BoCs` are explicit copies of `ShardAccount` state; importing them creates
@@ -248,6 +250,9 @@ pub struct Network {
     pub config: NetworkConfig,
     pub endpoints: Endpoints,
     pub nodes: Vec<Node>,
+    /// Desired private overlay memberships, independent of immutable genesis settings.
+    #[serde(default, skip_serializing_if = "OverlayConfig::is_empty")]
+    pub overlay_config: OverlayConfig,
     pub state: Option<NetworkState>,
     pub status: Status,
     pub operation: Option<Operation>,
