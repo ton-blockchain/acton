@@ -350,6 +350,12 @@ Inspect the coverage:
 
 ![](ide-support/imgs/test-ui/coverage.png)
 
+Test UI's result and transaction inspector are also included in Acton Studio's <kbd>[Local tests](/docs/studio#local-tests)</kbd>, alongside project-wide test run history.
+
+<Callout type="note">
+  For now, coverage and gas profiling are only available in the standalone Test UI.
+</Callout>
+
 ### Run mutation testing
 
 Coverage shows which lines ran — not whether the tests would catch a bug on those lines. Mutation testing fills the gap: it makes small, deliberate changes to the contract — for example, replacing `+= 1` with `-= 1` or removing an `assert` — and reruns the suite. If every test still passes against a mutation, that mutation is a **survivor** — the line is exercised but its behavior is not actually verified.
