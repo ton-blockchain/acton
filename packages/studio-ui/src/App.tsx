@@ -366,7 +366,7 @@ function StudioWorkspace({
           environmentRoute
             ? (activeEnvironmentShell?.pageTitle ??
               environment?.name ??
-              (environmentRoute.section === "networks" ? "Network" : "Virtual Environment"))
+              (environmentRoute.section === "networks" ? "Network" : "Virtual environment"))
             : undefined
         }
         pages={studioPages}

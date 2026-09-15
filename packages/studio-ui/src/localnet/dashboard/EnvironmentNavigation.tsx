@@ -94,9 +94,9 @@ const contractItems: NestedSidebarItem[] = [
 ]
 
 const standaloneItems: SidebarItem[] = [
-  {label: "Simulator", icon: Waypoints, path: "/simulator"},
-  {label: "Cell Inspector", icon: Binary, path: "/cell-inspector"},
-  {label: "Address Converter", icon: ArrowRightLeft, path: "/address-converter"},
+  {label: "Transaction emulator", icon: Waypoints, path: "/transaction-emulator"},
+  {label: "Cell inspector", icon: Binary, path: "/cell-inspector"},
+  {label: "Address converter", icon: ArrowRightLeft, path: "/address-converter"},
 ]
 
 const environmentItems: SidebarItem[] = [
@@ -107,7 +107,7 @@ const environmentItems: SidebarItem[] = [
 ]
 
 const apiCallsItem: SidebarItem = {
-  label: "API Calls",
+  label: "API calls",
   icon: Activity,
   path: "/api-calls",
 }
@@ -465,12 +465,12 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
               {visibleApiReferenceItems.length > 0 ? (
                 <NavigationDisclosure
                   active={isApiReferenceActive}
-                  ariaLabel="API Reference pages"
+                  ariaLabel="API reference pages"
                   controlsId="environment-api-reference-navigation"
                   icon={Brackets}
                   isItemActive={item => localPathname === item.path}
                   items={visibleApiReferenceItems}
-                  label="API Reference"
+                  label="API reference"
                   onItemSelect={path => void navigate(routes.path(path))}
                   onParentSelect={() => {
                     setIsApiReferenceOpen(true)

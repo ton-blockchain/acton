@@ -76,7 +76,7 @@ export function describeCellInspector({app, route}: CellInspectorSuiteOptions): 
     test.beforeEach(async ({page}) => {
       await prepareVisualPage(page, {app})
       await page.goto(route)
-      await expect(page.getByRole("heading", {name: "Cell Inspector", exact: true})).toBeVisible()
+      await expect(page.getByRole("heading", {name: "Cell inspector", exact: true})).toBeVisible()
     })
 
     test("parses a built-in text comment", async ({page}) => {
@@ -152,7 +152,7 @@ export function describeCellInspector({app, route}: CellInspectorSuiteOptions): 
       await inspect(page, CELL_INSPECTOR_FIXTURES.textCommentBase64)
       await page.getByLabel("Root", {exact: true}).fill("10")
 
-      await expect(page.getByRole("heading", {name: "Cell Inspector", exact: true})).toBeVisible()
+      await expect(page.getByRole("heading", {name: "Cell inspector", exact: true})).toBeVisible()
       await expect(page.getByRole("alert")).toContainText(
         "Root 10 is unavailable. This BoC contains 1 root cell",
       )
@@ -174,7 +174,7 @@ export function describeCellInspector({app, route}: CellInspectorSuiteOptions): 
       await inspect(page, CELL_INSPECTOR_FIXTURES.tvmCodeHex)
 
       const outputTabs = page.getByRole("group", {
-        name: "Cell Inspector output",
+        name: "Cell inspector output",
       })
       await expect(outputTabs).toHaveAttribute("data-tvm-code-status", "available", {
         timeout: 15_000,
@@ -253,7 +253,7 @@ async function expectOutputTabs(page: Page): Promise<void> {
 }
 
 async function expectTvmCodeUnavailable(page: Page): Promise<void> {
-  await expect(page.getByRole("group", {name: "Cell Inspector output"})).toHaveAttribute(
+  await expect(page.getByRole("group", {name: "Cell inspector output"})).toHaveAttribute(
     "data-tvm-code-status",
     "unavailable",
   )
@@ -261,7 +261,7 @@ async function expectTvmCodeUnavailable(page: Page): Promise<void> {
 }
 
 async function expectTvmCodeSecondary(page: Page): Promise<void> {
-  const outputTabs = page.getByRole("group", {name: "Cell Inspector output"})
+  const outputTabs = page.getByRole("group", {name: "Cell inspector output"})
   await expect(outputTabs).toHaveAttribute("data-tvm-code-status", "available")
   await expect(outputTabs.getByRole("button").first()).toHaveText("Parsed")
   await expect(outputTabs.getByRole("button", {name: "Parsed", exact: true})).toHaveAttribute(

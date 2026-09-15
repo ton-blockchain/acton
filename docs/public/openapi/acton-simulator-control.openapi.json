@@ -3,7 +3,7 @@
   "info": {
     "title": "Simulator control API",
     "version": "1.0.0",
-    "description": "Control endpoints for Acton's fast local TON development environment, which provides TON-compatible blocks and APIs for local tooling. The environment is Acton's custom simplified implementation, not a real TON network or validator cluster. When Simulator is started with --require-auth, pass the printed token as Authorization: Bearer <token> or X-API-Key: <token>."
+    "description": "Control endpoints for Acton's fast local TON development environment, which provides TON-compatible blocks and APIs for local tooling. The environment is Acton's custom simplified implementation, not a real TON network or validator cluster. When the simulator is started with --require-auth, pass the printed token as Authorization: Bearer <token> or X-API-Key: <token>."
   },
   "servers": [
     {

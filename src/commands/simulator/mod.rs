@@ -51,7 +51,7 @@ pub async fn simulator_start_cmd(
     liteapi_port: Option<u16>,
 ) -> anyhow::Result<()> {
     println!(
-        "      {} Acton Simulator is a custom simplified implementation, not a real TON network",
+        "      {} Acton simulator is a custom simplified implementation, not a real TON network",
         "Notice".yellow().bold()
     );
     println!(
@@ -123,12 +123,12 @@ pub async fn simulator_start_cmd(
         return match error {
             ServerError::Bind { address, source } => Err(anyhow::Error::new(source).context(
                 format!(
-                    "Failed to start Acton Simulator on {address}\nSet another port with [localnet].port in Acton.toml\nOr stop the process currently listening on that port"
+                    "Failed to start Acton simulator on {address}\nSet another port with [localnet].port in Acton.toml\nOr stop the process currently listening on that port"
                 ),
             )),
             ServerError::LiteApiBind { address, source } => Err(anyhow::Error::new(source).context(
                 format!(
-                    "Failed to start Acton Simulator LiteAPI on {address}\nSet another localnet port with [localnet].port in Acton.toml so the next port is free\nOr stop the process currently listening on that port"
+                    "Failed to start Acton simulator LiteAPI on {address}\nSet another localnet port with [localnet].port in Acton.toml so the next port is free\nOr stop the process currently listening on that port"
                 ),
             )),
             error => Err(error.into()),
@@ -136,7 +136,7 @@ pub async fn simulator_start_cmd(
     }
 
     println!(
-        "     {} Acton Simulator gracefully",
+        "     {} Acton simulator gracefully",
         "Stopped".green().bold()
     );
 

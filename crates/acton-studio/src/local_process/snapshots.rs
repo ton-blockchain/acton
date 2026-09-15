@@ -159,7 +159,7 @@ async fn run(
 
     let client = reqwest::Client::new();
     if status == EnvironmentStatus::Stopped {
-        // Match Localnet restoration: the restored environment becomes available to use.
+        // Match localnet restoration: the restored environment becomes available to use.
         restart_environment_locked(runtime, environment).await?;
 
         let deadline = Instant::now() + LOCALNET_READY_TIMEOUT;

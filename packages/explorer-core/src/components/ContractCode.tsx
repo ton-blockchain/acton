@@ -258,13 +258,13 @@ function StoragePanel({
   const activeStorage =
     activeTab === "base64"
       ? {
-          title: "Data BoC Base64",
+          title: "Data BoC base64",
           value: storageData?.base64,
           wrap: true,
         }
       : activeTab === "hex"
         ? {
-            title: "Data BoC HEX",
+            title: "Data BoC hex",
             value: storageData?.hex,
             wrap: true,
           }

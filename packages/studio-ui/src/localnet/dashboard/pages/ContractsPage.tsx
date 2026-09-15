@@ -49,7 +49,7 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
   const localnetRoutes = useLocalnetRoutes()
   const addressFormat = useAddressFormat()
   const {environment} = useLocalnetRuntime()
-  const simulatorEnabled = supports(environment, "simulator")
+  const transactionEmulatorEnabled = supports(environment, "simulator")
   const [contracts, setContracts] = useState<readonly LocalnetContract[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string>()
@@ -115,7 +115,7 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
     void navigate(routes.addressPath(formatAddress(address, false, addressFormat)))
   }
 
-  const openSimulator = (address: string) => {
+  const openTransactionEmulator = (address: string) => {
     const search = new URLSearchParams({
       address: formatAddress(address, false, addressFormat),
     })
@@ -251,11 +251,11 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
                           icon={<ExternalLink />}
                           onClick={() => openExplorer(contract.address)}
                         />
-                        {simulatorEnabled ? (
+                        {transactionEmulatorEnabled ? (
                           <InlineAction
-                            label="Open in Simulator"
+                            label="Open in transaction emulator"
                             icon={<Waypoints />}
-                            onClick={() => openSimulator(contract.address)}
+                            onClick={() => openTransactionEmulator(contract.address)}
                           />
                         ) : null}
                         <InlineAction

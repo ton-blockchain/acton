@@ -7,7 +7,7 @@ SYNOPSIS
        acton simulator [options] command
 
 DESCRIPTION
-       Acton Simulator is a fast, deterministic TON development environment for
+       Acton simulator is a fast, deterministic TON development environment for
        local execution, forked-state development, and faucet-based funding. It
        produces TON-compatible blocks and provides LiteAPI, TON Center v2/v3,
        Streaming API, and Emulate API surfaces used by many contract and dApp
@@ -73,14 +73,14 @@ SUBCOMMANDS
 
           --liteapi
               Start the LiteAPI server on the TCP port immediately after the
-              Localnet HTTP port. LiteAPI is disabled by default.
+              localnet HTTP port. LiteAPI is disabled by default.
 
           --liteapi-port port
               Set the LiteAPI TCP port explicitly. Requires --liteapi;
-              otherwise LiteAPI uses the Localnet HTTP port plus one.
+              otherwise LiteAPI uses the localnet HTTP port plus one.
 
           --require-auth
-              Require a token for all Localnet HTTP API, control, emulate, and
+              Require a token for all localnet HTTP API, control, emulate, and
               streaming endpoints. The server prints the token on startup.
 
    acton simulator airdrop
@@ -258,7 +258,7 @@ TON CENTER API KEYS
        variables only for one-off overrides or CI.
 
 LOCALNET API AUTH
-       acton simulator start --require-auth protects every Localnet HTTP route
+       acton simulator start --require-auth protects every localnet HTTP route
        under /api/*, /acton_*, /api/emulate/*, and /api/streaming/*. Static UI
        files remain public, but the bundled UI does not receive the token from
        the server. When a protected API request returns 401, the bundled UI
@@ -293,7 +293,7 @@ RUNTIME MODEL
        o  the server keeps running until the process is stopped, for example
           with Ctrl+C
 
-       o  the Localnet UI is available on the root path, for example
+       o  the localnet UI is available on the root path, for example
           http://127.0.0.1:<port>/
 
        o  the node produces a block every --block-time-ms milliseconds,

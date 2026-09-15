@@ -112,7 +112,7 @@ const quickSearchResults: readonly SearchResult[] = [
   },
   {
     id: "quick-api-calls",
-    title: "API Calls",
+    title: "API calls",
     description: "Recent API traffic handled by this environment",
     href: "/api-calls",
     icon: FileJson,
@@ -224,7 +224,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
         break
       }
 
-      const name = token.jetton_content.name || "Unknown Jetton"
+      const name = token.jetton_content.name || "Unknown jetton"
       const symbol = token.jetton_content.symbol || "???"
       const description = token.jetton_content.description
       if (!matchesQuery([name, symbol, description, token.address], query)) {
@@ -247,7 +247,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
 
     if (results.length < 12) {
       for (const item of searchAssetsState.nfts) {
-        const name = contentString(item.content, "name") || "NFT Item"
+        const name = contentString(item.content, "name") || "NFT item"
         const description = contentString(item.content, "description")
         const collectionName = contentString(item.collection?.collection_content, "name")
         if (!matchesQuery([name, description, collectionName, item.address], query)) {

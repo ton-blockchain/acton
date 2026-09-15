@@ -4,7 +4,7 @@ import type {FC} from "react"
 
 import {useLocalnetRuntime} from "../../LocalnetRuntimeProvider"
 
-/** Connects validator session charts to the selected Localnet observer */
+/** Connects validator session charts to the selected localnet observer */
 export const StatsPage: FC = () => {
   const {environment} = useLocalnetRuntime()
   const endpoint = environment?.endpoints.observability

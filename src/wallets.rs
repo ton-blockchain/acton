@@ -379,7 +379,7 @@ pub fn prepare_localnet_wallets(
         .map(|(name, wallet)| {
             anyhow::ensure!(
                 wallet.wallet.address.workchain == 0,
-                "Startup wallet '{name}' must be in workchain 0 for Localnet"
+                "Startup wallet '{name}' must be in workchain 0 for localnet"
             );
 
             let address = wallet.address();

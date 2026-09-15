@@ -61,7 +61,7 @@
   gap: var(--acton-space-4);
 }
 
-/* The text cursor shares the chip container's surface, unlike standalone Simulator inputs. */
+/* The text cursor shares the chip container's surface, unlike standalone message simulation inputs. */
 .walletEditor .sendModes input[role="combobox"] {
   background: transparent;
 }

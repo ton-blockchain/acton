@@ -967,7 +967,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
         <AlertCircle className={styles.errorIcon} />
         <p className={styles.errorText}>{error}</p>
         <button type="button" onClick={() => void navigate(-1)} className={styles.backButton}>
-          <ArrowLeft size={16} /> Go Back
+          <ArrowLeft size={16} /> Go back
         </button>
       </div>
     )
@@ -1483,7 +1483,7 @@ function TraceTabs({
           disabled={disabled}
           tabIndex={disabled ? -1 : undefined}
         >
-          <ListChecks size={16} /> Event Overview
+          <ListChecks size={16} /> Event overview
         </button>
       )}
       <button
@@ -1494,7 +1494,7 @@ function TraceTabs({
         disabled={disabled}
         tabIndex={disabled ? -1 : undefined}
       >
-        <CircleDotDashed size={16} /> Value Flow
+        <CircleDotDashed size={16} /> Value flow
       </button>
       <button
         type="button"
@@ -1514,7 +1514,7 @@ function TraceTabs({
         disabled={disabled}
         tabIndex={disabled ? -1 : undefined}
       >
-        <Database size={16} /> State Changes
+        <Database size={16} /> State changes
       </button>
       <button
         type="button"
@@ -1645,8 +1645,8 @@ function ValueFlowSkeleton(): JSX.Element {
     <div className={styles.skeletonFlowCard} aria-hidden="true">
       <div className={styles.skeletonFlowHeader}>
         <span>Account</span>
-        <span>Balance Change</span>
-        <span>Network Fee</span>
+        <span>Balance change</span>
+        <span>Network fee</span>
       </div>
       {[0, 1].map(index => (
         <div key={`flow-skeleton-${index}`} className={styles.skeletonFlowRow}>

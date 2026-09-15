@@ -185,13 +185,13 @@ function SourcePanel({
           }
         : activeSourceTab === "base64"
           ? {
-              title: "Code BoC Base64",
+              title: "Code BoC base64",
               value: codeData.base64,
               wrap: true,
             }
           : activeSourceTab === "hex"
             ? {
-                title: "Code BoC HEX",
+                title: "Code BoC hex",
                 value: codeData.hex,
                 wrap: true,
               }

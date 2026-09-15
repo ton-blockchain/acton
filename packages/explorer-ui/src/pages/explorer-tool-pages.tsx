@@ -16,7 +16,7 @@ export function ExplorerToolHeader({title}: {readonly title: string}) {
 export function CellInspectorExplorerPage() {
   return (
     <>
-      <ExplorerToolHeader title="Cell Inspector" />
+      <ExplorerToolHeader title="Cell inspector" />
       <CellInspectorPage />
     </>
   )

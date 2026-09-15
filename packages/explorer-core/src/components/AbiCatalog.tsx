@@ -281,7 +281,7 @@ export const AbiCatalog: FC = () => {
               <thead>
                 <tr>
                   <th>Name</th>
-                  <th>Get Methods</th>
+                  <th>Get methods</th>
                   <th>Messages</th>
                   <th>Declarations</th>
                   <th>Errors</th>
@@ -385,7 +385,7 @@ export const AbiCatalog: FC = () => {
                         </div>
                         <p className={styles.localNote}>
                           <CircleAlert size={15} />
-                          <span>Registered ABI remains in this virtual environment</span>
+                          <span>Registered ABI remains in this Studio environment</span>
                         </p>
                         <button
                           type="submit"

@@ -98,7 +98,7 @@ export const Tokens: FC<TokensProps> = ({wallets, client, onAddressClick}) => {
             wallets.map(wallet => {
               const master = wallet.master ?? mastersByAddress.get(toRawAddress(wallet.jetton))
               const symbol = master?.jetton_content?.symbol || "UNKNOWN"
-              const name = master?.jetton_content?.name || "Unknown Jetton"
+              const name = master?.jetton_content?.name || "Unknown jetton"
               const imageSources = getImageSources(master?.jetton_content, TOKEN_IMAGE_SOURCE_KEYS)
               const image = getPrimaryImageSource(master?.jetton_content, TOKEN_IMAGE_SOURCE_KEYS)
 

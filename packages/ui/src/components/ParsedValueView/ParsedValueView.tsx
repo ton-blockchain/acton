@@ -257,7 +257,7 @@ function ParsedScalarValue({
           {canInspectCell && (
             <InlineAction
               label={`Inspect ${inspectableLabel}`}
-              title={`Open this ${inspectableLabel} in the Cell Inspector`}
+              title={`Open this ${inspectableLabel} in the Cell inspector`}
               size="compact"
               icon={<Binary />}
               onClick={() => onCellInspect(inspectableBoc)}

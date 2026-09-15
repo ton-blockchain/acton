@@ -51,7 +51,7 @@ export function ContractPage({client, section}: ContractPageProps) {
   const localnetRoutes = useLocalnetRoutes()
   const addressFormat = useAddressFormat()
   const {environment} = useLocalnetRuntime()
-  const simulatorEnabled = supports(environment, "simulator")
+  const transactionEmulatorEnabled = supports(environment, "simulator")
   const {details, error, loading, reload} = useContractDetails(client, address)
   const [renaming, setRenaming] = useState(false)
 
@@ -78,7 +78,7 @@ export function ContractPage({client, section}: ContractPageProps) {
   const identity = getContractIdentity(contract)
   const userFriendlyAddress = formatAddress(contract.address, false, addressFormat)
   const openExplorer = () => void navigate(explorerRoutes.addressPath(userFriendlyAddress))
-  const openSimulator = () => {
+  const openTransactionEmulator = () => {
     const search = new URLSearchParams({address: userFriendlyAddress})
     void navigate(`${explorerRoutes.emulatePath}?${search}`)
   }
@@ -124,12 +124,12 @@ export function ContractPage({client, section}: ContractPageProps) {
               <Button size="sm" variant="outline" leadingIcon={<Search />} onClick={openExplorer}>
                 Open in Explorer
               </Button>
-              {simulatorEnabled ? (
+              {transactionEmulatorEnabled ? (
                 <Button
                   size="sm"
                   variant="primary"
                   leadingIcon={<Waypoints />}
-                  onClick={openSimulator}
+                  onClick={openTransactionEmulator}
                 >
                   Simulate
                 </Button>
@@ -232,7 +232,7 @@ function ContractSource({
           error ??
           "Register the Acton source artifact that produced the code deployed at this address"
         }
-        action="Open Sources"
+        action="Open sources"
         onAction={onOpenSources}
       />
     )

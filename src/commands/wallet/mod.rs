@@ -462,8 +462,8 @@ fn resolve_airdrop_target(
 /// Resolves both localnet requests from the configured V2 endpoint.
 ///
 /// Studio exposes every environment through one `/rpc` prefix, so removing the
-/// terminal `/api/v2` selects that environment's control API for both simulated
-/// and Localnets. Direct simulator URLs follow the same layout.
+/// terminal `/api/v2` selects that environment's control API for both
+/// simulator networks and localnets. Direct simulator URLs follow the same layout.
 fn localnet_airdrop_urls(config: &ActonConfig) -> anyhow::Result<(reqwest::Url, reqwest::Url)> {
     let networks = config.custom_networks();
     let api_v2 = networks

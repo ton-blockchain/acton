@@ -903,7 +903,7 @@ function SourceDebugPanel({
 
       <SourceDebugResizableSection
         id="callStack"
-        title="Call Stack"
+        title="Call stack"
         collapsed={collapsedSections.callStack}
         height={sectionHeights.callStack}
         grow={true}
@@ -1436,7 +1436,7 @@ function RetraceWorkspaceFc({
             <div className={styles.statusContainer} role="status" aria-live="polite">
               <StatusBadge
                 type="warning"
-                text="Trace Incomplete"
+                text="Trace incomplete"
                 popoverContent="Because the transaction runs in a local sandbox, we can't always reproduce it exactly. Sandbox replay was incomplete, and some values may differ from those on the real blockchain."
               />
             </div>

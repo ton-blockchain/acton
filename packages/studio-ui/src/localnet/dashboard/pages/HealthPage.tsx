@@ -373,7 +373,7 @@ const HealthPageSkeleton: FC = () => (
     </section>
 
     <DataTable title="Services" minWidth="44rem">
-      <DataTableTable aria-label="Loading Localnet services">
+      <DataTableTable aria-label="Loading localnet services">
         <DataTableHead>
           <DataTableRow>
             <DataTableHeaderCell>Service</DataTableHeaderCell>

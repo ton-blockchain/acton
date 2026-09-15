@@ -421,7 +421,7 @@ function tryDecodeNestedTextCommentPayload(slice: Slice): ParsedValue | undefine
 
   return {
     kind: "object",
-    typeName: "Text Comment",
+    typeName: "Text comment",
     entries: [{key: "text", value: textCommentTailValue(parser)}],
   }
 }
@@ -585,11 +585,11 @@ const tryDecodeTextCommentSlice = (baseSlice: Slice): ParsedTransactionBody | un
   }
 
   return {
-    name: "Text Comment",
+    name: "Text comment",
     opcode: 0,
     value: {
       kind: "object",
-      typeName: "Text Comment",
+      typeName: "Text comment",
       entries: [{key: "text", value: textCommentTailValue(parser)}],
     },
   }
@@ -1006,7 +1006,7 @@ export const resolveMessageOpcodeName = (
     return undefined
   }
   if (opcode === 0) {
-    return "Text Comment"
+    return "Text comment"
   }
 
   const destinationContract =

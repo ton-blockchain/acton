@@ -257,7 +257,7 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({environmentId}) => {
                 <DataTableHeaderCell align="center" columnWidth="4rem">
                   Status
                 </DataTableHeaderCell>
-                <DataTableHeaderCell columnWidth="7rem">Status Code</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="7rem">Status code</DataTableHeaderCell>
                 <DataTableHeaderCell columnWidth="7rem">Type</DataTableHeaderCell>
                 <DataTableHeaderCell>Endpoint</DataTableHeaderCell>
                 <DataTableHeaderCell columnWidth="7rem">Duration</DataTableHeaderCell>

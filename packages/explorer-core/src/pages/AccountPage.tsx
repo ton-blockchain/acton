@@ -1795,7 +1795,7 @@ export const AccountPage: FC<AccountPageProps> = ({
 
   const tokenInfo = jettonMaster ?? jettonWalletMaster
   const tokenSymbol = tokenInfo?.jetton_content.symbol
-  const tokenName = tokenInfo?.jetton_content.name || "Unknown Jetton"
+  const tokenName = tokenInfo?.jetton_content.name || "Unknown jetton"
   const tokenDecimals = tokenInfo?.jetton_content.decimals
   const tokenImageSources = getImageSources(tokenInfo?.jetton_content, TOKEN_IMAGE_SOURCE_KEYS)
   const tokenImage = tokenImageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE
@@ -1859,7 +1859,7 @@ export const AccountPage: FC<AccountPageProps> = ({
   const nftCollectionName =
     tokenInfoString(nftCollectionTokenInfo, "name") ||
     contentString(collectionSample?.content, "collection_name") ||
-    (nftCollectionTokenInfo || currentNftCollectionItems.length > 0 ? "NFT Collection" : undefined)
+    (nftCollectionTokenInfo || currentNftCollectionItems.length > 0 ? "NFT collection" : undefined)
   const nftCollectionDescription =
     tokenInfoString(nftCollectionTokenInfo, "description") ||
     contentString(collectionSample?.content, "collection_description")

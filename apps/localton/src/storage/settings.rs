@@ -15,7 +15,7 @@ use crate::storage::{
 
 pub const SETTINGS_SCHEMA_VERSION: u32 = 2;
 
-/// Persistent settings for one Localnet
+/// Persistent settings for one localnet
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct Settings {

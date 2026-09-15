@@ -34,12 +34,12 @@ export function useExplorerPageTitle(): string | undefined {
   if (relativePath === "/elections") return "Elections"
   if (relativePath === "/tokens") return "Tokens"
   if (relativePath === "/abi") return "ABI"
-  if (relativePath === "/address-converter") return "Address Converter"
-  if (relativePath === "/cell") return "Cell Inspector"
-  if (relativePath === "/emulate") return "Emulate Transaction"
-  if (relativePath === "/sources") return "Verified Sources"
+  if (relativePath === "/address-converter") return "Address converter"
+  if (relativePath === "/cell") return "Cell inspector"
+  if (relativePath === "/emulate") return "Emulate transaction"
+  if (relativePath === "/sources") return "Verified sources"
   if (relativePath === "/favorites") return "Favorites"
-  if (relativePath === "/suspended") return "Suspended Addresses"
+  if (relativePath === "/suspended") return "Suspended addresses"
 
   if (address) {
     const preferredTitle = pageTitleFromState(location.state) ?? addressName

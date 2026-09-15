@@ -49,7 +49,7 @@ pub struct RunGetMethodRequest {
     /// A method name or signed 32-bit method id.
     pub method: StringOrNumber,
     pub stack: Vec<Value>,
-    /// Historical masterchain seqno supported by `TON Center` v2 and Acton Simulator.
+    /// Historical masterchain seqno supported by `TON Center` v2 and Acton simulator.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seqno: Option<StringOrNumber>,
 }

@@ -61,7 +61,7 @@ export const ExplorerIndexPage: FC<ExplorerIndexPageProps> = ({
               <Binary aria-hidden="true" />
             </span>
             <span className={styles.toolCardBadge}>Inspect</span>
-            <span className={styles.toolCardTitle}>Cell Inspector</span>
+            <span className={styles.toolCardTitle}>Cell inspector</span>
             <span className={styles.toolCardDescription}>
               Decode Cell and BoC data, inspect bits and references, and parse values with ABI or
               custom TL-B schemas.
@@ -74,7 +74,7 @@ export const ExplorerIndexPage: FC<ExplorerIndexPageProps> = ({
                 <Droplets aria-hidden="true" />
               </span>
               <span className={styles.toolCardBadge}>Testnet</span>
-              <span className={styles.toolCardTitle}>Testnet Faucet</span>
+              <span className={styles.toolCardTitle}>Testnet faucet</span>
               <span className={styles.toolCardDescription}>
                 Request Testnet GRAM for development, testing, contract deployment, and experiments
                 on TON.

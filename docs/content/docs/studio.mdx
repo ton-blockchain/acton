@@ -1,0 +1,267 @@
+---
+title: "Acton Studio"
+sidebarTitle: "Studio"
+description: "Develop contracts with local tests, virtual environments, and public networks in one browser workspace"
+icon: LayoutDashboard
+---
+
+Acton Studio is the browser workspace for Acton development. Keep it running to rebuild project artifacts, inspect local tests, manage virtual environments, and interact with testnet and mainnet. All with the same consistent UI.
+
+Start with local emulator tests, continue development on a simulator network, validate deployments on testnet, then deploy to mainnet. Explorer, wallets, contracts, and debugging tools follow the same layout across virtual environments and public networks.
+
+## Get started
+
+With [Acton](/docs/installation) 1.2 or later installed, run this from the directory containing [`Acton.toml`](/docs/acton-toml):
+
+```bash
+acton studio
+```
+
+Studio opens [the local workspace](http://127.0.0.1:3015) in the browser. The overview shows the project, connection status, recent tests, and running environments.
+
+![Studio overview with local tests, virtual environments, real networks, and test results from a counter template project](imgs/overview-dark.png)
+
+Outside a project, Studio can explore public networks and create simulator networks without project wallets. An `Acton.toml` project is required for local tests, project builds, and configured wallets.
+
+<Callout type="note">
+  When Studio finds no contracts in `Acton.toml`, it suggests adding one on stdout.
+</Callout>
+
+Studio listens on loopback only — press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop it.
+
+To open the printed Studio URL manually, pass `--no-open`:
+
+```bash
+acton studio --no-open
+```
+
+If the default port is occupied, pass `--port <PORT>`, replacing `<PORT>` with an available port number. Only one Studio instance can run per project — use different ports for different projects.
+
+```bash
+acton studio --port <PORT>
+```
+
+The workspace history and managed environment data are kept in `.studio/` placed within the root of the git repository, nearest `Acton.toml`, or the current directory if neither are found.
+
+## Daemon
+
+Studio watches project Tolk sources and `Acton.toml`. Changes trigger an [Acton build](/docs/building/overview) and refresh the source and ABI artifacts used to decode contracts and trace execution. Build diagnostics appear in the terminal running Studio.
+
+Run tests from the browser or CLI after editing. Run deployment scripts when ready to update the selected network.
+
+Switching networks in the Studio does not discard the previous state — contracts and balances stay on the network where they were created.
+
+## Dashboard
+
+The Studio is split between three main areas:
+
+- <kbd>[Local tests](#local-tests)</kbd>,
+- <kbd>[Virtual environments](#virtual-environments)</kbd>,
+- and <kbd>[Real networks](#real-networks)</kbd>.
+
+The key information from each is gathered together in the <kbd>Overview</kbd> page.
+
+Each network workspace keeps the [tools](#common-tools) in the same order. When in a virtual environment or a real network, use <kbd>Find…</kbd> in the upper-left corner to locate tools, addresses, transactions, blocks, and known contracts.
+
+Select the environment name to return to the main navigation.
+
+### Local tests
+
+Studio integrates all [Test UI](/docs/testing/test-ui/overview) capabilities, including result and transaction inspector plus coverage and gas profiling into <kbd>Local tests</kbd>, alongside project-wide test run history.
+
+These [tests execute in the local emulator](/docs/testing/overview) rather than in a virtual environment:
+
+- Select <kbd>Run tests</kbd>, keep <kbd>Save traces</kbd> enabled, and leave the filters empty to run the entire project test suite.
+- Narrow later runs by path, test name, or include/exclude patterns.
+- Enable <kbd>Fail fast</kbd> to stop at the first failure. A run started in Studio can also be cancelled from its details page.
+
+With Studio already running, tests started in another terminal report to the same history:
+
+```bash
+acton test
+```
+
+The run table shows results, duration, start time, and whether Studio or the CLI started the run.
+
+![Studio test history with CLI and Studio runs, results, duration, and start time](imgs/tests-dark.png)
+
+Open a run, select a test, and inspect:
+
+- <kbd>Info</kbd>: failures, matcher messages, source locations, and fees.
+- <kbd>Transactions</kbd>: message chains, compute/action/storage/bounce phases, exit codes, and state changes.
+- <kbd>Logs</kbd>: executor and VM output.
+
+<kbd>Runner output</kbd> captures compilation and process failures for Studio-started runs. CLI runs keep stdout and stderr in their terminal.
+
+![A counter test in Studio with test navigation, transaction details, and execution results](imgs/test-details-dark.png)
+
+<Callout type="tip">
+  See the [Test UI reference](/docs/testing/test-ui/reference) for exact transaction panels, trace controls, and source navigation.
+</Callout>
+
+Completed runs survive Studio restarts. To disable reporting for one run, pass [`--no-studio-reporting`](/docs/commands/test#options):
+
+```bash
+acton test --no-studio-reporting
+```
+
+To override the project default, set `studio-reporting = false` in `Acton.toml` under [`[test]`](/docs/acton-toml#test).
+
+### Virtual environments
+
+Create isolated local TON networks, keep presets and move between active environments:
+
+| Environment | Use it for | Network controls |
+| ----------- | ---------- | ---------------- |
+| [`simulator` network](/docs/commands/simulator) | Daily contract and frontend development with an emulated network and TON-compatible APIs | Forked state, funding, mining, virtual time, snapshots, API latency, and request rate limits |
+| [`localnet`](/docs/commands/localnet) | Testing with real validator-engine nodes and TON Center indexers running in Docker | Node management, logs, health, test traffic, and blockchain snapshots |
+
+A simulator network needs only Acton to emulate the TON network state without running validators or consensus. It is a fast, lightweight development solution when local tests are no longer enough and the project is not ready for testnet or mainnet yet.
+
+A localnet also requires Docker to be installed and running, with enough memory and disk space for TON nodes and indexers. Each running localnet might use more than 10 GB of disk space per day. It is generally not needed unless a project needs deep tests and integrations in a real network, and the TON testnet falls short on fast iteration, required funds, or other factors like its current load.
+
+![Virtual environments with running and stopped localnet networks](imgs/environments-dark.png)
+
+#### Basic setup
+
+To start the common development loop:
+
+1. Open <kbd>Virtual environments</kbd> → <kbd>Create environment</kbd>.
+1. Keep <kbd>Simulator</kbd> selected, enter a name, and choose a clean network or a testnet/mainnet fork.
+1. Select project wallets as <kbd>Startup accounts</kbd> to initialize and fund each with 100 GRAM.
+1. Create the environment and open <kbd>Home</kbd> → <kbd>Connect environment</kbd>.
+1. Select <kbd>Acton project</kbd>, copy the generated network entry into `Acton.toml`, and run the accompanying deployment command.
+
+![Create environment dialog configured for a simulator network](imgs/create-environment-dark.png)
+
+<Callout type="note">
+  For simulator timing and load scenarios, expand <kbd>Network and mining</kbd> during creation. Choose automatic or manual mining, block time, request rate limits, and artificial response delay.
+</Callout>
+
+Alternative setups:
+
+- <kbd>JavaScript app</kbd> provides client setup for TypeScript code running `@ton/ton`.
+- <kbd>RPC endpoints</kbd> lists TON Center endpoints for other compatible tools.
+
+The <kbd>Integrate</kbd> page in the network sidebar keeps all setup examples available. Use Studio's generated URLs to observe requests and deployments — those URLs remain stable across runtime restarts.
+
+![Localnet home page with project integration settings, node information, and recent transactions](imgs/environment-dashboard-dark.png)
+
+#### State forks
+
+A simulator network can fork public account state at a chosen block. A localnet can import selected accounts during creation or later through <kbd>Import accounts</kbd>. Imports copy balances, code, and data, without source-network transaction history.
+
+Importing into an existing localnet pauses it for a hardfork, replaces accounts at the selected addresses, then resumes the network.
+
+#### Faucets
+
+Both simulator and localnet provide a GRAM <kbd>Faucet</kbd>, while the simulator networks also provide a Jetton faucet.
+
+#### Config management
+
+Open <kbd>Network</kbd> → <kbd>Config</kbd> to inspect and edit blockchain configuration parameters in either environment.
+
+#### Additional tools
+
+On localnet, <kbd>Network</kbd> also provides node and validator management, logs, statistics, and service health. Its <kbd>Activity</kbd> page generates transfers, Jettons, and NFTs for testing. <kbd>Admin actions</kbd> edits account balances, code, and state through a hardfork.
+
+Use <kbd>Snapshots</kbd> to save named states and restore them for repeatable tests. Simulator snapshots support JSON import and export. A localnet pauses while creating a blockchain snapshot — restoration restarts services and rebuilds indexed data.
+
+![Localnet snapshots with saved block, archive size, state size, and restore actions](imgs/snapshots-dark.png)
+
+#### Network settings
+
+The settings icon at the bottom of the sidebar opens environment identity, endpoints, and runtime settings.
+
+For a running simulator, adjust <kbd>Response delay</kbd> and <kbd>Mine empty blocks</kbd> there — the request rate limit and initial mining schedule are chosen during creation.
+
+Stopped environments are preserved. Renaming an environment does not affect its original endpoints.
+
+<Callout type="caution">
+  Deleting an environment permanently removes its managed state and snapshots. Stop it instead to preserve that state for later development.
+</Callout>
+
+### Real networks
+
+Open <kbd>Real networks</kbd> → <kbd>Testnet</kbd> or <kbd>Mainnet</kbd> to inspect accounts, transactions, tokens, and NFTs, run get-methods, emulate messages, and interact through wallets.
+
+Public networks have most of the same workspace tools as [virtual environments](#virtual-environments), except for their lifecycle, administration, and mining controls. Testnet dashboard retains the <kbd>Faucet</kbd> page that works by utilizing the [real faucet provided by Acton](/docs/wallets#fund-a-wallet-on-testnet).
+
+Acton CLI commands route default testnet and mainnet requests automatically through the running Studio instance, making submissions visible alongside project source and ABI artifacts.
+
+Custom RPC endpoints and external applications need the generated <kbd>Integrate</kbd> settings to send requests through Studio. [Deployment scripts](/docs/deploy) use the network selected by `--net` — changing the browser's selected network does not change a CLI command's destination.
+
+<Callout type="caution">
+  Public-network writes submit transactions from the selected wallet. Validate on a simulator network and testnet before mainnet, then check the network, recipient, and amount. Transactions on mainnet spend real funds and **cannot** be rolled back.
+</Callout>
+
+## Common tools
+
+Each network workspace keeps the tools in the same order. When in a virtual environment or a real network, use <kbd>Find…</kbd> in the upper-left corner to locate tools, addresses, transactions, blocks, and known contracts.
+
+### Explorer
+
+Browse accounts, blocks, tokens, NFTs, and blockchain configuration; inspect elections on public networks. Run ABI-backed get-methods and inspect code, storage, transaction phases, fees, messages, and state changes. Retrace transactions for execution details; save accounts in <kbd>Favorites</kbd>.
+
+![Explorer account page with a named contract, balance, detected type, and history tabs](imgs/explorer-dark.png)
+
+### Contracts
+
+Name and track addresses, inspect source artifacts and ABI, and open contracts in Explorer or message simulation.
+
+![Contracts registry with a named active contract and source availability](imgs/contracts-dark.png)
+
+- Successful deployments using Studio endpoints enter <kbd>Contracts</kbd> automatically. Existing addresses outside of the project need to be added manually.
+
+- Registration alone does not supply source or ABI: source matching uses the deployed code hash — the catalog ABI can decode a contract independently. Removing a registry entry leaves the on-chain account intact.
+
+### Transaction emulator
+
+Build a typed message or paste a raw BoC, set temporary account/time overrides, and emulate against the selected network. Message simulation works within a network workspace and does not require a simulator network.
+
+![Message simulation with builder and raw input modes, timestamp overrides, and account state overrides](imgs/simulator-dark.png)
+
+<kbd>Transaction emulator</kbd> does not change the network state. Its result depends on the selected state and present overrides. Later emulations can differ from the earlier ones.
+
+### Cell inspector
+
+Decode BoC data, navigate roots, bits, and references, apply a TL-B schema, or inspect code disassembly.
+
+![Cell inspector with decoded BoC data, cell statistics, and parsed output](imgs/cell-inspector-dark.png)
+
+### API calls
+
+Filter requests by endpoint, read/write, status, or Studio origin. Inspect request and response data and timing.
+
+![API calls with request filters and captured network traffic](imgs/api-calls-dark.png)
+
+### Additional tools
+
+| Tool | Functionality |
+| ---- | ------------- |
+| <kbd>Address converter</kbd> | Convert raw and friendly address formats and inspect bounceable and testnet-only flags. |
+| <kbd>Wallets</kbd> | Inspect configured wallet balances, send transactions, or connect a dApp through TON Connect. Mnemonics are **not** sent to the browser. |
+| <kbd>API reference</kbd> | Execute supported V2/V3, simulator control, and localnet admin/config operations. |
+
+## Troubleshooting
+
+| Symptom | Check |
+| ------- | ----- |
+| Studio does not start | Choose another port and check whether Studio already runs for the same project. |
+| A test run is missing | Start Studio before the test, use the same project root, and enable reporting. Earlier terminal-only runs are not imported automatically. |
+| Explorer data is stale | Check the selected network and runtime readiness. The localnet APIs and indexers must be ready, not only its TON node. Inspect startup/Docker output if startup fails. |
+| A contract or request is missing | Use the generated Studio endpoint. Direct provider requests bypass observation; add existing contracts manually. |
+| Source is unavailable | Build the project version matching the deployed code hash. |
+| An API request is unauthorized | Enter the environment API token through the sidebar key control; it is separate from wallet credentials. |
+| A tool is absent | Its availability depends on the selected network's capabilities and runtime status. |
+
+- <kbd>API calls</kbd> keeps a bounded, temporary log — older entries can be evicted and restarting Studio clears it.
+
+- Use Studio controls to manage saved state instead of editing `.studio/`.
+
+- When [reporting a bug](https://github.com/ton-blockchain/acton/issues), include the Acton version, network type, and relevant errors, excluding credentials. Ensure that there are clear and minimal steps to reproduce the bug.
+
+## Next steps
+
+- [Write and configure tests](/docs/testing/overview) for the local emulator.
+- [Prepare deployment scripts](/docs/deploy) and [configure wallets](/docs/wallets) for network interaction.

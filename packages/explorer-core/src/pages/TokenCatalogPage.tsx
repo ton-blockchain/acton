@@ -272,7 +272,7 @@ export const TokenCatalogPage: FC<TokenCatalogPageProps> = ({client, embedded = 
                           </span>
                           <span className={styles.tokenText}>
                             <strong className={styles.tokenName}>
-                              {token.jetton_content.name || "Unknown Jetton"}
+                              {token.jetton_content.name || "Unknown jetton"}
                             </strong>
                             <span className={styles.tokenSymbol}>
                               {token.jetton_content.symbol || "Unknown symbol"}

@@ -52,7 +52,7 @@ export function TlbCellViewer({
       <RawDataBlock
         className={styles.parsedBlock}
         contentClassName={styles.parsedBlockContent}
-        title="Parsed Cell"
+        title="Parsed cell"
         titleLabel="parsed cell"
         value={boc}
         copyValue={parsed.bocHex}
@@ -95,7 +95,7 @@ function parseTlbCell(boc: string, schema: string): ParsedTlbCell {
     cell = Cell.fromBase64(boc)
   } catch (error) {
     return {
-      title: "TON Cell",
+      title: "TON cell",
       bocHex: "",
       bits: 0,
       refs: 0,
@@ -110,7 +110,7 @@ function parseTlbCell(boc: string, schema: string): ParsedTlbCell {
     const result = parseTLB(schema).deserialize(boc, true)
     if (!result.success) {
       return {
-        title: "TON Cell",
+        title: "TON cell",
         bocHex,
         bits: cell.bits.length,
         refs: cell.refs.length,
@@ -128,7 +128,7 @@ function parseTlbCell(boc: string, schema: string): ParsedTlbCell {
     }
   } catch (error) {
     return {
-      title: "TON Cell",
+      title: "TON cell",
       bocHex,
       bits: cell.bits.length,
       refs: cell.refs.length,
@@ -219,7 +219,7 @@ function getParsedCellTitle(value: ParsedCell): string {
     if (typeof kind === "string") return kind
   }
 
-  return "TON Cell"
+  return "TON cell"
 }
 
 function normalizeTypeName(typeName: string): string {

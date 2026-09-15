@@ -475,7 +475,7 @@ impl LocalnetHandle {
             if let Some(status) = self
                 .child_mut()
                 .try_wait()
-                .map_err(|e| format!("Failed to poll Localnet process: {e}"))?
+                .map_err(|e| format!("Failed to poll localnet process: {e}"))?
             {
                 return Err(format!("Localnet exited before ready with status {status}"));
             }

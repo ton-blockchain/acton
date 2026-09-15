@@ -67,7 +67,7 @@ export function formatExitCode(
 ): FormattedExitCode {
   const codeLabel = String(code).trim() || "unknown"
   const description = exitCodeDescription(code, options)
-  const message = `Exit Code: ${codeLabel}: ${description}`
+  const message = `Exit code: ${codeLabel}: ${description}`
 
   return {
     code: codeLabel,

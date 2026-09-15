@@ -1012,7 +1012,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                 >
                   {actionsSupported && (
                     <section className={styles.filterSection}>
-                      <div className={styles.filterSectionTitle}>History View</div>
+                      <div className={styles.filterSectionTitle}>History view</div>
                       <div className={styles.segmentedControl}>
                         <button
                           type="button"

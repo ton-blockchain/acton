@@ -41,11 +41,11 @@ const apiReferences: Record<
     specUrl: "/openapi/acton-simulator-control.openapi.json",
   },
   admin: {
-    title: "Localton Admin API",
+    title: "Localton admin API",
     slug: "localton-admin-api",
   },
   config: {
-    title: "Localton Config API",
+    title: "Localton config API",
     slug: "localton-config-api",
   },
 }

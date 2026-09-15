@@ -944,7 +944,7 @@ const DesktopMoreMenu: FC = () => {
             </Link>
             <Link className={styles.desktopMoreItem} to="/address-converter" onClick={closeMenu}>
               <span className={styles.desktopMoreItemCopy}>
-                <span className={styles.desktopMoreItemTitle}>Address Converter</span>
+                <span className={styles.desktopMoreItemTitle}>Address converter</span>
                 <span className={styles.desktopMoreItemDescription}>
                   Convert raw and friendly TON addresses
                 </span>
@@ -952,7 +952,7 @@ const DesktopMoreMenu: FC = () => {
             </Link>
             <Link className={styles.desktopMoreItem} to="/cell" onClick={closeMenu}>
               <span className={styles.desktopMoreItemCopy}>
-                <span className={styles.desktopMoreItemTitle}>Cell Inspector</span>
+                <span className={styles.desktopMoreItemTitle}>Cell inspector</span>
                 <span className={styles.desktopMoreItemDescription}>
                   Inspect and decode TON cells
                 </span>
@@ -1408,10 +1408,10 @@ export const ExplorerApp: FC = () => {
                                 Verified contracts
                               </Link>
                               <Link to="/address-converter" onClick={closeMobileHeaderPanels}>
-                                Address Converter
+                                Address converter
                               </Link>
                               <Link to="/cell" onClick={closeMobileHeaderPanels}>
-                                Cell Inspector
+                                Cell inspector
                               </Link>
                               <Link to="/emulate" onClick={closeMobileHeaderPanels}>
                                 Emulator

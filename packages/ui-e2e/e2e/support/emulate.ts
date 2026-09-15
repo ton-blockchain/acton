@@ -19,7 +19,7 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
       await prepareVisualPage(page, {app})
       await page.goto(route)
       await expect(
-        page.getByRole("heading", {name: "Emulate Transaction", exact: true}),
+        page.getByRole("heading", {name: "Emulate transaction", exact: true}),
       ).toBeVisible()
     })
 

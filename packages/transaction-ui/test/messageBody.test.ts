@@ -545,10 +545,10 @@ describe("decodeCellWithAbi", () => {
 
     expect(decodeCellWithAbi(cell, extendedAbi)).toEqual({
       category: "comment",
-      name: "Text Comment",
+      name: "Text comment",
       value: {
         kind: "object",
-        typeName: "Text Comment",
+        typeName: "Text comment",
         entries: [{key: "text", value: {kind: "scalar", value: "hello"}}],
       },
       provenance: {source: "text-comment", parser: "built-in"},

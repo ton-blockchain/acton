@@ -94,7 +94,7 @@ export function ValueFlowTable({
           <DataTableRow>
             <DataTableHeaderCell columnWidth="20rem">Account</DataTableHeaderCell>
             <DataTableHeaderCell align="right" columnWidth={numericColumnWidth}>
-              Balance Change
+              Balance change
             </DataTableHeaderCell>
             {assets.map(asset => (
               <DataTableHeaderCell
@@ -107,7 +107,7 @@ export function ValueFlowTable({
               </DataTableHeaderCell>
             ))}
             <DataTableHeaderCell align="right" columnWidth={numericColumnWidth}>
-              Network Fee
+              Network fee
             </DataTableHeaderCell>
           </DataTableRow>
         </DataTableHead>

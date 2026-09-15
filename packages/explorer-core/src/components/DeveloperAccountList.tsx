@@ -164,10 +164,10 @@ function getAccountStatus(state: V3AccountState | undefined): AccountStatusInfo 
 }
 
 const KNOWN_ACCOUNT_TYPES: readonly [string, string][] = [
-  ["jetton_wallet", "Jetton Wallet"],
-  ["jetton_master", "Jetton Master"],
-  ["nft_collection", "NFT Collection"],
-  ["nft_item", "NFT Item"],
+  ["jetton_wallet", "Jetton wallet"],
+  ["jetton_master", "Jetton master"],
+  ["nft_collection", "NFT collection"],
+  ["nft_item", "NFT item"],
 ]
 
 function getAccountType(state: V3AccountState | undefined): string {

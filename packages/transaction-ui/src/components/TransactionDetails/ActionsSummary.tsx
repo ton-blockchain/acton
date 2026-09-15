@@ -64,14 +64,14 @@ const getActionIcon = (actionType: OutAction["type"]): ActionIconMeta => {
       return {
         badgeClassName: styles.actionIconSendMsg,
         element: <FiCornerUpRight size={14} />,
-        label: "Send Message",
+        label: "Send message",
       }
     }
     case "setCode": {
       return {
         badgeClassName: styles.actionIconSetCode,
         element: <FiCode size={14} />,
-        label: "Set Code",
+        label: "Set code",
       }
     }
     case "reserve": {
@@ -85,7 +85,7 @@ const getActionIcon = (actionType: OutAction["type"]): ActionIconMeta => {
       return {
         badgeClassName: styles.actionIconChangeLibrary,
         element: <FiBookOpen size={14} />,
-        label: "Change Library",
+        label: "Change library",
       }
     }
     default: {
@@ -380,7 +380,7 @@ const renderActionDetails = (
                     )}
                   </div>
                 )}
-                <div className={styles.messageDataTitle}>Message Data</div>
+                <div className={styles.messageDataTitle}>Message data</div>
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Opcode:</span>
                   <div className={styles.detailValue}>
@@ -413,7 +413,7 @@ const renderActionDetails = (
             )}
             {execution.failureCode !== undefined && (
               <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Exit Code:</span>
+                <span className={styles.detailLabel}>Exit code:</span>
                 <span className={styles.detailValue}>
                   <ExitCodeChip exitCode={execution.failureCode} abi={contractAbi} phase="action" />
                 </span>
@@ -435,7 +435,7 @@ const renderActionDetails = (
           </div>
           <div className={styles.detailsContent}>
             <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>Code Hash:</span>
+              <span className={styles.detailLabel}>Code hash:</span>
               <span className={styles.detailValue}>
                 <RawDataBlock value={action.newCode.hash().toString("hex")} />
               </span>
@@ -449,7 +449,7 @@ const renderActionDetails = (
             <DisasmSection bocHex={newCodeBocHex} />
             {execution.failureCode !== undefined && (
               <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Exit Code:</span>
+                <span className={styles.detailLabel}>Exit code:</span>
                 <span className={styles.detailValue}>
                   <ExitCodeChip exitCode={execution.failureCode} abi={contractAbi} phase="action" />
                 </span>
@@ -490,7 +490,7 @@ const renderActionDetails = (
             )}
             {execution.failureCode !== undefined && (
               <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Exit Code:</span>
+                <span className={styles.detailLabel}>Exit code:</span>
                 <span className={styles.detailValue}>
                   <ExitCodeChip exitCode={execution.failureCode} abi={contractAbi} phase="action" />
                 </span>
@@ -522,7 +522,7 @@ const renderActionDetails = (
             <div className={styles.detailRow}>
               <span className={styles.detailLabel}>Reference:</span>
               <span className={styles.detailValue}>
-                {action.libRef.type === "hash" ? "Library Hash" : "Embedded Library"}
+                {action.libRef.type === "hash" ? "Library hash" : "Embedded library"}
               </span>
             </div>
             <div className={styles.detailRow}>
@@ -541,11 +541,11 @@ const renderActionDetails = (
               </span>
             </div>
             {isEmbeddedLibrary && embeddedLibraryBocHex && (
-              <DisasmSection bocHex={embeddedLibraryBocHex} title="Library Disassembly" />
+              <DisasmSection bocHex={embeddedLibraryBocHex} title="Library disassembly" />
             )}
             {execution.failureCode !== undefined && (
               <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Exit Code:</span>
+                <span className={styles.detailLabel}>Exit code:</span>
                 <span className={styles.detailValue}>
                   <ExitCodeChip exitCode={execution.failureCode} abi={contractAbi} phase="action" />
                 </span>
@@ -594,7 +594,7 @@ export function ActionsSummary({
             "external-out"
           )
         return {
-          title: "Send Message",
+          title: "Send message",
           description:
             message.info.type === "internal"
               ? `Internal → ${message.info.dest.toString()}`
@@ -604,7 +604,7 @@ export function ActionsSummary({
       }
       case "setCode": {
         return {
-          title: "Set Code",
+          title: "Set code",
           description: "Update contract code",
           value: "",
         }
@@ -618,7 +618,7 @@ export function ActionsSummary({
       }
       case "changeLibrary": {
         return {
-          title: "Change Library",
+          title: "Change library",
           description:
             action.libRef.type === "hash" ? "Attach library by hash" : "Attach embedded library",
           value: "",

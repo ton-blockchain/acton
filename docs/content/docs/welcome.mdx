@@ -5,7 +5,7 @@ description: "Acton is an all-in-one TON smart contract development toolkit"
 
 import {Step, Steps} from "fumadocs-ui/components/steps";
 
-Acton is an all-in-one TON smart contract development toolkit written in Rust. It combines project scaffolding, build, testing, scripting, wallet and network operations, verification, linting, formatting, and low-level VM tooling in one CLI.
+Acton is an all-in-one TON smart contract development toolkit written in Rust. It combines project scaffolding, build, testing, scripting, wallet and network operations, verification, linting, formatting, and low-level VM tooling in one CLI, with [Acton Studio](/docs/studio) as its browser workspace.
 
 <Callout>
     New to Acton? Start with the [installation](/docs/installation), then follow the [quickstart](/docs/quickstart).
@@ -17,6 +17,8 @@ Acton is an all-in-one TON smart contract development toolkit written in Rust. I
 - Build contracts, run tests, and script interactions with a single CLI.
 - Lint, format, and ensure contract code quality through coverage, mutation, and integration tests.
 - Manage wallets, deploy to the network, and verify published contracts.
+- Develop and test applications in virtual environments: simulator networks and full localnets.
+- Transition from local tests to virtual environments to real networks with the same comprehensive Studio UI.
 
 ## Start here
 
@@ -42,6 +44,9 @@ For an existing repository, start with `acton init` and [grow the project](/docs
 <Cards>
     <Card href="/docs/testing/overview" title="Test runner">
         Write unit and integration tests in Tolk, inspect traces, and measure coverage.
+    </Card>
+    <Card href="/docs/studio" title="Acton Studio">
+        Accelerate development with virtual environments and universal UI.
     </Card>
     <Card href="/docs/lint" title="Linting">
         Check Tolk code, configure rules, and integrate checks into CI.

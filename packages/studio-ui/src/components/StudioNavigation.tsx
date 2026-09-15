@@ -112,7 +112,7 @@ export function StudioNavigation({
       <img className={styles.workspaceMark} src={actonStudioLogo} alt="" />
       <span className={styles.workspaceBody}>
         <span className={styles.workspaceTitleRow}>
-          <span className={styles.workspaceName}>Acton Studio</span>
+          <span className={styles.workspaceName}>Studio</span>
         </span>
         <span className={styles.workspaceMeta}>by Acton</span>
       </span>

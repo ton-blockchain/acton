@@ -411,7 +411,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 EnvironmentDriver::ActonSimulatedLocalnet { .. } => {
                     Err(EnvironmentRuntimeError::Conflict {
                         code: "environment_health_unavailable",
-                        message: "Health diagnostics are available for Localnet environments"
+                        message: "Health diagnostics are available for localnet environments"
                             .to_owned(),
                     })
                 }
@@ -449,7 +449,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
             let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver else {
                 return Err(EnvironmentRuntimeError::Conflict {
                     code: "environment_activity_unavailable",
-                    message: "Activity generation is available for Localnet environments"
+                    message: "Activity generation is available for localnet environments"
                         .to_owned(),
                 });
             };
@@ -580,7 +580,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 EnvironmentDriver::ActonSimulatedLocalnet { .. } => {
                     Err(EnvironmentRuntimeError::Conflict {
                         code: "environment_config_unavailable",
-                        message: "Configuration editing is available for Localnet environments"
+                        message: "Configuration editing is available for localnet environments"
                             .to_owned(),
                     })
                 }
@@ -1598,7 +1598,7 @@ fn spawn_localnet(
         mine_empty_blocks,
     } = config
     else {
-        unreachable!("localnet driver requires an Acton Simulator configuration");
+        unreachable!("localnet driver requires an Acton simulator configuration");
     };
     let mut command = Command::new(acton_executable);
     command

@@ -665,7 +665,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({
               trailingIcon={<ArrowUpRight size={16} />}
               disabled={isSubmitDisabled}
             >
-              {isSubmitting ? "Sending..." : isJettonMode ? "Mint Jetton" : "Send GRAM"}
+              {isSubmitting ? "Sending..." : isJettonMode ? "Mint jetton" : "Send GRAM"}
             </Button>
           </div>
         </form>

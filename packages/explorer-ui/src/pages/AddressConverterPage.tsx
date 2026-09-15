@@ -13,7 +13,7 @@ export function AddressConverterPage() {
 
   return (
     <>
-      <ExplorerToolHeader title="Address Converter" />
+      <ExplorerToolHeader title="Address converter" />
       <Converter
         onOpenAddress={(address, testOnly) => {
           const search = new URLSearchParams(searchParams)

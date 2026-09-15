@@ -147,7 +147,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 onClick={onCollapse}
                 className={styles.collapseButton}
-                aria-label={isCollapsed ? "Pin Sidebar" : "Collapse Sidebar"}
+                aria-label={isCollapsed ? "Pin sidebar" : "Collapse sidebar"}
               >
                 <PanelLeft aria-hidden="true" />
               </button>

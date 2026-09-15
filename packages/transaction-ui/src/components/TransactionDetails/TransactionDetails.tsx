@@ -347,7 +347,7 @@ function TransactionDetailsContent({
   return (
     <div className={styles.transactionDetailsContainer}>
       <div className={styles.detailRow}>
-        <div className={styles.detailLabel}>{isTickTock ? "Trigger" : "Message Route"}</div>
+        <div className={styles.detailLabel}>{isTickTock ? "Trigger" : "Message route"}</div>
         <div className={styles.heightDetailValue}>
           <div className={styles.messageRouteValue}>
             {isTickTock ? (
@@ -414,7 +414,7 @@ function TransactionDetailsContent({
 
       {!isTickTock && inMessage && inMessage.info.type === "internal" && (
         <div className={styles.labeledSectionRow}>
-          <div className={styles.labeledSectionTitle}>In Message</div>
+          <div className={styles.labeledSectionTitle}>In message</div>
 
           <div className={styles.labeledSectionContent}>
             <div className={styles.multiColumnRow}>
@@ -426,7 +426,7 @@ function TransactionDetailsContent({
               </div>
               {sendMode !== undefined && (
                 <div className={`${styles.multiColumnItem} ${styles.sendModeItem}`}>
-                  <div className={styles.multiColumnItemTitle}>Send Mode</div>
+                  <div className={styles.multiColumnItemTitle}>Send mode</div>
                   <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
                     <SendModeViewer mode={sendMode} />
                   </div>
@@ -445,7 +445,7 @@ function TransactionDetailsContent({
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Created At</div>
+                <div className={styles.multiColumnItemTitle}>Created at</div>
                 <DateTime
                   className={`${styles.multiColumnItemValue} ${styles.timestampValue}`}
                   data-visual-dynamic="timestamp"
@@ -456,7 +456,7 @@ function TransactionDetailsContent({
                 />
               </div>
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Created Lt</div>
+                <div className={styles.multiColumnItemTitle}>Created LT</div>
                 <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
                   {inMessage.info.createdLt.toString()}
                 </div>
@@ -482,12 +482,12 @@ function TransactionDetailsContent({
 
       {!isTickTock && inMessage && inMessage.info.type === "external-in" && (
         <div className={styles.labeledSectionRow}>
-          <div className={styles.labeledSectionTitle}>In Message</div>
+          <div className={styles.labeledSectionTitle}>In message</div>
 
           <div className={styles.labeledSectionContent}>
             <div className={styles.multiColumnRow}>
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Created At</div>
+                <div className={styles.multiColumnItemTitle}>Created at</div>
                 <DateTime
                   className={`${styles.multiColumnItemValue} ${styles.timestampValue}`}
                   data-visual-dynamic="timestamp"
@@ -498,7 +498,7 @@ function TransactionDetailsContent({
                 />
               </div>
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Created Lt</div>
+                <div className={styles.multiColumnItemTitle}>Created LT</div>
                 <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
                   {tx.transaction.lt.toString()}
                 </div>
@@ -524,7 +524,7 @@ function TransactionDetailsContent({
 
       {!isTickTock && (
         <div className={styles.labeledSectionRow}>
-          <div className={styles.labeledSectionTitle}>Message Data</div>
+          <div className={styles.labeledSectionTitle}>Message data</div>
           <div
             className={`${styles.labeledSectionContent} ${
               messageCopyActions ? styles.copyableSectionContent : ""
@@ -557,7 +557,7 @@ function TransactionDetailsContent({
             {(stateInitCode || stateInitData) && (
               <div className={styles.parsedBodySection}>
                 <div className={styles.parsedBodyTitle}>
-                  State Init
+                  State init
                   <DisclosureToggle
                     expanded={showStateInit}
                     contextLabel="state init"
@@ -724,26 +724,26 @@ function TransactionDetailsContent({
         <div className={styles.labeledSectionContent}>
           <div className={styles.multiColumnRow}>
             <div className={styles.multiColumnItem}>
-              <div className={styles.multiColumnItemTitle}>Amount Sent (Total)</div>
+              <div className={styles.multiColumnItemTitle}>Amount sent (total)</div>
               <div className={`${styles.multiColumnItemValue}`}>
                 <GramAmount value={sentTotal} />
               </div>
             </div>
             <div className={styles.multiColumnItem}>
-              <div className={styles.multiColumnItemTitle}>End Balance</div>
+              <div className={styles.multiColumnItemTitle}>End balance</div>
               <div className={`${styles.multiColumnItemValue}`}>
                 <GramAmount value={endBalance} />
               </div>
             </div>
             <div className={styles.multiColumnItem}>
-              <div className={styles.multiColumnItemTitle}>Total Fee</div>
+              <div className={styles.multiColumnItemTitle}>Total fee</div>
               <div className={`${styles.multiColumnItemValue}`}>
                 <GramAmount value={tx.transaction.totalFees.coins} />
               </div>
             </div>
             {actionPhase && (
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Action Fee</div>
+                <div className={styles.multiColumnItemTitle}>Action fee</div>
                 <div className={`${styles.multiColumnItemValue}`}>
                   <GramAmount value={actionFee} />
                 </div>
@@ -751,7 +751,7 @@ function TransactionDetailsContent({
             )}
             {tx.transaction.inMessage?.info.type === "internal" && (
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Forward Fee</div>
+                <div className={styles.multiColumnItemTitle}>Forward fee</div>
                 <div className={`${styles.multiColumnItemValue}`}>
                   <GramAmount value={tx.transaction.inMessage.info.forwardFee} />
                 </div>
@@ -763,23 +763,23 @@ function TransactionDetailsContent({
 
       {tickTockDescription && (
         <div className={styles.labeledSectionRow}>
-          <div className={styles.labeledSectionTitle}>Storage Phase</div>
+          <div className={styles.labeledSectionTitle}>Storage phase</div>
           <div className={styles.labeledSectionContent}>
             <div className={styles.multiColumnRow}>
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Storage Fee</div>
+                <div className={styles.multiColumnItemTitle}>Storage fee</div>
                 <div className={styles.multiColumnItemValue}>
                   <GramAmount value={tickTockDescription.storagePhase.storageFeesCollected} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Storage Due</div>
+                <div className={styles.multiColumnItemTitle}>Storage due</div>
                 <div className={styles.multiColumnItemValue}>
                   <GramAmount value={tickTockStorageFeesDue} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Status Change</div>
+                <div className={styles.multiColumnItemTitle}>Status change</div>
                 <div className={styles.multiColumnItemValue}>
                   {formatStatusChange(tickTockDescription.storagePhase.statusChange)}
                 </div>
@@ -790,7 +790,7 @@ function TransactionDetailsContent({
       )}
 
       <div className={styles.labeledSectionRow}>
-        <div className={styles.labeledSectionTitle}>Compute Phase</div>
+        <div className={styles.labeledSectionTitle}>Compute phase</div>
         <div className={styles.labeledSectionContent}>
           {computePhase.type === "skipped" ? (
             <div className={styles.multiColumnItemValue}>Skipped ({computePhase.reason})</div>
@@ -803,23 +803,23 @@ function TransactionDetailsContent({
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Exit Code</div>
+                <div className={styles.multiColumnItemTitle}>Exit code</div>
                 <div className={styles.multiColumnItemValue}>
                   <ExitCodeChip exitCode={computePhase.exitCode} abi={targetAbi} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>VM Steps</div>
+                <div className={styles.multiColumnItemTitle}>VM steps</div>
                 <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
                   {computePhase.vmSteps}
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Gas Used</div>
+                <div className={styles.multiColumnItemTitle}>Gas used</div>
                 <div className={styles.multiColumnItemValue}>{computePhase.gasUsed.toString()}</div>
               </div>
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Gas Fee</div>
+                <div className={styles.multiColumnItemTitle}>Gas fee</div>
                 <div className={styles.multiColumnItemValue}>
                   <GramAmount value={computePhase.gasFees} />
                 </div>
@@ -830,7 +830,7 @@ function TransactionDetailsContent({
       </div>
 
       <div className={styles.labeledSectionRow}>
-        <div className={styles.labeledSectionTitle}>Action Phase</div>
+        <div className={styles.labeledSectionTitle}>Action phase</div>
         <div
           className={`${styles.labeledSectionContent} ${
             actionPhaseCopyActions ? styles.copyableSectionContent : ""
@@ -846,13 +846,13 @@ function TransactionDetailsContent({
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Exit Code</div>
+                <div className={styles.multiColumnItemTitle}>Exit code</div>
                 <div className={styles.multiColumnItemValue}>
                   <ExitCodeChip exitCode={actionPhase.resultCode} abi={targetAbi} phase="action" />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Total Actions</div>
+                <div className={styles.multiColumnItemTitle}>Total actions</div>
                 <div
                   className={`${styles.multiColumnItemValue} ${styles.numberValue} ${styles.actionsCountValue}`}
                 >
@@ -877,7 +877,7 @@ function TransactionDetailsContent({
 
       {showActions && hasResolvedActions && (
         <div className={styles.labeledSectionRow}>
-          <div className={styles.labeledSectionTitle}>Actions Details</div>
+          <div className={styles.labeledSectionTitle}>Actions details</div>
           <div className={styles.labeledSectionContent}>
             <ActionsSummary
               actions={resolvedOutActions}

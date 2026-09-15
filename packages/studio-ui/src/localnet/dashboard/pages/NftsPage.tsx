@@ -140,7 +140,7 @@ export const NftsPage: FC<NftsPageProps> = ({client}) => {
                 </DataTableEmpty>
               ) : (
                 visibleItems.map(item => {
-                  const name = contentString(item.content, "name") || "NFT Item"
+                  const name = contentString(item.content, "name") || "NFT item"
                   const imageSources = getNftImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
                   const collectionName =
                     contentString(item.collection?.collection_content, "name") || "Standalone"

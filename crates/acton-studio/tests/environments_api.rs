@@ -256,7 +256,7 @@ impl EnvironmentRuntime for TestEnvironmentRuntime {
             if !is_full_ton_network {
                 return Err(EnvironmentRuntimeError::Conflict {
                     code: "environment_health_unavailable",
-                    message: "Health diagnostics are available for Localnet environments"
+                    message: "Health diagnostics are available for localnet environments"
                         .to_owned(),
                 });
             }

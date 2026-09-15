@@ -36,7 +36,7 @@ test.describe("Explorer shell", () => {
       "href",
       "/emulate",
     )
-    await expect(developerTools.getByRole("link", {name: /Cell Inspector/})).toHaveAttribute(
+    await expect(developerTools.getByRole("link", {name: /Cell inspector/})).toHaveAttribute(
       "href",
       "/cell",
     )

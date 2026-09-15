@@ -198,7 +198,7 @@ const CoverageContent: React.FC<CoverageContentProps> = ({lcov, projectRoot}) =>
     <div className={styles.coverage}>
       <div className={styles.summaryGrid}>
         <div className={styles.summaryCard}>
-          <div className={styles.summaryLabel}>Overall Score</div>
+          <div className={styles.summaryLabel}>Overall score</div>
           <div className={`${styles.summaryValue} ${getScoreTone(coverage.combinedScore)}`}>
             <Percentage
               fallback="n/a"
@@ -210,7 +210,7 @@ const CoverageContent: React.FC<CoverageContentProps> = ({lcov, projectRoot}) =>
           <div className={styles.summaryMeta}>Weighted across lines and branches</div>
         </div>
         <div className={styles.summaryCard}>
-          <div className={styles.summaryLabel}>Line Coverage</div>
+          <div className={styles.summaryLabel}>Line coverage</div>
           <div className={styles.summaryValue}>
             <Percentage
               fallback="n/a"
@@ -224,7 +224,7 @@ const CoverageContent: React.FC<CoverageContentProps> = ({lcov, projectRoot}) =>
           </div>
         </div>
         <div className={styles.summaryCard}>
-          <div className={styles.summaryLabel}>Branch Coverage</div>
+          <div className={styles.summaryLabel}>Branch coverage</div>
           <div className={styles.summaryValue}>
             <Percentage
               fallback="n/a"
@@ -249,7 +249,7 @@ const CoverageContent: React.FC<CoverageContentProps> = ({lcov, projectRoot}) =>
       <div className={styles.workspace}>
         <aside className={styles.sidebar}>
           <div className={styles.sidebarHeader}>
-            <div className={styles.sidebarTitle}>Coverage Files</div>
+            <div className={styles.sidebarTitle}>Coverage files</div>
             <div className={styles.sidebarMeta}>Sorted by score</div>
           </div>
 

@@ -66,7 +66,7 @@ export function EnvironmentWorkspacePage({
 
     onShellChange({
       pageDescription,
-      pageTitle: environment?.name ?? (isManaged ? "Virtual Environment" : "Network"),
+      pageTitle: environment?.name ?? (isManaged ? "Virtual environment" : "Network"),
     })
   }, [
     environment?.name,

@@ -852,10 +852,10 @@ function getInterfaceLabel(value: string): string | undefined {
 
   switch (normalizedInterface) {
     case "jetton_master": {
-      return "Jetton Master interface"
+      return "Jetton master interface"
     }
     case "jetton_wallet": {
-      return "Jetton Wallet interface"
+      return "Jetton wallet interface"
     }
     case "nft_item":
     case "nft_item_simple": {

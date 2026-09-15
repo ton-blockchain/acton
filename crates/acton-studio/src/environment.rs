@@ -193,7 +193,7 @@ pub enum EnvironmentSnapshotOperationPhase {
 
 pub use acton_localnet::StartupTimings as EnvironmentStartupTimings;
 
-/// Browser-facing snapshot of a Localnet startup operation
+/// Browser-facing snapshot of a localnet startup operation
 ///
 /// Studio exposes only progress fields that help explain startup. The local
 /// filesystem log path and operation result remain owned by the localnet process
@@ -207,7 +207,7 @@ pub struct EnvironmentStartupOperation {
     pub completed_steps: Vec<acton_localnet::OperationStep>,
 }
 
-/// Bounded live startup diagnostics displayed while a Localnet opens
+/// Bounded live startup diagnostics displayed while a localnet opens
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvironmentStartupState {
@@ -594,7 +594,7 @@ pub trait EnvironmentRuntime: Send + Sync {
         Box::pin(async {
             Err(EnvironmentRuntimeError::Conflict {
                 code: "environment_activity_unavailable",
-                message: "Activity generation is available for Localnet environments".to_owned(),
+                message: "Activity generation is available for localnet environments".to_owned(),
             })
         })
     }
@@ -643,7 +643,7 @@ pub trait EnvironmentRuntime: Send + Sync {
         Box::pin(async {
             Err(EnvironmentRuntimeError::Conflict {
                 code: "environment_startup_state_unavailable",
-                message: "Startup diagnostics are available for Localnet environments".to_owned(),
+                message: "Startup diagnostics are available for localnet environments".to_owned(),
             })
         })
     }

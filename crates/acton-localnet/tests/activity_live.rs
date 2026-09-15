@@ -1,4 +1,4 @@
-//! Opt-in checks against a dedicated running Localnet. The caller supplies
+//! Opt-in checks against a dedicated running localnet. The caller supplies
 //! its network directory; these tests spend faucet funds and replace activity settings.
 
 use acton_localnet::{

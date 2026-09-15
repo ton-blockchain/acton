@@ -44,7 +44,7 @@ export function ExternalOutMessageDetails({
   return (
     <section aria-label="External-out message" className={styles.transactionDetailsContainer}>
       <div className={styles.detailRow}>
-        <div className={styles.detailLabel}>Message Route</div>
+        <div className={styles.detailLabel}>Message route</div>
         <div className={styles.heightDetailValue}>
           <div className={styles.triggerRoute}>
             {renderAddressChip ? (
@@ -64,18 +64,18 @@ export function ExternalOutMessageDetails({
         </div>
       </div>
       <div className={styles.labeledSectionRow}>
-        <div className={styles.labeledSectionTitle}>Out Message</div>
+        <div className={styles.labeledSectionTitle}>Out message</div>
         <div className={styles.labeledSectionContent}>
           <div className={styles.multiColumnRow}>
             <div className={styles.multiColumnItem}>
-              <div className={styles.multiColumnItemTitle}>Created Lt</div>
+              <div className={styles.multiColumnItemTitle}>Created LT</div>
               <div className={styles.multiColumnItemValue}>{message.info.createdLt.toString()}</div>
             </div>
           </div>
         </div>
       </div>
       <div className={styles.labeledSectionRow}>
-        <div className={styles.labeledSectionTitle}>Message Data</div>
+        <div className={styles.labeledSectionTitle}>Message data</div>
         <div className={`${styles.labeledSectionContent} ${styles.copyableSectionContent}`}>
           {renderSectionCopyActions([
             {

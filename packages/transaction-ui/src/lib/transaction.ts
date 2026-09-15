@@ -72,7 +72,7 @@ export function resolveTransactionOpcodeName(
     return undefined
   }
   if (opcode === 0) {
-    return "Text Comment"
+    return "Text comment"
   }
 
   const inMessage = tx.transaction.inMessage
@@ -336,7 +336,7 @@ export function isSystemSourceAddress(address: Address | null | undefined): bool
 export function getTransactionSourceLabel(tx: Transaction): string | undefined {
   const inMessage = tx.inMessage
   if (inMessage?.info.type === "external-in") {
-    return "External In"
+    return "External in"
   }
   if (inMessage?.info.type === "internal" && isSystemSourceAddress(inMessage.info.src)) {
     return "System"

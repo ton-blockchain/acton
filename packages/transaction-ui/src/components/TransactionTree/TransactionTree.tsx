@@ -254,7 +254,7 @@ function EdgeTransactionTooltipContent({
   return (
     <div className={styles.tooltipContent}>
       <div className={styles.tooltipField}>
-        <div className={styles.tooltipFieldLabel}>From Address</div>
+        <div className={styles.tooltipFieldLabel}>From address</div>
         <div className={styles.tooltipFieldValue}>
           {data.fromAddress ? (
             <span className={fromAddressContent ? styles.tooltipAddressChip : undefined}>
@@ -267,7 +267,7 @@ function EdgeTransactionTooltipContent({
       </div>
 
       <div className={styles.tooltipField}>
-        <div className={styles.tooltipFieldLabel}>Compute Phase</div>
+        <div className={styles.tooltipFieldLabel}>Compute phase</div>
         <div className={styles.tooltipFieldValue}>
           {data.computePhase.success ? "Success" : "Failed"}
           {data.computePhase.exitCode !== undefined && data.computePhase.exitCode !== 0 && (
@@ -278,12 +278,12 @@ function EdgeTransactionTooltipContent({
           )}
           {data.computePhase.gasUsed !== undefined && (
             <div className={styles.tooltipSubValue}>
-              Gas Used: {data.computePhase.gasUsed.toString()}
+              Gas used: {data.computePhase.gasUsed.toString()}
             </div>
           )}
           {data.computePhase.vmSteps !== undefined && (
             <div className={styles.tooltipSubValue}>
-              VM Steps: {data.computePhase.vmSteps.toString()}
+              VM steps: {data.computePhase.vmSteps.toString()}
             </div>
           )}
         </div>
@@ -293,14 +293,14 @@ function EdgeTransactionTooltipContent({
         <div className={styles.tooltipFieldLabel}>Money</div>
         <div className={styles.tooltipFieldValue}>
           <div>
-            Sent Total: <GramAmount value={data.sentTotal} />
+            Sent total: <GramAmount value={data.sentTotal} />
           </div>
           <div className={styles.tooltipSubValue}>
-            Total Fees: <GramAmount value={data.fees.totalFees} />
+            Total fees: <GramAmount value={data.fees.totalFees} />
           </div>
           {data.fees.gasFees !== undefined && (
             <div className={styles.tooltipSubValue}>
-              Gas Fees: <GramAmount value={data.fees.gasFees} />
+              Gas fees: <GramAmount value={data.fees.gasFees} />
             </div>
           )}
         </div>
@@ -1124,7 +1124,7 @@ function TransactionTreeComponent({
                 xmlns="http://www.w3.org/2000/svg"
                 className={styles.iconSvg}
               >
-                <title>External Out</title>
+                <title>External out</title>
                 <path
                   d="M0.400044 0.549983C0.648572 0.218612 1.11867 0.151455 1.45004 0.399983L3.45004 1.89998C3.6389 2.04162 3.75004 2.26392 3.75004 2.49998C3.75004 2.73605 3.6389 2.95834 3.45004 3.09998L1.45004 4.59998C1.11867 4.84851 0.648572 4.78135 0.400044 4.44998C0.151516 4.11861 0.218673 3.64851 0.550044 3.39998L1.75004 2.49998L0.550044 1.59998C0.218673 1.35145 0.151516 0.881354 0.400044 0.549983Z"
                   fill="var(--acton-color-text-subtle)"
@@ -1211,7 +1211,7 @@ function TransactionTreeComponent({
               xmlns="http://www.w3.org/2000/svg"
               className={styles.iconSvg}
             >
-              <title>Incoming Message</title>
+              <title>Incoming message</title>
               <path
                 d="M0.400044 0.549983C0.648572 0.218612 1.11867 0.151455 1.45004 0.399983L3.45004 1.89998C3.6389 2.04162 3.75004 2.26392 3.75004 2.49998C3.75004 2.73605 3.6389 2.95834 3.45004 3.09998L1.45004 4.59998C1.11867 4.84851 0.648572 4.78135 0.400044 4.44998C0.151516 4.11861 0.218673 3.64851 0.550044 3.39998L1.75004 2.49998L0.550044 1.59998C0.218673 1.35145 0.151516 0.881354 0.400044 0.549983Z"
                 fill="var(--acton-color-text-subtle)"

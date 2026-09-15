@@ -52,7 +52,7 @@ export const NftOverview: FC<NftOverviewProps> = props => (
               onAddressClick={props.onAddressClick}
             />
             <AccountAddressDetailRow
-              label="Collection Address"
+              label="Collection address"
               address={props.collectionAddress}
               fallback="Standalone"
               onAddressClick={props.onAddressClick}

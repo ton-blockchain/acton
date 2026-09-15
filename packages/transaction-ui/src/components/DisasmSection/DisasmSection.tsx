@@ -23,7 +23,7 @@ const EMPTY_CELL_DISASM_TEXT = "// Cell is empty"
 
 export function DisasmSection({
   bocHex,
-  title = "Disassembled Code",
+  title = "Disassembled code",
   defaultExpanded = false,
 }: DisasmSectionProps): React.JSX.Element {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)

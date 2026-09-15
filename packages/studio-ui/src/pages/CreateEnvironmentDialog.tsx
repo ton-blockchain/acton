@@ -279,9 +279,9 @@ export function CreateEnvironmentDialog({
                     className={styles.environmentTypeLink}
                     onClick={() => updateKind("fullTonNetwork")}
                   >
-                    Localnet
+                    localnet
                   </button>{" "}
-                  for real TON validators and full-node behavior
+                  for real TON validators and full-node behavior.
                 </>
               ) : (
                 <>
@@ -293,9 +293,9 @@ export function CreateEnvironmentDialog({
                     className={styles.environmentTypeLink}
                     onClick={() => updateKind("actonSimulatedLocalnet")}
                   >
-                    Simulator
+                    simulator
                   </button>{" "}
-                  for instant, lightweight development, forks, and deterministic network control
+                  for instant, lightweight development, forks, and deterministic network control.
                 </>
               )
             }

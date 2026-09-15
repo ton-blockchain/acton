@@ -75,9 +75,9 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/network/stats": "Stats",
   "/faucet": "Faucet",
   "/wallets": "Wallets",
-  "/simulator": "Simulator",
-  "/cell-inspector": "Cell Inspector",
-  "/address-converter": "Address Converter",
+  "/transaction-emulator": "Transaction emulator",
+  "/cell-inspector": "Cell inspector",
+  "/address-converter": "Address converter",
   "/contracts": "Contracts",
   "/contracts/sources": "Sources",
   "/contracts/abi": "ABI",
@@ -90,26 +90,26 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/admin": "Admin actions",
   "/snapshots": "Snapshots",
   "/integrate": "Integrate",
-  "/api-reference/v2": "API Reference v2",
-  "/api-reference/v3": "API Reference v3",
-  "/api-reference/admin": "Admin API Reference",
-  "/api-reference/config": "Config API Reference",
-  "/api-reference/control": "Control API Reference",
-  "/api-calls": "API Calls",
+  "/api-reference/v2": "API reference v2",
+  "/api-reference/v3": "API reference v3",
+  "/api-reference/admin": "Admin API reference",
+  "/api-reference/config": "Config API reference",
+  "/api-reference/control": "Control API reference",
+  "/api-calls": "API calls",
 }
 
 const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/dashboard": "Network status and recent activity",
   "/network/health": "API readiness, indexer lag and service health",
   "/network/config": "Update on-chain configuration parameters",
-  "/network/activity": "Generate on-chain transfers, tokens and NFTs in your Localnet",
+  "/network/activity": "Generate on-chain transfers, tokens and NFTs in your localnet",
   "/network": "Throughput, topology and consensus health",
   "/network/nodes": "Node availability, synchronization and diagnostics",
   "/network/validators": "Elections, validator sets and block production",
   "/network/stats": "Validator session timing, block limits and message queues",
   "/faucet": "Fund accounts in this environment",
   "/wallets": "Project wallets available on this network, ready for TON Connect",
-  "/simulator": "Build and replay messages against this network",
+  "/transaction-emulator": "Build and replay messages against this network",
   "/cell-inspector": "Decode cells and inspect serialized TON data",
   "/address-converter": "Convert TON addresses and inspect their flags",
   "/contracts": "Track deployed contracts and match them with source artifacts",
@@ -126,8 +126,8 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/integrate": "Connect Acton projects, applications and TON-compatible tools to this network",
   "/api-reference/v2": "Explore the v2 API",
   "/api-reference/v3": "Explore the v3 API",
-  "/api-reference/admin": "Inspect and manage Localnet services",
-  "/api-reference/config": "Read Localnet configuration and connection endpoints",
+  "/api-reference/admin": "Inspect and manage localnet services",
+  "/api-reference/config": "Read localnet configuration and connection endpoints",
   "/api-reference/control": "Explore network management methods",
   "/api-calls": "Review requests made to this environment",
 }
@@ -251,7 +251,7 @@ const AppContent: FC<AppContentProps> = ({
       ? "ABI"
       : (LOCALNET_PAGE_TITLES[localPathname] ??
         contractDetailsPageTitle(localPathname) ??
-        "Virtual Environment")
+        "Virtual environment")
   const pageDescription =
     configSeqno === undefined
       ? (LOCALNET_PAGE_DESCRIPTIONS[localPathname] ??
@@ -297,7 +297,7 @@ const AppContent: FC<AppContentProps> = ({
   return (
     <>
       <LocalnetDocumentTitle
-        environmentName={runtime.environment?.name ?? "Virtual Environment"}
+        environmentName={runtime.environment?.name ?? "Virtual environment"}
         pageTitle={pageTitle}
       />
       <div className={`${styles.app} ${allowsOverflow ? styles.allowsOverflow : ""}`}>
@@ -812,7 +812,7 @@ const AppContent: FC<AppContentProps> = ({
               )}
             />
             <Route
-              path={path("/simulator")}
+              path={path("/transaction-emulator")}
               element={withCapability(
                 "simulator",
                 <DashboardPage embedded>

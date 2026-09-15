@@ -193,7 +193,7 @@ API, web UI, and `acton verify` CLI integration are included below.
   wallets, snapshots, API reference, configuration, control API, settings, and
   troubleshooting pages, plus a complete documentation section.
 
-### Localnet Simulator
+### Localnet simulator
 
 - Added interval and manual block production with `--block-time-ms`,
   `--no-mining`, `acton simulator mine`, `/acton_mine`, and optional empty-block
@@ -657,7 +657,7 @@ update, and a broad documentation refresh.
   styling, fixed play-button styling, corrected redirects, and updated Open
   Graph metadata.
 
-### Localnet Preview
+### Localnet preview
 
 > Warning: the localnet features listed in this section are still preview work
 > and are not available to end users yet. They are documented here so the
@@ -1548,7 +1548,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   `acton build`, `acton wrapper`, or the bundled TypeScript generator, migrate
   your own tooling only where it reads the raw compiler payloads.
 
-### Localnet, CLI, and Project Workflows
+### Localnet, CLI, and project workflows
 
 - Replaced the old `litenode` surface with `localnet` across the CLI, docs,
   config schema, manpages, and internal crates, making the terminology match

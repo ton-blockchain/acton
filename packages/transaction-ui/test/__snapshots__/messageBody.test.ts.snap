@@ -197,7 +197,7 @@ exports[`decodeMessageBody selects the matching opcode when the receiver ABI has
 
 exports[`decodeMessageBody does not guess between multiple prefixless messages without an opcode 1`] = `
 {
-  "name": "Text Comment",
+  "name": "Text comment",
   "opcode": 0,
   "value": {
     "entries": [
@@ -210,7 +210,7 @@ exports[`decodeMessageBody does not guess between multiple prefixless messages w
       },
     ],
     "kind": "object",
-    "typeName": "Text Comment",
+    "typeName": "Text comment",
   },
 }
 `;
@@ -277,7 +277,7 @@ exports[`decodeMessageBody tries fallback contract ABIs after both endpoint ABIs
 
 exports[`decodeMessageBody decodes a text comment only after receiver and sender ABIs fail 1`] = `
 {
-  "name": "Text Comment",
+  "name": "Text comment",
   "opcode": 0,
   "value": {
     "entries": [
@@ -290,7 +290,7 @@ exports[`decodeMessageBody decodes a text comment only after receiver and sender
       },
     ],
     "kind": "object",
-    "typeName": "Text Comment",
+    "typeName": "Text comment",
   },
 }
 `;

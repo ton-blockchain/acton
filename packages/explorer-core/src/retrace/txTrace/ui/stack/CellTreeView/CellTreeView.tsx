@@ -145,12 +145,12 @@ const CellTreeView: React.FC<CellTreeViewProps> = ({cell, depth = 0, maxBitsLeng
             refsCount
           )}
         </div>
-        <Tooltip content="Copy BoC (Hex)">
+        <Tooltip content="Copy BoC (hex)">
           <button
             type="button"
             className={`${styles.copyButton} ${copied ? styles.copied : ""}`}
             onClick={handleCopyToClipboard}
-            aria-label="Copy BoC (Hex)"
+            aria-label="Copy BoC (hex)"
           >
             {copied ? <CheckIcon /> : <CopyIcon />}
           </button>

@@ -530,8 +530,8 @@ fn localnet_start_port_conflict_is_reported_with_hint() {
         .failure();
 
     output
-        .assert_not_contains("Starting Localnet server")
-        .assert_stderr_contains("Failed to start Acton Simulator on 127.0.0.1:")
+        .assert_not_contains("Starting localnet server")
+        .assert_stderr_contains("Failed to start Acton simulator on 127.0.0.1:")
         .assert_stderr_contains("Set another port with [localnet].port in Acton.toml")
         .assert_stderr_contains("Or stop the process currently listening on that port")
         .assert_stderr_snapshot_matches(

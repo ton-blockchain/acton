@@ -745,7 +745,7 @@ function ResultOutput({
 
       <PillTabs
         className={styles.outputTabs}
-        ariaLabel="Cell Inspector output"
+        ariaLabel="Cell inspector output"
         data-tvm-code-status={codeTabStatus}
       >
         {outputTabs.map(tab => (
@@ -870,7 +870,7 @@ function CodeOutput({
 
   return (
     <CodeCellDetails
-      cell={{bocHex: state.source, fieldName: "Cell Inspector root"}}
+      cell={{bocHex: state.source, fieldName: "Cell inspector root"}}
       verifiedSourcesByCodeHash={
         state.codeHash && state.verifiedSource
           ? new Map([[state.codeHash, state.verifiedSource]])

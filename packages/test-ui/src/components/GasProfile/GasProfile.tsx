@@ -822,7 +822,7 @@ const GasProfileContent: React.FC<GasProfileContentProps> = ({profile, projectRo
                         <strong>{formatGas(selectedNodeSelfGas)}</strong>
                       </div>
                       <div className={styles.metric}>
-                        <span>Contract Share</span>
+                        <span>Contract share</span>
                         <strong>
                           <Percentage
                             maximumFractionDigits={1}

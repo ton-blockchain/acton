@@ -10,7 +10,7 @@ acton-simulator --- Run Acton's simplified TON development environment
 
 ## Description
 
-Acton Simulator is a fast, deterministic TON development environment
+Acton simulator is a fast, deterministic TON development environment
 for local execution, forked-state development, and faucet-based funding. It
 produces TON-compatible blocks and provides LiteAPI, TON Center v2/v3, Streaming
 API, and Emulate API surfaces used by many contract and dApp workflows.
@@ -86,17 +86,17 @@ inside the project when no database is configured.
 {{/option}}
 
 {{#option "`--liteapi`" }}
-Start the LiteAPI server on the TCP port immediately after the Localnet HTTP
+Start the LiteAPI server on the TCP port immediately after the localnet HTTP
 port. LiteAPI is disabled by default.
 {{/option}}
 
 {{#option "`--liteapi-port` _port_" }}
 Set the LiteAPI TCP port explicitly. Requires `--liteapi`; otherwise LiteAPI
-uses the Localnet HTTP port plus one.
+uses the localnet HTTP port plus one.
 {{/option}}
 
 {{#option "`--require-auth`" }}
-Require a token for all Localnet HTTP API, control, emulate, and streaming
+Require a token for all localnet HTTP API, control, emulate, and streaming
 endpoints. The server prints the token on startup.
 {{/option}}
 
@@ -334,9 +334,9 @@ Acton loads `.env` automatically, so the simplest setup during project work is
 usually to keep these keys there and use shell environment variables only for
 one-off overrides or CI.
 
-## Localnet API Auth
+## Localnet API auth
 
-`acton simulator start --require-auth` protects every Localnet HTTP route under
+`acton simulator start --require-auth` protects every localnet HTTP route under
 `/api/*`, `/acton_*`, `/api/emulate/*`, and `/api/streaming/*`. Static UI files
 remain public, but the bundled UI does not receive the token from the server.
 When a protected API request returns `401`, the bundled UI shows a token overlay;
@@ -367,7 +367,7 @@ and prints a fresh token.
   endpoints, and the bundled localnet UI
 - the server keeps running until the process is stopped, for example with
   `Ctrl+C`
-- the Localnet UI is available on the root path, for example
+- the localnet UI is available on the root path, for example
   `http://127.0.0.1:<port>/`
 - the node produces a block every `--block-time-ms` milliseconds, defaults
   to 500 ms, and still creates empty blocks when no transactions are queued

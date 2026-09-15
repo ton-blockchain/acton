@@ -86,7 +86,7 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, contracts, onSta
     setExpandedItem(prev => (prev === key ? null : key))
   }
 
-  const handleOpenDetailsModal = (itemData: StackElement, elementTitle: string = "Stack Item") => {
+  const handleOpenDetailsModal = (itemData: StackElement, elementTitle: string = "Stack item") => {
     if (onStackItemClick) {
       onStackItemClick(itemData, elementTitle)
     } else {
@@ -114,16 +114,16 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, contracts, onSta
     const handleItemClick = () => {
       switch (element.$) {
         case "Cell":
-          handleOpenDetailsModal(element, "Cell Details")
+          handleOpenDetailsModal(element, "Cell details")
           break
         case "Slice":
-          handleOpenDetailsModal(element, "Slice Details")
+          handleOpenDetailsModal(element, "Slice details")
           break
         case "Builder":
-          handleOpenDetailsModal(element, "Builder Details")
+          handleOpenDetailsModal(element, "Builder details")
           break
         case "Address":
-          handleOpenDetailsModal(element, "Address Details")
+          handleOpenDetailsModal(element, "Address details")
           break
         default:
           toggleExpand(keyPrefix)
@@ -182,7 +182,7 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, contracts, onSta
             <div className={styles.stackItemLabel}>Cell</div>
             <div className={styles.stackItemValue}>
               {cell.bits.length === 0 && cell.refs.length === 0
-                ? "Empty Cell"
+                ? "Empty cell"
                 : expandedItem === keyPrefix
                   ? element.boc
                   : truncateMiddle(element.boc, 35)}
@@ -213,10 +213,10 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, contracts, onSta
               <div
                 className={styles.addressItem}
                 key={keyPrefix}
-                onClick={() => handleOpenDetailsModal(element, "Address Details")}
+                onClick={() => handleOpenDetailsModal(element, "Address details")}
                 onKeyDown={e => {
                   if (e.key === "Enter" || e.key === " ")
-                    handleOpenDetailsModal(element, "Address Details")
+                    handleOpenDetailsModal(element, "Address details")
                 }}
                 role="button"
                 tabIndex={0}
@@ -246,7 +246,7 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, contracts, onSta
             <div className={styles.stackItemLabel}>Slice</div>
             <div className={styles.stackItemValue}>
               {cell.bits.length === 0 && cell.refs.length === 0
-                ? "Empty Slice"
+                ? "Empty slice"
                 : expandedItem === keyPrefix
                   ? element.hex
                   : truncateMiddle(element.hex, 35)}
@@ -279,7 +279,7 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, contracts, onSta
             <div className={styles.stackItemLabel}>Builder</div>
             <div className={styles.stackItemValue}>
               {cell.bits.length === 0 && cell.refs.length === 0
-                ? "Empty Builder"
+                ? "Empty builder"
                 : expandedItem === keyPrefix
                   ? element.hex
                   : truncateMiddle(element.hex, 35)}

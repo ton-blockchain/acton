@@ -1226,12 +1226,12 @@ pub enum SimulatorCommand {
         snapshots_dir: Option<PathBuf>,
         #[arg(
             long,
-            help = "Require a token for all Localnet HTTP API, control, emulate, and streaming endpoints"
+            help = "Require a token for all localnet HTTP API, control, emulate, and streaming endpoints"
         )]
         require_auth: bool,
         #[arg(
             long,
-            help = "Start the LiteAPI server (default port: Localnet HTTP port + 1)"
+            help = "Start the LiteAPI server (default port: localnet HTTP port + 1)"
         )]
         liteapi: bool,
         #[arg(
@@ -1239,7 +1239,7 @@ pub enum SimulatorCommand {
             requires = "liteapi",
             value_name = "PORT",
             value_parser = clap::value_parser!(u16).range(1..),
-            help = "LiteAPI server port (default: Localnet HTTP port + 1)"
+            help = "LiteAPI server port (default: localnet HTTP port + 1)"
         )]
         liteapi_port: Option<u16>,
     },

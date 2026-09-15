@@ -140,19 +140,19 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
     },
     ...(traceState.toLowerCase() === status.toLowerCase()
       ? []
-      : [{label: "Trace State", value: traceState}]),
+      : [{label: "Trace state", value: traceState}]),
   ]
   const activityItems: readonly {readonly label: string; readonly value: ReactNode}[] = [
     {label: "Transactions", value: data.transactionCount},
     {label: "Messages", value: data.messageCount},
     {label: "Accounts", value: accountCount},
     ...(actionCount === undefined ? [] : [{label: "Actions", value: actionCount}]),
-    {label: "Pending Messages", value: data.pendingMessageCount},
+    {label: "Pending messages", value: data.pendingMessageCount},
   ]
   const executionItems: readonly {readonly label: string; readonly value: ReactNode}[] = [
-    {label: "Total Fees", value: <GramAmount value={totalFees} useGrouping />},
+    {label: "Total fees", value: <GramAmount value={totalFees} useGrouping />},
     {label: "Aborted", value: abortedTransactionCount},
-    {label: "Skipped Compute", value: skippedComputeCount},
+    {label: "Skipped compute", value: skippedComputeCount},
   ]
   const timeItems: readonly {readonly label: string; readonly value: ReactNode}[] = [
     {
@@ -164,7 +164,7 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
       value: <DateTime display="date-time-seconds" value={data.endUtime} unit="seconds" />,
     },
     {label: "Duration", value: <Duration display="human" value={duration} />},
-    {label: "Logical Time", value: `${data.startLt} — ${data.endLt}`},
+    {label: "Logical time", value: `${data.startLt} — ${data.endLt}`},
   ]
 
   return (
@@ -195,7 +195,7 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
         <div className={styles.sectionContent}>
           <div className={styles.multiColumnRow}>
             <div className={styles.multiColumnItem}>
-              <div className={styles.itemTitle}>Start Masterchain Block</div>
+              <div className={styles.itemTitle}>Start masterchain block</div>
               <div className={styles.itemValue}>
                 <BlockChip
                   workchain={-1}
@@ -218,7 +218,7 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
               </div>
             </div>
             <div className={styles.multiColumnItem}>
-              <div className={styles.itemTitle}>End Masterchain Block</div>
+              <div className={styles.itemTitle}>End masterchain block</div>
               <div className={styles.itemValue}>
                 <BlockChip
                   workchain={-1}
@@ -246,7 +246,7 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
 
       {shardFlow.segments.length > 0 ? (
         <div className={styles.sectionRow}>
-          <div className={styles.sectionTitle}>Shard Flow</div>
+          <div className={styles.sectionTitle}>Shard flow</div>
           <div className={`${styles.sectionContent} ${styles.shardFlowContent}`}>
             <div className={styles.shardFlowSummary}>
               Logical-time order · <CountValue singular="shard" value={shardFlow.shardCount} /> ·{" "}
@@ -364,7 +364,7 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
             </div>
             {externalHash ? (
               <div className={styles.identifierItem}>
-                <div className={styles.itemTitle}>External Hash</div>
+                <div className={styles.itemTitle}>External hash</div>
                 <InlineActions
                   className={styles.copyableValue}
                   visibility="hover"

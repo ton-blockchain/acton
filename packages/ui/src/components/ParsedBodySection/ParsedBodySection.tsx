@@ -24,7 +24,7 @@ export function ParsedBodySection({
   onContractClick,
   renderCodeCellDetails,
   defaultExpanded = false,
-  title = "Parsed Body",
+  title = "Parsed body",
 }: ParsedBodySectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   const contentId = useId()
