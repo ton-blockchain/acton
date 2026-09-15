@@ -9,7 +9,7 @@ development platform. It adds Acton Studio, a full local TON network, Actonscan,
 source verification, a testnet faucet, a native language server, substantially
 more capable RPC and localnet tooling, and a shared explorer and transaction UI.
 
-`acton simulated-localnet` remains the lightweight in-process simulator. Acton Studio can
+`acton simulator` remains the lightweight in-process simulator. Acton Studio can
 manage both simulator environments and full local TON networks; those full
 networks are powered by the separate Localton runtime. The verifier service,
 API, web UI, and `acton verify` CLI integration are included below.
@@ -196,7 +196,7 @@ API, web UI, and `acton verify` CLI integration are included below.
 ### Localnet Simulator
 
 - Added interval and manual block production with `--block-time-ms`,
-  `--no-mining`, `acton simulated-localnet mine`, `/acton_mine`, and optional empty-block
+  `--no-mining`, `acton simulator mine`, `/acton_mine`, and optional empty-block
   mining. Submitted messages are queued into blocks, and automatic mining runs
   only while messages are pending unless empty-block mining is enabled.
   Generated blocks include a simplified masterchain, state updates, Merkle
@@ -208,8 +208,8 @@ API, web UI, and `acton verify` CLI integration are included below.
 - Added optional API authentication through `--require-auth`, bearer tokens,
   `X-API-Key`, and WebSocket query tokens. Static UI assets remain public.
 - Added persistent SQLite state through `[localnet].db-path`, state file
-  dump/load through `acton simulated-localnet state`, and named in-memory checkpoints
-  through `acton simulated-localnet checkpoint`, including import and export over HTTP.
+  dump/load through `acton simulator state`, and named in-memory checkpoints
+  through `acton simulator checkpoint`, including import and export over HTTP.
   Imports validate histories, hashes, references, transactions, messages,
   queues, and configuration before atomic replacement.
 - Added typed TON Center v2, v3, Emulation, and Streaming APIs with stable error
@@ -879,7 +879,7 @@ linter, formatter, docs, templates, and editor integrations.
   # before
   acton test -v
   acton script scripts/deploy.tolk -v
-  
+
   # after
   acton test --verbose
   acton script scripts/deploy.tolk --verbose
@@ -899,7 +899,7 @@ linter, formatter, docs, templates, and editor integrations.
   if (!ok) {
       return;
   }
-  
+
   // after
   val applied = txs.waitForFirstTransaction();
   if (applied == null) {
@@ -929,7 +929,7 @@ linter, formatter, docs, templates, and editor integrations.
   # before
   [wrappers.typescript]
   output-dir = "app/src/wrapper-ts"
-  
+
   # after
   [wrappers.typescript]
   output-dir = "app/src/wrappers-ts"
@@ -1328,7 +1328,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   ```bash
   # before
   acton script scripts/deploy.tolk --broadcast --net testnet
-  
+
   # after
   acton script scripts/deploy.tolk --net testnet
   ```
@@ -1346,7 +1346,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   # before
   acton test --fork-net testnet --api-key YOUR_API_KEY
   acton script scripts/deploy.tolk --net mainnet --api-key YOUR_API_KEY
-  
+
   # after
   TONCENTER_TESTNET_API_KEY=YOUR_API_KEY acton test --fork-net testnet
   TONCENTER_MAINNET_API_KEY=YOUR_API_KEY acton script scripts/deploy.tolk --net mainnet
@@ -1366,7 +1366,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   [litenode]
   port = 3010
   fork-net = "testnet"
-  
+
   # after
   [localnet]
   port = 3010
@@ -1401,7 +1401,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   [contracts.counter]
   name = "Counter"
   src = "contracts/counter.tolk"
-  
+
   # after
   [contracts.Counter]
   display-name = "Counter"
@@ -1425,7 +1425,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   [wrappers.tolk]
   output-dir = "tests/wrappers"
   test-output-dir = "tests"
-  
+
   [import-mappings]
   wrappers = "tests/wrappers"
   ```
@@ -1447,7 +1447,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   ```text
   # before
   gen/jetton-wallet_code.tolk
-  
+
   # after
   gen/JettonWallet.code.tolk
   ```
@@ -1465,7 +1465,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   @test({ fail_with: 42 })
   @test({ gas_limit: 1000 })
   @test({ fuzz: { runs: 64, seed: 42 } })
-  
+
   // after
   @test.skip
   @test.todo("later")
@@ -1486,7 +1486,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   # before
   acton test
   acton script scripts/debug.tolk
-  
+
   # after, to keep the old debug-log-heavy output
   acton test -v
   acton script scripts/debug.tolk --verbose
@@ -1502,7 +1502,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   ```tolk
   // before
   // acton-disable-next-line unused-variable
-  
+
   // after
   // check-disable-next-line unused-variable
   ```
