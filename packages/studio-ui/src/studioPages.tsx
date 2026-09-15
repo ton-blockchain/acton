@@ -31,7 +31,7 @@ export const studioPages: readonly StudioPage[] = [
   },
   {
     path: "/virtual-environments",
-    label: "Virtual Environments",
+    label: "Virtual environments",
     shortDescription:
       "Create isolated TON networks, keep presets and move between active environments",
     icon: Boxes,
