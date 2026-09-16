@@ -55,7 +55,7 @@ EXAMPLES
 
 SEE ALSO
        o  Studio guide
-          <https://ton-blockchain.github.io/acton/docs/studio/getting-started>
+          <https://ton-blockchain.github.io/acton/docs/studio#get-started>
 
        o  acton help test
 

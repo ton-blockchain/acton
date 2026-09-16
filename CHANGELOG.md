@@ -57,7 +57,7 @@ and formatter fixes address cases where formatting lost code or broke syntax.
 
 ### Acton Studio
 
-[Acton Studio](docs/content/docs/studio/overview.mdx) is a local browser workspace
+[Acton Studio](docs/content/docs/studio.mdx) is a local browser workspace
 for an Acton project. Start it with `acton studio` at `127.0.0.1:3015`.
 
 - Run tests and inspect saved results, logs, traces, coverage, gas profiles,
@@ -69,7 +69,7 @@ for an Acton project. Start it with `acton studio` at `127.0.0.1:3015`.
 
 ### Simulator
 
-[Acton simulator](docs/content/docs/simulator/overview.mdx) runs a lightweight TON
+[Acton simulator](docs/content/docs/environments/simulator/overview.mdx) runs a lightweight TON
 simulation with `acton simulator`. It supports local development and forks of
 mainnet or testnet state without running validators.
 

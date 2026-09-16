@@ -59,7 +59,7 @@ acton --project-root ../my-project studio
 
 ## See Also
 
-- [Studio guide](https://ton-blockchain.github.io/acton/docs/studio/getting-started)
+- [Studio guide](https://ton-blockchain.github.io/acton/docs/studio#get-started)
 - `acton help test`
 - `acton help simulator`
 - `acton help localnet`
