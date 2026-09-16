@@ -1,0 +1,4 @@
+  Installing standard library [ACTON_VERSION]
+Awaiting trace... [Attempt 1/20]
+Trace settled with 2 transaction(s)
+CURRENT_TRACE=true

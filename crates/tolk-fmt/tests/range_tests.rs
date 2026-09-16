@@ -95,6 +95,28 @@ fn parse_selection(marked_code: &str) -> (String, FormatRange) {
 }
 
 #[test]
+fn test_range_preserves_selected_incomplete_declarations() {
+    check_selection(
+        r"fun before(){return 1;}
+
+<selection>fun unfinished(value: int): int
+
+fun int.unfinished(self): int</selection>
+
+fun after(){return 2;}",
+        80,
+        expect![[r"
+            fun before(){return 1;}
+
+            fun unfinished(value: int): int
+
+            fun int.unfinished(self): int
+
+            fun after(){return 2;}"]],
+    );
+}
+
+#[test]
 fn test_range_formats_only_selected_statement() {
     check_selection(
         r"fun foo() {

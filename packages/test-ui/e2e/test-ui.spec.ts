@@ -1,4 +1,6 @@
 import type {Page} from "@playwright/test"
+import {Cell} from "@ton/core"
+import type {Trace} from "../src/types/test"
 
 import {
   expect,
@@ -444,6 +446,100 @@ test.describe("Test UI", () => {
     await expect(page.getByText("Message Route", {exact: true})).toBeVisible()
     await expect(page.getByText("Compute Phase", {exact: true})).toBeVisible()
   })
+
+  for (const logKind of ["both", "vm", "executor", "none"] as const) {
+    test(`handles transaction log navigation with ${logKind} logs`, async ({
+      loggedActonUi,
+      page,
+    }) => {
+      await page.route("**/api/trace/**", async route => {
+        const response = await route.fetch()
+        const trace = (await response.json()) as Trace
+        // Keep real collected logs, omitting kinds to cover partial and empty trace data.
+        const json = {
+          ...trace,
+          traces: trace.traces.map(entry => ({
+            ...entry,
+            transactions: entry.transactions.map(tx => ({
+              ...tx,
+              vm_log_diff: logKind === "executor" || logKind === "none" ? "" : tx.vm_log_diff,
+              executor_logs: logKind === "vm" || logKind === "none" ? "" : tx.executor_logs,
+            })),
+          })),
+        }
+        await route.fulfill({response, json})
+      })
+      await page.goto(loggedActonUi.baseUrl)
+      const traceResponse = page.waitForResponse("**/api/trace/**")
+      await openOwnerCanSendJettons(page)
+      const trace = (await (await traceResponse).json()) as Trace
+      const transactions = trace.traces.find(entry => entry.name === "Trace 4")?.transactions ?? []
+      expect(transactions.length).toBeGreaterThan(1)
+
+      // Reopening the same target must work after navigating to another transaction.
+      for (const index of [1, 0, 1]) {
+        await page.getByRole("tab", {name: "Transactions", exact: true}).click()
+        await page.getByRole("button", {name: "Trace 4", exact: true}).click()
+        const tx = transactions[index]
+        const id = Cell.fromBase64(tx.raw_transaction).hash().toString("hex")
+        await page.getByRole("button", {name: `Transaction ${id}`, exact: true}).click()
+        await expect(page.getByText("Message Route", {exact: true})).toBeVisible()
+
+        if (logKind === "none") {
+          await expect(page.getByRole("button", {name: "View logs", exact: true})).toHaveCount(0)
+          await page.getByRole("tab", {name: "Logs", exact: true}).click()
+          await page.getByRole("button", {name: "Expand VM Log", exact: true}).click()
+          await expect(page.getByText("No VM logs were collected", {exact: false})).toBeVisible()
+          await expect(page.getByTestId("test-details-content").locator("pre")).toHaveCount(0)
+          await expect(page.getByRole("button", {name: "Copy VM log", exact: true})).toHaveCount(0)
+          return
+        }
+
+        await page.getByRole("button", {name: "View logs", exact: true}).click()
+
+        await expect(page.getByRole("tab", {name: "Logs", exact: true})).toHaveAttribute(
+          "aria-selected",
+          "true",
+        )
+        await expect(page.getByRole("button", {name: "Trace 4", exact: true})).toHaveAttribute(
+          "aria-current",
+          "true",
+        )
+        const logs = page.getByRole("region", {name: `Transaction #${index + 1} logs`, exact: true})
+        await expect(logs).toBeFocused()
+        await expect(logs.getByText(`Transaction #${index + 1}`, {exact: true})).toBeInViewport()
+        const vmLog = logs.locator('[data-visual-dynamic="vm-log"]')
+
+        if (logKind === "executor") {
+          await logs.getByRole("button", {name: "Expand VM Log", exact: true}).click()
+          await expect(logs.getByText("No VM logs were collected", {exact: false})).toBeVisible()
+          await expect(vmLog.locator("pre")).toHaveCount(0)
+          await expect(logs.getByRole("button", {name: "Copy VM log", exact: true})).toHaveCount(0)
+        } else {
+          await expect(
+            logs.getByRole("button", {name: "Collapse VM Log", exact: true}),
+          ).toBeVisible()
+          await expect(vmLog.locator("pre")).toHaveText(tx.vm_log_diff)
+          await expect(logs.getByRole("button", {name: "Copy VM log", exact: true})).toBeVisible()
+        }
+
+        if (logKind === "both") {
+          await logs.getByRole("button", {name: "Expand Executor Log", exact: true}).click()
+        }
+        if (logKind !== "vm") {
+          await expect(
+            logs.getByRole("button", {name: "Collapse Executor Log", exact: true}),
+          ).toBeVisible()
+          await expect(logs.locator('[data-visual-dynamic="executor-log"] pre')).toHaveText(
+            tx.executor_logs,
+          )
+          await expect(
+            logs.getByRole("button", {name: "Copy Executor log", exact: true}),
+          ).toBeVisible()
+        }
+      }
+    })
+  }
 
   test("opens coverage for the same jetton run", async ({actonUi, page}) => {
     await page.goto(actonUi.baseUrl)

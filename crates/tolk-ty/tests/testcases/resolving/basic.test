@@ -422,3 +422,26 @@ contract Wallet {
 8:15 -> 0:5 resolved
 9:18 -> 1:6 resolved
 10:15 -> 3:4 resolved
+
+========================================================================
+References in direct match-arm statements
+========================================================================
+fun main(value: int) {
+    match (value) {
+        1 => if (<caret>value > 0) {
+            val local = <caret>value;
+            <caret>local;
+        }
+        2 => while (<caret>value > 0) { <caret>value -= 1; }
+        3 => try { throw 1; } catch (code) { <caret>code; }
+        else => assert (<caret>value > 0) throw 123,
+    }
+}
+------------------------------------------------------------------------
+2:17 -> 0:9 resolved
+3:24 -> 0:9 resolved
+4:12 -> 3:16 resolved
+6:20 -> 0:9 resolved
+6:33 -> 0:9 resolved
+7:45 -> 7:37 resolved
+8:24 -> 0:9 resolved

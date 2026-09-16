@@ -49,3 +49,28 @@ fun test() {
             (var_declaration
               name: (identifier)))
           right: (string_literal))))))
+
+========================================================================
+Escaped quotes before triple string delimiters
+========================================================================
+
+const a = """a\"""";
+const b = """a\"""b""";
+const c = """a"\"b""";
+const d = """a""\"b""";
+
+------------------------------------------------------------------------
+
+(source_file
+  (constant_declaration
+    (identifier)
+    (string_literal))
+  (constant_declaration
+    (identifier)
+    (string_literal))
+  (constant_declaration
+    (identifier)
+    (string_literal))
+  (constant_declaration
+    (identifier)
+    (string_literal)))

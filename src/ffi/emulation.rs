@@ -4242,7 +4242,7 @@ fn wait_for_trace_impl(
             println!("Awaiting trace... [Attempt {attempt}/{attempts}]");
         }
 
-        match poll_send_results_by_trace(&api_client, &msg_hash_hex) {
+        match poll_send_results_by_trace(&api_client, &msg_hash_hex, ctx.execution_started_at) {
             Ok(TracePollOutcome::Settled(send_results)) => {
                 if !quiet {
                     println!("Trace settled with {} transaction(s)", send_results.len());
@@ -4326,15 +4326,22 @@ enum TracePollOutcome {
 
 /// One polling step for a full trace.
 ///
-/// Returns `NotYet` when the indexer hasn't yet built the trace or referenced txs aren't
-/// resolvable yet, `Incomplete` when the indexer explicitly flagged the trace as truncated,
-/// and `Err` for transport / parse failures the caller may retry on.
+/// Returns `NotYet` when only older executions exist, the indexer hasn't yet built
+/// the trace, or referenced txs aren't resolvable yet; `Incomplete` when the current
+/// trace is truncated; and `Err` for transport / parse failures the caller may retry on.
 fn poll_send_results_by_trace(
     client: &TonApiClient,
     msg_hash_hex: &str,
+    execution_started_at: i64,
 ) -> anyhow::Result<TracePollOutcome> {
-    let traces = client.get_traces_by_msg_hash(msg_hash_hex, 1)?;
-    let Some(trace) = traces.into_iter().next() else {
+    let traces = client.get_traces_by_msg_hash(msg_hash_hex, 1, Some(execution_started_at))?;
+    // Match the v2 wait's inclusive, second-precision cutoff. Check the response
+    // before interpreting status so an older failure or truncated trace cannot
+    // stop this wait, even if an endpoint ignores the request's time filter.
+    let Some(trace) = traces
+        .into_iter()
+        .find(|trace| i64::from(trace.start_utime) >= execution_started_at)
+    else {
         return Ok(TracePollOutcome::NotYet);
     };
     if trace.is_incomplete {

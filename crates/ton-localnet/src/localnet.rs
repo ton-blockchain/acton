@@ -738,43 +738,53 @@ pub struct Localnet {
 pub const DEFAULT_BLOCK_TIME_MS: u64 = 500;
 
 impl Localnet {
-    #[must_use]
-    pub fn new(
+    /// Starts the node on its own thread and waits for persistent state and mining
+    /// runtime initialization. Callers can publish HTTP endpoints after this succeeds.
+    /// Initialization errors retain their original causes. Dropping the pending
+    /// future closes the request channel, so the worker exits after initialization.
+    pub async fn new(
         state_source: StateSource,
         db_path: Option<String>,
         snapshots: SnapshotStore,
         block_time: Duration,
         auto_mining: bool,
         mining_mode: LocalnetMiningMode,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let (tx, rx) = mpsc::channel(100);
         let (events_tx, _) = broadcast::channel(1024);
+        let (ready_tx, ready_rx) = oneshot::channel();
         let started_at = SystemTime::now();
         let node_events_tx = events_tx.clone();
         let block_time_ms = u64::try_from(block_time.as_millis()).unwrap_or(u64::MAX);
 
-        std::thread::spawn(move || {
-            if let Err(e) = run_node_loop(
-                rx,
-                node_events_tx,
-                state_source,
-                db_path,
-                snapshots,
-                block_time,
-                auto_mining,
-                mining_mode,
-            ) {
-                tracing::error!("Node loop failed: {:?}", e);
-            }
-        });
+        std::thread::Builder::new()
+            .name("acton-simulator".to_owned())
+            .spawn(move || {
+                run_node_loop(
+                    rx,
+                    node_events_tx,
+                    ready_tx,
+                    state_source,
+                    db_path,
+                    snapshots,
+                    block_time,
+                    auto_mining,
+                    mining_mode,
+                );
+            })
+            .context("Failed to start Simulator node thread")?;
 
-        Self {
+        ready_rx
+            .await
+            .context("Simulator node thread exited before initialization completed")??;
+
+        Ok(Self {
             tx,
             events_tx,
             started_at,
             block_time_ms,
             auto_mining,
-        }
+        })
     }
 
     #[must_use]
@@ -1868,39 +1878,55 @@ impl Localnet {
 fn run_node_loop(
     mut rx: mpsc::Receiver<Request>,
     events_tx: broadcast::Sender<StreamingCommitEvent>,
+    ready_tx: oneshot::Sender<anyhow::Result<()>>,
     state_source: StateSource,
     db_path: Option<String>,
     snapshots: SnapshotStore,
     block_time: Duration,
     auto_mining: bool,
     mut mining_mode: LocalnetMiningMode,
-) -> anyhow::Result<()> {
-    let mut node = create_node(events_tx, state_source, db_path)?;
-    tracing::info!(
-        "TON localnet started, block time: {}ms, auto mining: {}, skip empty blocks: {}",
-        block_time.as_millis(),
-        auto_mining,
-        mining_mode.skip_empty_blocks
-    );
+) {
+    // The non-Send executor must be created and used on this worker thread.
+    // Both state loading and runtime creation must succeed before acknowledging startup.
+    let initialized = create_node(events_tx, state_source, db_path).and_then(|node| {
+        let runtime = if auto_mining {
+            Some(
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_time()
+                    .build()
+                    .context("Failed to create Simulator node runtime")?,
+            )
+        } else {
+            None
+        };
+        Ok((node, runtime))
+    });
 
-    if !auto_mining {
+    let (mut node, runtime) = match initialized {
+        Ok(initialized) => initialized,
+        Err(error) => {
+            let _ = ready_tx.send(Err(error));
+            return;
+        }
+    };
+
+    if ready_tx.send(Ok(())).is_err() {
+        return;
+    }
+
+    if let Some(runtime) = runtime {
+        runtime.block_on(run_node_loop_async(
+            rx,
+            node,
+            snapshots,
+            block_time,
+            mining_mode,
+        ));
+    } else {
         while let Some(req) = rx.blocking_recv() {
             process_loop_request(&mut node, &snapshots, &mut mining_mode, req);
         }
-        return Ok(());
     }
-
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .context("Failed to create localnet node runtime")?;
-    runtime.block_on(run_node_loop_async(
-        rx,
-        node,
-        snapshots,
-        block_time,
-        mining_mode,
-    ))
 }
 
 fn create_node(
@@ -1910,7 +1936,13 @@ fn create_node(
 ) -> anyhow::Result<Node> {
     let executor = Box::new(TvmEmulatorAdapter::new()?);
     let config_boc = BocBytes::from_base64(DEFAULT_CONFIG)?;
-    let mut node = Node::with_db_path(executor, config_boc, state_source, db_path)?;
+    let mut node = Node::with_db_path(executor, config_boc, state_source, db_path.as_deref())
+        .with_context(|| {
+            db_path.map_or_else(
+                || "Failed to initialize Simulator state".to_owned(),
+                |path| format!("Failed to initialize Simulator database at {path}"),
+            )
+        })?;
     node.streaming_events = Some(events_tx);
     Ok(node)
 }
@@ -1924,7 +1956,7 @@ async fn run_node_loop_async(
     snapshots: SnapshotStore,
     block_time: Duration,
     mut mining_mode: LocalnetMiningMode,
-) -> anyhow::Result<()> {
+) {
     let mut next_block_at = Instant::now() + block_time;
 
     loop {
@@ -1940,7 +1972,7 @@ async fn run_node_loop_async(
             }
             req = rx.recv() => {
                 let Some(req) = req else {
-                    return Ok(());
+                    return;
                 };
                 process_loop_request(&mut node, &snapshots, &mut mining_mode, req);
             }

@@ -104,12 +104,13 @@ impl LspTestClient {
     ) -> anyhow::Result<()> {
         self.request("shutdown", Value::Null).await?;
         self.notify("exit", Value::Null).await?;
-        self.writer.shutdown().await?;
-        drop(self);
 
-        tokio::time::timeout(std::time::Duration::from_secs(5), server)
+        // The client keeps its transport open while waiting for the server to exit.
+        let result = tokio::time::timeout(std::time::Duration::from_secs(5), server)
             .await
-            .map_err(|_| anyhow::anyhow!("language server did not stop after exit"))??
+            .map_err(|_| anyhow::anyhow!("language server did not stop after exit"))??;
+        drop(self);
+        result
     }
 
     async fn write_message(&mut self, message: &Value) -> anyhow::Result<()> {

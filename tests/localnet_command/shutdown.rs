@@ -3,9 +3,69 @@
 use super::{Service, acton, api_listener, cli};
 use acton_localnet::Network;
 use expect_test::expect;
+use serde_json::json;
 use std::{process::Stdio, time::Duration};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
+
+#[tokio::test]
+async fn shutdown_after_a_prerequisite_failure_preserves_the_startup_error() {
+    let mut service = Service::start(false).await;
+    let client = service.client().await;
+    std::fs::write(service.root.path().join("docker-unavailable"), "")
+        .expect("Docker is not running");
+    let startup = tokio::time::timeout(
+        Duration::from_secs(20),
+        Command::from(acton(
+            service.root.path(),
+            &["start", "integration", "--json"],
+        ))
+        .output(),
+    )
+    .await
+    .expect("startup failure deadline")
+    .expect("startup output");
+    let failed = client.network().await.expect("failed network");
+
+    // Keep the service alive until the client requests shutdown. There is no
+    // deployment to clean up, but the startup diagnostic must remain available.
+    let (shutdown, repeated) = tokio::time::timeout(Duration::from_secs(20), async {
+        (client.shutdown().await, client.shutdown().await)
+    })
+    .await
+    .expect("client shutdown deadline");
+    let exit = tokio::time::timeout(Duration::from_secs(20), service.child.wait())
+        .await
+        .expect("service shutdown deadline")
+        .expect("service exit");
+    let observed: Network = serde_json::from_value(cli(&service.state(), &["status"]).await)
+        .expect("offline network status");
+    expect![[r#"
+        {
+          "deploymentCreated": false,
+          "errorRetained": true,
+          "repeatedShutdownSucceeded": true,
+          "serviceLeftRunning": false,
+          "serviceSucceeded": true,
+          "shutdownSucceeded": true,
+          "startupSucceeded": false,
+          "status": "failed"
+        }"#]]
+    .assert_eq(
+        &serde_json::to_string_pretty(&json!({
+            "startupSucceeded": startup.status.success(),
+            "shutdownSucceeded": shutdown.is_ok(),
+            "repeatedShutdownSucceeded": repeated.is_ok(),
+            "serviceSucceeded": exit.success(),
+            "status": observed.status,
+            "errorRetained": failed.error.is_some() && observed.error == failed.error,
+            "deploymentCreated": service.network.path.join("runtime.json").exists(),
+            "serviceLeftRunning": service.network.path.join("service.json").exists(),
+        }))
+        .expect("shutdown outcome"),
+    );
+    drop(service);
+}
 
 #[tokio::test]
 async fn failed_foreground_owner_does_not_hide_the_service_cleanup_result() {

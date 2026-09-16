@@ -90,16 +90,19 @@ pub async fn simulator_start_cmd(
             |path| ton_localnet::snapshots::SnapshotStore::for_database(std::path::Path::new(path)),
         ),
     };
-    let node = Arc::new(Localnet::new(
-        state_source,
-        db_path.clone(),
-        snapshots,
-        Duration::from_millis(block_time_ms),
-        !no_mining,
-        LocalnetMiningMode {
-            skip_empty_blocks: !mine_empty_blocks,
-        },
-    ));
+    let node = Arc::new(
+        Localnet::new(
+            state_source,
+            db_path.clone(),
+            snapshots,
+            Duration::from_millis(block_time_ms),
+            !no_mining,
+            LocalnetMiningMode {
+                skip_empty_blocks: !mine_empty_blocks,
+            },
+        )
+        .await?,
+    );
     let startup_accounts = setup_startup_accounts(&node, &accounts, no_mining).await?;
     let auth_token = require_auth.then(simulator_auth_token);
     let run_result = run_server(

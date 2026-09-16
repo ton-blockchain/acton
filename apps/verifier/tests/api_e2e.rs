@@ -37,6 +37,8 @@ const CODE_HASH_ONE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 const CODE_HASH_ONE_BASE64: &str = "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=";
 const CODE_HASH_TWO: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const CODE_HASH_THREE: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+const PAYMENT_TX_HASH_TWO: &str =
+    "b17d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394c";
 const API_KEY: &str = "migration-api-key";
 const ORIGINAL_VERIFIED_AT: &str = "1678647600000";
 const COMPILE_PARAMS_TOLK: &str = r#"{"compiler_version":"1.4.1"}"#;
@@ -209,7 +211,7 @@ async fn healthz_reports_payment_history_recovery() {
 }
 
 #[tokio::test]
-async fn take_ticket_returns_a_testnet_payment_bound_to_the_code_hash() {
+async fn take_ticket_returns_a_payment_bound_to_the_code_hash() {
     let response = post_take_ticket(app_state(&[], CODE_HASH_ONE), CODE_HASH_ONE_BASE64).await;
 
     assert_eq!(response.status(), StatusCode::OK);
@@ -218,6 +220,7 @@ async fn take_ticket_returns_a_testnet_payment_bound_to_the_code_hash() {
         json!({
             "status": "payment_required",
             "code_hash": CODE_HASH_ONE,
+            "network": "testnet",
             "payment_address": "0:1111111111111111111111111111111111111111111111111111111111111111",
             "amount_nano": "10000000",
             "comment": format!("acton-verify:v1:{CODE_HASH_ONE}")
@@ -392,7 +395,7 @@ async fn verify_maps_payment_failures_to_stable_http_contracts() {
         (
             PaymentError::TransactionNotFound,
             StatusCode::PAYMENT_REQUIRED,
-            "payment_not_found: transaction was not found on TON testnet".to_owned(),
+            "payment_not_found: transaction was not found on the configured TON network".to_owned(),
         ),
         (
             PaymentError::InvalidTransaction,
@@ -560,7 +563,10 @@ async fn openapi_json_documents_verifier_api() {
         ]
     );
     assert_eq!(response_statuses(abi), ["200", "400", "404", "502"]);
-    assert_eq!(response_statuses(source), ["200", "400", "404", "502"]);
+    assert_eq!(
+        response_statuses(source),
+        ["200", "400", "404", "409", "502"]
+    );
 }
 
 #[tokio::test]
@@ -2136,6 +2142,34 @@ async fn verification_finishes_after_the_request_task_is_cancelled() {
             .await
             .expect("verification status should be readable")
             .verified
+    );
+}
+
+#[tokio::test]
+async fn an_outstanding_payment_is_consumed_when_the_code_hash_is_already_verified() {
+    let (state, outcomes) = recording_payment_app_state(CODE_HASH_ONE);
+
+    let first_response = post_verify(state.clone(), valid_verify_parts()).await;
+    assert_eq!(first_response.status(), StatusCode::OK);
+
+    let mut second_parts = valid_verify_parts();
+    second_parts.push(text_part("tx_hash", PAYMENT_TX_HASH_TWO));
+    let second_response = post_verify_without_payment(state, second_parts).await;
+    assert_eq!(second_response.status(), StatusCode::OK);
+    assert_eq!(
+        response_json::<VerifyResponse>(second_response)
+            .await
+            .verification_result,
+        "already_verified"
+    );
+    assert_eq!(
+        *outcomes
+            .lock()
+            .expect("payment outcomes mutex should not be poisoned"),
+        [
+            PaymentAttemptOutcome::Consumed,
+            PaymentAttemptOutcome::Consumed
+        ]
     );
 }
 

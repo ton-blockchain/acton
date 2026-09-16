@@ -222,6 +222,7 @@ async fn missing_tools_and_timeout_remain_actionable_after_cli_shutdown() {
     for scenario in [
         "missing",
         "missing-context",
+        "docker-unavailable",
         "compose-unavailable",
         "docker-timeout",
     ] {
@@ -246,6 +247,17 @@ async fn missing_tools_and_timeout_remain_actionable_after_cli_shutdown() {
             &std::fs::read(service.network.path.join("network.json")).expect("persisted failure"),
         )
         .expect("network");
+
+        // Read through the CLI after the owner has exited. Polling only the live
+        // service can miss the fallback that used to replace Failed with Stopped.
+        let observed: Network = serde_json::from_value(cli(&service.state(), &["status"]).await)
+            .expect("offline network status");
+        expect![["Failed:true"]].assert_eq(&format!(
+            "{:?}:{}",
+            observed.status,
+            observed.error == network.error,
+        ));
+
         let operation = network.operation.expect("failed operation");
         let error = operation.error.expect("actionable error");
         let summary = error.lines().take(2).collect::<Vec<_>>().join("\n");
@@ -295,6 +307,19 @@ async fn missing_tools_and_timeout_remain_actionable_after_cli_shutdown() {
             "error": "Docker CLI was not found on PATH\nInstall Docker Desktop or Docker Engine with Compose v2 and make `docker` available to Acton",
             "logExplainsRecovery": true,
             "scenario": "missing-context",
+            "serviceLeftRunning": false,
+            "status": "failed"
+          },
+          {
+            "cliExplainsRecovery": true,
+            "cliFailed": true,
+            "code": "docker_engine_unavailable",
+            "composeCreated": false,
+            "containersStarted": false,
+            "descriptorCreated": false,
+            "error": "Docker is not running\nStart Docker Desktop or your Docker Engine service, wait until it is ready, then retry",
+            "logExplainsRecovery": true,
+            "scenario": "docker-unavailable",
             "serviceLeftRunning": false,
             "status": "failed"
           },

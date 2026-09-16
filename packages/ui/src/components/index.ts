@@ -1,4 +1,5 @@
 export * from "./AddressChip"
+export * from "./Banner"
 export * from "./BlockChip"
 export * from "./BocInput"
 export * from "./BooleanValue"

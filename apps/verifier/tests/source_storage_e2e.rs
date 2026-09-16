@@ -107,6 +107,26 @@ async fn git_source_storage_rejects_untracked_files_at_startup() -> Result<(), B
 }
 
 #[tokio::test]
+async fn git_source_storage_runs_startup_validation_before_loading() -> Result<(), Box<dyn Error>> {
+    let fixture = GitFixture::new()?;
+    fs::write(fixture.repo_path.join("pending.txt"), "not committed\n")?;
+    let config = Config::load_from_path(fixture.write_config()?)?;
+    let storage = GitSourceStorage::from_config(&config);
+
+    let error = storage
+        .load_bundle(CODE_HASH)
+        .await
+        .expect_err("loading should validate the source repository first");
+    assert!(matches!(
+        &error,
+        SourceStorageError::DirtySourceRepository { changes, .. }
+            if changes == "?? pending.txt"
+    ));
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn git_source_storage_rejects_unstaged_changes_at_startup() -> Result<(), Box<dyn Error>> {
     let fixture = GitFixture::new()?;
     fs::write(
@@ -459,10 +479,13 @@ async fn git_source_storage_requires_current_source_attributes_rule() -> Result<
         "git commit",
     )?;
 
-    let error = storage
+    assert!(storage.current_revision().await?.is_some());
+
+    let restarted_storage = GitSourceStorage::from_config(&config);
+    let error = restarted_storage
         .current_revision()
         .await
-        .expect_err("source repository should retain sources/** -text");
+        .expect_err("source repository should validate sources/** -text at startup");
     assert!(matches!(
         error,
         SourceStorageError::UnpreparedSourceRepository { .. }
@@ -478,7 +501,10 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
     let config = Config::load_from_path(config_path)?;
     let storage = GitSourceStorage::from_config(&config);
 
-    assert!(storage.current_revision().await?.is_some());
+    let initial_revision = storage
+        .current_revision()
+        .await?
+        .expect("fixture should have an initial revision");
 
     let started_at = unix_timestamp()?;
     let bundle_path = format!(
@@ -521,6 +547,7 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
 
     assert_eq!(receipt.revision.len(), 40);
     assert!(receipt.created);
+    assert_ne!(receipt.revision, initial_revision);
 
     let stored_main = fixture.repo_path.join(&bundle_path).join("files/main.tolk");
     let stored_lib = fixture

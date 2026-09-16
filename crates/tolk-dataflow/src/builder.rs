@@ -637,6 +637,7 @@ impl<'idx> CfgBuilder<'idx> {
             MatchArmBody::Block(block) => self.build_block_fragment(block),
             MatchArmBody::Return(ret) => self.build_return_fragment(ret),
             MatchArmBody::Throw(throw) => self.build_throw_fragment(throw),
+            MatchArmBody::Statement(stmt) => self.build_stmt_fragment(stmt),
             MatchArmBody::Expr(expr) => {
                 let node = self.cfg.add_node(FlowNodeKind::Expr, Some(expr.span()));
                 self.collect_expr_into_node(node, expr, AccessMode::Read);
@@ -1020,7 +1021,7 @@ impl<'idx> UseDefCollector<'idx> {
                     }
 
                     arm.body().is_some_and(|body| match body {
-                        MatchArmBody::Block(_) => false,
+                        MatchArmBody::Block(_) | MatchArmBody::Statement(_) => false,
                         MatchArmBody::Return(ret) => ret.expr().is_some_and(|expr| {
                             self.contains_random_method_call(expr, method_names)
                         }),
@@ -1295,7 +1296,7 @@ impl<'idx> UseDefCollector<'idx> {
 
                     if let Some(body) = arm.body() {
                         match body {
-                            MatchArmBody::Block(_) => {}
+                            MatchArmBody::Block(_) | MatchArmBody::Statement(_) => {}
                             MatchArmBody::Return(ret) => {
                                 if let Some(expr) = ret.expr() {
                                     self.collect_called_globals_inner(expr, out);
@@ -1599,7 +1600,7 @@ impl<'idx> UseDefCollector<'idx> {
                     }
                     if let Some(body) = arm.body() {
                         match body {
-                            MatchArmBody::Block(_) => {}
+                            MatchArmBody::Block(_) | MatchArmBody::Statement(_) => {}
                             MatchArmBody::Return(ret) => {
                                 if let Some(expr) = ret.expr() {
                                     self.collect_message_field_roots_inner(
@@ -1822,7 +1823,7 @@ impl<'idx> UseDefCollector<'idx> {
                     }
 
                     arm.body().is_some_and(|body| match body {
-                        MatchArmBody::Block(_) => false,
+                        MatchArmBody::Block(_) | MatchArmBody::Statement(_) => false,
                         MatchArmBody::Return(ret) => ret
                             .expr()
                             .is_some_and(|expr| self.contains_storage_write_sink(expr)),
@@ -2421,6 +2422,7 @@ impl<'idx> UseDefCollector<'idx> {
                 }
             }
             MatchArmBody::Expr(expr) => self.collect_expr(expr, AccessMode::Read, reads, writes),
+            MatchArmBody::Statement(stmt) => self.collect_stmt_inline(stmt, reads, writes),
         }
     }
 

@@ -2,6 +2,7 @@ import {ThemeProvider, ThemeSwitch} from "@acton/ui"
 import {useEffect, useRef, useState} from "react"
 import type {ReactNode} from "react"
 import {Github, Menu, Search, X} from "lucide-react"
+import {Link, useLocation} from "react-router"
 
 import tonVerifierIcon from "../assets/ton-verifier-icons/icon.svg"
 import {SearchBox} from "./SearchBox"
@@ -18,7 +19,7 @@ interface AppShellProps {
 }
 
 export function AppShell({children, headerAccessory}: AppShellProps) {
-  const {pathname} = globalThis.location
+  const {pathname} = useLocation()
   const isHomePage = pathname === "/"
   const headerClassName = isHomePage ? `${styles.header} ${styles.headerHome}` : styles.header
   const [mobileHeaderPanel, setMobileHeaderPanel] = useState<"navigation" | "search">()
@@ -58,21 +59,21 @@ export function AppShell({children, headerAccessory}: AppShellProps) {
         <header className={headerClassName}>
           <div className={styles.headerInner}>
             <div className={styles.headerPrimary}>
-              <a className={styles.brand} href="/" aria-label="TON Verifier home">
+              <Link className={styles.brand} to="/" aria-label="TON Verifier home">
                 <img className={styles.brandIcon} src={tonVerifierIcon} alt="" aria-hidden="true" />
                 <span>TON Verifier</span>
-              </a>
+              </Link>
               <nav className={styles.nav} aria-label="TON Verifier navigation">
                 {PRIMARY_NAV_ITEMS.map(item => (
-                  <a
+                  <Link
                     key={item.href}
                     className={`${styles.navLink} ${
                       pathname === item.href ? styles.navLinkActive : ""
                     }`}
-                    href={item.href}
+                    to={item.href}
                   >
                     {item.label}
-                  </a>
+                  </Link>
                 ))}
               </nav>
             </div>
@@ -136,9 +137,9 @@ export function AppShell({children, headerAccessory}: AppShellProps) {
                     aria-label="Mobile TON Verifier navigation"
                   >
                     {PRIMARY_NAV_ITEMS.map(item => (
-                      <a key={item.href} href={item.href}>
+                      <Link key={item.href} to={item.href}>
                         {item.label}
-                      </a>
+                      </Link>
                     ))}
                     <a
                       href="https://github.com/ton-blockchain/acton"

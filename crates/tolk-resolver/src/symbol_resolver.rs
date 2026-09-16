@@ -803,6 +803,7 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
                 ast::MatchArmBody::Block(ref block) => self.walk_block(block),
                 ast::MatchArmBody::Return(ref ret) => self.walk_return(ret),
                 ast::MatchArmBody::Throw(ref throw) => self.walk_throw(throw),
+                ast::MatchArmBody::Statement(ref stmt) => self.visit_stmt(stmt),
                 ast::MatchArmBody::Expr(ref expr) => self.visit_expr(expr),
             }
         }

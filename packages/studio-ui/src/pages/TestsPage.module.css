@@ -30,6 +30,25 @@
   background: var(--acton-color-surface);
 }
 
+.runTabs,
+.runTabPanel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.runTabs {
+  padding-top: var(--acton-space-3);
+}
+
+.runTabPanel {
+  border: 0;
+  border-top: 1px solid var(--acton-color-border);
+  border-radius: 0;
+}
+
 .runHeader {
   display: flex;
   align-items: center;

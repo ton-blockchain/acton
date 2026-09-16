@@ -6,7 +6,7 @@ use tokio_util::task::TaskTracker;
 use tracing::instrument::WithSubscriber;
 
 use crate::{
-    blockchain::{BlockchainClient, ToncenterClient},
+    blockchain::{BlockchainClient, MultiNetworkToncenterClient},
     compilation_queue::{CompilationQueue, CompilationStatus},
     compilers::{
         CompileOutput, CompileRequest, CompilerError, CompilerService, NodeCompilerService,
@@ -49,7 +49,7 @@ impl AppState {
         let payment_verifier = Arc::new(OnchainPaymentVerifier::from_config(config)?);
 
         Ok(Self::new(
-            Arc::new(ToncenterClient::from_config(config)),
+            Arc::new(MultiNetworkToncenterClient::from_config(config)),
             Arc::new(NodeCompilerService::from_config(config)),
             verification_registry,
             payment_verifier,
@@ -164,7 +164,7 @@ impl AppState {
         Ok(())
     }
 
-    /// Rebuilds payment replay state from TON testnet history.
+    /// Rebuilds payment replay state from TON history.
     ///
     /// # Errors
     ///

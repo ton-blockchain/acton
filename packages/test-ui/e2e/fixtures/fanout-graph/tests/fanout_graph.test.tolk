@@ -260,6 +260,17 @@ get fun `test tall chain graph has eight sequential self calls`() {
     println(result);
 }
 
+get fun `test chain graph has twenty transactions`() {
+    val sender = testing.treasury("long-chain-sender");
+    val fanout = deployFanout(sender);
+
+    val result = fanout.sendChain(sender.address, 19);
+    result.giveName("chain 20");
+
+    expect(result).toHaveAllSuccessfulTxs();
+    println(result);
+}
+
 get fun `test wide fanout graph has six outgoing messages`() {
     val sender = testing.treasury("wide-sender");
     val first = testing.treasury("wide-first");

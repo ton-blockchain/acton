@@ -1,0 +1,17 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/approx.test.tolk (2 tests)
+  ✗ zero denominator even for equal zeros [TIME]
+    └─ Error: toBeApproxEqRel: maxDeltaDenominator must be positive, got 0
+      └─ at tests/approx.test[LINE]
+  ✗ negative denominator even for equal values [TIME]
+    └─ Error: toBeApproxEqRel: maxDeltaDenominator must be positive, got -100
+      └─ at tests/approx.test[LINE]
+
+ ✗ 2 failed in 1 file
+
+Some tests failed.

@@ -7,6 +7,58 @@ use crate::common::{
 use expect_test::expect;
 
 #[test]
+fn test_incomplete_function_is_preserved() {
+    check("fun unfinished", expect!["fun unfinished"]);
+    check(
+        "fun unfinished(value: int):",
+        expect!["fun unfinished(value: int):"],
+    );
+    check(
+        "fun unfinished(value: int): int",
+        expect!["fun unfinished(value: int): int"],
+    );
+    check(
+        "fun unfinished() { if (true) }",
+        expect!["fun unfinished() { if (true) }"],
+    );
+}
+
+#[test]
+fn test_incomplete_declarations_preserve_comments_and_neighbors() {
+    check(
+        r"fun before(){return 1;}
+
+// Function in progress
+@inline
+fun    unfinished<T>(
+    value: T,
+): T // needs a body
+
+// Method in progress
+fun int.unfinished(self): int
+
+fun after(){return 2;}",
+        expect![[r"
+            fun before() {
+                return 1;
+            }
+
+            // Function in progress
+            @inline
+            fun    unfinished<T>(
+                value: T,
+            ): T // needs a body
+
+            // Method in progress
+            fun int.unfinished(self): int
+
+            fun after() {
+                return 2;
+            }"]],
+    );
+}
+
+#[test]
 fn test_function_parameters_comments() {
     check(
         "fun test(
@@ -80,6 +132,46 @@ fn test_asm_comments() {
                         "INC" // inline
                         // trailing
                         "DEC""#]],
+    );
+}
+
+#[test]
+fn test_asm_line_comment_preserves_next_instruction() {
+    check_with_width(
+        r#"fun two(): int asm "ONE" // first instruction
+            "INC";"#,
+        expect![[r#"
+            fun two(): int
+                asm
+                    "ONE" // first instruction
+                    "INC""#]],
+        1000,
+    );
+}
+
+#[test]
+fn test_asm_line_comments_preserve_following_literals() {
+    check(
+        r#"fun four(): int asm "ONE" "INC" // second instruction
+            """INC""" // third instruction
+            "INC";"#,
+        expect![[r#"
+            fun four(): int
+                asm
+                    "ONE"
+                    "INC" // second instruction
+                    """INC""" // third instruction
+                    "INC""#]],
+    );
+}
+
+#[test]
+fn test_asm_block_comment_keeps_instructions_inline() {
+    check(
+        r#"fun two(): int asm "ONE" /* first instruction */ "INC";"#,
+        expect![[r#"
+            fun two(): int
+                asm "ONE" /* first instruction */ "INC""#]],
     );
 }
 
@@ -1665,3 +1757,22 @@ fn test_constants_with_newlines() {
     );
 }
 // }
+
+#[test]
+fn test_enum_semicolon_separators() {
+    check(
+        r"enum E { A = 1; B = 2; C, D }
+get fun f(): int { return E.D as int; }",
+        expect![[r"
+enum E {
+    A = 1
+    B = 2
+    C
+    D
+}
+
+get fun f(): int {
+    return E.D as int;
+}"]],
+    );
+}

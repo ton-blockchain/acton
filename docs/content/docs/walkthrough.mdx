@@ -721,31 +721,41 @@ acton script contracts/scripts/deploy.tolk --net testnet --verbose --show-bodies
 
 ## Verify the contract
 
-Use [`acton verify`](/docs/commands/verify) to check that the deployed bytecode matches the local sources. It compiles local sources, uploads them to the verifier backend, collects the required signatures, and submits the verification transaction.
+Use [`acton verify`](/docs/commands/verify) to publish Tolk sources that reproduce the contract's compiled code hash. Address checks and verification payments use TON testnet.
+
+Use the same source revision and compiler settings as deployment. First, prepare verification and inspect the payment details:
 
 ```bash
-acton verify Counter --net testnet --address <CONTRACT_ADDRESS>
+acton verify Counter --address <CONTRACT_ADDRESS> --dry-run
 ```
 
-Replace `<CONTRACT_ADDRESS>` with the address from the [deployment step](#run-scripts).
+Replace `<CONTRACT_ADDRESS>` with the testnet address from the [deployment step](#run-scripts).
 
-Verification requires a [funded wallet](#set-up-a-wallet). If there is more than one wallet, choose the target wallet when prompted. If there is a single wallet, it will be selected automatically.
+Acton compiles the contract and requests a verification ticket. If the code hash is already verified, Acton prints its verifier link and exits without payment.
 
-Use `--dry-run` to compile and upload sources without consuming funds to send the verification message:
+For new code, Acton compares the deployed code hash with the local result and stops on a mismatch. It then prepares the sources and displays the ticket's payment amount, recipient address, and comment.
+
+`--dry-run` does not send a payment or upload sources. It does not confirm that the verifier can compile the source bundle.
+
+To complete verification, use the [funded wallet](#set-up-a-wallet) created earlier:
 
 ```bash
-acton verify Counter --net testnet --address <CONTRACT_ADDRESS> --dry-run
+acton verify Counter --address <CONTRACT_ADDRESS> --wallet deployer
 ```
 
-Pass `--tonconnect` to approve the final verification transaction through a TON Connect wallet instead of a wallet from `wallets.toml`:
+Review the amount and recipient, then approve the payment when prompted. The ticket sets the amount. Keep enough testnet GRAM in the wallet for this payment and network fees.
+
+Acton sends the payment, waits for the recipient transaction to finalize, and uploads the sources with that transaction's hash. On success, it prints a verifier link for the code hash.
+
+To approve the payment through a TON Connect testnet wallet, use `--tonconnect`:
 
 ```bash
-acton verify Counter --address EQDt7LL... --net mainnet --tonconnect
+acton verify Counter --address <CONTRACT_ADDRESS> --tonconnect
 ```
 
-Acton prints a native TON Connect QR code and a `tc://` link.
+Acton prints a QR code and a `tc://` link. Connect the wallet and approve the payment in the wallet app.
 
-See the [verification guide](/docs/verify) for more.
+See the [verification guide](/docs/verify) for compiler options and payment retries.
 
 ## Manage on-chain libraries
 

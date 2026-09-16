@@ -96,10 +96,9 @@ fun onInternalMessage(in: InMessage) {
                     queryId: msg.queryId,
                     outActions: null,
                     hasExtraActions: true,
-                    extraActions: W5RemoveExtensionExtraAction {
-                        addr: contract.getAddress(),
-                    }.toCell()
-                        .beginParse(),
+                    extraActions: W5RemoveExtensionExtraAction { addr: contract.getAddress() }
+                    .toCell()
+                    .beginParse(),
                 },
                 bounce: false,
                 dest: storage.walletAddress,

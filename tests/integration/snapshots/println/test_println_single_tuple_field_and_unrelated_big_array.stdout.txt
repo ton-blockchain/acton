@@ -1,0 +1,18 @@
+  Installing standard library [ACTON_VERSION]
+Box<[int, bool]> {
+    value: [1, true],
+}
+Box<array<int>> {
+    value: [1, 2, 3],
+}
+Box<array<int>> {
+    value: [],
+}
+Box<Box<[int, bool]>> {
+    value: Box<[int, bool]> {
+        value: [2, false],
+    },
+}
+BigArray<int> {
+    items: [4, 5],
+}

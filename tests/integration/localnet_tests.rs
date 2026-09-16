@@ -1,4 +1,4 @@
-use crate::common::{assertion, strip_ansi};
+use crate::common::{ActonCommandExt, assertion, strip_ansi};
 use crate::support::TestOutputExt;
 use crate::support::localnet::{
     assert_v3_bad_request, block_header_gen_utime, is_success_response, latest_masterchain_seqno,
@@ -510,6 +510,55 @@ fun main() {
     println("WORKER_CONTRACT={}", workerAddress);
 }
 "#;
+
+#[test]
+fn localnet_start_rejects_invalid_database_before_starting_server() {
+    let project = ProjectBuilder::new("localnet-invalid-database").build();
+    fs::write(
+        project.path().join("invalid.sqlite"),
+        "not a SQLite database",
+    )
+    .expect("failed to write invalid database");
+
+    for (no_mining, occupied_port) in [(false, false), (true, false), (false, true)] {
+        let Some((listener, port)) = reserve_localnet_port() else {
+            return;
+        };
+        // Also check an occupied port: the database error must take precedence
+        // over HTTP binding, with no startup wallets to detect a failed worker.
+        let _listener = occupied_port.then_some(listener);
+        let mut command = snapbox::cmd::Command::acton_ui()
+            .current_dir(project.path())
+            .env("HOME", project.path())
+            .env("USERPROFILE", project.path())
+            .env("NO_COLOR", "1")
+            .args([
+                "simulator",
+                "start",
+                "--port",
+                &port,
+                "--accounts",
+                "",
+                "--db-path",
+                "invalid.sqlite",
+            ])
+            .timeout(Duration::from_secs(15));
+        if no_mining {
+            command = command.arg("--no-mining");
+        }
+
+        let output = command.assert().code(1);
+        let output = output.get_output();
+        let snapshot = json!({
+            "stdout": strip_ansi(&String::from_utf8_lossy(&output.stdout)),
+            "stderr": strip_ansi(&String::from_utf8_lossy(&output.stderr)),
+        });
+        assertion().normalize_paths(false).eq(
+            pretty_json_for_snapshot(&snapshot, project.path()),
+            snapbox::file!("snapshots/localnet/test_localnet_start_invalid_database.json"),
+        );
+    }
+}
 
 #[test]
 fn localnet_start_port_conflict_is_reported_with_hint() {

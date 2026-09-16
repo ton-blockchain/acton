@@ -324,6 +324,26 @@ pub(crate) fn spawn_toncenter_mock_with_capture(
     thread::JoinHandle<()>,
     Arc<Mutex<Vec<CapturedToncenterRequest>>>,
 ) {
+    spawn_toncenter_mock_with_handlers(
+        responses
+            .into_iter()
+            .map(|response| move |_: &CapturedToncenterRequest| response)
+            .collect(),
+    )
+}
+
+/// Builds responses from the received request, so time-bound queries can be tested
+/// against the caller's exact timestamp without relying on wall-clock sleeps.
+pub(crate) fn spawn_toncenter_mock_with_handlers<F>(
+    responses: Vec<F>,
+) -> (
+    String,
+    thread::JoinHandle<()>,
+    Arc<Mutex<Vec<CapturedToncenterRequest>>>,
+)
+where
+    F: FnOnce(&CapturedToncenterRequest) -> (u16, String) + Send + 'static,
+{
     let listener = TcpListener::bind(("127.0.0.1", 0)).expect("failed to bind toncenter v2 mock");
     listener
         .set_nonblocking(true)
@@ -336,7 +356,7 @@ pub(crate) fn spawn_toncenter_mock_with_capture(
     let captured_requests_thread = Arc::clone(&captured_requests);
 
     let handle = thread::spawn(move || {
-        for (status, body) in responses {
+        for response in responses {
             let wait_until = Instant::now() + Duration::from_secs(30);
             let mut stream = loop {
                 match listener.accept() {
@@ -421,15 +441,17 @@ pub(crate) fn spawn_toncenter_mock_with_capture(
                     .expect("failed to read toncenter v2 request body");
             }
 
+            let request = CapturedToncenterRequest {
+                method,
+                path,
+                headers,
+                body: request_body,
+            };
+            let (status, body) = response(&request);
             captured_requests_thread
                 .lock()
                 .expect("captured toncenter requests mutex poisoned")
-                .push(CapturedToncenterRequest {
-                    method,
-                    path,
-                    headers,
-                    body: request_body,
-                });
+                .push(request);
 
             let raw_response = format!(
                 "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",

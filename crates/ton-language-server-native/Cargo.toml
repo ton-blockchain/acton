@@ -17,6 +17,7 @@ serde_json = { workspace = true }
 tasm-core = { workspace = true }
 tokio = { workspace = true }
 ton-language-server-core = { workspace = true, features = ["tolk-compiler"] }
+tower = { workspace = true }
 tower-lsp = { workspace = true }
 tracing = { workspace = true }
 tycho-types = { workspace = true }

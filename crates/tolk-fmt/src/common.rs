@@ -5,6 +5,8 @@ use tree_sitter::Node;
 
 pub struct ListOptions<'a> {
     pub separator: RcDoc<'a>,
+    /// Some fixed-arity forms, such as `assert(condition, code)`, reject a trailing comma.
+    pub trailing_separator: bool,
     pub brackets: (RcDoc<'a>, RcDoc<'a>),
     pub multiline_threshold: usize,
     pub single_line_edge_space: bool,
@@ -15,6 +17,7 @@ impl Default for ListOptions<'_> {
     fn default() -> Self {
         Self {
             separator: RcDoc::text(","),
+            trailing_separator: true,
             brackets: (RcDoc::text("("), RcDoc::text(")")),
             multiline_threshold: 5,
             single_line_edge_space: false,
@@ -146,10 +149,11 @@ where
         }
 
         if comments::has_fmt_ignore(ctx, comments) {
-            let doc = print_original_node_text(ctx, &node);
+            // Preserve the item itself; the list still owns its separators and comments.
+            let doc = print_original_node_text_inline(ctx, &node);
             item_docs_with_info.push(ItemDocInfo {
                 doc,
-                comments: None,
+                comments,
                 node,
                 ignored: true,
                 group_max_width: 0,
@@ -158,7 +162,12 @@ where
         }
 
         let doc = item_printer(ctx, item)?;
-        let width = doc_width(&doc) + sep_width;
+        let width = doc_width(&doc)
+            + if i + 1 < items.len() || options.trailing_separator {
+                sep_width
+            } else {
+                0
+            };
 
         let has_inline =
             comments.is_some_and(|cs| cs.iter().any(|c| c.kind == CommentKind::Inline));
@@ -202,40 +211,32 @@ where
     for (i, info) in item_docs_with_info.into_iter().enumerate() {
         let is_last = i == len - 1;
 
-        if !info.ignored {
-            comments::print_leading_comments(ctx, &mut docs, info.comments);
-        }
+        comments::print_leading_comments(ctx, &mut docs, info.comments);
 
         docs.push(info.doc);
 
-        if !info.ignored {
-            if is_last {
-                if force_single_line {
-                    docs.push(RcDoc::nil());
-                } else {
-                    docs.push(RcDoc::flat_alt(options.separator.clone(), RcDoc::nil()));
-                }
-            } else {
-                docs.push(options.separator.clone());
+        if is_last {
+            if !force_single_line && options.trailing_separator {
+                docs.push(RcDoc::flat_alt(options.separator.clone(), RcDoc::nil()));
             }
+        } else {
+            docs.push(options.separator.clone());
+        }
 
-            if is_multiline {
-                comments::print_inline_comments_with_alignment(
-                    ctx,
-                    &mut docs,
-                    info.comments,
-                    info.group_max_width,
-                );
-            } else {
-                comments::print_inline_comments(ctx, &mut docs, info.comments);
-            }
+        if is_multiline && !info.ignored {
+            comments::print_inline_comments_with_alignment(
+                ctx,
+                &mut docs,
+                info.comments,
+                info.group_max_width,
+            );
+        } else {
+            comments::print_inline_comments(ctx, &mut docs, info.comments);
         }
 
         if is_last {
             if is_multiline {
-                if !info.ignored {
-                    docs.push(RcDoc::hardline());
-                }
+                docs.push(RcDoc::hardline());
             } else if force_single_line {
                 if options.single_line_edge_space {
                     docs.push(RcDoc::space());
@@ -245,13 +246,11 @@ where
             } else {
                 docs.push(RcDoc::line_());
             }
-        } else if !info.ignored {
+        } else {
             docs.push(item_separator.clone());
         }
 
-        if !info.ignored {
-            comments::print_trailing_comments(ctx, &mut docs, info.comments);
-        }
+        comments::print_trailing_comments(ctx, &mut docs, info.comments);
 
         // Preserve empty lines between items
         if let Some(next) = items.get(i + 1)

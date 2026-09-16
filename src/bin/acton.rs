@@ -2571,7 +2571,7 @@ fn main() {
                 .enable_all()
                 .build()
                 .expect("Failed to initialize tokio runtime for language server");
-            rt.block_on(ls_cmd(
+            let result = rt.block_on(ls_cmd(
                 port,
                 stdio,
                 log_file,
@@ -2579,7 +2579,12 @@ fn main() {
                 log_level,
                 stdlib_path,
                 profile,
-            ))
+            ));
+
+            // Tokio's blocking stdin read cannot be cancelled. The LSP session has
+            // finished, so process shutdown must not wait for the client to send EOF.
+            rt.shutdown_background();
+            result
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
         Commands::Localnet { args } => commands::localnet::localnet_cmd(args),

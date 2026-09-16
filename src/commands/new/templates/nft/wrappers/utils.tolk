@@ -70,13 +70,14 @@ fun NftItem.sendTransferPayloadAuto(
         customPayload,
         forwardTonAmount,
         forwardPayload: createEmptySlice(),
-    }.toCell()
-        .beginParse()
-        .remainingBitsAndRefsCount();
+    }
+    .toCell()
+    .beginParse()
+    .remainingBitsAndRefsCount();
 
     // +1 for the prefix bit added by `PayloadInline`/`PayloadInRef`
     val fitsInline = (1023 - bodyBits - 1) >= forwardPayload.remainingBitsCount() &&
-    (4 - bodyRefs) > forwardPayload.remainingRefsCount();
+        (4 - bodyRefs) > forwardPayload.remainingRefsCount();
 
     return fitsInline
         ? self.sendTransferPayloadInline(

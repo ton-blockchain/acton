@@ -376,6 +376,7 @@ fun SendResultList.hideTraceFromUi(self): void {
 /// actually delivered to the network is identified by its TEP-467 normalized hash
 /// (returned by `sendBocReturnHash` at send time), and the destination account's recent
 /// transactions are scanned until one with a matching `inMessage` shows up.
+/// Only transactions created at or after the script's start time are eligible.
 ///
 /// Returns the matched [SendResult] rebuilt from the on-chain transaction if found, or `null`
 /// otherwise. Fields that cannot be reconstructed from a single on-chain transaction
@@ -439,6 +440,7 @@ fun SendResultList.waitForFirstTransaction(
 /// Unlike [SendResultList.waitForFirstTransaction], this method follows all descendant
 /// transactions (children, grandchildren, ...) using toncenter's traces API and returns
 /// them as a fresh [SendResultList].
+/// Only traces that started at or after the script's start time are eligible.
 ///
 /// In emulation mode (without `--net`), the trace is already fully processed locally, so
 /// the method returns `self` as-is (or `null` if the list is empty).
@@ -587,18 +589,18 @@ fun impl.toPredicate<T>(field: (T -> bool) | T | null): tuple {
 /// If not (most common), fast FFI path will be used.
 fun SearchParams.__hasPredicates(self): bool {
     return impl.isPredicate(self.to) | impl.isPredicate(self.from) | impl.isPredicate(self.value) |
-    impl.isPredicate(self.exitCode) |
-    impl.isPredicate(self.success) |
-    impl.isPredicate(self.aborted) |
-    impl.isPredicate(self.deploy) |
-    impl.isPredicate(self.bounce) |
-    impl.isPredicate(self.bounced) |
-    impl.isPredicate(self.opcode) |
-    impl.isPredicate(self.actionExitCode) |
-    impl.isPredicate(self.computePhaseSkipped) |
-    impl.isPredicate(self.body) |
-    impl.isPredicate(self.state_init) |
-    impl.isPredicate(self.sendMode);
+        impl.isPredicate(self.exitCode) |
+        impl.isPredicate(self.success) |
+        impl.isPredicate(self.aborted) |
+        impl.isPredicate(self.deploy) |
+        impl.isPredicate(self.bounce) |
+        impl.isPredicate(self.bounced) |
+        impl.isPredicate(self.opcode) |
+        impl.isPredicate(self.actionExitCode) |
+        impl.isPredicate(self.computePhaseSkipped) |
+        impl.isPredicate(self.body) |
+        impl.isPredicate(self.state_init) |
+        impl.isPredicate(self.sendMode);
 }
 
 /// Convert SearchParams to a tuple of plain nullable scalar values for the fast FFI path.

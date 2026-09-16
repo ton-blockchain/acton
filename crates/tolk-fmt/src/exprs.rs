@@ -520,12 +520,22 @@ pub fn print_binary_operator<'a>(ctx: &Context<'_>, binary: &Bin) -> Option<RcDo
     ])))
 }
 
+/// Keeps adjacent signs separate so the compiler cannot read them as `++` or `--`.
 #[must_use]
 pub fn print_unary_operator<'a>(ctx: &Context<'_>, unary: &Unary) -> Option<RcDoc<'a>> {
     let op = unary.operator_name(ctx.code.as_ref().as_ref()).to_string();
     let arg = unary.argument()?;
     let arg_doc = print_expression(ctx, &arg)?;
-    Some(RcDoc::concat([RcDoc::text(op), arg_doc]))
+    let separator = if matches!(&arg, Expr::Unary(inner)
+        if matches!(op.as_str(), "+" | "-")
+            && inner.operator_name(ctx.code.as_ref().as_ref()) == op)
+    {
+        RcDoc::space()
+    } else {
+        RcDoc::nil()
+    };
+
+    Some(RcDoc::concat([RcDoc::text(op), separator, arg_doc]))
 }
 
 #[must_use]
@@ -794,6 +804,16 @@ pub fn print_match_arm<'a>(ctx: &Context<'_>, arm: &MatchArm) -> Option<RcDoc<'a
         MatchArmBody::Block(b) => (stmts::print_block_statement(ctx, &b)?, true),
         MatchArmBody::Return(r) => (stmts::print_return_statement(ctx, &r)?, false),
         MatchArmBody::Throw(t) => (stmts::print_throw_statement(ctx, &t)?, false),
+        MatchArmBody::Statement(stmt) => (
+            stmts::print_statement(ctx, &stmt)?,
+            matches!(
+                stmt,
+                tolk_syntax::Stmt::If(_)
+                    | tolk_syntax::Stmt::While(_)
+                    | tolk_syntax::Stmt::Repeat(_)
+                    | tolk_syntax::Stmt::TryCatch(_)
+            ),
+        ),
         MatchArmBody::Expr(e) => (print_expression(ctx, &e)?, false),
     };
 

@@ -3,16 +3,18 @@
 This document describes how to deploy the verifier backend as a Docker service on a server.
 
 The Docker image contains the verifier backend, Node.js, the compiler worker,
-Git, and OpenSSH. It does not run a TON node. The verifier always needs a
-TON Center v3 endpoint for TON testnet payment verification.
+Git, and OpenSSH. It does not run a TON node. The verifier needs TON Center v3
+endpoints for address lookup on both networks and payment verification on the
+selected network.
 
 ## Architecture
 
 At runtime the service needs:
 
 - Verifier HTTP backend exposed on port `3000`.
-- TON Center-compatible API endpoint for address-to-code-hash resolution.
-- Testnet wallet address that receives verification payments.
+- TON Center-compatible API endpoints for address-to-code-hash resolution on
+  mainnet and testnet.
+- Wallet address on the selected network that receives verification payments.
 - SQLite payment ledger that prevents transaction replay.
 - Git source repository for verified source bundles.
 - SQLite registry index for fast reads, rebuilt from Git when stale or missing.
@@ -113,14 +115,16 @@ sudo install -m 600 /dev/null /opt/ton-verifier/verifier.env
 Example `/opt/ton-verifier/verifier.env`:
 
 ```bash
-VERIFIER_NETWORK=testnet
 VERIFIER_LOG_LEVEL=info
 VERIFIER_API_KEY=
 VERIFIER_READ_ONLY=false
-VERIFIER_TONCENTER_BASE_URL=https://testnet.toncenter.com
-VERIFIER_TONCENTER_API_KEY=
+VERIFIER_TONCENTER_MAINNET_BASE_URL=https://toncenter.com
+VERIFIER_TONCENTER_MAINNET_API_KEY=
+VERIFIER_TONCENTER_TESTNET_BASE_URL=https://testnet.toncenter.com
+VERIFIER_TONCENTER_TESTNET_API_KEY=
 VERIFIER_COMPILER_MAX_CONCURRENT_COMPILATIONS=1
-VERIFIER_PAYMENT_ADDRESS="0:<64-hex-character-testnet-wallet-address>"
+VERIFIER_PAYMENT_PRIMARY_NETWORK=testnet
+VERIFIER_PAYMENT_ADDRESS="0:<64-hex-character-wallet-address>"
 VERIFIER_PAYMENT_MIN_AMOUNT_NANO=500000000
 VERIFIER_PAYMENT_LEDGER_PATH=/var/lib/verifier/payment-ledger/payment-ledger.sqlite3
 VERIFIER_UPLOAD_MAX_REQUEST_BYTES=524288
@@ -149,10 +153,11 @@ multipart body, and defaults to 512 KiB. When nginx proxies the verifier,
 configure `client_max_body_size` slightly above the verifier request limit to
 allow for multipart framing overhead.
 
-The payment verifier supports only TON testnet. `VERIFIER_PAYMENT_ADDRESS` must
-use the raw basechain form `0:<64 hex characters>`. The minimum amount is in
-nanoGRAM and must be more than zero. This example sets the amount to
-`0.5 GRAM`.
+The payment verifier supports TON mainnet and testnet.
+`VERIFIER_PAYMENT_PRIMARY_NETWORK` selects which network receives and verifies
+payments. `VERIFIER_PAYMENT_ADDRESS` must use the raw basechain form
+`0:<64 hex characters>`. The minimum amount is in nanoGRAM and must be more
+than zero. This example sets the amount to `0.5 GRAM`.
 
 ## Configure GitHub Source Storage
 
@@ -364,8 +369,8 @@ curl -sS -X POST http://127.0.0.1:3000/api/v1/take_ticket \
 ```
 
 If the response status is `payment_required`, send the returned amount and
-comment to the returned testnet address. Wait for the finalized recipient
-transaction hash.
+comment to the returned address on the quoted network. Wait for the finalized
+recipient transaction hash.
 
 Submit a verification request with that transaction hash:
 
@@ -446,10 +451,10 @@ source of truth. If the index volume is lost, the service rebuilds it from the
 Git source repository.
 
 The payment ledger is also derived state. If this volume is lost, the service
-rebuilds it from TON testnet history. Funded protocol payments remain claimable
-unless a published source manifest references them; referenced payments are
-restored as consumed. Keeping or backing up this volume does not skip the full
-startup history scan.
+rebuilds it from TON history on the selected payment network. Funded protocol
+payments remain claimable unless a published source manifest references them;
+referenced payments are restored as consumed. Keeping or backing up this volume
+does not skip the full startup history scan.
 
 The Docker `source-repo` volume is a local clone. The remote Git repository is
 the authoritative source storage after every successful push.
@@ -494,14 +499,17 @@ Common causes:
 
 Check:
 
-- `VERIFIER_NETWORK` is `testnet`.
-- `VERIFIER_TONCENTER_BASE_URL` is reachable from inside the container.
-- `VERIFIER_TONCENTER_API_KEY` is set if your endpoint requires it.
+- `VERIFIER_PAYMENT_PRIMARY_NETWORK` selects the intended network.
+- Both TON Center URLs are reachable for address lookup.
+- The TON Center URL matching the selected payment network is reachable for
+  payment verification.
+- The corresponding API keys are set if the endpoints require them.
 
-Connectivity check:
+The following payment connectivity check uses testnet. Replace `TESTNET` with
+`MAINNET` in both environment variable names when mainnet is selected:
 
 ```bash
-docker compose exec verifier node -e "const u=new URL('/api/v3/transactions',process.env.VERIFIER_TONCENTER_BASE_URL);u.searchParams.set('account',process.env.VERIFIER_PAYMENT_ADDRESS);u.searchParams.set('limit','1');fetch(u,{headers:{'X-API-Key':process.env.VERIFIER_TONCENTER_API_KEY||''}}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()}).then(()=>console.log('ok')).catch(e=>{console.error(e);process.exit(1)})"
+docker compose exec verifier node -e "const u=new URL('/api/v3/transactions',process.env.VERIFIER_TONCENTER_TESTNET_BASE_URL);u.searchParams.set('account',process.env.VERIFIER_PAYMENT_ADDRESS);u.searchParams.set('limit','1');fetch(u,{headers:{'X-API-Key':process.env.VERIFIER_TONCENTER_TESTNET_API_KEY||''}}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()}).then(()=>console.log('ok')).catch(e=>{console.error(e);process.exit(1)})"
 ```
 
 ### Compiler fails

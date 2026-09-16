@@ -5,15 +5,15 @@ use std::{
     time::Duration,
 };
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use utoipa::ToSchema;
 
 const DEFAULT_CONFIG_PATH: &str = "config.toml";
 const CONFIG_PATH_ENV: &str = "VERIFIER_CONFIG";
 const DEFAULT_LOG_LEVEL: &str = "info";
 const MAINNET_TONCENTER_BASE_URL: &str = "https://toncenter.com";
 const TESTNET_TONCENTER_BASE_URL: &str = "https://testnet.toncenter.com";
-const LOCALNET_TONCENTER_BASE_URL: &str = "http://127.0.0.1:5411";
 const DEFAULT_COMPILER_NODE_BIN: &str = "node";
 const DEFAULT_COMPILER_WORKER_PATH: &str = "compiler-worker/compile.mjs";
 const DEFAULT_COMPILER_TIMEOUT_MS: u64 = 10_000;
@@ -34,9 +34,10 @@ pub struct Config {
     api_key: Option<String>,
     read_only: bool,
     logging_level: String,
-    network: TonNetwork,
-    toncenter_base_url: Option<String>,
-    toncenter_api_key: Option<String>,
+    toncenter_mainnet_base_url: Option<String>,
+    toncenter_mainnet_api_key: Option<String>,
+    toncenter_testnet_base_url: Option<String>,
+    toncenter_testnet_api_key: Option<String>,
     source_repository_path: Option<PathBuf>,
     source_repository_remote: String,
     source_repository_storage_root: String,
@@ -49,6 +50,7 @@ pub struct Config {
     payment_address: Option<String>,
     payment_min_amount_nano: Option<u64>,
     payment_ledger_path: PathBuf,
+    payment_primary_network: TonNetwork,
     compiler_node_bin: String,
     compiler_worker_path: PathBuf,
     compiler_timeout: Duration,
@@ -61,8 +63,8 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// Returns an error if the config file cannot be read, parsed as TOML,
-    /// selects a network other than testnet, or has an invalid compiler limit.
+    /// Returns an error if the config file cannot be read, parsed as TOML, or has an invalid
+    /// compiler limit.
     pub fn load() -> Result<Self, ConfigError> {
         let path = env::var_os(CONFIG_PATH_ENV)
             .map_or_else(|| PathBuf::from(DEFAULT_CONFIG_PATH), PathBuf::from);
@@ -74,8 +76,8 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// Returns an error if the config file cannot be read, parsed as TOML,
-    /// selects a network other than testnet, or has an invalid compiler limit.
+    /// Returns an error if the config file cannot be read, parsed as TOML, or has an invalid
+    /// compiler limit.
     pub fn load_from_path(path: impl AsRef<Path>) -> Result<Self, ConfigError> {
         let path = path.as_ref();
         let raw_config = fs::read_to_string(path).map_err(|source| ConfigError::Read {
@@ -88,14 +90,7 @@ impl Config {
                 source,
             })?;
 
-        let config = file.into_config()?;
-        if config.network != TonNetwork::Testnet {
-            return Err(ConfigError::UnsupportedNetwork {
-                network: config.network,
-            });
-        }
-
-        Ok(config)
+        file.into_config()
     }
 
     #[must_use]
@@ -119,20 +114,27 @@ impl Config {
     }
 
     #[must_use]
-    pub const fn network(&self) -> TonNetwork {
-        self.network
-    }
-
-    #[must_use]
-    pub fn toncenter_base_url(&self) -> &str {
-        self.toncenter_base_url
+    pub fn toncenter_mainnet_base_url(&self) -> &str {
+        self.toncenter_mainnet_base_url
             .as_deref()
-            .unwrap_or_else(|| self.network.default_toncenter_base_url())
+            .unwrap_or(TonNetwork::Mainnet.default_toncenter_base_url())
     }
 
     #[must_use]
-    pub fn toncenter_api_key(&self) -> Option<&str> {
-        self.toncenter_api_key.as_deref()
+    pub fn toncenter_mainnet_api_key(&self) -> Option<&str> {
+        self.toncenter_mainnet_api_key.as_deref()
+    }
+
+    #[must_use]
+    pub fn toncenter_testnet_base_url(&self) -> &str {
+        self.toncenter_testnet_base_url
+            .as_deref()
+            .unwrap_or(TonNetwork::Testnet.default_toncenter_base_url())
+    }
+
+    #[must_use]
+    pub fn toncenter_testnet_api_key(&self) -> Option<&str> {
+        self.toncenter_testnet_api_key.as_deref()
     }
 
     #[must_use]
@@ -196,6 +198,11 @@ impl Config {
     }
 
     #[must_use]
+    pub const fn payment_primary_network(&self) -> TonNetwork {
+        self.payment_primary_network
+    }
+
+    #[must_use]
     pub fn compiler_node_bin(&self) -> &str {
         &self.compiler_node_bin
     }
@@ -228,9 +235,10 @@ impl Default for Config {
             api_key: None,
             read_only: false,
             logging_level: DEFAULT_LOG_LEVEL.to_owned(),
-            network: TonNetwork::Testnet,
-            toncenter_base_url: None,
-            toncenter_api_key: None,
+            toncenter_mainnet_base_url: None,
+            toncenter_mainnet_api_key: None,
+            toncenter_testnet_base_url: None,
+            toncenter_testnet_api_key: None,
             source_repository_path: None,
             source_repository_remote: DEFAULT_SOURCE_REPOSITORY_REMOTE.to_owned(),
             source_repository_storage_root: DEFAULT_SOURCE_REPOSITORY_STORAGE_ROOT.to_owned(),
@@ -243,6 +251,7 @@ impl Default for Config {
             payment_address: None,
             payment_min_amount_nano: None,
             payment_ledger_path: PathBuf::from(DEFAULT_PAYMENT_LEDGER_PATH),
+            payment_primary_network: TonNetwork::Testnet,
             compiler_node_bin: DEFAULT_COMPILER_NODE_BIN.to_owned(),
             compiler_worker_path: PathBuf::from(DEFAULT_COMPILER_WORKER_PATH),
             compiler_timeout: Duration::from_millis(DEFAULT_COMPILER_TIMEOUT_MS),
@@ -252,25 +261,18 @@ impl Default for Config {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum TonNetwork {
     Mainnet,
     Testnet,
-    Localnet,
 }
 
 impl TonNetwork {
-    #[must_use]
-    pub const fn uses_testnet_address_format(self) -> bool {
-        matches!(self, Self::Testnet | Self::Localnet)
-    }
-
     const fn default_toncenter_base_url(self) -> &'static str {
         match self {
             Self::Mainnet => MAINNET_TONCENTER_BASE_URL,
             Self::Testnet => TESTNET_TONCENTER_BASE_URL,
-            Self::Localnet => LOCALNET_TONCENTER_BASE_URL,
         }
     }
 }
@@ -280,7 +282,6 @@ impl fmt::Display for TonNetwork {
         match self {
             Self::Mainnet => formatter.write_str("mainnet"),
             Self::Testnet => formatter.write_str("testnet"),
-            Self::Localnet => formatter.write_str("localnet"),
         }
     }
 }
@@ -294,8 +295,6 @@ pub enum ConfigError {
         path: PathBuf,
         source: toml::de::Error,
     },
-    #[error("unsupported network {network}: verifier supports only testnet")]
-    UnsupportedNetwork { network: TonNetwork },
     #[error("compiler max_concurrent_compilations must be -1 or a positive integer, got {value}")]
     InvalidCompilerConcurrency { value: i64 },
 }
@@ -306,8 +305,6 @@ struct ConfigFile {
     server: ServerConfig,
     #[serde(default)]
     logging: LoggingConfig,
-    #[serde(default)]
-    network: NetworkConfig,
     #[serde(default)]
     toncenter: ToncenterConfig,
     #[serde(default)]
@@ -346,9 +343,10 @@ impl ConfigFile {
                 .logging
                 .level
                 .unwrap_or_else(|| DEFAULT_LOG_LEVEL.to_owned()),
-            network: self.network.name.unwrap_or(TonNetwork::Testnet),
-            toncenter_base_url: self.toncenter.base_url,
-            toncenter_api_key: self.toncenter.api_key,
+            toncenter_mainnet_base_url: self.toncenter.mainnet_base_url,
+            toncenter_mainnet_api_key: self.toncenter.mainnet_api_key,
+            toncenter_testnet_base_url: self.toncenter.testnet_base_url,
+            toncenter_testnet_api_key: self.toncenter.testnet_api_key,
             source_repository_path: self.source_repository.path,
             source_repository_remote: self
                 .source_repository
@@ -385,6 +383,7 @@ impl ConfigFile {
                 .payment
                 .ledger_path
                 .unwrap_or_else(|| PathBuf::from(DEFAULT_PAYMENT_LEDGER_PATH)),
+            payment_primary_network: self.payment.primary_network.unwrap_or(TonNetwork::Testnet),
             compiler_node_bin: self
                 .compiler
                 .node_bin
@@ -420,14 +419,11 @@ struct LoggingConfig {
 }
 
 #[derive(Debug, Default, Deserialize)]
-struct NetworkConfig {
-    name: Option<TonNetwork>,
-}
-
-#[derive(Debug, Default, Deserialize)]
 struct ToncenterConfig {
-    base_url: Option<String>,
-    api_key: Option<String>,
+    mainnet_base_url: Option<String>,
+    mainnet_api_key: Option<String>,
+    testnet_base_url: Option<String>,
+    testnet_api_key: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -449,6 +445,7 @@ struct RegistryIndexConfig {
 
 #[derive(Debug, Default, Deserialize)]
 struct PaymentConfig {
+    primary_network: Option<TonNetwork>,
     address: Option<String>,
     min_amount_nano: Option<u64>,
     ledger_path: Option<PathBuf>,

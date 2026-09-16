@@ -14,9 +14,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!(
         %addr,
-        network = %config.network(),
+        payment_primary_network = %config.payment_primary_network(),
         read_only = config.read_only(),
-        toncenter_base_url = %config.toncenter_base_url(),
+        toncenter_mainnet_base_url = %config.toncenter_mainnet_base_url(),
+        toncenter_testnet_base_url = %config.toncenter_testnet_base_url(),
         "starting verifier backend"
     );
 

@@ -4,16 +4,22 @@ interface EmbeddedTestDetailsProps {
   readonly baseUrl: string
   readonly projectRoot: string
   readonly test: TestReport
+  readonly gasProfileAvailable: boolean
 }
 
 export default function EmbeddedTestDetails({
   baseUrl,
   projectRoot,
   test,
+  gasProfileAvailable,
 }: EmbeddedTestDetailsProps) {
   return (
     <TestUiApiProvider baseUrl={baseUrl}>
-      <TestDetailsWithTrace projectRoot={projectRoot} test={test} />
+      <TestDetailsWithTrace
+        projectRoot={projectRoot}
+        test={test}
+        gasProfileAvailable={gasProfileAvailable}
+      />
     </TestUiApiProvider>
   )
 }
@@ -21,9 +27,11 @@ export default function EmbeddedTestDetails({
 function TestDetailsWithTrace({
   projectRoot,
   test,
+  gasProfileAvailable,
 }: {
   readonly projectRoot: string
   readonly test: TestReport
+  readonly gasProfileAvailable: boolean
 }) {
   const {trace, error, loading} = useTestTrace(test)
 
@@ -34,7 +42,7 @@ function TestDetailsWithTrace({
       traceError={error}
       isTraceLoading={loading}
       projectRoot={projectRoot}
-      gasProfileAvailable={false}
+      gasProfileAvailable={gasProfileAvailable}
       gasProfileAvailabilityLoaded
     />
   )

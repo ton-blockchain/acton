@@ -66,3 +66,26 @@ enum Color: uint8 {
         (binary_operator
           (number_literal)
           (number_literal))))))
+
+========================================================================
+Enum semicolon separators
+========================================================================
+
+enum E { A = 1; B = 2; C, D }
+
+------------------------------------------------------------------------
+
+(source_file
+  (enum_declaration
+    (identifier)
+    (enum_body
+      (enum_member_declaration
+        (identifier)
+        (number_literal))
+      (enum_member_declaration
+        (identifier)
+        (number_literal))
+      (enum_member_declaration
+        (identifier))
+      (enum_member_declaration
+        (identifier)))))

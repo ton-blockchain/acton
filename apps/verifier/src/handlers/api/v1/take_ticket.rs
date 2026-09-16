@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    error::ApiError, payment::PaymentError, registry::VerifiedBundleRequest, state::AppState,
+    config::TonNetwork, error::ApiError, payment::PaymentError, registry::VerifiedBundleRequest,
+    state::AppState,
 };
 
 use super::validation;
@@ -14,7 +15,7 @@ use super::validation;
     operation_id = "take_ticket",
     request_body = TakeTicketRequest,
     responses(
-        (status = 200, description = "Verification status or testnet payment quote", body = TakeTicketResponse),
+        (status = 200, description = "Verification status or payment quote", body = TakeTicketResponse),
         (status = 400, description = "Invalid code hash", body = crate::error::ErrorResponse),
         (status = 502, description = "Verification registry failure", body = crate::error::ErrorResponse),
         (status = 503, description = "Verifier is read-only or payment history recovery is in progress", body = crate::error::ErrorResponse)
@@ -53,6 +54,7 @@ pub async fn handler(
     let quote = state.payment_verifier().quote(&code_hash);
     Ok(Json(TakeTicketResponse::PaymentRequired {
         code_hash,
+        network: quote.network,
         payment_address: quote.payment_address,
         amount_nano: quote.amount_nano,
         comment: quote.comment,
@@ -75,6 +77,7 @@ pub(super) enum TakeTicketResponse {
     },
     PaymentRequired {
         code_hash: String,
+        network: TonNetwork,
         payment_address: String,
         amount_nano: String,
         comment: String,

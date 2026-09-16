@@ -11,7 +11,8 @@ import {
   shortenMiddle,
 } from "@acton/ui"
 import {useEffect, useMemo, useState, type ReactNode} from "react"
-import {Download, ExternalLink} from "lucide-react"
+import {ArrowRight, Download, ExternalLink} from "lucide-react"
+import {Link} from "react-router"
 
 import {StatusPill} from "../components/StatusPill"
 import compilerIcon from "../assets/ton-verifier-icons/compiler.svg"
@@ -22,9 +23,14 @@ import verificationBinaryIcon from "../assets/ton-verifier-icons/verification-bi
 import verificationBombIcon from "../assets/ton-verifier-icons/verification-bomb.svg"
 import verificationPaperIcon from "../assets/ton-verifier-icons/verification-paper.svg"
 import verifiedSourceIcon from "../assets/ton-verifier-icons/verified-light.svg"
-import type {VerificationSourceResponse, VerifierApi} from "../lib/api"
+import {
+  ApiRequestError,
+  type CodeHashMatch,
+  type VerificationSourceResponse,
+  type VerifierApi,
+} from "../lib/api"
 import {downloadSourceArchive} from "../lib/source-archive"
-import {parseLookupTarget, type LookupTarget} from "../lib/target"
+import {lookupPath, parseLookupTarget, type LookupTarget} from "../lib/target"
 import detailsStyles from "./ContractDetails.module.css"
 import summaryStyles from "./ContractSummary.module.css"
 import styles from "./VerifiedContractPage.module.css"
@@ -505,6 +511,30 @@ function UnverifiedContract({
   )
 }
 
+function AmbiguousAddress({matches}: {readonly matches: readonly CodeHashMatch[]}) {
+  return (
+    <section className={styles["empty-state"]}>
+      <h1>Contract exists on multiple networks</h1>
+      <p>This address exists on both TON mainnet and testnet. Choose a contract to continue.</p>
+      <div className={styles.networkOptions}>
+        {matches.map(match => (
+          <Link
+            key={`${match.network}:${match.code_hash}`}
+            className={styles.networkOption}
+            to={lookupPath(match.code_hash)}
+          >
+            <span className={styles.networkOptionContent}>
+              <strong>{match.network === "mainnet" ? "Mainnet" : "Testnet"}</strong>
+              <code title={match.code_hash}>{match.code_hash}</code>
+            </span>
+            <ArrowRight size={18} aria-hidden="true" />
+          </Link>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 export interface VerifiedContractPageProps {
   readonly api: VerifierApi
   readonly target: string
@@ -529,7 +559,7 @@ export function VerifiedContractPage({
     }
   }, [rawLookup])
   const [data, setData] = useState<VerificationSourceResponse | undefined>()
-  const [error, setError] = useState<string | undefined>()
+  const [error, setError] = useState<Error | undefined>()
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -547,7 +577,7 @@ export function VerifiedContractPage({
         }
       } catch (error) {
         if (!cancelled) {
-          setError(error instanceof Error ? error.message : String(error))
+          setError(error instanceof Error ? error : new Error(String(error)))
         }
       } finally {
         if (!cancelled) {
@@ -562,14 +592,21 @@ export function VerifiedContractPage({
     }
   }, [api, rawLookup])
 
+  const ambiguousMatches =
+    error instanceof ApiRequestError && error.status === 409 && error.matches.length > 1
+      ? error.matches
+      : undefined
+
   return (
     <div className={`${styles.page} ${className ?? ""}`}>
       {loading ? (
         <section className={styles["loading-state"]}>Loading verification state...</section>
+      ) : ambiguousMatches ? (
+        <AmbiguousAddress matches={ambiguousMatches} />
       ) : error ? (
         <section className={`${styles["empty-state"]} ${styles["error-state"]}`}>
           <h1>Could not load contract</h1>
-          <p>{error}</p>
+          <p>{error.message}</p>
         </section>
       ) : data?.verified ? (
         <VerifiedContract

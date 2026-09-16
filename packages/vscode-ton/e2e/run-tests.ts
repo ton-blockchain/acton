@@ -3,6 +3,7 @@ import path from "node:path"
 import process from "node:process"
 import {fileURLToPath} from "node:url"
 import {runTests} from "@vscode/test-electron"
+import manifest from "../package.json"
 
 const extensionDevelopmentPath = path.resolve(fileURLToPath(new URL("..", import.meta.url)))
 const extensionTestsPath = path.join(extensionDevelopmentPath, "e2e", "out", "index.js")
@@ -77,6 +78,8 @@ async function main(): Promise<void> {
 
   try {
     await runTests({
+      // Exercise the oldest editor allowed to install the extension by default.
+      version: process.env.VSCODE_VERSION ?? manifest.engines.vscode.replace(/^\^/, ""),
       extensionDevelopmentPath,
       extensionTestsPath,
       extensionTestsEnv: {ACTON_LS_E2E_BIN: actonPath},

@@ -40,6 +40,7 @@ const MAX_PAGE_LIMIT: usize = 100;
         (status = 200, description = "Verification status for the resolved code hash", body = VerificationStatusResponse),
         (status = 400, description = "Invalid or missing verification target", body = crate::error::ErrorResponse),
         (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
+        (status = 409, description = "The address exists on both TON networks", body = crate::error::ErrorResponse),
         (status = 502, description = "Blockchain or registry lookup failure", body = crate::error::ErrorResponse)
     ),
     tag = "verification"
@@ -78,6 +79,7 @@ pub async fn status_handler(
         (status = 200, description = "Verified source bundle for the resolved code hash", body = VerificationSourceResponse),
         (status = 400, description = "Invalid or missing verification target", body = crate::error::ErrorResponse),
         (status = 404, description = "Current code hash or verified source bundle was not found", body = crate::error::ErrorResponse),
+        (status = 409, description = "The address exists on both TON networks", body = crate::error::ErrorResponse),
         (status = 502, description = "Blockchain, registry, or source lookup failure", body = crate::error::ErrorResponse)
     ),
     tag = "verification"

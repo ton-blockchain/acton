@@ -3,7 +3,8 @@ use crate::support::project::{Project, ProjectBuilder};
 use crate::support::toncenter::{
     ToncenterV2MockResponse, ToncenterV3MockResponse, append_custom_network,
     append_custom_network_with_urls, format_captured_requests, mocked_config_boc64,
-    spawn_toncenter_v2_mock, spawn_toncenter_v2_mock_with_capture, spawn_toncenter_v3_mock,
+    spawn_toncenter_mock_with_handlers, spawn_toncenter_v2_mock,
+    spawn_toncenter_v2_mock_with_capture, spawn_toncenter_v3_mock,
     toncenter_v2_account_info_ok_response, toncenter_v2_block_header_ok_response,
     toncenter_v2_config_all_ok_response, toncenter_v2_error_response,
     toncenter_v2_fork_snapshot_responses, toncenter_v2_get_libraries_ok_response,
@@ -405,6 +406,7 @@ fun main() {
     );
 
     println(result.waitForFirstTransaction(false, 1, 1));
+    println(result.waitForTrace(false, 2, 1));
 }
 "#;
 
@@ -4671,7 +4673,7 @@ fn test_script_wait_for_first_transaction_returns_root_on_localnet() {
 }
 
 #[test]
-fn test_script_wait_for_first_transaction_ignores_transaction_before_script_start_on_localnet() {
+fn test_script_waits_ignore_transaction_before_script_start_on_localnet() {
     let project = ProjectBuilder::new("script-wait-ignores-old-transaction-localnet")
         .contract("accept_external_once", ACCEPT_EXTERNAL_ONCE_CONTRACT)
         .script_file(
@@ -4694,7 +4696,7 @@ fn test_script_wait_for_first_transaction_ignores_transaction_before_script_star
         .success();
 
     seed_output.assert_snapshot_matches(
-        "integration/snapshots/script/test_script_wait_for_first_transaction_ignores_transaction_before_script_start_on_localnet.seed.stdout.txt",
+        "integration/snapshots/script/test_script_waits_ignore_transaction_before_script_start_on_localnet.seed.stdout.txt",
     );
 
     thread::sleep(Duration::from_secs(2));
@@ -4707,10 +4709,131 @@ fn test_script_wait_for_first_transaction_ignores_transaction_before_script_star
         .success();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/script/test_script_wait_for_first_transaction_ignores_transaction_before_script_start_on_localnet.stdout.txt",
+        "integration/snapshots/script/test_script_waits_ignore_transaction_before_script_start_on_localnet.stdout.txt",
     );
 
     node.stop();
+}
+
+#[test]
+fn test_script_wait_for_trace_skips_stale_results_until_current_trace() {
+    // Use the original external message as well as its trace, so both sides use
+    // the same normalized message hash throughout the polling sequence.
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("../../src/ffi/testdata/v3_trace_fixture.json"))
+            .expect("valid trace fixture");
+    let trace = &fixture["traces"][0];
+    let root_hash = trace["transactions_order"][0].as_str().unwrap();
+    let root = &trace["transactions"][root_hash];
+    let body = root["in_msg"]["message_content"]["body"].as_str().unwrap();
+    let address = root["account"].as_str().unwrap();
+
+    // The boundary is inclusive: a transaction in the script's starting second
+    // is just as eligible as one in a later second.
+    for fresh_offset in [0_u32, 1] {
+        let script = r#"
+            import "../../lib/emulation/network"
+            import "../../lib/io"
+            import "../../lib/testing/expect"
+            import "../../lib/types/big_array"
+            import "../../lib/types/transaction"
+
+            fun messageBody(): cell asm """
+                "$BODY" base64>B B>boc PUSHREF
+            """
+
+            fun main() {
+                val result = net.sendExternal(
+                    net.createExternalMessage(address("$ADDRESS"), messageBody()),
+                );
+                val trace = result.waitForTrace(false, 4, 1);
+                expect(trace != null).toBeTrue();
+                expect(trace!.size()).toEqual(2);
+                val root = trace!.at(0).tx.load();
+                expect(root.now).toEqual(blockchain.now() + $OFFSET);
+                println("CURRENT_TRACE=true");
+            }
+        "#
+        .replace("$BODY", body)
+        .replace("$ADDRESS", address)
+        .replace("$OFFSET", &fresh_offset.to_string());
+        let project = ProjectBuilder::new(&format!("script-wait-trace-boundary-{fresh_offset}"))
+            .script_file("wait_for_trace", &script)
+            .build();
+
+        let (v2_url, v2_handle) =
+            spawn_toncenter_v2_mock(vec![toncenter_v2_send_boc_ok_response()]);
+        let responses = (0..4)
+            .map(|attempt| {
+                let trace = trace.clone();
+                move |request: &crate::support::toncenter::CapturedToncenterRequest| {
+                    let url = reqwest::Url::parse(&format!("http://localhost{}", request.path))
+                        .expect("valid traces request URL");
+                    let start: u32 = url
+                        .query_pairs()
+                        .find(|(key, _)| key == "start_utime")
+                        .expect("trace lookup must exclude executions before script start")
+                        .1
+                        .parse()
+                        .expect("valid script start time");
+                    let mut old = trace.clone();
+                    old["start_utime"] = (start - 1).into();
+                    old["end_utime"] = (start - 1).into();
+                    for tx in old["transactions"].as_object_mut().unwrap().values_mut() {
+                        tx["now"] = (start - 1).into();
+                    }
+
+                    // Stale success, truncation, and root failure must all keep
+                    // polling. Return an old entry before the fresh one as well.
+                    let traces = match attempt {
+                        0 => vec![old],
+                        1 => {
+                            old["is_incomplete"] = true.into();
+                            vec![old]
+                        }
+                        2 => {
+                            let root_hash =
+                                old["transactions_order"][0].as_str().unwrap().to_owned();
+                            let description = &mut old["transactions"][root_hash]["description"];
+                            description["aborted"] = true.into();
+                            description["compute_ph"]["success"] = false.into();
+                            description["compute_ph"]["exit_code"] = 10.into();
+                            vec![old]
+                        }
+                        _ => {
+                            let mut current = trace;
+                            current["start_utime"] = (start + fresh_offset).into();
+                            current["end_utime"] = (start + fresh_offset).into();
+                            for tx in current["transactions"]
+                                .as_object_mut()
+                                .unwrap()
+                                .values_mut()
+                            {
+                                tx["now"] = (start + fresh_offset).into();
+                            }
+                            vec![old, current]
+                        }
+                    };
+                    (200, serde_json::json!({"traces": traces}).to_string())
+                }
+            })
+            .collect();
+        let (v3_url, v3_handle, _) = spawn_toncenter_mock_with_handlers(responses);
+        append_custom_network_with_urls(project.path(), "trace-boundary", &v2_url, &v3_url);
+
+        project
+            .acton()
+            .script("scripts/wait_for_trace.tolk")
+            .verify_network("custom:trace-boundary")
+            .run()
+            .success()
+            .assert_snapshot_matches(
+                "integration/snapshots/script/test_script_wait_for_trace_skips_stale_results_until_current_trace.stdout.txt",
+            );
+
+        v2_handle.join().expect("mock toncenter v2 must finish");
+        v3_handle.join().expect("mock toncenter v3 must finish");
+    }
 }
 
 #[test]

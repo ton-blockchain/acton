@@ -29,6 +29,7 @@ const MAX_PAYMENT_ATTEMPTS: u64 = 3;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct PaymentQuote {
+    pub network: TonNetwork,
     pub payment_address: String,
     pub amount_nano: String,
     pub comment: String,
@@ -138,20 +139,19 @@ pub struct OnchainPaymentVerifier {
     ledger: PaymentLedger,
     payment_address: String,
     min_amount_nano: u64,
+    network: TonNetwork,
     ready: AtomicBool,
 }
 
 impl OnchainPaymentVerifier {
-    /// Opens the payment ledger and configures the testnet payment verifier.
+    /// Opens the payment ledger and configures the payment verifier.
     ///
     /// # Errors
     ///
     /// Returns an error when payment configuration is missing or invalid, or when the ledger
     /// cannot be opened.
     pub fn from_config(config: &Config) -> Result<Self, PaymentError> {
-        if config.network() != TonNetwork::Testnet {
-            return Err(PaymentError::UnsupportedNetwork);
-        }
+        let network = config.payment_primary_network();
         let payment_address = config
             .payment_address()
             .ok_or(PaymentError::MissingConfiguration("payment.address"))?;
@@ -164,11 +164,12 @@ impl OnchainPaymentVerifier {
             ))?;
 
         Ok(Self::new(
-            Arc::new(ToncenterClient::from_config(config)),
+            Arc::new(ToncenterClient::for_network(config, network)),
             PaymentLedger::open(config.payment_ledger_path())?,
             payment_address.to_owned(),
             min_amount_nano,
-        ))
+        )
+        .with_network(network))
     }
 
     #[must_use]
@@ -183,8 +184,14 @@ impl OnchainPaymentVerifier {
             ledger,
             payment_address,
             min_amount_nano,
+            network: TonNetwork::Testnet,
             ready: AtomicBool::new(false),
         }
+    }
+
+    const fn with_network(mut self, network: TonNetwork) -> Self {
+        self.network = network;
+        self
     }
 
     async fn load_history(&self) -> Result<Vec<RecoveredPayment>, PaymentError> {
@@ -291,6 +298,7 @@ impl OnchainPaymentVerifier {
 impl PaymentVerifier for OnchainPaymentVerifier {
     fn quote(&self, code_hash: &str) -> PaymentQuote {
         PaymentQuote {
+            network: self.network,
             payment_address: self.payment_address.clone(),
             amount_nano: self.min_amount_nano.to_string(),
             comment: payment_comment(code_hash),
@@ -311,7 +319,8 @@ impl PaymentVerifier for OnchainPaymentVerifier {
             payment_count = payments.len(),
             published_payment_count = published_transaction_hashes.len(),
             payment_address = %self.payment_address,
-            "payment ledger recovered from testnet history"
+            network = %self.network,
+            "payment ledger recovered from blockchain history"
         );
         Ok(())
     }
@@ -953,15 +962,13 @@ fn load_aligned_bytes(slice: &mut CellSlice<'_>) -> Option<Vec<u8>> {
 
 #[derive(Debug, Error)]
 pub enum PaymentError {
-    #[error("the TON verifier supports only TON testnet")]
-    UnsupportedNetwork,
     #[error("missing required verifier configuration: {0}")]
     MissingConfiguration(&'static str),
     #[error("payment.address must be a raw basechain address in the form 0:<64 hex chars>")]
     InvalidPaymentAddress,
     #[error("payment_recovery_in_progress: payment history is still being recovered")]
     RecoveryInProgress,
-    #[error("payment_not_found: transaction was not found on TON testnet")]
+    #[error("payment_not_found: transaction was not found on the configured TON network")]
     TransactionNotFound,
     #[error("payment_invalid: transaction is not a finalized incoming payment")]
     InvalidTransaction,

@@ -225,3 +225,46 @@ global d: Container<
       (type_identifier)
       (instantiationT_list
         (type_identifier)))))
+
+========================================================================
+Empty tuple types
+========================================================================
+
+type Empty = []
+type Nested = [[], Cell<[]>?]
+
+------------------------------------------------------------------------
+
+(source_file
+  (type_alias_declaration
+    (identifier)
+    (tuple_type))
+  (type_alias_declaration
+    (identifier)
+    (tuple_type
+      (tuple_type)
+      (nullable_type
+        (type_instantiatedTs
+          (type_identifier)
+          (instantiationT_list
+            (tuple_type)))))))
+
+========================================================================
+Single parenthesized union variant
+========================================================================
+
+type Single = (| int)
+type Optional = (| int)?
+
+------------------------------------------------------------------------
+
+(source_file
+  (type_alias_declaration
+    (identifier)
+    (parenthesized_type
+      (type_identifier)))
+  (type_alias_declaration
+    (identifier)
+    (nullable_type
+      (parenthesized_type
+        (type_identifier)))))

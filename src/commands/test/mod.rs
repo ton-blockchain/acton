@@ -35,7 +35,7 @@ use acton_debug::replayer::TolkReplayer;
 use acton_debug::{
     DapTransport, ReplayerDebugSession, reserve_dap_listener, start_dap_server_with_listener,
 };
-use anyhow::anyhow;
+use anyhow::{Context as _, anyhow};
 use dunce;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use log::{debug, error, warn};
@@ -591,6 +591,8 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
     let acton_config = ActonConfig::load()?;
     let studio_reporter =
         StudioReporter::prepare(project_root, &acton_config.package.name, &mut config);
+    let studio_artifact_dir = studio_reporter.as_ref().map(StudioReporter::artifact_dir);
+    let collect_viewer_reports = config.ui || studio_artifact_dir.is_some();
 
     // First we need to build all contracts and generate all dependency files with code.
     // Internal mutation child runs may skip this via environment variable.
@@ -746,7 +748,7 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
             config.coverage_include_tests,
         );
         print_coverage_summary(&coverage);
-        if config.ui {
+        if collect_viewer_reports {
             coverage_lcov = Some(generate_lcov_report(&coverage));
         }
 
@@ -806,7 +808,7 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
                     true,
                 )?;
             }
-            gas_profile_report = profiling::collect_profile(&runner)?;
+            gas_profile_report = profiling::collect_profile(&runner, collect_viewer_reports)?;
         } else {
             let skipped_outputs = if config.gas_profile.is_some() {
                 "Gas profiling outputs were skipped because tests failed."
@@ -814,6 +816,29 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
                 "Gas profiling snapshot and comparison tables were skipped because tests failed."
             };
             println!("\n{} {skipped_outputs}", "Note:".yellow(),);
+        }
+    }
+
+    // Publish artifacts before the finished event so Studio can open them immediately.
+    if let Some(directory) = studio_artifact_dir
+        && (coverage_lcov.is_some() || gas_profile_report.is_some())
+    {
+        fs::create_dir_all(&directory).with_context(|| {
+            format!(
+                "Failed to create Studio artifact directory '{}'",
+                directory.display()
+            )
+        })?;
+        if let Some(lcov) = &coverage_lcov {
+            let path = directory.join("coverage.lcov");
+            fs::write(&path, lcov)
+                .with_context(|| format!("Failed to save Studio coverage '{}'", path.display()))?;
+        }
+        if let Some(profile) = &gas_profile_report {
+            let path = directory.join("gas-profile.json");
+            fs::write(&path, serde_json::to_vec(profile)?).with_context(|| {
+                format!("Failed to save Studio gas profile '{}'", path.display())
+            })?;
         }
     }
 

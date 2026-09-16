@@ -323,3 +323,119 @@ fun onInternalMessage() {
                   (instance_argument
                     (identifier)
                     (identifier)))))))))))
+
+========================================================================
+Statements directly in match arms
+========================================================================
+
+fun f(x: int) {
+    match (x) {
+        1 => assert (x > 0) throw 123,
+        2 => if (x > 0) { return 1; } else { return 2; }
+        3 => while (x > 0) { x -= 1; }
+        4 => do { x -= 1; } while (x > 0)
+        5 => repeat (x) { x -= 1; }
+        6 => try { throw 123; } catch (code) { x = code; }
+        7 => while (x > 0) {
+            match (x) { 0 => break, else => continue, }
+        }
+        else => return 0
+    }
+}
+
+------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    (identifier)
+    (parameter_list
+      (parameter_declaration
+        (identifier)
+        (type_identifier)))
+    (block_statement
+      (match_statement
+        (match_expression
+          (identifier)
+          (match_body
+            (match_arm
+              (number_literal)
+              (assert_statement
+                (binary_operator
+                  (identifier)
+                  (number_literal))
+                (number_literal)))
+            (match_arm
+              (number_literal)
+              (if_statement
+                (binary_operator
+                  (identifier)
+                  (number_literal))
+                (block_statement
+                  (return_statement
+                    (number_literal)))
+                (block_statement
+                  (return_statement
+                    (number_literal)))))
+            (match_arm
+              (number_literal)
+              (while_statement
+                (binary_operator
+                  (identifier)
+                  (number_literal))
+                (block_statement
+                  (expression_statement
+                    (set_assignment
+                      (identifier)
+                      (number_literal))))))
+            (match_arm
+              (number_literal)
+              (do_while_statement
+                (block_statement
+                  (expression_statement
+                    (set_assignment
+                      (identifier)
+                      (number_literal))))
+                (binary_operator
+                  (identifier)
+                  (number_literal))))
+            (match_arm
+              (number_literal)
+              (repeat_statement
+                (identifier)
+                (block_statement
+                  (expression_statement
+                    (set_assignment
+                      (identifier)
+                      (number_literal))))))
+            (match_arm
+              (number_literal)
+              (try_catch_statement
+                (block_statement
+                  (throw_statement
+                    (number_literal)))
+                (catch_clause
+                  (identifier)
+                  (block_statement
+                    (expression_statement
+                      (assignment
+                        (identifier)
+                        (identifier)))))))
+            (match_arm
+              (number_literal)
+              (while_statement
+                (binary_operator
+                  (identifier)
+                  (number_literal))
+                (block_statement
+                  (match_statement
+                    (match_expression
+                      (identifier)
+                      (match_body
+                        (match_arm
+                          (number_literal)
+                          (break_statement))
+                        (match_arm
+                          (continue_statement))))))))
+            (match_arm
+              (return_statement
+                (number_literal)))))))))

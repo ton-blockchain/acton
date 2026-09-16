@@ -39,9 +39,10 @@ Run with generated config:
 
 ```bash
 docker run --rm -p 3000:3000 \
-  -e VERIFIER_NETWORK=testnet \
-  -e VERIFIER_TONCENTER_BASE_URL=https://testnet.toncenter.com \
-  -e 'VERIFIER_PAYMENT_ADDRESS=0:<64-hex-character-testnet-wallet-address>' \
+  -e VERIFIER_TONCENTER_MAINNET_BASE_URL=https://toncenter.com \
+  -e VERIFIER_TONCENTER_TESTNET_BASE_URL=https://testnet.toncenter.com \
+  -e VERIFIER_PAYMENT_PRIMARY_NETWORK=testnet \
+  -e 'VERIFIER_PAYMENT_ADDRESS=0:<64-hex-character-wallet-address>' \
   -e VERIFIER_PAYMENT_MIN_AMOUNT_NANO=500000000 \
   -e SOURCE_REPOSITORY_URL=https://github.com/i582/test-verify-repo \
   -e SOURCE_REPOSITORY_STORAGE_ROOT=sources \
@@ -52,10 +53,11 @@ docker run --rm -p 3000:3000 \
   ghcr.io/ton-blockchain/verifier:latest
 ```
 
-The verifier accepts payments only on TON testnet. The payment address must
-use raw basechain form. At startup, the service rebuilds the payment ledger
-from wallet history and reports `503` until the scan is complete. This example
-sets the minimum payment to `0.5 GRAM`.
+The verifier accepts payments on TON mainnet or testnet, selected with
+`VERIFIER_PAYMENT_PRIMARY_NETWORK`. The payment address must use raw basechain
+form. At startup, the service rebuilds the payment ledger from the selected
+network's wallet history and reports `503` until the scan is complete. This
+example sets the minimum payment to `0.5 GRAM`.
 
 Set `VERIFIER_READ_ONLY=true` to reject tickets and submissions for new code
 hashes while keeping verified source and metadata lookups available.

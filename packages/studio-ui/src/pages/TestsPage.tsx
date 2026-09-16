@@ -1,5 +1,5 @@
 import type {TestReport} from "@acton/test-ui/embed"
-import {Button, Dialog, Duration} from "@acton/ui"
+import {Button, ContentTabs, Dialog, Duration} from "@acton/ui"
 import {
   Ban,
   Check,
@@ -20,6 +20,8 @@ import {
   type TestRunOutput,
   type TestRunRecord,
   type TestRunStatus,
+  type TestArtifactConfig,
+  fetchStudioTestArtifactConfig,
   studioTestRunArtifactsUrl,
 } from "../studioApi"
 import {testRunStatusLabel} from "../testRunPresentation"
@@ -28,6 +30,7 @@ import {RunTestsDialog} from "./RunTestsDialog"
 import styles from "./TestsPage.module.css"
 
 const EmbeddedTestDetails = lazy(() => import("./EmbeddedTestDetails"))
+const EmbeddedTestAnalysis = lazy(() => import("./EmbeddedTestAnalysis"))
 
 interface TestsPageProps {
   readonly runDialogOpen: boolean
@@ -140,7 +143,8 @@ export function TestsPage({
                   {selectedRun.error}
                 </div>
               ) : null}
-              <TestResults
+              <TestRunResults
+                key={selectedRun.id}
                 run={selectedRun}
                 selectedKey={selectedTestKey}
                 onSelectedKeyChange={onSelectedTestKeyChange}
@@ -175,14 +179,83 @@ export function TestsPage({
   )
 }
 
+interface TestResultsProps {
+  readonly run: TestRunRecord
+  readonly selectedKey?: string
+  readonly onSelectedKeyChange: (testKey: string, replace: boolean) => void
+}
+
+function TestRunResults(props: TestResultsProps) {
+  const {run} = props
+  const [config, setConfig] = useState<TestArtifactConfig>()
+  const [error, setError] = useState<string>()
+  const [retry, setRetry] = useState(0)
+  const [view, setView] = useState<"tests" | "coverage" | "profile">("tests")
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setError(undefined)
+    void fetchStudioTestArtifactConfig(run.id, controller.signal)
+      .then(setConfig)
+      .catch(error => {
+        if (!controller.signal.aborted) setError(String(error))
+      })
+    return () => controller.abort()
+  }, [run.id, run.status, retry])
+
+  const tabs = [
+    {value: "tests" as const, label: "Tests"},
+    ...(config?.coverage_available ? [{value: "coverage" as const, label: "Coverage"}] : []),
+    ...(config?.gas_profile_available ? [{value: "profile" as const, label: "Gas profile"}] : []),
+  ]
+  const content =
+    view === "tests" ? (
+      <TestResults {...props} gasProfileAvailable={config?.gas_profile_available === true} />
+    ) : (
+      <Suspense fallback={<div className={styles.waitingState}>Loading report</div>}>
+        <EmbeddedTestAnalysis
+          baseUrl={studioTestRunArtifactsUrl(run.id)}
+          projectRoot={config?.project_root ?? run.projectRoot}
+          view={view}
+        />
+      </Suspense>
+    )
+
+  return (
+    <>
+      {error ? (
+        <div className={styles.errorPanel} role="alert">
+          <span>Unable to load test artifacts: {error}</span>
+          <Button size="sm" variant="outline" onClick={() => setRetry(value => value + 1)}>
+            Retry
+          </Button>
+        </div>
+      ) : null}
+      {tabs.length > 1 ? (
+        <ContentTabs
+          ariaLabel="Test run views"
+          tabs={tabs}
+          value={view}
+          onValueChange={setView}
+          className={styles.runTabs}
+          panelClassName={styles.runTabPanel}
+        >
+          {content}
+        </ContentTabs>
+      ) : (
+        content
+      )}
+    </>
+  )
+}
+
 function TestResults({
   run,
   selectedKey,
   onSelectedKeyChange,
-}: {
-  readonly run: TestRunRecord
-  readonly selectedKey?: string
-  readonly onSelectedKeyChange: (testKey: string, replace: boolean) => void
+  gasProfileAvailable,
+}: TestResultsProps & {
+  readonly gasProfileAvailable: boolean
 }) {
   const reports = run.reports
   const selectedTest =
@@ -249,6 +322,7 @@ function TestResults({
             baseUrl={studioTestRunArtifactsUrl(run.id)}
             projectRoot={run.projectRoot}
             test={selectedTest}
+            gasProfileAvailable={gasProfileAvailable}
           />
         </Suspense>
       </div>

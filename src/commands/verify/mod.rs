@@ -30,6 +30,8 @@ const VERIFIER_BACKEND: &str = "https://verifier.ton.org";
 const VERIFY_BACKEND_ENV: &str = "ACTON_VERIFY_BACKEND";
 const VERIFIER_PAYMENT_COMMENT_PREFIX: &str = "acton-verify:v1:";
 const SOURCE_UPLOAD_ATTEMPTS: usize = 8;
+const VERIFIER_STATUS_POLL_ATTEMPTS: usize = 50;
+const VERIFIER_STATUS_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 pub fn verify_cmd(
     contract_id: Option<String>,
@@ -103,6 +105,10 @@ pub fn verify_cmd(
         "→".blue().bold(),
         format!("0x{code_hash_hex}").dimmed()
     );
+
+    if wait_for_existing_verification(&code_hash_hex)? {
+        return Ok(());
+    }
 
     let Some(payment_quote) = take_verifier_ticket(&code_hash_hex)? else {
         return Ok(());
@@ -436,6 +442,21 @@ enum VerifierTicketResponse {
     },
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum VerifierStatus {
+    Unverified,
+    Queued,
+    Compiling,
+    Verified,
+}
+
+#[derive(Debug, Deserialize)]
+struct VerifierStatusResponse {
+    code_hash: String,
+    status: VerifierStatus,
+}
+
 #[derive(Debug, Deserialize)]
 struct VerifierErrorResponse {
     error: String,
@@ -544,6 +565,72 @@ enum VerificationResult {
 struct UploadPart {
     field_name: String,
     bytes: Vec<u8>,
+}
+
+fn wait_for_existing_verification(code_hash: &str) -> anyhow::Result<bool> {
+    let backend = verifier_backend();
+    let status_url = format!("{backend}/api/v1/verification/status");
+    let client =
+        build_verify_http_client().context("Failed to create HTTP client for verifier backend")?;
+    let mut previous_status = None;
+
+    for attempt in 1..=VERIFIER_STATUS_POLL_ATTEMPTS {
+        let response = client
+            .get(&status_url)
+            .query(&[("code_hash", code_hash)])
+            .send()
+            .with_context(|| format!("Failed to request verification status from {status_url}"))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response
+                .text()
+                .unwrap_or_else(|_| "Unknown error".to_owned());
+            anyhow::bail!(
+                "Verification status request failed: HTTP {status} at {status_url}\nResponse body:\n{}",
+                truncate_for_display(&body, 4_000)
+            );
+        }
+
+        let response = response
+            .json::<VerifierStatusResponse>()
+            .context("Failed to parse verification status response")?;
+        if response.code_hash != code_hash {
+            anyhow::bail!(
+                "Verifier status returned a different code hash: expected {code_hash}, received {}",
+                response.code_hash
+            );
+        }
+
+        match response.status {
+            VerifierStatus::Unverified => return Ok(false),
+            VerifierStatus::Verified => {
+                println!("  {} Contract was already verified", "✓".green().bold());
+                println!();
+                show_verifier_link(&backend, code_hash);
+                return Ok(true);
+            }
+            VerifierStatus::Queued => {
+                if previous_status != Some(VerifierStatus::Queued) {
+                    println!("  {} Verification is queued", "→".blue().bold());
+                }
+            }
+            VerifierStatus::Compiling => {
+                if previous_status != Some(VerifierStatus::Compiling) {
+                    println!("  {} Verification is compiling", "→".blue().bold());
+                }
+            }
+        }
+
+        previous_status = Some(response.status);
+        if attempt < VERIFIER_STATUS_POLL_ATTEMPTS {
+            std::thread::sleep(VERIFIER_STATUS_POLL_INTERVAL);
+        }
+    }
+
+    anyhow::bail!(
+        "Verification is still queued or compiling after {VERIFIER_STATUS_POLL_ATTEMPTS} status checks"
+    )
 }
 
 fn take_verifier_ticket(code_hash: &str) -> anyhow::Result<Option<VerifierPaymentQuote>> {
@@ -772,7 +859,7 @@ fn wait_for_verifier_payment(
     let message_hash = hex::encode(normalized_external_hash.as_slice());
 
     for attempt in 1..=ATTEMPTS {
-        match client.get_traces_by_msg_hash(&message_hash, 1) {
+        match client.get_traces_by_msg_hash(&message_hash, 1, None) {
             Ok(traces) => {
                 for trace in traces {
                     if trace.is_incomplete {

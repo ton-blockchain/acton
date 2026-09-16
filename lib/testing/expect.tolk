@@ -231,46 +231,68 @@ fun Expectation<int>.toBeApproxEqAbs(self, expected: int, maxDelta: int): void {
     }
 }
 
-/// Asserts that actual value is approximately equal to expected value using relative percentage difference.
+/// Asserts approximate equality using relative difference at the requested precision.
+///
+/// `maxDeltaDenominator` must be positive. Its default value of `100` expresses `maxDelta` in percent.
+/// Use `1_000_000` for millionths or a larger denominator for finer precision.
 ///
 /// Relative delta is computed as:
-/// `floor(abs(actual - expected) * 100 / abs(actual))`.
-/// The assertion passes when this computed percentage is less than or equal to `maxDelta`.
+/// `floor(abs(actual - expected) * maxDeltaDenominator / abs(actual))`.
+/// The assertion passes when this rounded-down delta is less than or equal to `maxDelta`.
 ///
-/// Zero branch:
-/// if `actual == 0`, only `expected == 0` passes; any non-zero `expected` is treated as infinite delta and fails.
+/// If `actual` is zero, only a zero `expected` value passes. A non-zero `expected` value has infinite relative difference.
 ///
 /// Example:
 /// ```tolk
 /// expect(1000).toBeApproxEqRel(1099, 9);
+/// expect(1_000_000).toBeApproxEqRel(1_000_001, 1, 1_000_000);
+/// val scale = 1_000_000_000_000_000_000;
+/// expect(scale).toBeApproxEqRel(scale + 1, 1, scale);
 /// expect(0).toBeApproxEqRel(0, 0);
 /// ```
-fun Expectation<int>.toBeApproxEqRel(self, expected: int, maxDelta: int): void {
+fun Expectation<int>.toBeApproxEqRel(
+    self,
+    expected: int,
+    maxDelta: int,
+    maxDeltaDenominator: int = 100,
+): void {
+    if (maxDeltaDenominator <= 0) {
+        self.fail(
+            format(
+                "toBeApproxEqRel: maxDeltaDenominator must be positive, got {}",
+                maxDeltaDenominator,
+            ),
+        );
+    }
+
     val valueDelta = abs(self.value - expected);
     val denominator = abs(self.value);
     if (denominator == 0) {
         if (valueDelta > 0) {
+            val unit = maxDeltaDenominator == 100 ? "%" : format("/{}", maxDeltaDenominator);
             self.fail(
                 format(
-                    "{} !~= {} (max delta: {}%, real delta: inf%)",
+                    "{} !~= {} (max delta: {}, real delta: {})",
                     self.value,
                     expected,
-                    maxDelta,
+                    format("{}{}", maxDelta, unit),
+                    maxDeltaDenominator == 100 ? "inf%" : "inf",
                 ),
             );
         }
         return;
     }
 
-    val percent = mulDivFloor(valueDelta, 100, denominator);
-    if (percent > maxDelta) {
+    val realDelta = mulDivFloor(valueDelta, maxDeltaDenominator, denominator);
+    if (realDelta > maxDelta) {
+        val unit = maxDeltaDenominator == 100 ? "%" : format("/{}", maxDeltaDenominator);
         self.fail(
             format(
-                "{} !~= {} (max delta: {}%, real delta: {}%)",
+                "{} !~= {} (max delta: {}, real delta: {})",
                 self.value,
                 expected,
-                maxDelta,
-                percent,
+                format("{}{}", maxDelta, unit),
+                format("{}{}", realDelta, unit),
             ),
         );
     }

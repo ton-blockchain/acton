@@ -1081,16 +1081,18 @@ fn normalize_toncenter_error_message(raw_msg: &str) -> Option<&'static str> {
 impl TonApiClient {
     /// Fetch traces that include a message with the given hash using toncenter v3.
     ///
-    /// `msg_hash` is accepted in hex, base64, or base64url form. A transaction may be part
-    /// of at most one trace, so callers typically want the first (or only) result. Pass
+    /// `msg_hash` is accepted in hex, base64, or base64url form. Repeated external
+    /// messages can match multiple executions; `start_utime` excludes traces that
+    /// started before that Unix second, before the server applies `limit`. Pass
     /// the TEP-467 `hash_norm` from `sendBocReturnHash` to avoid indexer false-misses on
     /// cell-layout variations.
     pub fn get_traces_by_msg_hash(
         &self,
         msg_hash: &str,
         limit: u32,
+        start_utime: Option<i64>,
     ) -> anyhow::Result<Vec<v3::Trace>> {
-        self.get_traces_by_hash_param("msg_hash", msg_hash, limit)
+        self.get_traces_by_hash_param("msg_hash", msg_hash, limit, start_utime)
     }
 
     /// Fetch a trace by its root transaction hash using toncenter v3.
@@ -1099,7 +1101,7 @@ impl TonApiClient {
         tx_hash: &str,
         limit: u32,
     ) -> anyhow::Result<Vec<v3::Trace>> {
-        self.get_traces_by_hash_param("tx_hash", tx_hash, limit)
+        self.get_traces_by_hash_param("tx_hash", tx_hash, limit, None)
     }
 
     fn get_traces_by_hash_param(
@@ -1107,14 +1109,19 @@ impl TonApiClient {
         hash_param: &str,
         hash: &str,
         limit: u32,
+        start_utime: Option<i64>,
     ) -> anyhow::Result<Vec<v3::Trace>> {
         let url = format!(
             "{}/traces",
             self.network.toncenter_v3_url(&self.custom_networks)?
         );
 
-        let params: Vec<(&str, String)> =
+        let mut params: Vec<(&str, String)> =
             vec![(hash_param, hash.to_owned()), ("limit", limit.to_string())];
+        if let Some(start_utime) = start_utime {
+            params.push(("start_utime", start_utime.to_string()));
+            params.push(("sort", "desc".to_owned()));
+        }
 
         let response = self.send_with_retry(
             || self.build_request(&url).query(&params),

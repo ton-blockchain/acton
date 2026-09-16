@@ -265,3 +265,57 @@ fun main() {
 }
 ------------------------------------------------------------------------
 ok
+
+========================================================================
+Types inside direct match-arm statements
+========================================================================
+fun main(tag: int, value: int | slice) {
+    match (value) {
+        int => if (value > 0) {
+            val number = value + 1;
+            number;
+//!         ^ int
+        }
+        slice => while (value.bitsCount() > 0) {
+            value = value.skipBits(1);
+            value;
+//!         ^ slice
+        }
+    }
+    match (tag) {
+        1 => repeat (tag) {
+            val flag = true;
+            flag;
+//!         ^ bool
+        }
+        2 => do {
+            val text = "hello";
+            text;
+//!         ^ string
+        } while (false)
+        3 => try { throw 123; } catch (code) {
+            code;
+//!         ^ int
+        }
+        else => assert (tag > 0) throw 123,
+    }
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Return inference through a direct conditional match arm
+========================================================================
+fun choose(tag: int) {
+    match (tag) {
+        0 => if (tag == 0) { return "zero"; } else { return "other"; }
+        else => throw 123,
+    }
+}
+
+fun main() {
+    choose(0);
+//! ^ string
+}
+------------------------------------------------------------------------
+ok

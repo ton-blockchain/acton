@@ -51,8 +51,8 @@ pub fn print_union_type<'a>(ctx: &Context<'_>, union: &UnionType) -> Option<RcDo
     collect_union_parts(union, &mut parts);
 
     let mut parts_docs = vec![];
-    for part in parts {
-        let part_doc = print_type(ctx, &part)?;
+    for part in &parts {
+        let part_doc = print_type(ctx, part)?;
         parts_docs.push(part_doc);
     }
 
@@ -62,6 +62,12 @@ pub fn print_union_type<'a>(ctx: &Context<'_>, union: &UnionType) -> Option<RcDo
         let kind = p.kind();
         kind == "type_alias_declaration"
     });
+    let parenthesized_with_comments = union
+        .0
+        .parent()
+        .is_some_and(|parent| parent.kind() == "parenthesized_type")
+        && comments::has_inline_line_comment_in_subtree(ctx, union.0);
+
     // we want to preserve user's newlines
     let source_has_newline = union
         .0
@@ -99,14 +105,28 @@ pub fn print_union_type<'a>(ctx: &Context<'_>, union: &UnionType) -> Option<RcDo
     ]);
 
     let mut tail_docs = vec![];
-    for doc in rest {
-        tail_docs.push(RcDoc::line());
+    for (i, doc) in rest.iter().enumerate() {
+        // A line comment on the preceding variant must end before the next `|`.
+        tail_docs.push(
+            if parenthesized_with_comments
+                || comments::has_inline_line_comment_in_subtree(ctx, parts[i].syntax())
+            {
+                RcDoc::hardline()
+            } else {
+                RcDoc::line()
+            },
+        );
         tail_docs.push(RcDoc::text("| "));
         tail_docs.push(force_alias_breaks(doc.clone()));
     }
 
-    let union_doc =
-        RcDoc::concat([RcDoc::softline_(), first_doc, RcDoc::concat(tail_docs)]).nest(4);
+    let union_doc = RcDoc::concat([RcDoc::softline_(), first_doc, RcDoc::concat(tail_docs)]);
+    // Multiline parentheses already indent their contents, including every union variant.
+    let union_doc = if parenthesized_with_comments {
+        union_doc
+    } else {
+        union_doc.nest(4)
+    };
 
     if in_type_alias {
         return Some(if source_has_newline {
@@ -145,6 +165,17 @@ pub fn print_parenthesized_type<'a>(
 ) -> Option<RcDoc<'a>> {
     let inner = paren.inner()?;
     let inner_doc = print_type(ctx, &inner)?;
+
+    // A line comment requires multiline parentheses so it cannot swallow the closing delimiter.
+    if comments::has_inline_line_comment_in_subtree(ctx, inner.syntax()) {
+        return Some(RcDoc::concat([
+            RcDoc::text("("),
+            RcDoc::concat([RcDoc::hardline(), inner_doc]).nest(4),
+            RcDoc::hardline(),
+            RcDoc::text(")"),
+        ]));
+    }
+
     Some(RcDoc::concat([
         RcDoc::text("("),
         inner_doc,

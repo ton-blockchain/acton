@@ -121,19 +121,36 @@ Decoded Storage
 
 ## Verify the source code
 
-Source verification proves the deployed bytecode was compiled from specific source files, letting users inspect the source in a blockchain explorer.
+Source verification publishes the Tolk sources that reproduce the poll's compiled code hash. Use the same source revision and compiler settings as deployment.
+
+First, prepare verification and inspect the payment details:
 
 ```acton-cli
-acton verify Poll --address <POLL_ADDRESS> --net testnet
+acton verify Poll --address <POLL_ADDRESS> --dry-run
 ```
+
+Acton compiles the poll and requests a verification ticket. If the code hash is already verified, Acton prints its verifier link and exits without payment.
+
+For new code, Acton checks that the deployed testnet contract has the same code hash. A mismatch stops verification before payment. Acton then prepares the sources and displays the ticket's payment amount, recipient address, and comment.
+
+`--dry-run` does not send a payment or upload sources. It does not confirm that the verifier can compile the source bundle.
+
+To complete verification, pay with the testnet wallet created earlier:
+
+```acton-cli
+acton verify Poll --address <POLL_ADDRESS> --wallet testnet-deployer
+```
+
+Review the amount and recipient, then approve the payment when prompted. The ticket sets the amount. Keep enough testnet GRAM in `testnet-deployer` for this payment and network fees.
+
+Acton waits for the recipient transaction to finalize, then uploads the sources with that transaction's hash. On success, it prints a link that identifies the verified code hash:
 
 ```acton-cli noCopy title="terminal"
-$ acton verify Poll --address EQC9R1p... --net testnet
 ✓ Contract verification completed!
-View at: https://verifier.ton.org/EQC9R1p...?testnet
+View at: https://verifier.ton.org/<CODE_HASH>
 ```
 
-When `--dry-run` is not used, the final verification transaction sends `0.1 GRAM` unless the verifier backend reports that the same code hash is already verified.
+Open the printed link to inspect the verified sources. See the [verification guide](/docs/verify) for TON Connect, compiler options, and payment retries.
 
 ## Send a vote and retrace the transaction
 

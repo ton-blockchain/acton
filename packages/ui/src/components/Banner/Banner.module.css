@@ -37,42 +37,63 @@
   text-align: center;
 }
 
-.message strong {
+.title {
   font-weight: var(--acton-font-weight-bold);
 }
 
-.mobileHeadline {
+.compactTitle {
   display: none;
 }
 
-.developerIcon {
+.icon {
   display: block;
   flex: 0 0 auto;
+}
+
+.icon > svg {
+  display: block;
 }
 
 .separator {
   opacity: 0.58;
 }
 
-.link {
+.action {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 4px;
   border-radius: 4px;
   color: inherit;
   font-weight: var(--acton-font-weight-emphasis);
+  white-space: nowrap;
+}
+
+.action > :where(a, button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: inherit;
+  color: inherit;
+  font: inherit;
   text-decoration: underline;
   text-decoration-color: color-mix(in srgb, white 58%, transparent);
   text-underline-offset: 3px;
-  white-space: nowrap;
   transition: text-decoration-color var(--acton-duration-fast);
 }
 
-.link:hover {
+.action > button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.action > :where(a, button):hover {
   text-decoration-color: white;
 }
 
-.link:focus-visible,
+.action > :where(a, button):focus-visible,
 .closeButton:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px white;
@@ -123,20 +144,20 @@
     text-align: left;
   }
 
-  .developerIcon,
-  .message strong {
+  .icon,
+  .title {
     align-self: center;
   }
 
-  .desktopHeadline {
+  .desktopTitle {
     display: none;
   }
 
-  .mobileHeadline {
+  .compactTitle {
     display: inline;
   }
 
-  .separator:first-of-type {
+  .separator {
     display: none;
   }
 }
@@ -152,19 +173,18 @@
     overflow: hidden;
   }
 
-  .message strong {
+  .title {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .link {
-    flex: 0 0 auto;
+  .action {
     margin-left: auto;
   }
 
-  .publicExplorerPrompt,
+  .description,
   .separator {
     display: none;
   }

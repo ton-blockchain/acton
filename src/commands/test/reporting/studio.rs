@@ -40,6 +40,11 @@ struct StudioEventWorker {
 }
 
 impl StudioReporter {
+    /// Keeps optional viewer outputs with this run, separate from reusable CLI exports.
+    pub(crate) fn artifact_dir(&self) -> PathBuf {
+        acton_studio::test_artifact_dir(&self.project_root, &self.run.id)
+    }
+
     pub(crate) fn prepare(
         project_root: &Path,
         workspace_name: &str,
