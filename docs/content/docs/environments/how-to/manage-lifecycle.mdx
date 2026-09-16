@@ -1,16 +1,22 @@
 ---
 title: "How to manage virtual environment lifecycle"
 sidebarTitle: "Manage environment lifecycle"
-description: "Stop, resume, rename, and delete development networks without confusing saved state with running processes"
+description: "Learn how to stop, resume, rename, and delete development networks without confusing saved state with running processes"
 ---
 
 import {Tabs, Tab} from "fumadocs-ui/components/tabs";
 
 Stop a network to release runtime resources while preserving saved state.
 
+<Callout type="caution">
+  Deleting a Studio environment removes its state and snapshots. Deleting a localnet also removes its managed Docker containers and volumes.
+
+  Stop the environment instead if its state must be retained — deletion has no **undo.**
+</Callout>
+
 ## Prerequisites
 
-- [Create a virtual environment](/docs/environments/how-to/create-network) to stop, resume, rename, or delete.
+- A [virtual environment](/docs/environments/how-to/create-network).
 
 ## Stop or resume work
 
@@ -46,7 +52,7 @@ acton localnet stop dev
 acton localnet start dev --detach
 ```
 
-Use the same `--state-dir` for commands managing a custom catalog. Resuming a named network preserves its blockchain and does not replenish startup wallets. Creation options are rejected on an existing network; choose another name for a different initial scenario.
+Use the same [`--state-dir`](/docs/commands/localnet#options) for commands managing a custom catalog. Resuming a named network preserves its blockchain state and does not replenish startup wallets.
 
 To delete a network, run the interactive command and review its confirmation:
 
@@ -61,8 +67,6 @@ The CLI has no rename subcommand. A name belongs to its saved network definition
 
 ## Verify the result
 
-A stopped network remains listed with its saved state. A deleted network disappears from the catalog. On restart, inspect the previous block and account state before continuing work.
-
-<Callout type="caution">
-  Deleting a Studio-managed environment removes its saved state and snapshots. Deleting a localnet also removes its managed Docker containers and volumes. Stopping preserves them.
-</Callout>
+- A stopped network remains listed with its saved state.
+- A deleted network disappears from the catalog.
+- On restart, inspect the previous block and account state before continuing work.

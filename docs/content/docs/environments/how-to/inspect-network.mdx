@@ -1,7 +1,7 @@
 ---
 title: "How to inspect virtual network activity"
 sidebarTitle: "Inspect activity and health"
-description: "Trace transactions, inspect API traffic, and diagnose localnet node or indexer problems"
+description: "Learn how to trace transactions, inspect API traffic, and diagnose localnet node or indexer problems"
 ---
 
 import {Tabs, Tab} from "fumadocs-ui/components/tabs";
@@ -10,7 +10,7 @@ Trace transactions, inspect API traffic, and diagnose readiness problems in the 
 
 ## Prerequisites
 
-- [Create a virtual environment](/docs/environments/how-to/create-network). It can be stopped or failing to start when you inspect status and diagnostics.
+- A [virtual environment](/docs/environments/how-to/create-network). Status and diagnostics remain available when it is stopped or fails to start.
 
 ## Inspect execution and readiness
 
@@ -19,14 +19,15 @@ Trace transactions, inspect API traffic, and diagnose readiness problems in the 
 
 Send requests and deployments through the [Studio connection settings](/docs/environments/how-to/connect) to capture them in <kbd>API calls</kbd> and the automatic contract registry.
 
-1. Open <kbd>Explorer</kbd>, find an account, and inspect balances, code, storage, and transaction history. Browse blocks, Jettons, and NFTs; save useful addresses in <kbd>Favorites</kbd>.
+1. Open <kbd>Explorer</kbd>, find an account, and inspect balances, code, storage, and transaction history. Browse blocks, jettons, and non-fungible tokens (NFTs); save useful addresses in <kbd>Favorites</kbd>.
 1. Open a transaction to inspect phases, fees, messages, and state changes. Retrace it for execution details when matching source artifacts are available.
-1. Use <kbd>Contracts</kbd> for registered addresses, source artifacts, and ABI. Add existing addresses manually when their deployment did not pass through Studio. Review the <kbd>Sources</kbd> and <kbd>ABI</kbd> catalogs for available metadata.
+1. Use <kbd>Contracts</kbd> for registered addresses, source artifacts, and application binary interfaces (ABIs). Add existing addresses manually when their deployment did not pass through Studio. Review the <kbd>Sources</kbd> and <kbd>ABI</kbd> catalogs for available metadata.
 1. Open <kbd>API calls</kbd> to inspect request/response data, timing, and errors. Enable the <kbd>Studio requests</kbd> filter to include calls made by the UI itself.
 
 ![Studio API calls with filters, responses, and timings](../../imgs/api-calls-dark.png)
 
-For localnet, open <kbd>Network</kbd> → <kbd>Health</kbd> for API readiness, indexer lag, and service health. Inspect <kbd>Nodes</kbd>, <kbd>Validators</kbd>, and <kbd>Stats</kbd> for synchronization, elections, and queues. On startup failure, expand <kbd>Diagnostic details</kbd> for the runtime error. The nodes page includes <kbd>Collector diagnostics</kbd> for observer failures. The simulator has no equivalent validator/service log dashboard.
+- For localnet, open <kbd>Network</kbd> → <kbd>Health</kbd> for API readiness, indexer lag, and service health. Inspect <kbd>Nodes</kbd>, <kbd>Validators</kbd>, and <kbd>Stats</kbd> for synchronization, elections, and queues. On startup failure, expand <kbd>Diagnostic details</kbd> for the runtime error. The nodes page includes <kbd>Collector diagnostics</kbd> for observer failures.
+- The simulator has no equivalent validator or service log dashboard.
 
 The [common Studio tools](/docs/studio#common-tools) provide message previews, cell inspection, address conversion, and interactive API requests.
 
@@ -51,7 +52,7 @@ acton localnet logs dev --tail 200
 The log command prints a bounded tail of the network operation log once and exits. It does not follow a live stream. Use the reported Dashboard URL for node health and elections. For a pending operation, replace `<OPERATION_ID>` with its ID from status:
 
 ```bash
-acton localnet operation <OPERATION_ID> --network dev --wait
+acton localnet operation '<OPERATION_ID>' --network dev --wait
 ```
 
 An accepted operation is not a completed operation. Inspect its terminal status and error before using the result.
@@ -62,12 +63,12 @@ An accepted operation is not a completed operation. Inspect its terminal status 
 ## Verify the diagnosis
 
 | Symptom | Check |
-| --- | --- |
-| No simulator transactions | Mine pending messages; check the client's selected endpoint. |
-| Localnet is producing blocks but reads fail | Wait for APIs and indexer readiness, then inspect service health and logs. |
+| ------- | ----- |
+| No simulator transactions | Manually mine pending blocks; check the client's selected endpoint. |
+| The localnet produces blocks but reads fail | Wait for APIs and indexer readiness, then inspect service health and logs. |
 | A deployment or request is missing in Studio | Direct provider/runtime URLs bypass Studio's proxy. |
 | Source is unavailable | Build the project version matching the deployed code hash. |
-| HTTP `401` from simulator APIs | Supply the token from `--require-auth` through the UI key control or `ACTON_LOCALNET_AUTH_TOKEN`. |
+| HTTP `401` from simulator APIs | Supply the token from [`--require-auth`](/docs/commands/localnet#subcommands) through the UI key control or `ACTON_LOCALNET_AUTH_TOKEN`. |
 | Old API calls disappear | The bounded request log is temporary and clears on Studio restart. |
 
-Preserve relevant errors and exclude credentials when reporting failures. Use Studio lifecycle and snapshot controls to recover state instead of editing managed files.
+Preserve relevant errors and exclude credentials when reporting failures. Use Studio snapshot controls to recover previous states.

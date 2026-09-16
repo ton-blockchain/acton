@@ -1,28 +1,37 @@
 ---
 title: "Localnet overview"
 sidebarTitle: "Overview"
-description: "Run real TON validators and TON Center APIs locally with node management, health diagnostics, snapshots, and administrative controls"
+description: "Localnet behavior, prerequisites, node controls, and resource requirements"
 ---
 
-A localnet runs TON validator-engine nodes, consensus, elections, and TON Center v2/v3 services in Docker. This is the full localnet option in Acton Studio. Use it when a test depends on validator, full-node, or indexer behavior. Local execution avoids dependence on testnet load and faucet availability.
+A localnet runs TON `validator-engine` nodes and TON Center v2/v3 services in Docker. It includes consensus and validator elections. Use it for tests that depend on validator, full-node, or indexer behavior without relying on testnet availability.
 
 ## Requirements and startup
 
-- Install [Acton](/docs/installation) {{ acton_version }} or later.
-- Install and start [Docker Engine](https://docs.docker.com/engine/install/) with [Compose v2](https://docs.docker.com/compose/install/), or [Docker Desktop](https://docs.docker.com/desktop/setup/install/).
-- For project builds, scripts, and configured wallets, [create or initialize an Acton project](/docs/projects#create-or-initialize-a-project) containing `Acton.toml`.
+### Prerequisites
 
-Check Docker before creating a localnet:
+- [Acton](/docs/installation) 1.2 or later installed.
+- An [Acton project](/docs/projects#create-or-initialize-a-project) containing `Acton.toml`.
+- For startup accounts, [configured project wallets](/docs/wallets#create-a-wallet).
+- A running [Docker engine](https://docs.docker.com/engine/install/) with [Compose v2](https://docs.docker.com/compose/install/). Note that [Docker Desktop](https://docs.docker.com/desktop/setup/install/) includes both.
+
+### Verify Docker availability
+
+Check that the engine and Compose are available:
 
 ```bash
 docker info
 docker compose version
 ```
 
+### Startup and storage
+
 A full node can take about 20 seconds to start with images already available. Image downloads, additional nodes, and indexer initialization can make startup take longer, including several minutes on a first launch. Wait for node, API, and indexer readiness before sending requests.
 
 <Callout type="caution">
-  Before running more than one node, increase Docker's disk allocation to fit the network. Each node can use up to 10 GB of disk space per day. Allow additional space for indexers, snapshot archives, and temporary restore data.
+  Insufficient Docker disk space can interrupt localnet operation. Each node can use up to about 9.3 GiB per day.
+
+  Allocate space for all nodes, indexers, snapshot archives, and temporary restore data before startup.
 </Callout>
 
 ## Create and connect
@@ -39,10 +48,6 @@ A full node can take about 20 seconds to start with images already available. Im
 
 ## Timing and API conditions
 
-Set an initial block-time target when creating a network from the CLI:
+The [`--block-time-ms` option](/docs/commands/localnet#acton-localnet-start) sets an initial block-time target when creating a localnet. Actual timing depends on consensus and resources.
 
-```bash
-acton localnet start timed --block-time-ms 1000 --detach
-```
-
-Actual timing depends on consensus and resources. Localnet has no virtual clock, manual mining, or synthetic API rate-limit and response-delay controls. Use simulator [time controls](/docs/environments/simulator/time) or [API conditions](/docs/environments/simulator/network-conditions) for those scenarios.
+A localnet has no virtual clock, manual mining, or synthetic API rate-limit and response-delay controls. Use simulator [time controls](/docs/environments/simulator/time) or [API conditions](/docs/environments/simulator/network-conditions) for those scenarios.

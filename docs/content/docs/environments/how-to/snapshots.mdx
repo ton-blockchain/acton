@@ -1,25 +1,26 @@
 ---
 title: "How to save and restore network snapshots"
 sidebarTitle: "Save and restore snapshots"
-description: "Save development checkpoints and restore simulator or localnet state in Studio"
+description: "Learn how to save development checkpoints and restore simulator or localnet state in Studio"
 ---
 
 import {Tabs, Tab} from "fumadocs-ui/components/tabs";
 
 Snapshots preserve network state for repeating scenarios or recovering after changes.
 
-| Environment | Saved state | Operational effects |
-| --- | --- | --- |
-| Simulator | JSON checkpoint of chain state, metadata, pending messages, and virtual time | A running simulator stays online during creation and restore. JSON checkpoints can be imported and exported. |
-| Localnet | Compressed archive of blockchain databases and node topology | Creation pauses a running network, then resumes it. Restore replaces chain state, restarts services, and rebuilds indexed data; operations can take several minutes. |
+A simulator saves JSON snapshots, while localnet snapshots use compressed archives. The formats are not interchangeable and differ from [emulator test fixtures](/docs/testing/world-state-snapshots).
 
-The formats cannot be interchanged. These network checkpoints are also separate from [world-state fixtures inside emulator tests](/docs/testing/world-state-snapshots).
+<Callout type="caution">
+  Restore replaces the selected simulator or localnet state, including localnet node topology. Save needed state first.
+
+  Deleting a snapshot **permanently** removes that restore point, and deleting a localnet removes its managed snapshots.
+</Callout>
 
 ## Prerequisites
 
-- [Create a virtual environment](/docs/environments/how-to/create-network).
-- For simulator CLI commands, start the simulator and note its HTTP port.
-- For localnet, start Docker and check that its storage has room for the live databases, snapshot archives, and temporary restore backups.
+- A [virtual environment](/docs/environments/how-to/create-network).
+- For simulator CLI commands, the HTTP port to use. The example starts a simulator on port `5411`.
+- For localnet, a running Docker engine with storage for live databases, snapshot archives, and temporary restore backups.
 
 ## Save and restore state
 
@@ -33,9 +34,9 @@ The formats cannot be interchanged. These network checkpoints are also separate 
 
 Use the row's delete action to remove an unneeded snapshot.
 
-For a stopped simulator, creation saves only [persisted state](/docs/environments/how-to/snapshots#retain-simulator-checkpoints). Restoring a stopped simulator starts it. Inventory, import, download, and delete controls work while it is stopped.
+A running simulator stays online during snapshot creation and restore. For a stopped simulator, creation saves only [persisted state](/docs/environments/how-to/snapshots#retain-simulator-checkpoints). Restoring a stopped simulator starts it. Inventory, import, download, and delete controls work while it is stopped.
 
-For localnet, an already stopped network stays stopped after snapshot creation. The table shows the saved masterchain block and compressed/uncompressed sizes. Operations continue in the background after leaving the page; reopen it to check progress.
+For localnet, creation pauses a running network, then resumes it. A stopped network stays stopped. Restore restarts services and rebuilds indexed data, which can take several minutes. The table shows the saved masterchain block and compressed and uncompressed sizes. Operations continue in the background after leaving the page; reopen it to check progress.
 
 ![Localnet snapshots with block information and archive sizes](../../imgs/snapshots-dark.png)
 
@@ -60,22 +61,22 @@ acton simulator snapshot list --port 5411 --json
 Replace `<SNAPSHOT_ID>` with the ID returned by create or list, not its display name:
 
 ```bash
-acton simulator snapshot restore <SNAPSHOT_ID> --port 5411
+acton simulator snapshot restore '<SNAPSHOT_ID>' --port 5411
 ```
 
 Export a checkpoint or import a shared one:
 
 ```bash
-acton simulator snapshot export <SNAPSHOT_ID> --out snapshots/before-upgrade.json --port 5411
+acton simulator snapshot export '<SNAPSHOT_ID>' --out snapshots/before-upgrade.json --port 5411
 acton simulator snapshot import snapshots/before-upgrade.json --name imported --port 5411
 ```
 
-Import creates a new snapshot ID without changing live state. Snapshot file arguments resolve from the project root. `--force` on export replaces an existing destination file.
+Import creates a new snapshot ID without changing live state. Snapshot file arguments resolve from the project root. Choose a new export filename to preserve existing files.
 
 Delete an unneeded saved state with its ID:
 
 ```bash
-acton simulator snapshot delete <SNAPSHOT_ID> --port 5411
+acton simulator snapshot delete '<SNAPSHOT_ID>' --port 5411
 ```
 
 </Tab>
@@ -89,7 +90,7 @@ acton localnet snapshot dev list
 Replace `<SNAPSHOT_ID>` with the returned ID, not its display name:
 
 ```bash
-acton localnet snapshot dev restore <SNAPSHOT_ID> --yes
+acton localnet snapshot dev restore '<SNAPSHOT_ID>'
 ```
 
 These commands also work when the control service is stopped. Acton opens a temporary service for the operation and closes it afterward. A restore through that temporary service leaves the network stopped again; resume it to continue:
@@ -101,7 +102,7 @@ acton localnet start dev --detach
 Delete an unneeded saved state with its ID:
 
 ```bash
-acton localnet snapshot dev delete <SNAPSHOT_ID> --yes
+acton localnet snapshot dev delete '<SNAPSHOT_ID>'
 ```
 
 </Tab>
@@ -109,20 +110,24 @@ acton localnet snapshot dev delete <SNAPSHOT_ID> --yes
 
 ## Verify the restored state
 
-Inspect the saved block and account balances, then repeat the relevant getter or script action. For a simulator, also check virtual time; for localnet, check node, API, and indexer readiness under <kbd>Network</kbd> → <kbd>Health</kbd> before querying indexed data.
+Inspect the saved block and account balances, then repeat the relevant getter or script action.
 
-<Callout type="caution">
-  Restore replaces current network state, including localnet node topology. Save any state that must be retained first. Deleting a snapshot permanently removes that restore point; deleting a localnet also removes all its managed snapshots.
-</Callout>
+- For a simulator, also check virtual time.
+- For localnet, check node, API, and indexer readiness under <kbd>Network</kbd> → <kbd>Health</kbd> before querying indexed data.
 
 ## Retain simulator checkpoints
 
-Studio configures persistence automatically. For a standalone simulator, use `--db-path` or `[localnet].db-path`; without a database, live state is ephemeral. SQLite preserves committed blocks, transactions, account state, configuration, ABIs, and source artifacts between process runs. Pending messages, time overrides, and other runtime metadata require a running-node snapshot.
+Studio configures persistence automatically. For a standalone simulator, use [`--db-path`](/docs/commands/simulator#acton-simulator-start) or [`[localnet].db-path`](/docs/acton-toml#localnet) in `Acton.toml` — without a database, live state is not persistent. SQLite preserves committed blocks, transactions, account state, configuration, application binary interfaces (ABIs), and source artifacts between process runs. Pending messages, time overrides, and other runtime metadata require a running-node snapshot.
 
-Without `--snapshots-dir`, a database named `simulator.sqlite` uses a sibling `simulator.snapshots/` directory. Without a database, snapshots default to `.acton/simulator/<PORT>/snapshots/`, where `<PORT>` is the runtime port. Use the same directory on restart to retain access.
+- Without [`--snapshots-dir`](/docs/commands/simulator#acton-simulator-start), a database named `simulator.sqlite` uses a sibling `simulator.snapshots/` directory.
+- Without a database, snapshots default to `.acton/simulator/<PORT>/snapshots/`, where `<PORT>` is the runtime port. Use the same directory on restart to retain access.
 
-A relative `[localnet].db-path` resolves from the project root; a relative `--db-path` resolves from the current working directory. When sharing JSON checkpoints, use the same Acton version and fork network. Import validates a snapshot before saving it.
+<Callout type="note">
+  A relative `[localnet].db-path` resolves from the project root, while a relative `--db-path` resolves from the current working directory.
+</Callout>
+
+When sharing JSON checkpoints, use the same Acton version and fork network. Import validates a snapshot before saving it.
 
 ## Retain localnet archives
 
-Archives live in Docker volumes. Copying `.acton-localnet` metadata alone does not back up the chain. Studio does not provide archive import/export.
+Archives live in Docker volumes. Copying `.acton-localnet` metadata alone does not back up the chain. Studio does **not** provide archive import or export.

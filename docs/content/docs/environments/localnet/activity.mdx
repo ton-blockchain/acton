@@ -1,17 +1,21 @@
 ---
 title: "How to generate localnet test traffic"
 sidebarTitle: "Generate test traffic"
-description: "Generate bounded transfers, Jetton operations, and NFT operations to exercise localnet behavior"
+description: "Generate bounded transfers, jetton operations, and NFT operations to test localnet behavior"
 ---
 
 import {Tabs, Tab} from "fumadocs-ui/components/tabs";
 
-Generate repeatable classes of on-chain activity to observe nodes and indexers under load. The localnet service owns the run, so closing the Studio page does not stop it.
+Generate transfers, jetton operations, and non-fungible token (NFT) operations to test localnet nodes and indexers under load. The localnet service owns the run, so closing the Studio page does not stop it.
+
+<Callout type="caution">
+  Activity submits transactions and increases load on the selected localnet. Save a [snapshot](/docs/environments/how-to/snapshots) first to restore the initial state. Stopping activity does not undo submitted transactions.
+</Callout>
 
 ## Prerequisites
 
-- [Create and start a localnet](/docs/environments/how-to/create-network).
-- Check node, API, and indexer readiness under <kbd>Network</kbd> → <kbd>Health</kbd> before adding load.
+- A running [localnet](/docs/environments/how-to/create-network).
+- Ready nodes, APIs, and indexers under <kbd>Network</kbd> → <kbd>Health</kbd>.
 
 ## Configure and run traffic
 
@@ -19,17 +23,17 @@ Generate repeatable classes of on-chain activity to observe nodes and indexers u
 <Tab value="UI">
 
 1. Open <kbd>Network</kbd> → <kbd>Activity</kbd>.
-1. Choose the mix of <kbd>Transfers</kbd>, <kbd>Batch transfers</kbd>, <kbd>Jettons</kbd>, and <kbd>NFTs</kbd>. A weight of zero disables that scenario family.
+1. Choose the mix of <kbd>Transfers</kbd>, <kbd>Batch transfers</kbd>, <kbd>Jettons</kbd>, and <kbd>NFTs</kbd>. A weight of 0 disables that scenario family.
 1. Set a bounded duration, interval, and concurrency. Adjust amounts and batch size under <kbd>Scenario settings</kbd> when needed.
-1. Select <kbd>Start activity</kbd>. Inspect completed/failed scenarios and confirmed messages.
+1. Select <kbd>Start activity</kbd>. Inspect completed and failed scenarios and confirmed messages.
 1. Select <kbd>Stop activity</kbd> to finish early. Wait for in-flight work to settle.
 
-Transfers use fresh wallets; Jetton and NFT scenarios include deployment and subsequent actions. Scenario weights control scenario starts, not exact transaction counts.
+Transfers use fresh wallets; jetton and NFT scenarios include deployment and subsequent actions. Scenario weights control scenario starts, not exact transaction counts.
 
 </Tab>
 <Tab value="Localnet CLI">
 
-Use the [control API connection](/docs/environments/how-to/connect#localnet-control-api), replacing `<CONTROL_URL>` and `<CONTROL_TOKEN>`. Save this bounded workload as `activity.json`:
+Use the [control API connection](/docs/environments/how-to/connect#localnet-control-api), replacing `<CONTROL_URL>` with the service URL and `<CONTROL_TOKEN>` with its token. Save this bounded workload as `activity.json`:
 
 ```json title="activity.json"
 {
@@ -67,4 +71,4 @@ curl --fail -X POST '<CONTROL_URL>/v1/network/activity/stop' \
 
 ## Verify the workload
 
-Inspect the recent scenario results and open the associated addresses in explorer. Compare node statistics and indexer lag under <kbd>Network</kbd>. A stopped run can still have submitted transactions on-chain. Interrupted runs are not automatically replayed after a service restart.
+Inspect the recent scenario results and open the associated addresses in <kbd>Explorer</kbd>. Compare node statistics and indexer lag under <kbd>Network</kbd>. A stopped run can still have submitted transactions on-chain. Interrupted runs are not automatically replayed after a service restart.

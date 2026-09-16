@@ -1,18 +1,24 @@
 ---
 title: "How to change blockchain configuration in Studio"
 sidebarTitle: "Change configuration"
-description: "Review and change on-chain configuration parameters on simulator networks and localnets"
+description: "Learn how to review and change on-chain configuration parameters on simulator networks and localnets"
 ---
 
 import {Tabs, Tab} from "fumadocs-ui/components/tabs";
 
 Change a configuration parameter to test fees, limits, or protocol settings. Studio provides the same editor for simulator and localnet. These changes affect the virtual blockchain, not `Acton.toml` or Docker settings.
 
+<Callout type="caution">
+  Configuration changes affect the selected simulator network or localnet. Invalid fees or limits can prevent contract execution. Restore the prerequisite snapshot to recover.
+
+  Public networks do not allow changing the config in the UI and only provide its inspection.
+</Callout>
+
 ## Prerequisites
 
-- [Create and start a virtual environment](/docs/environments/how-to/create-network).
-- Choose the configuration parameter number and the replacement value to test.
-- [Save a snapshot](/docs/environments/how-to/snapshots) so you can restore the original state.
+- A running [virtual environment](/docs/environments/how-to/create-network).
+- The configuration parameter number and replacement value to test.
+- A [snapshot](/docs/environments/how-to/snapshots) of the original state.
 
 ## Edit and apply a parameter
 
@@ -21,28 +27,28 @@ Change a configuration parameter to test fees, limits, or protocol settings. Stu
 
 1. Open the environment's <kbd>Network</kbd> → <kbd>Config</kbd> page.
 1. Find the parameter and select its edit control. Use <kbd>Add parameter</kbd> for a missing parameter.
-1. Edit the supported <kbd>Fields</kbd>, or select <kbd>Raw cell</kbd> to enter a parameter BoC in hex or base64. For a new parameter, enter its <kbd>Parameter number</kbd> first.
-1. Select <kbd>Review change</kbd> and inspect the before/after values. <kbd>Technical details</kbd> shows the resulting cell and hash.
+1. Edit the supported <kbd>Fields</kbd>, or select <kbd>Raw cell</kbd> to enter a parameter bag of cells (BoC) in hex or base64. For a new parameter, enter its <kbd>Parameter number</kbd> first.
+1. Select <kbd>Review change</kbd> and inspect the original and replacement values. <kbd>Technical details</kbd> shows the resulting cell and hash.
 1. Select <kbd>Apply to network</kbd> and wait for confirmation. Open the linked masterchain block.
 
-A simulator commits a configuration-only block even when automatic mining is disabled. Localnet submits the change through the network and waits for masterchain confirmation. The operation can continue after leaving the page.
+A simulator commits a configuration-only block even when automatic mining is disabled. A localnet submits the change through the network and waits for masterchain confirmation. The operation can continue after leaving the page.
 
 </Tab>
 <Tab value="Simulator CLI">
 
-Prepare the [shared request file](#cli-request-format), then submit it to the simulator control API:
+Prepare the [shared request file](/docs/environments/how-to/change-config#prepare-the-cli-request), then submit it to the simulator control API:
 
 ```bash
 curl --fail http://127.0.0.1:5411/acton_setConfigParam \
   -H 'content-type: application/json' --data-binary @parameter-update.json
 ```
 
-Use the [control API reference](/docs/environments/simulator/control-api) for the response format. Parameter `0` cannot be changed through this endpoint.
+The [control API reference](/docs/environments/simulator/control-api) defines the response format. Parameter `0` cannot be changed through this endpoint.
 
 </Tab>
 <Tab value="Localnet CLI">
 
-Prepare the [shared request file](#cli-request-format). Use the authenticated [control API connection](/docs/environments/how-to/connect#localnet-control-api), replacing `<CONTROL_URL>` and `<CONTROL_TOKEN>` with the selected service's values:
+Prepare the [shared request file](/docs/environments/how-to/change-config#prepare-the-cli-request). Use the authenticated [control API connection](/docs/environments/how-to/connect#localnet-control-api), replacing `<CONTROL_URL>` and `<CONTROL_TOKEN>` with the selected service's values:
 
 ```bash
 curl --fail '<CONTROL_URL>/v1/network/config' \
@@ -53,15 +59,15 @@ curl --fail '<CONTROL_URL>/v1/network/config' \
 The response accepts an operation; it does not prove the parameter is active yet. Replace `<OPERATION_ID>` with the returned `id` and wait:
 
 ```bash
-acton localnet operation <OPERATION_ID> --network dev --wait
+acton localnet operation '<OPERATION_ID>' --network dev --wait
 ```
 
 </Tab>
 </Tabs>
 
-## CLI request format
+## Prepare the CLI request
 
-Neither environment has a dedicated configuration subcommand. Both control APIs accept `parameter-update.json` with the parameter index, replacement base64 BoC, and current cell's lowercase hexadecimal representation hash. Replace `<PARAMETER_BOC>` and `<CURRENT_HASH>` for parameter `21`:
+Neither environment has a dedicated configuration subcommand. Both control APIs accept `parameter-update.json`. For parameter `21`, replace `<PARAMETER_BOC>` with the replacement base64 BoC and `<CURRENT_HASH>` with the current cell's lowercase hexadecimal representation hash:
 
 ```json title="parameter-update.json"
 {
@@ -76,7 +82,3 @@ Use `"expectedHash": null` only when adding a parameter that is absent.
 ## Verify the change
 
 Reopen <kbd>Network</kbd> → <kbd>Config</kbd> and inspect the committed value. Other parameters and historical configurations remain intact. If another edit changed the original cell, the expected-hash check rejects the stale update. Reload and review the current value before retrying.
-
-<Callout type="caution">
-  Invalid fee or limit settings can prevent normal contract execution. Restore the saved state to recover the test scenario. Public networks expose configuration inspection, not these local controls.
-</Callout>
