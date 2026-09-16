@@ -8,13 +8,13 @@
   "servers": [
     {
       "url": "http://127.0.0.1:5411",
-      "description": "Default localnet server"
+      "description": "Default simulator server"
     }
   ],
   "tags": [
     {
       "name": "Localnet Control",
-      "description": "Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.\n\nThese routes are intended for local development tooling and should not be exposed publicly. When localnet is started with --require-auth, these routes require the localnet API token. Rate limiting applies only to /api routes, and response delay applies only to TON Center-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled."
+      "description": "Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.\n\nThese routes are intended for local development tooling and should not be exposed publicly. When simulator is started with --require-auth, these routes require the simulator API token. Rate limiting applies only to /api routes, and response delay applies only to TON Center-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled."
     }
   ],
   "security": [
@@ -58,7 +58,7 @@
         "tags": ["Localnet Control"],
         "operationId": "fundJetton",
         "summary": "Mint jettons to an account",
-        "description": "Finds the jetton master in localnet state, verifies that it is mintable and has an admin, converts the display amount using the decimals from jetton metadata, preflights the legacy 0x15 and current 0x642b7d07 mint layouts, and queues the uniquely accepted message for the next block.",
+        "description": "Finds the jetton master in simulator state, verifies that it is mintable and has an admin, converts the display amount using the decimals from jetton metadata, preflights the legacy 0x15 and current 0x642b7d07 mint layouts, and queues the uniquely accepted message for the next block.",
         "requestBody": {
           "required": true,
           "content": {
@@ -149,7 +149,7 @@
         "tags": ["Localnet Control"],
         "operationId": "listCompilerAbis",
         "summary": "List registered compiler ABI metadata",
-        "description": "Returns compiler ABI metadata registered directly in the localnet node.",
+        "description": "Returns compiler ABI metadata registered directly in the simulator node.",
         "responses": {
           "200": {
             "$ref": "#/components/responses/RegisteredCompilerAbisResponse"
@@ -219,7 +219,7 @@
         "tags": ["Localnet Control"],
         "operationId": "getRegisteredVerifiedSource",
         "summary": "Get registered contract source",
-        "description": "Returns the source bundle registered directly in the localnet node for an address or code hash.",
+        "description": "Returns the source bundle registered directly in the simulator node for an address or code hash.",
         "parameters": [
           {
             "name": "address",
@@ -250,7 +250,7 @@
         "tags": ["Localnet Control"],
         "operationId": "listVerifiedSources",
         "summary": "List registered contract sources",
-        "description": "Returns source bundles registered directly in the localnet node, one per code hash.",
+        "description": "Returns source bundles registered directly in the simulator node, one per code hash.",
         "responses": {
           "200": {
             "$ref": "#/components/responses/RegisteredVerifiedSourcesResponse"
@@ -654,7 +654,7 @@
         "tags": ["Localnet Control"],
         "operationId": "getStartupAccounts",
         "summary": "List startup accounts",
-        "description": "Returns public account descriptors selected when the localnet server started.",
+        "description": "Returns public account descriptors selected when the simulator server started.",
         "responses": {
           "200": {
             "$ref": "#/components/responses/StartupAccountsResponse"
@@ -666,8 +666,8 @@
       "post": {
         "tags": ["Localnet Control"],
         "operationId": "mineBlocks",
-        "summary": "Mine localnet blocks",
-        "description": "Manually mines queued and/or empty localnet blocks. When the request body is omitted or blocks is not provided, one block is mined.",
+        "summary": "Mine simulator blocks",
+        "description": "Manually mines queued and/or empty simulator blocks. When the request body is omitted or blocks is not provided, one block is mined.",
         "requestBody": {
           "required": false,
           "content": {
@@ -693,7 +693,7 @@
         "tags": ["Localnet Control"],
         "operationId": "increaseTime",
         "summary": "Increase virtual time",
-        "description": "Adds seconds to the localnet virtual clock. Future blocks use this adjusted time until it is changed again.",
+        "description": "Adds seconds to the simulator virtual clock. Future blocks use this adjusted time until it is changed again.",
         "requestBody": {
           "required": true,
           "content": {
@@ -719,7 +719,7 @@
         "tags": ["Localnet Control"],
         "operationId": "setTime",
         "summary": "Set virtual time",
-        "description": "Sets the localnet virtual clock to a Unix timestamp. The timestamp must not be lower than the latest mined block time.",
+        "description": "Sets the simulator virtual clock to a Unix timestamp. The timestamp must not be lower than the latest mined block time.",
         "requestBody": {
           "required": true,
           "content": {
@@ -771,7 +771,7 @@
         "tags": ["Localnet Control"],
         "operationId": "setNetworkConditions",
         "summary": "Set simulated network conditions",
-        "description": "Updates simulated network conditions while the localnet server is running and returns the updated values. Set response_delay_ms to 0 to disable response delay. Current values are also available from /acton_nodeInfo.",
+        "description": "Updates simulated network conditions while the simulator server is running and returns the updated values. Set response_delay_ms to 0 to disable response delay. Current values are also available from /acton_nodeInfo.",
         "requestBody": {
           "required": true,
           "content": {
@@ -808,13 +808,13 @@
       "BearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Localnet API token printed by `acton simulator start --require-auth`."
+        "description": "Simulator API token printed by `acton simulator start --require-auth`."
       },
       "APIKeyHeader": {
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key",
-        "description": "Alternative localnet API token header for TON Center-compatible clients."
+        "description": "Alternative simulator API token header for TON Center-compatible clients."
       }
     },
     "parameters": {
@@ -1929,7 +1929,7 @@
           "seconds": {
             "type": "integer",
             "minimum": 1,
-            "description": "Seconds to add to the virtual localnet clock."
+            "description": "Seconds to add to the virtual simulator clock."
           }
         }
       },
@@ -1940,7 +1940,7 @@
           "timestamp": {
             "type": "integer",
             "minimum": 0,
-            "description": "Unix timestamp to use for the current virtual localnet time."
+            "description": "Unix timestamp to use for the current virtual simulator time."
           }
         }
       },
@@ -1961,7 +1961,7 @@
         "properties": {
           "current_unix_time": {
             "type": "integer",
-            "description": "Current virtual Unix timestamp used by localnet."
+            "description": "Current virtual Unix timestamp used by simulator."
           },
           "time_offset_seconds": {
             "type": "integer",
@@ -2066,7 +2066,7 @@
           },
           "current_unix_time": {
             "type": "integer",
-            "description": "Current virtual Unix timestamp used by localnet."
+            "description": "Current virtual Unix timestamp used by simulator."
           },
           "time_offset_seconds": {
             "type": "integer",

@@ -6,9 +6,9 @@ description: >-
 
 
   These routes are intended for local development tooling and should not be
-  exposed publicly. When localnet is started with --require-auth, these routes
-  require the localnet API token. Rate limiting applies only to /api routes, and
-  response delay applies only to TON Center-compatible API routes; control
+  exposed publicly. When simulator is started with --require-auth, these routes
+  require the simulator API token. Rate limiting applies only to /api routes,
+  and response delay applies only to TON Center-compatible API routes; control
   routes remain available when --rate-limit or --response-delay-ms is enabled.
 full: true
 sidebarTitle: Control API
@@ -90,8 +90,8 @@ _openapi:
       title: List startup accounts
       url: '#list-startup-accounts'
     - depth: 2
-      title: Mine localnet blocks
-      url: '#mine-localnet-blocks'
+      title: Mine simulator blocks
+      url: '#mine-simulator-blocks'
     - depth: 2
       title: Increase virtual time
       url: '#increase-virtual-time'
@@ -159,8 +159,8 @@ _openapi:
         id: send-a-raw-internal-message
       - content: List startup accounts
         id: list-startup-accounts
-      - content: Mine localnet blocks
-        id: mine-localnet-blocks
+      - content: Mine simulator blocks
+        id: mine-simulator-blocks
       - content: Increase virtual time
         id: increase-virtual-time
       - content: Set virtual time
@@ -177,7 +177,7 @@ _openapi:
           included on the next automatic or manually mined block.
         heading: fund-an-account
       - content: >-
-          Finds the jetton master in localnet state, verifies that it is
+          Finds the jetton master in simulator state, verifies that it is
           mintable and has an admin, converts the display amount using the
           decimals from jetton metadata, preflights the legacy 0x15 and current
           0x642b7d07 mint layouts, and queues the uniquely accepted message for
@@ -194,7 +194,7 @@ _openapi:
           Missing ABI entries are returned as null.
         heading: get-compiler-abi-metadata
       - content: >-
-          Returns compiler ABI metadata registered directly in the localnet
+          Returns compiler ABI metadata registered directly in the simulator
           node.
         heading: list-registered-compiler-abi-metadata
       - content: >-
@@ -206,11 +206,11 @@ _openapi:
           the verified source bundle when the contract is confirmed.
         heading: get-verified-contract-source
       - content: >-
-          Returns the source bundle registered directly in the localnet node for
-          an address or code hash.
+          Returns the source bundle registered directly in the simulator node
+          for an address or code hash.
         heading: get-registered-contract-source
       - content: >-
-          Returns source bundles registered directly in the localnet node, one
+          Returns source bundles registered directly in the simulator node, one
           per code hash.
         heading: list-registered-contract-sources
       - content: Deletes a locally registered source bundle by code hash.
@@ -267,19 +267,19 @@ _openapi:
           messages only.
         heading: send-a-raw-internal-message
       - content: >-
-          Returns public account descriptors selected when the localnet server
+          Returns public account descriptors selected when the simulator server
           started.
         heading: list-startup-accounts
       - content: >-
-          Manually mines queued and/or empty localnet blocks. When the request
+          Manually mines queued and/or empty simulator blocks. When the request
           body is omitted or blocks is not provided, one block is mined.
-        heading: mine-localnet-blocks
+        heading: mine-simulator-blocks
       - content: >-
-          Adds seconds to the localnet virtual clock. Future blocks use this
+          Adds seconds to the simulator virtual clock. Future blocks use this
           adjusted time until it is changed again.
         heading: increase-virtual-time
       - content: >-
-          Sets the localnet virtual clock to a Unix timestamp. The timestamp
+          Sets the simulator virtual clock to a Unix timestamp. The timestamp
           must not be lower than the latest mined block time.
         heading: set-virtual-time
       - content: >-
@@ -288,7 +288,7 @@ _openapi:
           be lower than the latest mined block time.
         heading: set-next-block-timestamp
       - content: >-
-          Updates simulated network conditions while the localnet server is
+          Updates simulated network conditions while the simulator server is
           running and returns the updated values. Set response_delay_ms to 0 to
           disable response delay. Current values are also available from
           /acton_nodeInfo.
@@ -303,6 +303,6 @@ _openapi:
 
 Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.
 
-These routes are intended for local development tooling and should not be exposed publicly. When localnet is started with --require-auth, these routes require the localnet API token. Rate limiting applies only to /api routes, and response delay applies only to TON Center-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled.
+These routes are intended for local development tooling and should not be exposed publicly. When simulator is started with --require-auth, these routes require the simulator API token. Rate limiting applies only to /api routes, and response delay applies only to TON Center-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled.
 
 <APIPage document={"./public/openapi/acton-simulator-control.openapi.json"} webhooks={[]} operations={[{"path":"/acton_fundAccount","method":"post"},{"path":"/acton_fundJetton","method":"post"},{"path":"/acton_getAddressName","method":"get"},{"path":"/acton_setAddressName","method":"post"},{"path":"/acton_getCompilerAbi","method":"get"},{"path":"/acton_listCompilerAbis","method":"get"},{"path":"/acton_deleteCompilerAbi","method":"post"},{"path":"/acton_getVerifiedSource","method":"get"},{"path":"/acton_getRegisteredVerifiedSource","method":"get"},{"path":"/acton_listVerifiedSources","method":"get"},{"path":"/acton_deleteVerifiedSource","method":"post"},{"path":"/acton_registerCompilerAbis","method":"post"},{"path":"/acton_registerVerifiedSources","method":"post"},{"path":"/acton_createSnapshot","method":"post"},{"path":"/acton_listSnapshots","method":"get"},{"path":"/acton_restoreSnapshot","method":"post"},{"path":"/acton_deleteSnapshot","method":"post"},{"path":"/acton_exportSnapshot","method":"get"},{"path":"/acton_importSnapshot","method":"post"},{"path":"/acton_setConfig","method":"post"},{"path":"/acton_setConfigParam","method":"post"},{"path":"/acton_setShardAccount","method":"post"},{"path":"/acton_changeAccountState","method":"post"},{"path":"/acton_sendInternalMessage","method":"post"},{"path":"/acton_getStartupAccounts","method":"get"},{"path":"/acton_mine","method":"post"},{"path":"/acton_increaseTime","method":"post"},{"path":"/acton_setTime","method":"post"},{"path":"/acton_setNextBlockTimestamp","method":"post"},{"path":"/acton_setNetworkConditions","method":"post"},{"path":"/acton_nodeInfo","method":"get"}]} showTitle />
