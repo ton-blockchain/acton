@@ -43,6 +43,81 @@ async fn request(
 }
 
 #[tokio::test]
+async fn overlay_api_reads_defaults_and_rejects_invalid_updates_before_docker() {
+    let root = tempfile::tempdir().expect("state directory");
+    let location = catalog::create(
+        root.path(),
+        CreateNetwork {
+            name: "overlay-api".to_owned(),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("network");
+    let runtime = Runtime::open(&location.path).await.expect("runtime");
+    let app = http::router(
+        runtime.clone(),
+        "secret".to_owned(),
+        Arc::new(Notify::new()),
+    );
+    let path = "/v1/network/overlays";
+    assert_eq!(
+        request(&app, Method::GET, path, Value::Null, None).await.0,
+        401
+    );
+    assert_eq!(
+        request(&app, Method::PUT, path, json!({"overlays": []}), None)
+            .await
+            .0,
+        401
+    );
+    assert_eq!(
+        request(&app, Method::GET, path, Value::Null, Some("secret")).await,
+        (200, json!({"overlays": []}))
+    );
+    let invalid = request(
+        &app,
+        Method::PUT,
+        path,
+        json!({"overlays": [{"name": "relay", "nodes": ["genesis", "missing"]}]}),
+        Some("secret"),
+    )
+    .await;
+    assert_eq!(invalid.0, 400);
+    assert_eq!(invalid.1["code"], "invalid_request");
+    assert!(
+        invalid.1["message"]
+            .as_str()
+            .unwrap()
+            .contains("Unknown node")
+    );
+
+    let malformed = request(
+        &app,
+        Method::PUT,
+        path,
+        json!({"overlay": []}),
+        Some("secret"),
+    )
+    .await;
+    assert_eq!(malformed.0, 422);
+    let stopped = request(
+        &app,
+        Method::PUT,
+        path,
+        json!({"overlays": []}),
+        Some("secret"),
+    )
+    .await;
+    assert_eq!(stopped.0, 409);
+    assert_eq!(stopped.1["code"], "network_not_running");
+    assert!(runtime.get().await.overlay_config.is_empty());
+    assert!(runtime.get().await.operation.is_none());
+    assert!(!location.path.join("runtime.json").exists());
+    runtime.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test]
 async fn authenticated_api_is_scoped_to_one_network() {
     let root = tempfile::tempdir().expect("state directory");
     let first = catalog::create(

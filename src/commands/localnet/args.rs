@@ -87,6 +87,17 @@ pub enum LocalnetCommand {
         command: NodeCommand,
     },
 
+    #[command(about = "Show or replace private overlay membership")]
+    Overlays {
+        network: Option<String>,
+
+        #[arg(
+            long,
+            help = "JSON file replacing the complete private overlay configuration"
+        )]
+        config: Option<PathBuf>,
+    },
+
     #[command(about = "Manage cold network snapshots")]
     Snapshot {
         network: Option<String>,

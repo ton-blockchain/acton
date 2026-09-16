@@ -7,6 +7,7 @@ mod lifecycle;
 mod network_config;
 mod nodes;
 mod operations;
+mod overlays;
 mod progress;
 mod readiness;
 
@@ -80,8 +81,9 @@ impl Runtime {
             let driver = DockerNetwork::load(&root, &record).await?.ok_or_else(|| {
                 Error::invalid("Snapshot recovery requires its deployment descriptor")
             })?;
-            if let Some(nodes) = driver.recover_snapshot().await? {
+            if let Some((nodes, overlay_config)) = driver.recover_snapshot().await? {
                 record.nodes = nodes;
+                record.overlay_config = overlay_config;
                 record.status = Status::Stopped;
                 storage::write_json(&path, &record).await?;
                 driver.finish_snapshot_restore(&record.nodes).await?;
@@ -106,6 +108,16 @@ impl Runtime {
             .is_some_and(|op| op.status == OperationStatus::Running)
         {
             record.snapshot_operation = record.operation.clone();
+        }
+        if record.operation.as_ref().is_some_and(|operation| {
+            operation.kind == "configureOverlays"
+                && operation.error_code.as_deref() == Some("operation_interrupted")
+        }) {
+            let recovery = root.join("overlays-recovery");
+            tokio::fs::write(&recovery, b"")
+                .await
+                .map_err(|error| Error::storage(&recovery, error))?;
+            record.error = Some("Overlay configuration was interrupted; start the network to reconcile the saved configuration".to_owned());
         }
         if record.status != Status::Deleted {
             record.status = Status::Unknown;

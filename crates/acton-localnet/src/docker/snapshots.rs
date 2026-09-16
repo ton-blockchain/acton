@@ -4,7 +4,7 @@ use super::{
     COMPOSE_DELETE_TIMEOUT, DockerNetwork, LOCALTON_SNAPSHOT_DIR, LOCALTON_STATE_DIR,
     SNAPSHOT_TIMEOUT,
 };
-use crate::{Error, Node, Snapshot, storage};
+use crate::{Error, Node, OverlayConfig, Snapshot, storage};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -20,6 +20,8 @@ const RECOVERY_FILE: &str = "snapshot-recovery.json";
 struct Bundle {
     snapshot: Snapshot,
     nodes: Vec<Node>,
+    #[serde(default)]
+    overlay_config: OverlayConfig,
     archives: BTreeMap<String, Snapshot>,
 }
 
@@ -35,6 +37,7 @@ impl Bundle {
     /// Reject an incomplete or damaged manifest before replacing any node state.
     fn validate(&self) -> Result<(), Error> {
         storage::validate_id(&self.snapshot.id)?;
+        self.overlay_config.validate(&self.nodes)?;
         if self.snapshot.format_version != 3
             || self.archives.len() != self.nodes.len() + 1
             || !self.archives.contains_key("localton")
@@ -113,8 +116,9 @@ impl DockerNetwork {
         &self,
         name: Option<&str>,
         nodes: &[Node],
+        overlay_config: &OverlayConfig,
     ) -> Result<Snapshot, Error> {
-        let bundle = self.capture_snapshot(name, nodes).await?;
+        let bundle = self.capture_snapshot(name, nodes, overlay_config).await?;
         let path = self.snapshot_path(&bundle.snapshot.id);
         let directory = self.compose_file.with_file_name("snapshots");
         tokio::fs::create_dir_all(&directory)
@@ -127,7 +131,12 @@ impl DockerNetwork {
         Ok(bundle.snapshot)
     }
 
-    async fn capture_snapshot(&self, name: Option<&str>, nodes: &[Node]) -> Result<Bundle, Error> {
+    async fn capture_snapshot(
+        &self,
+        name: Option<&str>,
+        nodes: &[Node],
+        overlay_config: &OverlayConfig,
+    ) -> Result<Bundle, Error> {
         let id = format!("snapshot-{}", uuid::Uuid::new_v4());
         let directory = format!("{LOCALTON_SNAPSHOT_DIR}/networks/{id}/localton");
         let primary: Snapshot = self
@@ -140,6 +149,7 @@ impl DockerNetwork {
         let mut bundle = Bundle {
             snapshot,
             nodes: nodes.to_vec(),
+            overlay_config: overlay_config.clone(),
             archives: BTreeMap::from([("localton".into(), primary)]),
         };
 
@@ -169,11 +179,12 @@ impl DockerNetwork {
         &self,
         id: &str,
         nodes: &[Node],
-    ) -> Result<(Snapshot, Vec<Node>), Error> {
+        overlay_config: &OverlayConfig,
+    ) -> Result<(Snapshot, Vec<Node>, OverlayConfig), Error> {
         storage::validate_id(id)?;
         let bundle: Bundle = storage::read_json(&self.snapshot_path(id)).await?;
         bundle.validate()?;
-        let backup = self.capture_snapshot(None, nodes).await?;
+        let backup = self.capture_snapshot(None, nodes, overlay_config).await?;
         storage::write_json(
             &self.compose_file.with_file_name(RECOVERY_FILE),
             &Recovery {
@@ -183,7 +194,7 @@ impl DockerNetwork {
         )
         .await?;
         self.restore_bundle(&bundle).await?;
-        Ok((bundle.snapshot, bundle.nodes))
+        Ok((bundle.snapshot, bundle.nodes, bundle.overlay_config))
     }
 
     async fn restore_bundle(&self, bundle: &Bundle) -> Result<(), Error> {
@@ -203,7 +214,9 @@ impl DockerNetwork {
 
     /// Leaves services stopped; only the runtime may restart after persisting the
     /// recovered topology. A failed recovery retains the journal for the next try.
-    pub(crate) async fn recover_snapshot(&self) -> Result<Option<Vec<Node>>, Error> {
+    pub(crate) async fn recover_snapshot(
+        &self,
+    ) -> Result<Option<(Vec<Node>, OverlayConfig)>, Error> {
         if !self.has_snapshot_recovery() {
             return Ok(None);
         }
@@ -215,7 +228,7 @@ impl DockerNetwork {
         self.remove_obsolete_nodes(&journal.target_nodes, &journal.backup.nodes)
             .await?;
         self.write_compose(&journal.backup.nodes).await?;
-        Ok(Some(journal.backup.nodes))
+        Ok(Some((journal.backup.nodes, journal.backup.overlay_config)))
     }
 
     pub(crate) async fn finish_snapshot_restore(&self, nodes: &[Node]) -> Result<(), Error> {

@@ -1,0 +1,88 @@
+---
+title: Private overlays in Localnet
+description: Configure private TON overlays between selected nodes in a Localnet.
+---
+
+Localnet can connect selected nodes through private TON overlays. Each overlay
+member sends blocks and external messages to the other members. A node can belong
+to several overlays, and an overlay can connect additional nodes without including
+the genesis node.
+
+These overlays add communication paths alongside the public overlays. Membership
+does not isolate nodes, and receiving an external message in one private overlay
+does not automatically relay it to another private overlay with overlapping members.
+
+## Create nodes and apply a configuration
+
+Start a Localnet and add nodes:
+
+```sh
+acton localnet start overlay-demo --detach
+acton localnet node overlay-demo add relay-a
+acton localnet node overlay-demo add relay-b
+acton localnet status overlay-demo --json
+```
+
+Use the stable `id` values from the status response's `nodes` array. For a newly
+created network, the first two additional nodes normally have IDs `node-1` and
+`node-2`. The original node is always selected with `genesis`. Node display names
+such as `relay-a` are not selectors.
+
+Save this as `overlays.json`, replacing the node IDs if necessary:
+
+```json
+{
+  "overlays": [
+    {
+      "name": "relay",
+      "nodes": ["genesis", "node-1", "node-2"]
+    },
+    {
+      "name": "peers",
+      "nodes": ["node-1", "node-2"]
+    }
+  ]
+}
+```
+
+Apply the configuration:
+
+```sh
+acton localnet overlays overlay-demo --config overlays.json
+```
+
+The command waits until the configuration is applied to the nodes; completion
+does not confirm that every overlay peer is connected. The network and all its nodes
+must be running when replacing overlay configuration. Acton saves the configuration
+and reapplies it when the network starts again.
+
+Every update replaces the complete list. To remove an overlay, omit it from the
+next configuration. To remove all private overlays, apply `{"overlays": []}`.
+Remove a node from the overlay configuration before deleting that node.
+Cold snapshots include overlay configuration and restore it with the saved nodes.
+
+## Inspect configuration
+
+Run the same command without `--config` to print the saved configuration as JSON:
+
+```sh
+acton localnet overlays overlay-demo
+```
+
+Overlay names must be unique and contain 1 to 80 ASCII letters, digits, hyphens,
+or underscores. Each overlay must contain at least two distinct existing node
+IDs. Duplicate members and unknown node IDs are rejected.
+
+## Control API
+
+Clients connected to the localnet control service use the same JSON contract:
+
+| Request | Result |
+| --- | --- |
+| `GET /v1/network/overlays` | The saved `{"overlays": [...]}` configuration |
+| `PUT /v1/network/overlays` | Replaces the configuration; returns HTTP 202 and an operation |
+| `GET /v1/operations/{id}` | Reports the accepted operation's progress and completion |
+
+The Rust client exposes `Client::overlays()` and
+`Client::configure_overlays(&OverlayConfig)`. Use `Client::wait(operation)` to
+wait for the returned operation to complete.

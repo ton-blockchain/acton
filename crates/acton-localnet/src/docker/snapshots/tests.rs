@@ -7,6 +7,45 @@ use anyhow::{Context as _, Result, ensure};
 use serde_json::{Value, json};
 use std::time::Duration;
 
+#[test]
+fn snapshot_overlay_topology_is_backward_compatible_and_validated() -> Result<()> {
+    let snapshot = json!({
+        "formatVersion": 3, "id": "snapshot-1", "name": null, "createdAt": 10,
+        "archiveSizeBytes": 200, "stateSizeBytes": 400, "stateSchemaVersion": 4,
+        "tonRelease": "test", "masterchainSeqno": 42,
+    });
+    let mut value = json!({
+        "snapshot": snapshot,
+        "nodes": [{"id": "node-1", "name": "replica", "validator": false,
+                   "portBase": 20010, "stopped": false}],
+        "archives": {"localton": snapshot, "node-1": snapshot},
+    });
+    let legacy: Bundle = serde_json::from_value(value.clone())?;
+    legacy.validate()?;
+    assert!(legacy.overlay_config.is_empty());
+
+    value["overlay_config"] = json!({"overlays": [{
+        "name": "relay", "nodes": ["genesis", "node-1"],
+    }]});
+    let configured: Bundle = serde_json::from_value(value.clone())?;
+    configured.validate()?;
+    assert_eq!(
+        serde_json::to_value(configured)?["overlay_config"],
+        value["overlay_config"]
+    );
+
+    value["overlay_config"]["overlays"][0]["nodes"][1] = "node-2".into();
+    let invalid: Bundle = serde_json::from_value(value)?;
+    assert!(
+        invalid
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown node")
+    );
+    Ok(())
+}
+
 async fn indexed_accounts(driver: &DockerNetwork) -> Result<String> {
     let mut command = driver.compose_command();
     command.args([
@@ -279,7 +318,9 @@ async fn interrupted_snapshot_restore_recovers_on_owner_restart() -> Result<()> 
         let accounts = indexed_accounts(&driver).await?;
 
         runtime.shutdown().await?;
-        driver.restore_snapshot(id, &[]).await?;
+        driver
+            .restore_snapshot(id, &[], &Default::default())
+            .await?;
         ensure!(
             driver.has_snapshot_recovery(),
             "Uncommitted restore has no journal"

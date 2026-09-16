@@ -85,6 +85,18 @@ impl Context {
             .iter()
             .find(|n| n.id == id)
             .ok_or_else(|| Error::invalid("Node is not managed by this network"))?;
+        let config = self.entry.record.read().await.overlay_config.clone();
+        if config
+            .overlays
+            .iter()
+            .any(|overlay| overlay.nodes.iter().any(|member| member == id))
+        {
+            return Err(Error::Conflict {
+                code: "node_in_overlay_config",
+                message: "Remove the node from the overlay configuration before deleting it"
+                    .to_owned(),
+            });
+        }
         if node.validator && !force {
             self.ensure_validator_can_be_removed(node).await?;
         }
@@ -139,6 +151,9 @@ impl Context {
 
         let result = match driver.node_running(&nodes, id, running).await {
             Ok(()) => {
+                if running {
+                    self.reconcile_overlays(driver).await?;
+                }
                 self.entry.record.write().await.error = None;
                 Ok(())
             }

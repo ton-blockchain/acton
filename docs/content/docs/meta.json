@@ -21,6 +21,7 @@
     "verify.mdx",
     "libraries.mdx",
     "simulator",
+    "!full-localnet-overlays",
     "dapps.mdx",
     "ci-setup.mdx",
     "--- Reference ---",
