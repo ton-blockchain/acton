@@ -3,7 +3,7 @@
 /// This module enables interactive scripts by providing functions to query information from the user via the command line.
 /// It is useful for deployment scripts or configuration wizards running in an interactive terminal.
 ///
-/// Ctrl+C terminates Acton with exit code `130`. Escape or a terminal I/O error
+/// Since Acton 1.2, Ctrl+C terminates Acton with exit code `130`. Escape or a terminal I/O error
 /// terminates Acton with exit code `1`. The script does not continue after an
 /// interactive prompt is cancelled or fails, even inside a `try` block.
 ///
@@ -96,6 +96,7 @@ fun confirm(message: string, default: bool, helpMessage: string): bool {
 ///
 /// Accepts the same decimal, hexadecimal (`0x`), and binary (`0b`) input as [parseInt].
 /// These formats also apply to `default`.
+/// Hexadecimal and binary inputs are available since Acton 1.2.
 ///
 /// Interactive behavior:
 /// - Invalid input is rejected by the host prompt validator until the user

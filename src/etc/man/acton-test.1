@@ -758,8 +758,8 @@ successfully.
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB1\fR: At least one test failed, profiling drift was detected with
-\fB\-\-fail\-on\-diff\fR, line coverage was below the configured minimum in non\-UI
-coverage mode, mutation score was below the configured minimum in mutation
+\fB\-\-fail\-on\-diff\fR, the blended coverage score was below the configured minimum
+in non\-UI coverage mode, mutation score was below the configured minimum in mutation
 mode, no tests matched after filtering, or infrastructure such as
 compilation, trace export, UI startup, or remote\-state resolution failed.
 .RE
@@ -817,7 +817,7 @@ acton test \-\-coverage \-\-coverage\-format lcov \-\-reporter junit \(rs
 .RE
 .sp
 .RS 4
-\h'-04' 6.\h'+01'Fail the run when line coverage drops below 85%:
+\h'-04' 6.\h'+01'Fail the run when the blended coverage score drops below 85%:
 .sp
 .RS 4
 .nf

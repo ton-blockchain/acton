@@ -134,9 +134,9 @@ contract and its transitive dependencies.
 
 ## Side Effects
 
-`acton build` writes artifacts, cache entries, and optional graph output under
-the resolved project root. If one contract fails after earlier contracts were
-built successfully, the successful artifacts remain on disk.
+`acton build` writes artifacts and optional graph output to the configured paths,
+and cache entries under the resolved project root. If one contract fails after
+earlier contracts were built successfully, the successful artifacts remain on disk.
 
 Before compiling, `acton build` normally refreshes the bundled standard library
 under `.acton/`. Set `ACTON_DISABLE_AUTO_STDLIB=1` to skip that automatic

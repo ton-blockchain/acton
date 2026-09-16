@@ -118,12 +118,16 @@ struct Counter {
     toShard: AddressShardingOptions? = null
 }
 
-fun Counter.fromStorage(storage: Storage, toShard: AddressShardingOptions? = null): Counter {
+fun Counter.fromStorage(
+    storage: Storage,
+    toShard: AddressShardingOptions? = null,
+    workchain: int8 = BASECHAIN,
+): Counter {
     val stateInit = ContractState {
         code: build("Counter"),
         data: storage.toCell(),
     };
-    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
     return Counter { address, stateInit, toShard };
 }
 
@@ -167,6 +171,10 @@ fun Counter.currentCounter(self): int {
 
 Notice that the wrapper uses the same patterns as in tests, making it easy to reuse testing code in scripts.
 
+<AvailabilityBadge since="Acton 1.2" />
+
+The optional `workchain` argument to `fromStorage()` defaults to `BASECHAIN`. Deployment preserves the selected workchain.
+
 Deploy to testnet:
 
 ```bash
@@ -186,6 +194,7 @@ In broadcast mode, post-deploy getter calls such as `counter.currentCounter()` a
 The `scripts.wallet()` function returns a wallet struct with an `address` field:
 
 ```tolk
+import "@acton/io"
 import "@acton/emulation/scripts"
 
 fun main() {
@@ -206,6 +215,8 @@ This dual behavior allows testing scripts locally before running them on the rea
 Use `net.send()` to send messages from a wallet address:
 
 ```tolk
+import "@acton/io"
+import "@acton/emulation/network"
 import "@acton/emulation/scripts"
 
 fun main() {
@@ -234,7 +245,10 @@ fun main() {
 The `SendResultList.waitForFirstTransaction()` polls until the first transaction from the result list is confirmed, while `SendResultList.waitForTrace()` waits for the complete descendant trace:
 
 ```tolk
+import "@acton/io"
+import "@acton/emulation/network"
 import "@acton/emulation/scripts"
+import "@wrappers/Counter.gen"
 
 fun main() {
     val deployer = scripts.wallet("deployer");
@@ -284,6 +298,8 @@ Both wait helpers automatically adapt to the execution mode:
 | `--net <network>` | Polls the network until the transaction or trace is found            |
 
 <Callout type="warn">
+  <AvailabilityBadge since="Acton 1.2" />
+
   Do not use `ExternalSendResult.isAccepted()` after broadcasting an external-in message. The send API confirms submission, but it does not report whether the destination contract accepted the message. `isAccepted()` exits with an error in this case. Use `waitForFirstTransaction()` or `waitForTrace()` to look for the transaction on-chain.
 </Callout>
 
@@ -302,12 +318,17 @@ if (net.isBroadcasting()) {
 Scripts can read contract state using `net.runGetMethod()`:
 
 ```tolk
+import "@acton/io"
+import "@acton/emulation/network"
+
 fun main() {
     val counterAddress = address("EQDt7LL...");
     val currentValue = net.runGetMethod<int>(counterAddress, "currentCounter");
     println("Counter value: {}", currentValue);
 }
 ```
+
+<AvailabilityBadge since="Acton 1.2" />
 
 Use `net.runGetMethodExt()` to inspect gas usage and the VM exit code. Call `unwrap()` to check success and decode the result:
 
@@ -353,7 +374,12 @@ When `--fork-net` is enabled, Acton automatically fetches account state from the
 - Test interactions with deployed contracts
 - Verify contract behavior against live data
 
-Acton resolves one masterchain block for the script run. Account state and the network configuration come from that block. Use `--fork-block-number` to select an exact block and use its Unix time. If you omit it, Acton resolves the latest block once, pins it for the script run, and uses the current system Unix time.
+<AvailabilityBadge since="Acton 1.2" />
+
+Acton resolves one masterchain block for the script run. Account state and the
+network configuration come from that block. Use `--fork-block-number` to select
+an exact block and use its Unix time. If you omit it, Acton resolves the latest
+block once, pins it for the script run, and uses the current system Unix time.
 
 If the script also passes `--fork-block-number`, fetched account states are persisted under `build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`. Later script runs with the same fork network, block number, and address reuse that file before calling the remote API. Fork runs without an explicit block also persist accounts under the resolved sequence number.
 

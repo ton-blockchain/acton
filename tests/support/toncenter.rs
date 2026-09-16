@@ -372,6 +372,11 @@ where
                 }
             };
 
+            // macOS inherits the listener's non-blocking mode on accepted
+            // sockets. HTTP headers and request bodies can arrive separately.
+            stream
+                .set_nonblocking(false)
+                .expect("failed to set toncenter mock stream blocking");
             stream
                 .set_read_timeout(Some(Duration::from_secs(2)))
                 .expect("failed to set toncenter v2 mock read timeout");

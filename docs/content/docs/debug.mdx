@@ -382,6 +382,12 @@ Use them for:
 - quick script progress output
 - printing transaction trees or matcher results
 
+<AvailabilityBadge since="Acton 1.2" />
+
+Pass `acton test --no-capture` to stream `println(...)` and `eprintln(...)`
+while retaining their output for reporters and Test UI. This flag does not
+stream VM debug logs and cannot be combined with `--mutate`.
+
 ### Use `debug.print*` inside contract code
 
 For contract code or other VM-executed Tolk code, use the built-in debug helpers:

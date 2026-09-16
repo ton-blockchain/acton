@@ -144,6 +144,8 @@ fun format<T1 = void, T2 = void, T3 = void, T4 = void, T5 = void>(
 /// Invalid digits, an empty string, or a whitespace-only string
 /// cause an error.
 ///
+/// Hexadecimal and binary inputs are available since Acton 1.2.
+///
 /// Example:
 /// ```tolk
 /// val n = parseInt("12345");

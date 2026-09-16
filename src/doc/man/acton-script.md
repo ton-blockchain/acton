@@ -76,6 +76,9 @@ Clear the compilation cache before running.
 
 {{#option "`--fork-net` _network_" }}
 Fork blockchain state from a remote network for local execution.
+
+Available since Acton 1.2.
+
 Acton also uses the network configuration from the resolved masterchain block.
 With an explicit historical block, it uses that block's Unix time; otherwise,
 it uses the current system Unix time.
@@ -85,6 +88,8 @@ network.
 
 {{#option "`--fork-block-number` _seqno_" }}
 Historical block sequence number to fork from.
+
+Available since Acton 1.2.
 
 When a fork block number is set, Acton caches resolved remote accounts under
 `build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`. Later script
@@ -118,6 +123,8 @@ mode. Conflicting `--net` and `--fork-net` values are rejected.
 {{#option "`--tonconnect`" }}
 Use TON Connect wallet approval for broadcast messages.
 
+Available since Acton 1.2.
+
 Acton prints a native TON Connect QR code and a `tc://` link. It sends
 `net.send(...)` messages through that wallet instead of loading local wallet
 mnemonics.
@@ -130,6 +137,8 @@ reused by later runs in the same project. Currently supported only with
 Explorer to use for transaction links.
 
 Possible values: `actonscan`, `tonscan`, `toncx`, `dton`, `tonviewer`
+
+Available since Acton 1.2.
 
 Actonscan is the default. For `custom:<name>` networks without an explicit
 `networks.<name>.explorer`, Acton embeds the configured `api.v2` and `api.v3`
@@ -196,8 +205,11 @@ Forwarded arguments are parsed against the ABI for `main()`.
 - `bool` accepts `true` and `false`
 - nullable supported types accept `null`
 - `cell`, `slice`, and `bitsN` accept plain BoC hex without `C{}` or `CS{}` prefixes
-- `any_address` accepts an internal address or the `addr_none` literal
 - arrays accept `[item1, item2]`
+
+Available since Acton 1.2.
+
+`any_address` accepts an internal address or the `addr_none` literal.
 
 Unsupported parameter types currently include `structs`, `tuple`, `map`,
 `dict`, `builder` and other complex types.
@@ -211,11 +223,19 @@ stays local even when `--fork-net` is used.
 Executor debug logs are hidden by default. Re-run with `--verbose` when you need
 level-1 executor output such as `debug.dumpStack()`.
 
+Available since Acton 1.2.
+
+Cancelling an interactive script prompt stops execution immediately, even
+inside `try`/`catch`. Ctrl+C exits with code `130`; Escape and terminal I/O
+errors exit with code `1`. Cancellation does not select the prompt's default.
+
 ## Exit Status
 
 - `0`: The script completed successfully, including successful broadcast flows.
 - `1`: Script execution failed, broadcast submission failed, or remote network
-  access such as fork-state resolution failed.
+  access such as fork-state resolution failed. Escape or a terminal I/O error
+  stopped an interactive prompt.
+- `130`: Ctrl+C interrupted an interactive script prompt.
 
 ## Safe Execution Order
 

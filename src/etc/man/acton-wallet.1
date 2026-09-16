@@ -280,6 +280,13 @@ wallet is available
 \h'-04'\(bu\h'+03'otherwise Acton prompts on a TTY; in non\-interactive contexts, provide the
 wallet name explicitly
 .RE
+.sp
+Available since Acton 1.2.
+.sp
+Wallet V5 derives its address from the selected network\[cq]s \fBglobal\-id\fR\&.
+Custom networks default to \fB\-3\fR, matching testnet and localnet. For a custom
+endpoint that uses mainnet wallet addresses, set
+\fBnetworks.<name>.global\-id = \-239\fR in \fBActon.toml\fR\&.
 .SH "NEW AND IMPORT WORKFLOW"
 \fBwallet new\fR and \fBwallet import\fR share the same storage choices and most of the
 same prompts.

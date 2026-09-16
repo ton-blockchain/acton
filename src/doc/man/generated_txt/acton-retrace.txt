@@ -82,7 +82,8 @@ OPTIONS
 NETWORK AND API BEHAVIOR
        o  Without --net, Acton tries mainnet and then testnet
 
-       o  localnet and custom:<name> are not supported by the retrace backend
+       o  localnet and custom:<name> use the TON Center endpoints configured in
+          Acton.toml (available since Acton 1.2)
 
 TON CENTER API KEYS
        Built-in mainnet/testnet requests read TONCENTER_MAINNET_API_KEY or

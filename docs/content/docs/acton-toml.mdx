@@ -90,6 +90,8 @@ Example:
 acton = "{{ acton_version }}"
 ```
 
+<AvailabilityBadge since="Acton 1.1" />
+
 For preview-channel builds installed with `acton up --trunk`, set the pin to `trunk` instead of the numbered stable release:
 
 ```acton-toml title="Acton.toml"
@@ -286,7 +288,7 @@ Docker-based `acton localnet` shares the startup `accounts` selection — its no
 
 <AvailabilityBadge since="Acton 1.2" />
 
-`response-delay-ms`, `block-time-ms`, `no-mining`, and `mine-empty-blocks` are available from Acton 1.2.
+`db-path`, `response-delay-ms`, `block-time-ms`, `no-mining`, and `mine-empty-blocks` are available from Acton 1.2.
 
 The localnet fork uses the network configuration from the resolved masterchain block. When `fork-block-number` is set, it also uses that block's Unix time; otherwise, the virtual clock starts from the current system Unix time.
 

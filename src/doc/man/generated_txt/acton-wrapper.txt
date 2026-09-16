@@ -15,6 +15,8 @@ DESCRIPTION
        Use --all to generate wrappers for every contract defined in Acton.toml
        without picking a single one.
 
+       Available since Acton 1.2.
+
        The wrapper type and default file name use the contract ID from
        Acton.toml. Acton converts the ID to PascalCase, treating spaces,
        underscores, and hyphens as word separators. Neither display-name nor
@@ -119,11 +121,14 @@ ABI REQUIREMENTS
 
        o  incomingMessages: ... enables send{Message} helpers
 
+       o  incomingExternal: ... enables sendExternal{Message} and
+          sendAnyExternal helpers
+
        o  declared get methods are emitted as wrapper methods
 
-       If incomingMessages is missing, message-sending helpers are not
-       generated. If storage is missing, storage helpers fall back to an
-       untyped initializer.
+       If incomingMessages is missing, only the generic sendAny
+       internal-message helper is generated. If storage is missing, storage
+       helpers fall back to an untyped initializer.
 
 TYPESCRIPT GENERATION
        acton wrapper --ts shells out to npx @ton/tolk-abi-to-typescript@0.5.0.
@@ -145,6 +150,8 @@ CONFIGURATION
            
            [wrappers.typescript]
            output-dir = "wrappers-ts"
+
+       Available since Acton 1.2.
 
        Each contract can override the same settings without changing the
        defaults for other contracts:

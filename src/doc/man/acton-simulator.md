@@ -81,6 +81,11 @@ Disable automatic block production. Mine blocks manually with
 `acton simulator mine` or `POST /acton_mine`.
 {{/option}}
 
+{{#option "`--mine-empty-blocks`" }}
+Produce blocks even when no messages are pending, including during manual mining. Disabled by default;
+the project default is `[localnet].mine-empty-blocks`.
+{{/option}}
+
 {{#option "`--snapshots-dir` _path_" }}
 Directory for persistent JSON snapshots. Defaults to a `.snapshots` directory
 next to the SQLite database, or `.acton/simulator/<port>/snapshots`
@@ -88,17 +93,17 @@ inside the project when no database is configured.
 {{/option}}
 
 {{#option "`--liteapi`" }}
-Start the LiteAPI server on the TCP port immediately after the localnet HTTP
+Start the LiteAPI server on the TCP port immediately after the simulator HTTP
 port. LiteAPI is disabled by default.
 {{/option}}
 
 {{#option "`--liteapi-port` _port_" }}
 Set the LiteAPI TCP port explicitly. Requires `--liteapi`; otherwise LiteAPI
-uses the localnet HTTP port plus one.
+uses the simulator HTTP port plus one.
 {{/option}}
 
 {{#option "`--require-auth`" }}
-Require a token for all localnet HTTP API, control, emulate, and streaming
+Require a token for all simulator HTTP API, control, emulate, and streaming
 endpoints. The server prints the token on startup.
 {{/option}}
 
@@ -129,7 +134,7 @@ Simulator HTTP port.
 {{/option}}
 
 {{#option "`--auth-token` _token_" }}
-Localnet API token for a server started with `--require-auth`. If omitted,
+Simulator API token for a server started with `--require-auth`. If omitted,
 Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
 {{/option}}
 
@@ -137,7 +142,9 @@ Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
 
 ### acton simulator mine
 
-Mine localnet blocks manually.
+Mine Simulator blocks manually. Empty blocks are skipped unless
+`--mine-empty-blocks` was enabled at startup or the mining mode was changed
+through `POST /acton_setMiningMode`.
 
 #### Synopsis
 
@@ -156,7 +163,7 @@ Simulator HTTP port.
 {{/option}}
 
 {{#option "`--auth-token` _token_" }}
-Localnet API token for a server started with `--require-auth`. If omitted,
+Simulator API token for a server started with `--require-auth`. If omitted,
 Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
 {{/option}}
 
@@ -164,7 +171,7 @@ Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
 
 ### acton simulator increase-time
 
-Increase the localnet virtual clock.
+Increase the Simulator virtual clock.
 
 #### Synopsis
 
@@ -175,7 +182,7 @@ Increase the localnet virtual clock.
 {{#options command="acton simulator increase-time"}}
 
 {{#option "_seconds_" }}
-Seconds to add to the virtual localnet clock.
+Seconds to add to the virtual Simulator clock.
 {{/option}}
 
 {{#option "`-p`, `--port` _port_" }}
@@ -183,7 +190,7 @@ Simulator HTTP port.
 {{/option}}
 
 {{#option "`--auth-token` _token_" }}
-Localnet API token for a server started with `--require-auth`. If omitted,
+Simulator API token for a server started with `--require-auth`. If omitted,
 Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
 {{/option}}
 
@@ -191,7 +198,7 @@ Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
 
 ### acton simulator set-time
 
-Set the localnet virtual clock.
+Set the Simulator virtual clock.
 
 #### Synopsis
 
@@ -211,7 +218,7 @@ Simulator HTTP port.
 {{/option}}
 
 {{#option "`--auth-token` _token_" }}
-Localnet API token for a server started with `--require-auth`. If omitted,
+Simulator API token for a server started with `--require-auth`. If omitted,
 Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
 {{/option}}
 
@@ -219,7 +226,7 @@ Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
 
 ### acton simulator set-next-block-timestamp
 
-Set a one-shot timestamp for the next localnet block.
+Set a one-shot timestamp for the next Simulator block.
 
 #### Synopsis
 
@@ -240,7 +247,7 @@ Simulator HTTP port.
 {{/option}}
 
 {{#option "`--auth-token` _token_" }}
-Localnet API token for a server started with `--require-auth`. If omitted,
+Simulator API token for a server started with `--require-auth`. If omitted,
 Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
 {{/option}}
 
@@ -248,7 +255,7 @@ Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
 
 ### acton simulator status
 
-Inspect the current localnet status.
+Inspect the current Simulator status.
 
 #### Synopsis
 
@@ -267,7 +274,7 @@ Print machine-readable JSON.
 {{/option}}
 
 {{#option "`--auth-token` _token_" }}
-Localnet API token for a server started with `--require-auth`. If omitted,
+Simulator API token for a server started with `--require-auth`. If omitted,
 Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
 {{/option}}
 
@@ -275,7 +282,7 @@ Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
 
 ### acton simulator snapshot
 
-Save and restore persistent JSON snapshots of a localnet.
+Save and restore persistent JSON snapshots of a Simulator.
 
 #### Synopsis
 
@@ -296,7 +303,7 @@ block and transaction history, registered metadata, pending messages, and
 virtual time. Restoration also updates SQLite when persistence is enabled.
 
 Relative file paths resolve from the Acton project root. These commands call the
-running localnet control API. Pass `--port` or `--auth-token` when needed, and
+running Simulator control API. Pass `--port` or `--auth-token` when needed, and
 `--json` for structured output. Use the returned ID for restore, delete, and export.
 
 ## Configuration
@@ -314,6 +321,7 @@ rate-limit = 1
 response-delay-ms = 300
 block-time-ms = 500
 no-mining = false
+mine-empty-blocks = false
 ```
 
 CLI flags override config values for the current invocation. In particular,
@@ -323,11 +331,11 @@ current working directory.
 
 ## TON Center API Keys
 
-When localnet forks from the built-in `mainnet`/`testnet` backends,
+When Simulator forks from the built-in `mainnet`/`testnet` backends,
 authenticated requests read `TONCENTER_MAINNET_API_KEY` or
 `TONCENTER_TESTNET_API_KEY`.
 
-When localnet forks from `custom:<name>`, Acton reads
+When Simulator forks from `custom:<name>`, Acton reads
 `<NORMALIZED_NAME>_API_KEY`. Custom network names are uppercased and
 non-alphanumeric characters are replaced with `_`, so `custom:mock-remote`
 becomes `MOCK_REMOTE_API_KEY`.
@@ -336,16 +344,16 @@ Acton loads `.env` automatically, so the simplest setup during project work is
 usually to keep these keys there and use shell environment variables only for
 one-off overrides or CI.
 
-## Localnet API auth
+## Simulator API Auth
 
-`acton simulator start --require-auth` protects every localnet HTTP route under
+`acton simulator start --require-auth` protects every simulator HTTP route under
 `/api/*`, `/acton_*`, `/api/emulate/*`, and `/api/streaming/*`. Static UI files
 remain public, but the bundled UI does not receive the token from the server.
 When a protected API request returns `401`, the bundled UI shows a token overlay;
 paste the printed token there before using protected API views. The key button
 in the sidebar footer reopens the same overlay.
 
-When auth is enabled, the server prints a localnet API token. Pass it as either:
+When auth is enabled, the server prints a Simulator API token. Pass it as either:
 
 ```text
 Authorization: Bearer <TOKEN>
@@ -356,27 +364,28 @@ X-API-Key: <TOKEN>
 TON Center-compatible clients. Browser WebSocket clients can pass `token=<TOKEN>`
 only on `/api/streaming/v2/ws`.
 
-For CLI subcommands that call localnet control routes, pass `--auth-token` or
+For CLI subcommands that call Simulator control routes, pass `--auth-token` or
 set `ACTON_LOCALNET_AUTH_TOKEN`. If `ACTON_LOCALNET_AUTH_TOKEN` is set when
-starting with `--require-auth`, localnet uses that value; otherwise it generates
+starting with `--require-auth`, Simulator uses that value; otherwise it generates
 and prints a fresh token.
 
 ## Runtime Model
 
 - fork mode allows local development against remote chain state
 - `acton simulator start` runs in the foreground until the process is stopped
-- Acton starts an HTTP server on `127.0.0.1:<port>` for localnet API, control
-  endpoints, and the bundled localnet UI
+- Acton starts an HTTP server on `127.0.0.1:<port>` for Simulator API, control
+  endpoints, and the bundled Simulator UI
 - the server keeps running until the process is stopped, for example with
   `Ctrl+C`
-- the localnet UI is available on the root path, for example
+- the simulator UI is available on the root path, for example
   `http://127.0.0.1:<port>/`
-- the node produces a block every `--block-time-ms` milliseconds, defaults
-  to 500 ms, and still creates empty blocks when no transactions are queued
+- the node checks for pending messages every `--block-time-ms` milliseconds,
+  defaulting to 500 ms; `--mine-empty-blocks` also creates blocks when no
+  messages are queued
 - `--no-mining` or `[localnet].no-mining = true` disables automatic block
   production; use `acton simulator mine [N]` or `POST /acton_mine` to create
   blocks manually
-- localnet has a virtual clock for block and transaction time; use
+- Simulator has a virtual clock for block and transaction time; use
   `acton simulator increase-time`, `acton simulator set-time`, or
   `acton simulator set-next-block-timestamp` to move it without waiting for real
   time
@@ -403,7 +412,7 @@ and prints a fresh token.
 
 ## Control Endpoints
 
-The localnet server exposes `acton_*` control routes for local development
+The Simulator server exposes `acton_*` control routes for local development
 tooling:
 
 - `GET /acton_nodeInfo` returns uptime, latest block seqno, and the active state
@@ -430,9 +439,11 @@ tooling:
 - `POST /acton_sendInternalMessage` with `{"boc":"<BASE64_BOC>"}` sends a
   base64-encoded internal message BOC through the local internal queue
 - `POST /acton_mine` with optional `{"blocks":N}` mines queued and/or empty
-  blocks manually; `N` defaults to `1`
+  blocks manually; `N` defaults to `1`, and empty blocks follow the mining mode
+- `POST /acton_setMiningMode` with `{"skip_empty_blocks":false}` enables empty
+  blocks for automatic and manual mining; use `true` to skip them
 - `POST /acton_increaseTime` with `{"seconds":3600}` adds seconds to the
-  virtual localnet clock
+  virtual Simulator clock
 - `POST /acton_setTime` with `{"timestamp":1710000000}` sets the current
   virtual Unix time
 - `POST /acton_setNextBlockTimestamp` with `{"timestamp":1710000600}` sets a
@@ -451,8 +462,8 @@ message.
 
 Control endpoints are unauthenticated by default for local development. Use
 `--require-auth` when another local process, browser page, or test harness should
-not be able to read or mutate the running localnet without the token. Do not
-expose the localnet server publicly.
+not be able to read or mutate the running Simulator without the token. Do not
+expose the Simulator server publicly.
 
 ## Persistence
 
@@ -468,7 +479,7 @@ expose the localnet server publicly.
 
 ## Exit Status
 
-- `0`: The selected localnet subcommand completed successfully. For
+- `0`: The selected simulator subcommand completed successfully. For
   `acton simulator status`, this also includes the selected port not running;
   use `--json` and inspect `running` for automation.
 - `1`: Startup failed because port binding, database setup, remote fork
@@ -514,7 +525,7 @@ expose the localnet server publicly.
    acton simulator start --accounts deployer,user --db-path build/localnet.db
    ```
 
-6. Inspect a running localnet:
+6. Inspect a running Simulator:
 
    ```bash
    acton simulator status --json

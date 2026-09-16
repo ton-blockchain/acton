@@ -35,7 +35,7 @@ struct KeyPair {
 // Mnemonic phrase represented as `array<string>` (24 words for `crypto.createMnemonic()`).
 type Mnemonic = array<string>
 
-/// Generates a new random BIP39-compatible mnemonic phrase.
+/// Generates a new random TON mnemonic phrase.
 ///
 /// Returns an array of 24 English words that can be used to derive a key pair
 /// via [Mnemonic.toKeyPair].
@@ -51,7 +51,7 @@ fun crypto.createMnemonic(): Mnemonic {
 
 /// Derives an Ed25519 [KeyPair] from a mnemonic phrase.
 ///
-/// `self` must be a [Mnemonic] (`array<string>`) of 24 valid BIP39 words,
+/// `self` must be a valid 24-word TON [Mnemonic] (`array<string>`),
 /// for example as returned by [crypto.createMnemonic].
 ///
 /// Example:
@@ -145,6 +145,9 @@ fun crypto.getSecureRandomBytes(bytesNum: uint16): slice {
 /// [random.uint256]), so successive calls return different bytes.
 /// The maximum `bytesNum` is 127; values >= 128 will throw an error.
 ///
+/// Since Acton 1.2, this function uses the current VM random state and no longer
+/// accepts a `seed` argument.
+///
 /// Reproducibility:
 /// The output is deterministic for a fixed VM random seed. In tests, call
 /// [testing.setRandomSeed] (or [random.setSeed]) with an explicit seed before
@@ -182,7 +185,7 @@ fun crypto.getFastRandomBytes(bytesNum: uint16): slice {
 /// Generates a random Ed25519 [KeyPair] without creating a mnemonic.
 ///
 /// Much faster than [crypto.createMnemonic] + [Mnemonic.toKeyPair] because it
-/// skips BIP39 word generation.  Use this when you don't need the mnemonic itself.
+/// skips mnemonic generation.  Use this when you don't need the mnemonic itself.
 ///
 /// Example:
 /// ```tolk

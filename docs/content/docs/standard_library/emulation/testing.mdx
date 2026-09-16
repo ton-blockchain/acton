@@ -256,8 +256,8 @@ Note: in scripts always use [scripts.wallet](/docs/standard_library/emulation/sc
 fun testing.getAccountState(addr: address): TlbAccountInfo?
 ```
 
-Returns current account state for address or null if no information available or
-contract is not deployed.
+Returns current account state, including uninitialized accounts.
+Returns `null` if no account state is available.
 
 The account state includes balance, storage information, and other account data.
 See [TlbAccountInfo](/docs/standard_library/types/transaction#tlbaccountinfo) type for more information.
@@ -282,7 +282,7 @@ fun testing.getAccountStorageFee(addr: address, seconds: int): coins?
 
 Returns storage fee for address for specified amount of seconds.
 
-Returns `null` if the contract with given address is not deployed.
+Returns `null` if no account state is available. Uses basechain storage prices.
 
 Example:
 ```tolk
@@ -328,7 +328,7 @@ fun testing.getNow(): uint32
 
 Get the current Unix timestamp used in emulation.
 
-Test and script runs initialize this value from the current wall clock. A
+Since Acton 1.2, test and script runs initialize this value from the current wall clock. A
 fork with an explicit block number uses that block's timestamp instead.
 Latest forks use the current wall clock. Call [testing.setNow](#testingsetnow) to
 override it for time-dependent scenarios.
@@ -436,7 +436,7 @@ fun testing.getAccountBalance(of: address): coins
 
 Get the balance of an address.
 
-Returns 0 if the address is not deployed.
+Returns 0 if no account state is available.
 
 Example:
 ```tolk
@@ -576,7 +576,7 @@ For detailed information about blockchain configuration parameters, see the
 [TON Blockchain Configuration Reference](https://docs.ton.org/foundations/config).
 
 Parameters:
-- `config`: The new [BlockchainConfigMap](/docs/standard_library/emulation/config#blockchainconfigmap) map containing configuration parameters (indices 0-90)
+- `config`: The new [BlockchainConfigMap](/docs/standard_library/emulation/config#blockchainconfigmap) map containing configuration parameters indexed by signed 32-bit integers
 
 Returns: `true` if the configuration was successfully updated, `false` if
 validation failed. On failure, neither the emulator world state nor the C7
@@ -611,7 +611,7 @@ fun testing.getConfig(): BlockchainConfigMap
 
 Retrieves the current blockchain configuration.
 
-Returns a map of all blockchain configuration parameters indexed from 0-90.
+Returns a map of all blockchain configuration parameters indexed by signed 32-bit integers.
 The configuration includes gas prices, storage costs, validator settings, and other
 network parameters. Use specialized getter functions like [BlockchainConfigMap.getGasPrices](/docs/standard_library/emulation/config#blockchainconfigmapgetgasprices),
 [BlockchainConfigMap.getStoragePrices](/docs/standard_library/emulation/config#blockchainconfigmapgetstorageprices), or [BlockchainConfigMap.getGlobalVersion](/docs/standard_library/emulation/config#blockchainconfigmapgetglobalversion)

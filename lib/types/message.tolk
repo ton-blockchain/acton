@@ -55,6 +55,7 @@ struct TlbMessageRelaxedGeneric {
 ///
 /// If [skipBounce] is true, `0xFFFFFFFF` is skipped inline, while `0xFFFFFFFE`
 /// loads the original body from the first reference. For other prefixes, returns the first 32-bit opcode.
+/// Rich bounce (`0xFFFFFFFE`) payload decoding is supported since Acton 1.2.
 ///
 /// Example:
 /// ```tolk
@@ -85,6 +86,8 @@ struct TlbExtMessageRelaxedGeneric {
 /// - returns the first 32-bit opcode by default;
 /// - if [skipBounce] is true, legacy and rich bounce envelopes are unwrapped;
 /// - returns `null` for malformed or too-short body data.
+///
+/// Rich bounce (`0xFFFFFFFE`) payload decoding is supported since Acton 1.2.
 fun TlbExtMessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int? {
     return impl.loadOpcode(self.body, skipBounce);
 }

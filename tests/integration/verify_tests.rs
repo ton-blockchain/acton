@@ -1,11 +1,15 @@
+use crate::common::assertion;
 use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
 use crate::support::toncenter::{spawn_toncenter_v3_mock, toncenter_v3_account_states_ok_response};
 use crate::support::verifier::{
     CapturedVerifierRequest, VerifierMockResponse, spawn_verifier_mock,
 };
+use std::io::{Read, Write};
+use std::net::TcpStream;
 use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
+use std::time::Duration;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 
@@ -1114,6 +1118,56 @@ fn test_verify_verifier_does_not_retry_a_generic_server_error() {
         captured.len(),
         3,
         "expected status, ticket, and one verify request"
+    );
+}
+
+#[test]
+fn test_verify_mock_reads_a_fragmented_request_body() {
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
+        status: 200,
+        body: "{}".to_owned(),
+        headers: vec![],
+    }]);
+    let mut stream = TcpStream::connect(mock_url.trim_start_matches("http://"))
+        .expect("must connect to verifier mock");
+    stream
+        .set_nodelay(true)
+        .expect("must disable Nagle buffering");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .expect("must bound response reads");
+
+    // Leave the body incomplete long enough for the mock to start reading it.
+    // An accepted non-blocking socket would fail immediately with WouldBlock.
+    stream
+        .write_all(b"POST /api/v1/verify HTTP/1.1\r\nContent-Length: 13\r\n\r\nsource ")
+        .expect("must send headers and the first body fragment");
+    std::thread::sleep(Duration::from_millis(100));
+    stream
+        .write_all(b"bundle")
+        .expect("must send the remaining body fragment");
+
+    let mut response = String::new();
+    stream
+        .read_to_string(&mut response)
+        .expect("must read verifier response");
+    mock_handle.join().expect("mock verifier must finish");
+
+    let captured = captured.lock().expect("captured requests mutex poisoned");
+    let request = captured.first().expect("mock must capture the request");
+    let outcome = format!(
+        "Response:\n{}\nCaptured requests: {}\n{} {}\n{}\n",
+        response.replace("\r\n", "\n"),
+        captured.len(),
+        request.method,
+        request.path,
+        String::from_utf8_lossy(&request.body),
+    );
+    drop(captured);
+
+    assertion().eq(
+        outcome,
+        snapbox::file!["snapshots/verify/test_verify_mock_reads_a_fragmented_request_body.txt"],
     );
 }
 

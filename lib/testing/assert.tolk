@@ -79,9 +79,9 @@ fun Assert.notEqual<V1, V2>(
     );
 }
 
-/// Fails the test with the given optional message.
+/// Fails the test with the given message.
 ///
-/// Optional message can be provided to describe the failure.
+/// Pass an empty string if no message is needed.
 /// Optional location can be provided to specify the location of the failure to
 /// be printed in the error message.
 fun Assert.fail(message: string, location: string = ""): never {

@@ -38,6 +38,10 @@ Pass flags to skip prompts:
 
 In non-interactive mode, these options are disabled unless their flags are passed explicitly.
 
+<AvailabilityBadge since="Acton 1.2" />
+
+Hook selection and the `pre-push` default are available from Acton 1.2.
+
 See the [`acton new`](/docs/commands/new) command reference for all available flags.
 
 ### Initialize an existing directory
@@ -65,7 +69,7 @@ Pass `--create-dapp` to skip project initialization and only scaffold a Vite-bas
 acton init --create-dapp
 ```
 
-It creates `app/` by default, or the path passed to `--create-dapp`. The target directory must not already exist. This mode does not change `Acton.toml`; use `acton new --app` when you want the full [dApp layout](#dapp-layout) in a new scaffold.
+It creates `app/` by default, or the path passed to `--create-dapp`. The target directory must not already exist. This mode does not change `Acton.toml`; use `acton new --app` when you want the full [dApp layout](#dapp-project-layout) in a new scaffold.
 
 <Callout>
     `acton init` also manages symlinks for [`global.wallets.toml`](/docs/wallets) and [`global.libraries.toml`](/docs/libraries):
@@ -73,7 +77,7 @@ It creates `app/` by default, or the path passed to `--create-dapp`. The target 
     - If either file already exists locally, it is left untouched.
     - If the matching global file does not exist, no symlink is created.
 
-    Dangling symlinks are recreated with a warning.
+    Dangling symlinks are not repaired; Acton warns if link creation fails.
 </Callout>
 
 ### Refresh the project
@@ -111,13 +115,13 @@ Directory overview:
 <Files>
   <Folder name="acton-project" defaultOpen>
     <File name="Acton.toml" description="Project manifest — edit directly" />
-    <File name=".env" description="Local secrets — not committed" />
+    <File name=".env.example" description="Copy to .env for local secrets" />
     <Folder name=".acton" description="Acton-managed internal state and Tolk libraries" />
     <Folder name="contracts" description="Tolk source files" />
     <Folder name="wrappers" description="Generated Tolk wrappers (.gen.tolk)" />
     <Folder name="tests" description="Test files (.test.tolk)" />
     <Folder name="scripts" description="Deployment and utility Tolk scripts" />
-    <Folder name="build" description="Compiled output (.boc, .fif)" />
+    <Folder name="build" description="Build artifacts (.json, optional .boc and .fif)" />
     <Folder name="gen" description="Generated dependency helpers (.code.tolk)" />
   </Folder>
 </Files>
@@ -129,7 +133,7 @@ Pass `--app` to `acton new` to add a React + Vite frontend. The dApp layout nest
 <Files>
   <Folder name="acton-project" defaultOpen>
     <File name="Acton.toml" />
-    <File name=".env" />
+    <File name=".env.example" />
     <Folder name=".acton" />
     <Folder name="app" description="React + Vite frontend" />
     <Folder name="wrappers-ts" description="Generated TypeScript wrappers" />
@@ -288,7 +292,7 @@ output-dir = "app/src/wrappers/counter"
 
 Only fields present in the contract table override project defaults. This also works with `acton wrapper --all`, which resolves settings contract by contract.
 
-The `@wrappers` in `import "@wrappers/..."` always resolves to the Tolk wrapper directory, regardless of existence of non-Tolk wrappers.
+The `@wrappers` in `import "@wrappers/..."` resolves through `[import-mappings]`. Keep that mapping aligned with the Tolk wrapper output directory.
 
 See the [`acton wrapper` command reference](/docs/commands/wrapper) for more.
 
@@ -329,9 +333,9 @@ To add a contract to an existing project:
    depends = []
    ```
 
-The `[contracts]` table key, e.g., `Counter`, is the [contract identifier (ID)](#choose-a-contract-id) used by all Acton commands. It is also the default display name of the contract in logs and the browser [Test UI](/docs/testing/test-ui/overview).
+The `[contracts]` table key, e.g., `Counter`, is the contract identifier (ID) used by all Acton commands. It is also the default display name of the contract in logs and the browser [Test UI](/docs/testing/test-ui/overview).
 
-The contract ID must be a valid TOML bare key (`A-Za-z0-9_-`): only ASCII letters, digits, underscores, and dashes are allowed.
+An unquoted contract ID must be a valid TOML bare key (`A-Za-z0-9_-`). Use a quoted key for other characters, such as `[contracts."My Contract"]`.
 
 Use short names in `PascalCase`:
 
@@ -354,7 +358,7 @@ depends = []
 display-name = "Alive Internet Theory"
 ```
 
-The `display-name` does not affect command-line usage, only the presentation. For example, `acton build 'Alive Internet Theory'` will not find the contract, whereas `acton build Counter` will.
+The `display-name` does not affect command-line usage, only the presentation. For example, `acton build 'Alive Internet Theory'` will not find the contract, whereas `acton build DnsCollection` will.
 
 ### Declare contract dependencies
 
@@ -423,7 +427,7 @@ To supply the code in deployments and store it in the contract's data storage in
    }
    ```
 
-3. Access the `storage.childContractCode` in the parent contract, on chain:
+3. Access the `storage.nftItemCode` in the parent contract, on chain:
 
    ```tolk title="contracts/NftCollection.tolk"
    get fun get_nft_item_code(): cell {

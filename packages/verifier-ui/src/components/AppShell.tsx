@@ -1,4 +1,4 @@
-import {ThemeProvider, ThemeSwitch} from "@acton/ui"
+import {Banner, ThemeProvider, ThemeSwitch} from "@acton/ui"
 import {useEffect, useRef, useState} from "react"
 import type {ReactNode} from "react"
 import {Github, Menu, Search, X} from "lucide-react"
@@ -22,6 +22,7 @@ export function AppShell({children, headerAccessory}: AppShellProps) {
   const {pathname} = useLocation()
   const isHomePage = pathname === "/"
   const headerClassName = isHomePage ? `${styles.header} ${styles.headerHome}` : styles.header
+  const [bannerVisible, setBannerVisible] = useState(true)
   const [mobileHeaderPanel, setMobileHeaderPanel] = useState<"navigation" | "search">()
   const mobileNavigationRef = useRef<HTMLDivElement>(null)
   const mobileSearchRef = useRef<HTMLDivElement>(null)
@@ -55,7 +56,15 @@ export function AppShell({children, headerAccessory}: AppShellProps) {
 
   return (
     <ThemeProvider storageKey="ton-verifier-theme">
-      <div className={styles.appShell}>
+      <div className={styles.appShell} data-banner-visible={bannerVisible}>
+        {bannerVisible ? (
+          <Banner
+            aria-label="TON Verifier announcement"
+            title="Welcome to the new TON Verifier"
+            dismissLabel="Dismiss TON Verifier announcement"
+            onDismiss={() => setBannerVisible(false)}
+          />
+        ) : undefined}
         <header className={headerClassName}>
           <div className={styles.headerInner}>
             <div className={styles.headerPrimary}>

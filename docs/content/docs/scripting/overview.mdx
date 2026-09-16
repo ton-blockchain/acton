@@ -12,7 +12,11 @@ The main difference between scripts and tests is that scripts define a `main()` 
 
 Each script is a regular smart contract, so, for example, sending a message through `msg.send()` will update the `c5` register.
 
-Scripts terminate with an exit code equal to the `exit_code` of the `main` get method execution. The maximum exit code is 255 due to the standard Unix/Linux operating system limitation, where exit codes are stored in an 8-bit unsigned integer. Any `exit_code` value larger than 255 will be wrapped using modulo 256 (`x % 256`).
+When `main()` finishes, scripts terminate with an exit code equal to its `exit_code`. The maximum exit code is 255 due to the standard Unix/Linux operating system limitation, where exit codes are stored in an 8-bit unsigned integer. Any `exit_code` value larger than 255 will be wrapped using modulo 256 (`x % 256`).
+
+<AvailabilityBadge since="Acton 1.2" />
+
+Cancelling an interactive script prompt stops the script immediately, even inside `try`/`catch`. Ctrl+C exits with code `130`; Escape and terminal I/O errors exit with code `1`. Cancellation does not select the prompt's default value.
 
 The following script shows the simplest Hello World written in Tolk:
 
@@ -35,6 +39,7 @@ acton script scripts/hello.tolk
 And the following script calculates the storage fee for a library code of a given duration in seconds:
 
 ```tolk title="scripts/storageFeeCalculator.tolk"
+import "@acton/io"
 import "@stdlib/gas-payments"
 
 fun main(libraryCode: cell, duration: int) {
@@ -53,7 +58,7 @@ To run it, pass the library code as a cell and the duration in seconds:
 ```bash
 acton script scripts/storageFeeCalculator.tolk b5ee9c72010101010006000008000003e7 3600
 
-# Storage fee: 0.002140812 GRAM
+# Storage fee: 0.002169224 GRAM
 ```
 
 ## Next steps

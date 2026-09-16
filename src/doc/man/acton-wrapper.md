@@ -18,6 +18,8 @@ Generate a wrapper for the contract identified by `_contract-name_` from
 Use `--all` to generate wrappers for every contract defined in `Acton.toml`
 without picking a single one.
 
+Available since Acton 1.2.
+
 The wrapper type and default file name use the contract ID from `Acton.toml`.
 Acton converts the ID to PascalCase, treating spaces, underscores, and hyphens
 as word separators. Neither `display-name` nor the source file name affects
@@ -129,9 +131,11 @@ Wrapper generation depends on the contract ABI exposed by the Tolk compiler.
 
 - `storage: ...` enables typed storage helpers such as `fromStorage`
 - `incomingMessages: ...` enables `send{Message}` helpers
+- `incomingExternal: ...` enables `sendExternal{Message}` and `sendAnyExternal` helpers
 - declared get methods are emitted as wrapper methods
 
-If `incomingMessages` is missing, message-sending helpers are not generated. If
+If `incomingMessages` is missing, only the generic `sendAny` internal-message
+helper is generated. If
 `storage` is missing, storage helpers fall back to an untyped initializer.
 
 ## TypeScript Generation
@@ -156,6 +160,8 @@ test-output-dir = "tests"
 [wrappers.typescript]
 output-dir = "wrappers-ts"
 ```
+
+Available since Acton 1.2.
 
 Each contract can override the same settings without changing the defaults for
 other contracts:

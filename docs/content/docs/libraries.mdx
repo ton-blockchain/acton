@@ -25,9 +25,11 @@ Acton provides `acton library publish` to publish code as a library on the maste
 Create a minimal contract to publish as a library. For example:
 
 ```tolk title="contracts/Math.tolk"
-fun add(a: int, b: int): int {
+get fun add(a: int, b: int): int {
     return a + b;
 }
+
+fun onInternalMessage(in: InMessage) {}
 ```
 
 Register it in `Acton.toml`:
@@ -104,7 +106,7 @@ This command prints:
 
 - **Balance**: current balance of the library account.
 - **Last top-up**: timestamp used as the reference for storage runway calculations.
-- **Remaining**: estimated storage runway from current masterchain storage prices and time since the last top-up.
+- **Remaining**: estimated storage runway from Acton's built-in masterchain storage prices and time since the last top-up.
 - **Hash and account**: the library hash and on-chain address.
 
 When the estimated runway is exhausted, Acton prints a warning to top up. That warning does not guarantee the account is already frozen; it signals higher freeze risk.

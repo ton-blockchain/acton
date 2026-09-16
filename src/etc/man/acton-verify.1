@@ -33,7 +33,7 @@ If omitted, Acton prompts when the project contains multiple contracts.
 Deployed contract address to verify.
 .sp
 If omitted, Acton verifies the compiled code hash without a separate deployed
-address check.
+address check. Already verified code succeeds before this check.
 .RE
 .sp
 \fB\-\-wallet\fR \fIwallet\fR
@@ -111,7 +111,7 @@ This conflicts with \fB\-\-manifest\-path\fR\&.
 .RE
 .sp
 .RS 4
-\h'-04' 2.\h'+01'Request a ticket from \fB/api/v1/take_ticket\fR\&.
+\h'-04' 2.\h'+01'Check \fB/api/v1/verification/status\fR and wait for any queued or compiling attempt.
 .RE
 .sp
 .RS 4
@@ -119,23 +119,27 @@ This conflicts with \fB\-\-manifest\-path\fR\&.
 .RE
 .sp
 .RS 4
-\h'-04' 4.\h'+01'If \fB\-\-address\fR is set, compare its deployed code hash with the compiled code.
+\h'-04' 4.\h'+01'Request a ticket from \fB/api/v1/take_ticket\fR\&.
 .RE
 .sp
 .RS 4
-\h'-04' 5.\h'+01'Get wallet approval for the returned testnet amount and address.
+\h'-04' 5.\h'+01'If \fB\-\-address\fR is set, compare its deployed code hash with the compiled code.
 .RE
 .sp
 .RS 4
-\h'-04' 6.\h'+01'Send the payment with the returned code\-hash comment.
+\h'-04' 6.\h'+01'Get wallet approval for the returned testnet amount and address.
 .RE
 .sp
 .RS 4
-\h'-04' 7.\h'+01'Wait for the finalized recipient transaction.
+\h'-04' 7.\h'+01'Send the payment with the returned code\-hash comment.
 .RE
 .sp
 .RS 4
-\h'-04' 8.\h'+01'Upload the sources and recipient transaction hash to \fB/api/v1/verify\fR\&.
+\h'-04' 8.\h'+01'Wait for the finalized recipient transaction.
+.RE
+.sp
+.RS 4
+\h'-04' 9.\h'+01'Upload the sources and recipient transaction hash to \fB/api/v1/verify\fR\&.
 .RE
 .SH "PREREQUISITES"
 .sp
@@ -144,7 +148,7 @@ This conflicts with \fB\-\-manifest\-path\fR\&.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'testnet funds when \fB\-\-dry\-run\fR is not used
+\h'-04'\(bu\h'+03'testnet funds when a new verification payment is needed
 .RE
 .sp
 .RS 4
@@ -152,7 +156,8 @@ This conflicts with \fB\-\-manifest\-path\fR\&.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'a configured wallet or TON Connect wallet, funded when not using \fB\-\-dry\-run\fR
+\h'-04'\(bu\h'+03'a funded wallet or TON Connect wallet for a new payment; no wallet is needed
+for \fB\-\-dry\-run\fR, already verified code, or an eligible \fB\-\-payment\-tx\-hash\fR
 .RE
 .sp
 .RS 4
@@ -180,7 +185,7 @@ it automatically
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'if \fB\-\-tonconnect\fR is used, Acton skips local wallet selection and uses the
-wallet selected in the TON Connect page
+connected TON Connect wallet
 .RE
 .SH "REQUIREMENTS AND LIMITATIONS"
 .sp
@@ -205,8 +210,7 @@ wallet selected in the TON Connect page
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'verification requires a funded local or TON Connect wallet when not using
-\fB\-\-dry\-run\fR
+\h'-04'\(bu\h'+03'a new verification payment requires a funded local or TON Connect wallet
 .RE
 .sp
 .RS 4

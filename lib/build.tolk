@@ -18,8 +18,8 @@
 ///
 /// If `path` is omitted (empty string), Acton looks up the contract name in
 /// `Acton.toml`. If no contract with that name is found, execution fails.
-/// Acton builds the declared `depends`, including their dependencies, and updates
-/// their generated code files before it builds the requested contract.
+/// Since Acton 1.2, Acton builds the declared `depends`, including their dependencies,
+/// and updates their generated code files before it builds the requested contract.
 /// Unchanged dependencies use the compilation cache. Repeated calls reuse the
 /// result for the current run.
 /// If the resolved manifest source already points to a `.boc` file, the name
@@ -54,7 +54,7 @@
 ///   in-memory cache for the current run and the shared file cache under
 ///   `build/cache` across runs.
 /// - `.types.tolk` paths are compiled with no entrypoint required, so interface
-///   files can be built explicitly when needed.
+///   files can be built explicitly when needed (available since Acton 1.2).
 /// - `.boc` paths bypass compilation entirely. Acton just reads the file,
 ///   decodes the code cell, and returns it.
 /// - Because `.boc` mode does not compile anything, it does not populate or

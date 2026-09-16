@@ -48,6 +48,9 @@ OPTIONS
    Remote Options
        --fork-net network
            Fork blockchain state from a remote network for local execution.
+
+           Available since Acton 1.2.
+
            Acton also uses the network configuration from the resolved
            masterchain block. With an explicit historical block, it uses that
            block’s Unix time; otherwise, it uses the current system Unix
@@ -56,6 +59,8 @@ OPTIONS
 
        --fork-block-number seqno
            Historical block sequence number to fork from.
+
+           Available since Acton 1.2.
 
            When a fork block number is set, Acton caches resolved remote
            accounts under
@@ -86,6 +91,8 @@ OPTIONS
        --tonconnect
            Use TON Connect wallet approval for broadcast messages.
 
+           Available since Acton 1.2.
+
            Acton prints a native TON Connect QR code and a tc:// link. It sends
            net.send(...) messages through that wallet instead of loading local
            wallet mnemonics. The TON Connect session is saved under
@@ -97,6 +104,8 @@ OPTIONS
            Explorer to use for transaction links.
 
            Possible values: actonscan, tonscan, toncx, dton, tonviewer
+
+           Available since Acton 1.2.
 
            Actonscan is the default. For custom:<name> networks without an
            explicit networks.<name>.explorer, Acton embeds the configured
@@ -176,9 +185,11 @@ SCRIPT ARGUMENTS
        o  cell, slice, and bitsN accept plain BoC hex without C{} or CS{}
           prefixes
 
-       o  any_address accepts an internal address or the addr_none literal
-
        o  arrays accept [item1, item2]
+
+       Available since Acton 1.2.
+
+       any_address accepts an internal address or the addr_none literal.
 
        Unsupported parameter types currently include structs, tuple, map, dict,
        builder and other complex types.
@@ -191,12 +202,22 @@ SIDE EFFECTS
        Executor debug logs are hidden by default. Re-run with --verbose when
        you need level-1 executor output such as debug.dumpStack().
 
+       Available since Acton 1.2.
+
+       Cancelling an interactive script prompt stops execution immediately,
+       even inside try/catch. Ctrl+C exits with code 130; Escape and terminal
+       I/O errors exit with code 1. Cancellation does not select the prompt’s
+       default.
+
 EXIT STATUS
        o  0: The script completed successfully, including successful broadcast
           flows.
 
        o  1: Script execution failed, broadcast submission failed, or remote
-          network access such as fork-state resolution failed.
+          network access such as fork-state resolution failed. Escape or a
+          terminal I/O error stopped an interactive prompt.
+
+       o  130: Ctrl+C interrupted an interactive script prompt.
 
 SAFE EXECUTION ORDER
        When a script can affect on-chain state, the usual safe sequence is:

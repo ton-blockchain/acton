@@ -354,7 +354,7 @@ fun Expectation<slice>.toBeEmpty(self): void {
 ///
 /// Example:
 /// ```tolk
-/// expect(nan()).toBeNaN();
+/// expect(impl.nan()).toBeNaN();
 /// ```
 fun Expectation<int>.toBeNaN(self): void {
     Assert.equal(self.value, impl.nan(), "expect(<actual>).toBeNaN()", self.location);

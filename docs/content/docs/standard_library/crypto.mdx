@@ -68,7 +68,7 @@ type Mnemonic = array<string>
 fun crypto.createMnemonic(): Mnemonic
 ```
 
-Generates a new random BIP39-compatible mnemonic phrase.
+Generates a new random TON mnemonic phrase.
 
 Returns an array of 24 English words that can be used to derive a key pair
 via [Mnemonic.toKeyPair](#mnemonictokeypair).
@@ -89,7 +89,7 @@ fun Mnemonic.toKeyPair(self): KeyPair
 
 Derives an Ed25519 [KeyPair](#keypair) from a mnemonic phrase.
 
-`self` must be a [Mnemonic](#mnemonic) (`array<string>`) of 24 valid BIP39 words,
+`self` must be a valid 24-word TON [Mnemonic](#mnemonic) (`array<string>`),
 for example as returned by [crypto.createMnemonic](#cryptocreatemnemonic).
 
 Example:
@@ -204,6 +204,9 @@ Each call consumes from the VM's random number generator (via
 [random.uint256](/docs/tolk_standard_library/common#randomuint256)), so successive calls return different bytes.
 The maximum `bytesNum` is 127; values >= 128 will throw an error.
 
+Since Acton 1.2, this function uses the current VM random state and no longer
+accepts a `seed` argument.
+
 Reproducibility:
 The output is deterministic for a fixed VM random seed. In tests, call
 [testing.setRandomSeed](/docs/standard_library/emulation/testing#testingsetrandomseed) (or [random.setSeed](/docs/tolk_standard_library/common#randomsetseed)) with an explicit seed before
@@ -223,7 +226,7 @@ val b = crypto.getFastRandomBytes(16);
 // `a == b` because both calls started from the same VM random seed
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L166" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L169" />
 
 ## `crypto.generateKeyPair`
 
@@ -234,14 +237,14 @@ fun crypto.generateKeyPair(): KeyPair
 Generates a random Ed25519 [KeyPair](#keypair) without creating a mnemonic.
 
 Much faster than [crypto.createMnemonic](#cryptocreatemnemonic) + [Mnemonic.toKeyPair](#mnemonictokeypair) because it
-skips BIP39 word generation.  Use this when you don't need the mnemonic itself.
+skips mnemonic generation.  Use this when you don't need the mnemonic itself.
 
 Example:
 ```tolk
 val kp = crypto.generateKeyPair();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L191" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L194" />
 
 ## `crypto.seedToKeyPair`
 
@@ -258,5 +261,5 @@ Example:
 val kp = crypto.seedToKeyPair(mySeed);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L204" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L207" />
 

@@ -63,6 +63,9 @@ Clear the compilation cache before running.
 \fB\-\-fork\-net\fR \fInetwork\fR
 .RS 4
 Fork blockchain state from a remote network for local execution.
+.sp
+Available since Acton 1.2.
+.sp
 Acton also uses the network configuration from the resolved masterchain block.
 With an explicit historical block, it uses that block\[cq]s Unix time; otherwise,
 it uses the current system Unix time.
@@ -73,6 +76,8 @@ network.
 \fB\-\-fork\-block\-number\fR \fIseqno\fR
 .RS 4
 Historical block sequence number to fork from.
+.sp
+Available since Acton 1.2.
 .sp
 When a fork block number is set, Acton caches resolved remote accounts under
 \fBbuild/cache/<network>/<seqno>/<workchain>_<address\-hash>.json\fR\&. Later script
@@ -104,6 +109,8 @@ mode. Conflicting \fB\-\-net\fR and \fB\-\-fork\-net\fR values are rejected.
 .RS 4
 Use TON Connect wallet approval for broadcast messages.
 .sp
+Available since Acton 1.2.
+.sp
 Acton prints a native TON Connect QR code and a \fBtc://\fR link. It sends
 \fBnet.send(...)\fR messages through that wallet instead of loading local wallet
 mnemonics.
@@ -117,6 +124,8 @@ reused by later runs in the same project. Currently supported only with
 Explorer to use for transaction links.
 .sp
 Possible values: \fBactonscan\fR, \fBtonscan\fR, \fBtoncx\fR, \fBdton\fR, \fBtonviewer\fR
+.sp
+Available since Acton 1.2.
 .sp
 Actonscan is the default. For \fBcustom:<name>\fR networks without an explicit
 \fBnetworks.<name>.explorer\fR, Acton embeds the configured \fBapi.v2\fR and \fBapi.v3\fR
@@ -223,12 +232,12 @@ Forwarded arguments are parsed against the ABI for \fBmain()\fR\&.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBany_address\fR accepts an internal address or the \fBaddr_none\fR literal
-.RE
-.sp
-.RS 4
 \h'-04'\(bu\h'+03'arrays accept \fB[item1, item2]\fR
 .RE
+.sp
+Available since Acton 1.2.
+.sp
+\fBany_address\fR accepts an internal address or the \fBaddr_none\fR literal.
 .sp
 Unsupported parameter types currently include \fBstructs\fR, \fBtuple\fR, \fBmap\fR,
 \fBdict\fR, \fBbuilder\fR and other complex types.
@@ -239,6 +248,12 @@ stays local even when \fB\-\-fork\-net\fR is used.
 .sp
 Executor debug logs are hidden by default. Re\-run with \fB\-\-verbose\fR when you need
 level\-1 executor output such as \fBdebug.dumpStack()\fR\&.
+.sp
+Available since Acton 1.2.
+.sp
+Cancelling an interactive script prompt stops execution immediately, even
+inside \fBtry\fR/\fBcatch\fR\&. Ctrl+C exits with code \fB130\fR; Escape and terminal I/O
+errors exit with code \fB1\fR\&. Cancellation does not select the prompt\[cq]s default.
 .SH "EXIT STATUS"
 .sp
 .RS 4
@@ -247,7 +262,12 @@ level\-1 executor output such as \fBdebug.dumpStack()\fR\&.
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB1\fR: Script execution failed, broadcast submission failed, or remote network
-access such as fork\-state resolution failed.
+access such as fork\-state resolution failed. Escape or a terminal I/O error
+stopped an interactive prompt.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB130\fR: Ctrl+C interrupted an interactive script prompt.
 .RE
 .SH "SAFE EXECUTION ORDER"
 When a script can affect on\-chain state, the usual safe sequence is:

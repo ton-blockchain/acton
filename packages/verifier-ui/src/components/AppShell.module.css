@@ -1,7 +1,13 @@
 .appShell {
+  --verifier-banner-height: 0px;
+
   min-height: 100vh;
   background: var(--acton-color-canvas);
   color: var(--acton-color-text);
+}
+
+.appShell[data-banner-visible="true"] {
+  --verifier-banner-height: 36px;
 }
 
 .header {
@@ -258,7 +264,13 @@
 }
 
 .main {
-  min-height: calc(100vh - 52px);
+  min-height: calc(100vh - 52px - var(--verifier-banner-height));
+}
+
+@media (max-width: 720px) {
+  .appShell[data-banner-visible="true"] {
+    --verifier-banner-height: 44px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -294,5 +306,11 @@
 
   .headerActions {
     gap: 6px;
+  }
+}
+
+@media (max-width: 520px) {
+  .appShell[data-banner-visible="true"] {
+    --verifier-banner-height: 40px;
   }
 }

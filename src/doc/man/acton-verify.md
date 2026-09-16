@@ -37,7 +37,7 @@ If omitted, Acton prompts when the project contains multiple contracts.
 Deployed contract address to verify.
 
 If omitted, Acton verifies the compiled code hash without a separate deployed
-address check.
+address check. Already verified code succeeds before this check.
 {{/option}}
 
 {{#option "`--wallet` _wallet_" }}
@@ -94,20 +94,22 @@ one-off overrides or CI.
 ## Process
 
 1. Compile the local contract and compute its code hash.
-2. Request a ticket from `/api/v1/take_ticket`.
+2. Check `/api/v1/verification/status` and wait for any queued or compiling attempt.
 3. Stop successfully if the code hash is already verified.
-4. If `--address` is set, compare its deployed code hash with the compiled code.
-5. Get wallet approval for the returned testnet amount and address.
-6. Send the payment with the returned code-hash comment.
-7. Wait for the finalized recipient transaction.
-8. Upload the sources and recipient transaction hash to `/api/v1/verify`.
+4. Request a ticket from `/api/v1/take_ticket`.
+5. If `--address` is set, compare its deployed code hash with the compiled code.
+6. Get wallet approval for the returned testnet amount and address.
+7. Send the payment with the returned code-hash comment.
+8. Wait for the finalized recipient transaction.
+9. Upload the sources and recipient transaction hash to `/api/v1/verify`.
 
 ## Prerequisites
 
 - a `.tolk` contract source in the current project
-- testnet funds when `--dry-run` is not used
+- testnet funds when a new verification payment is needed
 - TON verifier availability
-- a configured wallet or TON Connect wallet, funded when not using `--dry-run`
+- a funded wallet or TON Connect wallet for a new payment; no wallet is needed
+  for `--dry-run`, already verified code, or an eligible `--payment-tx-hash`
 - reproducible compiler settings that match the deployed contract
 
 ## Contract And Wallet Selection
@@ -119,7 +121,7 @@ one-off overrides or CI.
   it automatically
 - if multiple wallets are configured, Acton prompts for the wallet
 - if `--tonconnect` is used, Acton skips local wallet selection and uses the
-  wallet selected in the TON Connect page
+  connected TON Connect wallet
 
 ## Requirements And Limitations
 
@@ -128,8 +130,7 @@ one-off overrides or CI.
 - verification always uses TON testnet
 - each verification payment contains the code hash in its comment
 - one payment transaction can authorize only one verification attempt
-- verification requires a funded local or TON Connect wallet when not using
-  `--dry-run`
+- a new verification payment requires a funded local or TON Connect wallet
 - if a contract with the same code hash is already verified, the backend can
   skip the final transaction
 

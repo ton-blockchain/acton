@@ -152,6 +152,8 @@ Underscores are ignored within the number, as in Tolk integer literals.
 Invalid digits, an empty string, or a whitespace-only string
 cause an error.
 
+Hexadecimal and binary inputs are available since Acton 1.2.
+
 Example:
 ```tolk
 val n = parseInt("12345");
@@ -160,7 +162,7 @@ val hex = parseInt("0xff");
 val withWhitespace = parseInt(" 42 ");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L154" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L156" />
 
 ## `parseAddress`
 
@@ -182,7 +184,7 @@ Example:
 val address = parseAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L173" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L175" />
 
 ## `parseCellFromHex`
 
@@ -196,7 +198,7 @@ Decode a root cell from hex-encoded BOC bytes.
 Invalid or malformed input (including non-BOC payloads) fails with an error like
 `Failed to decode cell hex <input>`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L183" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L185" />
 
 ## `parseCellFromBase64`
 
@@ -213,5 +215,5 @@ Decode a root cell from base64-encoded BOC bytes.
 Invalid or malformed input (including non-BOC payloads) fails with an error like
 `Failed to decode cell base64 <input>`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L194" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L196" />
 

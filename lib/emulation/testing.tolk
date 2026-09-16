@@ -210,8 +210,8 @@ fun impl.treasuryCode(): cell asm """
     "te6cckEBBAEARQABFP8A9KQT9LzyyAsBAgEgAwIAWvLT/+1E0NP/0RK68qL0BNH4AH+OFiGAEPR4b6UgmALTB9QwAfsAkTLiAbPmWwAE0jD+omUe" base64>B B>boc PUSHREF
 """
 
-/// Returns current account state for address or null if no information available or
-/// contract is not deployed.
+/// Returns current account state, including uninitialized accounts.
+/// Returns `null` if no account state is available.
 ///
 /// The account state includes balance, storage information, and other account data.
 /// See [TlbAccountInfo] type for more information.
@@ -231,7 +231,7 @@ fun testing.getAccountState(addr: address): TlbAccountInfo? {
 
 /// Returns storage fee for address for specified amount of seconds.
 ///
-/// Returns `null` if the contract with given address is not deployed.
+/// Returns `null` if no account state is available. Uses basechain storage prices.
 ///
 /// Example:
 /// ```tolk
@@ -270,7 +270,7 @@ fun testing.setNow(now: uint32): void {
 
 /// Get the current Unix timestamp used in emulation.
 ///
-/// Test and script runs initialize this value from the current wall clock. A
+/// Since Acton 1.2, test and script runs initialize this value from the current wall clock. A
 /// fork with an explicit block number uses that block's timestamp instead.
 /// Latest forks use the current wall clock. Call [testing.setNow] to
 /// override it for time-dependent scenarios.
@@ -371,7 +371,7 @@ fun testing.topUp(to: address, amount: coins): void {
 
 /// Get the balance of an address.
 ///
-/// Returns 0 if the address is not deployed.
+/// Returns 0 if no account state is available.
 ///
 /// Example:
 /// ```tolk
@@ -485,7 +485,7 @@ fun testing.loadSnapshot(pathToJsonFile: string): bool {
 /// [TON Blockchain Configuration Reference](https://docs.ton.org/foundations/config).
 ///
 /// Parameters:
-/// - `config`: The new [BlockchainConfigMap] map containing configuration parameters (indices 0-90)
+/// - `config`: The new [BlockchainConfigMap] map containing configuration parameters indexed by signed 32-bit integers
 ///
 /// Returns: `true` if the configuration was successfully updated, `false` if
 /// validation failed. On failure, neither the emulator world state nor the C7
@@ -546,7 +546,7 @@ fun testing.setConfig(config: BlockchainConfigMap): bool {
 
 /// Retrieves the current blockchain configuration.
 ///
-/// Returns a map of all blockchain configuration parameters indexed from 0-90.
+/// Returns a map of all blockchain configuration parameters indexed by signed 32-bit integers.
 /// The configuration includes gas prices, storage costs, validator settings, and other
 /// network parameters. Use specialized getter functions like [BlockchainConfigMap.getGasPrices],
 /// [BlockchainConfigMap.getStoragePrices], or [BlockchainConfigMap.getGlobalVersion]

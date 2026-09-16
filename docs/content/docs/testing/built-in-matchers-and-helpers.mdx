@@ -120,6 +120,12 @@ expect(result).toHaveExternalVmExitCode(10);
 
 Rejected external-in diagnostics include the matcher location and, with `--backtrace full`, the contract-side `onExternalMessage` backtrace.
 
+<AvailabilityBadge since="Acton 1.2" />
+
+`acceptanceKnown` indicates whether acceptance is known. After a real-network
+broadcast, `isAccepted()` reports an error because submission alone does not
+prove acceptance. Use `waitForFirstTransaction()` or `waitForTrace()` to inspect execution.
+
 Go deeper in:
 
 - [ExternalSendResult](/docs/standard_library/emulation/network#externalsendresult)

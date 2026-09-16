@@ -9,7 +9,7 @@ This guide covers the full Acton workflow: creating a counter contract from a te
 ## Prerequisites
 
 - [Acton](/docs/installation) {{ acton_version }} or later installed.
-- [Node.js](https://nodejs.org/en/download/) 22 or later LTS: required for the TypeScript app scaffold added by `--app`.
+- [Node.js](https://nodejs.org/en/download/) 22.12 or later LTS: required for the TypeScript app scaffold added by `--app`.
 
 To enable Acton support in the IDE, install either of:
 
@@ -50,7 +50,11 @@ Created Acton.toml with project configuration
 ```
 
 <Callout type="idea">
-  Pass `--hooks` to install pre-push checks, `--hooks=pre-commit` for checks before each commit, or `--agents` to add coding-agent guidance. See [`acton new`](/docs/commands/new) for all options. When run without arguments, `acton new` prompts interactively.
+  Pass `--agents` to add coding-agent guidance. See [`acton new`](/docs/commands/new) for all options. When run without arguments, `acton new` prompts interactively.
+
+  <AvailabilityBadge since="Acton 1.2" />
+
+  Pass `--hooks` to install pre-push checks or `--hooks=pre-commit` for checks before each commit.
 </Callout>
 
 Navigate to the project folder:
@@ -513,7 +517,7 @@ Acton blocks the selected test until a client attaches. Add the following to `.v
 
 ```json title=".vscode/launch.json"
 {
- "version": "{{ acton_version }}",
+ "version": "0.2.0",
  "configurations": [
    {
      "type": "tolk",
@@ -721,6 +725,8 @@ acton script contracts/scripts/deploy.tolk --net testnet --verbose --show-bodies
 
 ## Verify the contract
 
+<AvailabilityBadge since="Acton 1.2" />
+
 Use [`acton verify`](/docs/commands/verify) to publish Tolk sources that reproduce the contract's compiled code hash. Address checks and verification payments use TON testnet.
 
 Use the same source revision and compiler settings as deployment. First, prepare verification and inspect the payment details:
@@ -767,10 +773,10 @@ See the [verification guide](/docs/verify) for compiler options and payment retr
 
 The counter template does not need on-chain libraries, but larger contracts often use them to keep reusable code in a single masterchain account and reference it from many deployments. When a contract dependency in `Acton.toml` uses `kind = "library_ref"`, publish that dependency first with [`acton library`](/docs/commands/library), then build and deploy the contracts that reference it.
 
-Publish a configured contract as a library:
+On a network that permits library publication, publish a configured contract as a library:
 
-```bash
-acton library publish <CONTRACT_NAME> --duration 365d --wallet deployer --net testnet --local
+```acton-cli
+acton library publish <CONTRACT_NAME> --duration 365d --wallet deployer --net <NETWORK> --local
 ```
 
 Acton compiles the contract, estimates the storage payment for the requested duration, sends the funding transaction, and saves the resulting metadata to `libraries.toml`.
@@ -810,9 +816,11 @@ acton rpc info <CONTRACT_ADDRESS> --net testnet
 
 If automatic ABI matching is unavailable, pass compiler ABI JSON or a Tolk interface explicitly:
 
+<AvailabilityBadge since="Acton 1.2" />
+
 ```bash
-acton rpc info <CONTRACT_ADDRESS> --abi build/abi/counter.json --net testnet
-acton rpc call <CONTRACT_ADDRESS> currentCounter --abi contracts/Counter.types.tolk --net testnet
+acton rpc info <CONTRACT_ADDRESS> --abi build/abi/Counter.json --net testnet
+acton rpc call <CONTRACT_ADDRESS> currentCounter --abi build/abi/Counter.json --net testnet
 ```
 
 Fetch the latest masterchain block sequence number with `rpc block-number`:

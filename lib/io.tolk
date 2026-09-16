@@ -58,6 +58,9 @@ import "ffi"
 /// - `{:ton}` - legacy alias for `{:gram}` / `{:grams}`
 /// - `{:cell-tree}` - formats a cell/slice/builder/Cell<T> as a tree of cell references
 ///
+/// Binary output, hexadecimal prefixes, width, fill, alignment, and sign-aware
+/// zero padding are available since Acton 1.2, as are the `gram` and `grams` aliases.
+///
 /// Placeholder syntax is the same as `format` from `fmt.tolk`:
 /// - The full format spec is made of optional fill, align, width, and type parts.
 /// - `{:>8}`, `{:_<8}`, and `{:^8}` set constant width and alignment.

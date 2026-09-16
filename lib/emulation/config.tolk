@@ -39,6 +39,7 @@ import "../testing/assert"
 /// keys are **signed** 32-bit integers, so besides the in-consensus params
 /// (typically 0-90) it can also carry the out-of-consensus **negative** params
 /// (e.g. -137, -138, -1000) that `CONFIGPARAM`/`CONFIGOPTPARAM` read on-chain.
+/// Negative parameter indices are supported since Acton 1.2.
 ///
 /// `BlockchainConfigMap.set*` methods mutate only this in-memory map.
 /// To apply updates to the emulator globally, call [testing.setConfig] with the
@@ -55,8 +56,8 @@ type BlockchainConfigMap = map<int32, cell>
 /// This mutates only the local [BlockchainConfigMap] value until you call [testing.setConfig].
 ///
 /// Parameters:
-/// - `index`: The configuration parameter index. It is a signed 32-bit integer,
-///   so negative (out-of-consensus) indices such as `-137` are valid.
+/// - `index`: The configuration parameter index. It is a signed 32-bit integer.
+///   Negative (out-of-consensus) indices such as `-137` are supported since Acton 1.2.
 /// - `data`: The serialized cell containing the parameter value
 ///
 /// Example:
@@ -75,8 +76,8 @@ fun BlockchainConfigMap.setParamRaw(mutate self, index: int32, data: cell): void
 /// [BlockchainConfigMap.getGasPrices], [BlockchainConfigMap.getStoragePrices], or [BlockchainConfigMap.getGlobalVersion].
 ///
 /// Parameters:
-/// - `index`: The configuration parameter index. It is a signed 32-bit integer,
-///   so negative (out-of-consensus) indices such as `-137` are valid.
+/// - `index`: The configuration parameter index. It is a signed 32-bit integer.
+///   Negative (out-of-consensus) indices such as `-137` are supported since Acton 1.2.
 ///
 /// Returns: The raw cell containing the serialized parameter value.
 ///

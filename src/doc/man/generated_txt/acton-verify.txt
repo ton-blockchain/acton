@@ -31,7 +31,8 @@ OPTIONS
            Deployed contract address to verify.
 
            If omitted, Acton verifies the compiled code hash without a separate
-           deployed address check.
+           deployed address check. Already verified code succeeds before this
+           check.
 
        --wallet wallet
            Testnet wallet to use for the verification payment.
@@ -92,30 +93,34 @@ TON CENTER API KEYS
 PROCESS
        1. Compile the local contract and compute its code hash.
 
-       2. Request a ticket from /api/v1/take_ticket.
+       2. Check /api/v1/verification/status and wait for any queued or
+          compiling attempt.
 
        3. Stop successfully if the code hash is already verified.
 
-       4. If --address is set, compare its deployed code hash with the compiled
+       4. Request a ticket from /api/v1/take_ticket.
+
+       5. If --address is set, compare its deployed code hash with the compiled
           code.
 
-       5. Get wallet approval for the returned testnet amount and address.
+       6. Get wallet approval for the returned testnet amount and address.
 
-       6. Send the payment with the returned code-hash comment.
+       7. Send the payment with the returned code-hash comment.
 
-       7. Wait for the finalized recipient transaction.
+       8. Wait for the finalized recipient transaction.
 
-       8. Upload the sources and recipient transaction hash to /api/v1/verify.
+       9. Upload the sources and recipient transaction hash to /api/v1/verify.
 
 PREREQUISITES
        o  a .tolk contract source in the current project
 
-       o  testnet funds when --dry-run is not used
+       o  testnet funds when a new verification payment is needed
 
        o  TON verifier availability
 
-       o  a configured wallet or TON Connect wallet, funded when not using
-          --dry-run
+       o  a funded wallet or TON Connect wallet for a new payment; no wallet is
+          needed for --dry-run, already verified code, or an eligible
+          --payment-tx-hash
 
        o  reproducible compiler settings that match the deployed contract
 
@@ -131,7 +136,7 @@ CONTRACT AND WALLET SELECTION
        o  if multiple wallets are configured, Acton prompts for the wallet
 
        o  if --tonconnect is used, Acton skips local wallet selection and uses
-          the wallet selected in the TON Connect page
+          the connected TON Connect wallet
 
 REQUIREMENTS AND LIMITATIONS
        o  only .tolk sources can be verified
@@ -144,8 +149,8 @@ REQUIREMENTS AND LIMITATIONS
 
        o  one payment transaction can authorize only one verification attempt
 
-       o  verification requires a funded local or TON Connect wallet when not
-          using --dry-run
+       o  a new verification payment requires a funded local or TON Connect
+          wallet
 
        o  if a contract with the same code hash is already verified, the
           backend can skip the final transaction

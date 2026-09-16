@@ -586,8 +586,8 @@ CLI flags override config values for the current invocation.
 - `0`: All selected tests passed, or a non-mutating reporting mode completed
   successfully.
 - `1`: At least one test failed, profiling drift was detected with
-  `--fail-on-diff`, line coverage was below the configured minimum in non-UI
-  coverage mode, mutation score was below the configured minimum in mutation
+  `--fail-on-diff`, the blended coverage score was below the configured minimum
+  in non-UI coverage mode, mutation score was below the configured minimum in mutation
   mode, no tests matched after filtering, or infrastructure such as
   compilation, trace export, UI startup, or remote-state resolution failed.
 
@@ -624,7 +624,7 @@ CLI flags override config values for the current invocation.
                                                 --junit-path test-results
    ```
 
-6. Fail the run when line coverage drops below 85%:
+6. Fail the run when the blended coverage score drops below 85%:
 
    ```bash
    acton test --coverage --coverage-minimum-percent 85

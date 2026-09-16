@@ -10,7 +10,7 @@
 /// ```tolk
 /// // Setup
 /// val deployer = scripts.wallet("deployer");
-/// val contract = build("MyContract");
+/// val contract = MyContract.fromStorage({ ... });
 ///
 /// // Interact
 /// val msg = createMessage({ ... });
@@ -216,9 +216,9 @@ struct ExternalSendError {
 ///
 /// Available since Acton 1.1.
 struct ExternalSendResult {
-    /// Produced transaction trace, or `null` if the external-in message was not accepted.
+    /// Emulated transaction trace, a broadcast placeholder, or `null` if emulation failed before acceptance.
     transactions: SendResultList?
-    /// Failure metadata, or `null` when the external-in message was accepted.
+    /// Emulation failure metadata, or `null` after acceptance or successful broadcast submission.
     error: ExternalSendError?
     /// Destination account extracted from the original external-in message.
     destination: address
@@ -236,12 +236,12 @@ fun SendResultList.at(self, index: int): SendResult {
 /// Returns whether a locally emulated external-in message was accepted.
 ///
 /// After a network broadcast, Acton only knows that the message was submitted.
-/// Calling this method then fails with an actionable error because returning
+/// Since Acton 1.2, calling this method then fails with an actionable error because returning
 /// either `true` or `false` would be misleading. Use
 /// [ExternalSendResult.waitForFirstTransaction] or
 /// [ExternalSendResult.waitForTrace] to look for the transaction on-chain.
 ///
-/// The `location` parameter is filled automatically and is only used for
+/// The `location` parameter, added in Acton 1.2, is filled automatically and is only used for
 /// diagnostics; user code should normally omit it.
 ///
 /// Available since Acton 1.1.
@@ -260,6 +260,9 @@ fun ExternalSendResult.isAccepted(
 
 /// Returns produced transactions, or fails with external-error metadata if the
 /// message was not accepted.
+///
+/// After a broadcast, this returns a placeholder rather than an on-chain trace.
+/// Use [ExternalSendResult.waitForTrace] to fetch the actual transactions.
 ///
 /// Failed unwraps are reported like `expect(result).toBeAccepted()`:
 /// diagnostics include the external status, emulator reason, VM exit code when
@@ -382,14 +385,14 @@ fun SendResultList.hideTraceFromUi(self): void {
 /// actually delivered to the network is identified by its TEP-467 normalized hash
 /// (returned by `sendBocReturnHash` at send time), and the destination account's recent
 /// transactions are scanned until one with a matching `inMessage` shows up.
-/// Only transactions created at or after the script's start time are eligible.
+/// Since Acton 1.2, only transactions created at or after the script's start time are eligible.
 ///
 /// Returns the matched [SendResult] rebuilt from the on-chain transaction if found, or `null`
 /// otherwise. Fields that cannot be reconstructed from a single on-chain transaction
 /// (`childTxs`, `parentLt`, `outActions`) are left empty/null; `outMessages`, `externals`,
 /// and `gasUsed` are derived from the transaction itself.
 ///
-/// If the matched root transaction is already known to have failed, the method returns
+/// Since Acton 1.2, if the matched root transaction is already known to have failed, the method returns
 /// `null` immediately and prints a warning instead of waiting for the remaining attempts.
 ///
 /// In emulation mode (without `--net`), this method returns the first [SendResult] immediately
@@ -446,13 +449,13 @@ fun SendResultList.waitForFirstTransaction(
 /// Unlike [SendResultList.waitForFirstTransaction], this method follows all descendant
 /// transactions (children, grandchildren, ...) using toncenter's traces API and returns
 /// them as a fresh [SendResultList].
-/// Only traces that started at or after the script's start time are eligible.
+/// Since Acton 1.2, only traces that started at or after the script's start time are eligible.
 ///
 /// In emulation mode (without `--net`), the trace is already fully processed locally, so
 /// the method returns `self` as-is (or `null` if the list is empty).
 ///
 /// Returns `null` if the chain cannot be fetched within the given attempt budget.
-/// If the matched root transaction is already known to have failed, the method returns
+/// Since Acton 1.2, if the matched root transaction is already known to have failed, the method returns
 /// `null` immediately and prints a warning.
 fun SendResultList.waitForTrace(
     self,
@@ -1331,6 +1334,9 @@ fun cell.__asPayload(self): Cell<cell> {
 }
 
 /// Expect the external-in message to be accepted and produce a transaction trace.
+///
+/// In broadcast mode, this only checks submission, not contract acceptance.
+/// Use [ExternalSendResult.waitForFirstTransaction] to inspect execution on-chain.
 ///
 /// On failure, Acton reports the external status, emulator reason, VM exit code
 /// when available, a known exit-code description or ABI error name, source

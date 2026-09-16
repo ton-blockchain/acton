@@ -16,6 +16,8 @@ Generate a wrapper for the contract identified by \fB_contract\-name_\fR from
 Use \fB\-\-all\fR to generate wrappers for every contract defined in \fBActon.toml\fR
 without picking a single one.
 .sp
+Available since Acton 1.2.
+.sp
 The wrapper type and default file name use the contract ID from \fBActon.toml\fR\&.
 Acton converts the ID to PascalCase, treating spaces, underscores, and hyphens
 as word separators. Neither \fBdisplay\-name\fR nor the source file name affects
@@ -141,10 +143,15 @@ Wrapper generation depends on the contract ABI exposed by the Tolk compiler.
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fBincomingExternal: ...\fR enables \fBsendExternal{Message}\fR and \fBsendAnyExternal\fR helpers
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'declared get methods are emitted as wrapper methods
 .RE
 .sp
-If \fBincomingMessages\fR is missing, message\-sending helpers are not generated. If
+If \fBincomingMessages\fR is missing, only the generic \fBsendAny\fR internal\-message
+helper is generated. If
 \fBstorage\fR is missing, storage helpers fall back to an untyped initializer.
 .SH "TYPESCRIPT GENERATION"
 \fBacton wrapper \-\-ts\fR shells out to \fBnpx @ton/tolk\-abi\-to\-typescript@0.5.0\fR\&.
@@ -175,6 +182,8 @@ test\-output\-dir = "tests"
 output\-dir = "wrappers\-ts"
 .fi
 .RE
+.sp
+Available since Acton 1.2.
 .sp
 Each contract can override the same settings without changing the defaults for
 other contracts:
