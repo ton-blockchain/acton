@@ -1,0 +1,13 @@
+{
+  "title": "How to",
+  "pages": [
+    "create-network",
+    "connect",
+    "fund-accounts",
+    "fork-and-import",
+    "change-config",
+    "snapshots",
+    "inspect-network",
+    "manage-lifecycle"
+  ]
+}

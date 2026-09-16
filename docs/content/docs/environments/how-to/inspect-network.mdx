@@ -10,19 +10,21 @@ Trace transactions, inspect API traffic, and diagnose readiness problems in the 
 
 ## Prerequisites
 
-- A created environment. Requests or deployments must pass through its Studio endpoints to appear in Studio's API log and automatic contract registry.
+- [Create a virtual environment](/docs/environments/how-to/create-network). It can be stopped or failing to start when you inspect status and diagnostics.
 
 ## Inspect execution and readiness
 
 <Tabs items={["UI", "Simulator CLI", "Localnet CLI"]}>
 <Tab value="UI">
 
+Send requests and deployments through the [Studio connection settings](/docs/environments/how-to/connect) to capture them in <kbd>API calls</kbd> and the automatic contract registry.
+
 1. Open <kbd>Explorer</kbd>, find an account, and inspect balances, code, storage, and transaction history. Browse blocks, Jettons, and NFTs; save useful addresses in <kbd>Favorites</kbd>.
 1. Open a transaction to inspect phases, fees, messages, and state changes. Retrace it for execution details when matching source artifacts are available.
 1. Use <kbd>Contracts</kbd> for registered addresses, source artifacts, and ABI. Add existing addresses manually when their deployment did not pass through Studio. Review the <kbd>Sources</kbd> and <kbd>ABI</kbd> catalogs for available metadata.
 1. Open <kbd>API calls</kbd> to inspect request/response data, timing, and errors. Enable the <kbd>Studio requests</kbd> filter to include calls made by the UI itself.
 
-![Studio API calls with filters, responses, and timings](../imgs/api-calls-dark.png)
+![Studio API calls with filters, responses, and timings](../../imgs/api-calls-dark.png)
 
 For localnet, open <kbd>Network</kbd> → <kbd>Health</kbd> for API readiness, indexer lag, and service health. Inspect <kbd>Nodes</kbd>, <kbd>Validators</kbd>, and <kbd>Stats</kbd> for synchronization, elections, and queues. On startup failure, expand <kbd>Diagnostic details</kbd> for the runtime error. The nodes page includes <kbd>Collector diagnostics</kbd> for observer failures. The simulator has no equivalent validator/service log dashboard.
 

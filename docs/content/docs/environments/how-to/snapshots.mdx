@@ -17,9 +17,9 @@ The formats cannot be interchanged. These network checkpoints are also separate 
 
 ## Prerequisites
 
-- A [virtual environment](/docs/environments/create-network).
-- For simulator CLI commands, a running simulator on the selected port.
-- For localnet, a running Docker engine and enough disk space for live databases, archives, and temporary restore backups.
+- [Create a virtual environment](/docs/environments/how-to/create-network).
+- For simulator CLI commands, start the simulator and note its HTTP port.
+- For localnet, start Docker and check that its storage has room for the live databases, snapshot archives, and temporary restore backups.
 
 ## Save and restore state
 
@@ -33,11 +33,11 @@ The formats cannot be interchanged. These network checkpoints are also separate 
 
 Use the row's delete action to remove an unneeded snapshot.
 
-For a stopped simulator, creation saves only [persisted state](/docs/environments/snapshots#retain-simulator-checkpoints). Restoring a stopped simulator starts it. Inventory, import, download, and delete controls work while it is stopped.
+For a stopped simulator, creation saves only [persisted state](/docs/environments/how-to/snapshots#retain-simulator-checkpoints). Restoring a stopped simulator starts it. Inventory, import, download, and delete controls work while it is stopped.
 
 For localnet, an already stopped network stays stopped after snapshot creation. The table shows the saved masterchain block and compressed/uncompressed sizes. Operations continue in the background after leaving the page; reopen it to check progress.
 
-![Localnet snapshots with block information and archive sizes](../imgs/snapshots-dark.png)
+![Localnet snapshots with block information and archive sizes](../../imgs/snapshots-dark.png)
 
 To share a simulator checkpoint, use the row's download action to export JSON. <kbd>Import snapshot</kbd> saves a JSON file without applying it; restore the imported row separately.
 

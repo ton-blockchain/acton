@@ -1,41 +1,39 @@
 ---
 title: "Virtual environments"
 sidebarTitle: "Overview"
-description: "Choose a simulator network or localnet for persistent contract and application development in Acton Studio"
+description: "Choose, connect, and use a local TON network for contract and application development in Acton Studio"
 ---
 
-Virtual environments are local TON networks shared by deployment scripts, wallets, tools, and integration tests. Their state persists between interactions, so a frontend can use contracts deployed by a script and inspect the same transactions in [Acton Studio](/docs/studio).
+Virtual environments are local TON networks for developing contracts and applications together. A deployment script, wallet, and frontend can use the same blockchain, with accounts and transaction history preserved between interactions. [Acton Studio](/docs/studio) brings these networks into a single workspace.
 
-The usual development sequence is:
+Use a virtual environment when a scenario needs several clients or repeated interactions with deployed contracts. Local emulator tests remain separate: [`acton test`](/docs/commands/test) does not run against the selected environment.
 
-1. Run emulator tests under <kbd>Local tests</kbd> and emulate scripts without `--net`.
-1. Exercise deployments and application interactions on a <kbd>Simulator</kbd> network.
-1. Validate public-network deployments under <kbd>Real networks</kbd> → <kbd>Testnet</kbd>.
-1. Deploy to <kbd>Real networks</kbd> → <kbd>Mainnet</kbd> after validation.
-
-Changing the selected network does not move contracts, balances, or transaction history.
+After validation in virtual environments, test project deployments on testnet before moving to mainnet.
 
 ## Choose a network
 
-| Need | Environment |
-| ---- | ----------- |
-| Daily contract, script, and frontend development | [Simulator](/docs/environments/simulator/overview) |
-| Reproduce public account state or control time and blocks | [Simulator](/docs/environments/simulator/overview) |
-| Exercise validators, elections, node synchronization, or the full indexer stack | [Localnet](/docs/environments/localnet/overview) |
-| Validate public-network behavior before production | [Testnet](/docs/scripting/blockchain-interaction) |
+A [simulator network](/docs/environments/simulator/overview) is the default for contract and frontend development. It runs with Acton alone, emulating TON execution without real validators or consensus. Use it to reproduce account state, control block time, and test how an application responds to different network conditions.
 
-Simulator is the default choice and requires no additional resources, whereas the localnet runs real TON nodes and services in Docker containers and is very memory-intensive. Prefer to use the simulator networks unless a project needs deep node administration.
+A [localnet](/docs/environments/localnet/overview) runs real TON nodes and TON Center services in Docker. Choose it when the scenario depends on validator elections, node synchronization, or indexer behavior. This requires additional memory and disk space — check the [Docker requirements](/docs/environments/localnet/overview#requirements-and-startup) before creating one.
 
-[Create a network](/docs/environments/create-network), then [connect scripts and applications](/docs/environments/connect). Studio rebuilds project artifacts as sources change. Test persistent network interactions through scripts, RPC clients, or application integration tests connected to the selected environment.
+## Create and connect
 
-<Callout type="note">
-  Local emulator tests remain isolated. Running [`acton test`](/docs/commands/test) does not switch those tests to a simulator network.
-</Callout>
+Start Studio from the Acton project and [create an environment](/docs/environments/how-to/create-network) under <kbd>Virtual environments</kbd>. Choose the network type, name it, and select project wallets to initialize. For the initial state, start with a clean chain or [fork or import existing accounts](/docs/environments/how-to/fork-and-import) to work with deployed contracts. Changes stay local to the new environment.
 
-## Develop and inspect
+Once the network is ready, [connect scripts and applications](/docs/environments/how-to/connect) through <kbd>Home</kbd> → <kbd>Connect environment</kbd>. Studio generates settings for Acton projects, JavaScript clients, and other RPC tools. Point each client at the same environment so deployments, wallet actions, and frontend requests use the intended state. Selecting another environment in the browser does not redirect a running client.
 
-- [Fund accounts](/docs/environments/fund-accounts) and [fork or import state](/docs/environments/fork-and-import).
-- [Change blockchain configuration](/docs/environments/change-config) in the shared Studio editor.
-- [Save and restore snapshots](/docs/environments/snapshots).
-- [Inspect requests, transactions, and network health](/docs/environments/inspect-network).
-- [Stop, resume, rename, or delete environments](/docs/environments/manage-lifecycle).
+The task guides also provide CLI alternatives. Note that a network started from the CLI, separate from the Studio, is not automatically added to the Studio's environment list.
+
+## Exercise the application
+
+Deploy contracts, [fund accounts](/docs/environments/how-to/fund-accounts), and run the interactions the application needs to support. Inspect the resulting accounts and transactions in <kbd>Explorer</kbd>. Use [API calls and execution traces](/docs/environments/how-to/inspect-network) to investigate unexpected results.
+
+On a simulator network, [control time and mining](/docs/environments/simulator/time) to test deadlines without waiting, or [set API conditions](/docs/environments/simulator/network-conditions) to exercise loading states and retries. On a localnet, [manage nodes and validators](/docs/environments/localnet/nodes) and [generate test traffic](/docs/environments/localnet/activity) to observe the network under load.
+
+For scenarios that require different fees or limits, [edit blockchain configuration](/docs/environments/how-to/change-config). Localnet also supports [administrative account edits](/docs/environments/localnet/admin-actions) to prepare states that ordinary contract messages cannot easily produce.
+
+## Save and repeat
+
+[Save a snapshot](/docs/environments/how-to/snapshots) before changing the scenario. Restore it to repeat the same interactions from a known state. It is helpful for investigating a failure or comparing contract versions.
+
+When finished, [stop the environment](/docs/environments/how-to/manage-lifecycle) to release runtime resources and resume it later. Stopping preserves saved state; deleting the environment removes its managed state and snapshots.

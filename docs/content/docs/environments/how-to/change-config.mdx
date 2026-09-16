@@ -10,8 +10,9 @@ Change a configuration parameter to test fees, limits, or protocol settings. Stu
 
 ## Prerequisites
 
-- A running environment and the parameter to change.
-- A saved [snapshot](/docs/environments/snapshots) for restoring the original state.
+- [Create and start a virtual environment](/docs/environments/how-to/create-network).
+- Choose the configuration parameter number and the replacement value to test.
+- [Save a snapshot](/docs/environments/how-to/snapshots) so you can restore the original state.
 
 ## Edit and apply a parameter
 
@@ -41,7 +42,7 @@ Use the [control API reference](/docs/environments/simulator/control-api) for th
 </Tab>
 <Tab value="Localnet CLI">
 
-Prepare the [shared request file](#cli-request-format). Use the authenticated [control API connection](/docs/environments/connect#localnet-control-api), replacing `<CONTROL_URL>` and `<CONTROL_TOKEN>` with the selected service's values:
+Prepare the [shared request file](#cli-request-format). Use the authenticated [control API connection](/docs/environments/how-to/connect#localnet-control-api), replacing `<CONTROL_URL>` and `<CONTROL_TOKEN>` with the selected service's values:
 
 ```bash
 curl --fail '<CONTROL_URL>/v1/network/config' \

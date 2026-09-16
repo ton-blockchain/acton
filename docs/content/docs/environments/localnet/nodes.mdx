@@ -6,11 +6,12 @@ description: "Add nodes, control validation, and inspect election membership on 
 
 import {Tabs, Tab} from "fumadocs-ui/components/tabs";
 
-Use additional localnet nodes to test synchronization, validator participation, and consensus behavior. Before adding nodes, check the [Docker disk allocation](/docs/environments/localnet/overview#requirements-and-startup).
+Use additional localnet nodes to test synchronization, validator participation, and consensus behavior.
 
 ## Prerequisites
 
-- A running localnet with enough Docker resources for the additional nodes.
+- [Create and start a localnet](/docs/environments/how-to/create-network).
+- Check Docker's memory and disk allocation before adding nodes. Use the [localnet storage requirements](/docs/environments/localnet/overview#requirements-and-startup) to estimate the additional space.
 
 ## Manage participation
 
@@ -53,5 +54,5 @@ acton localnet node dev remove <NODE_ID> --yes
 Entering validation enables election participation; it does not immediately elect the node. Leaving validation still requires serving its existing elected duties. Check the current and next sets before removal.
 
 <Callout type="caution">
-  Node removal deletes its state. Forcing removal of an elected validator can disrupt consensus. Save a [localnet snapshot](/docs/environments/snapshots) before topology experiments.
+  Node removal deletes its state. Forcing removal of an elected validator can disrupt consensus. Save a [localnet snapshot](/docs/environments/how-to/snapshots) before topology experiments.
 </Callout>

@@ -10,9 +10,10 @@ Create an isolated network for scripts and application integration tests.
 
 ## Prerequisites
 
-- [Acton](/docs/installation) {{ acton_version }} or later and an `Acton.toml` project.
-- [Configured wallets](/docs/wallets#create-a-wallet) when startup accounts are needed.
-- For localnet only, the [Docker requirements](/docs/environments/localnet/overview#requirements-and-startup).
+- Install [Acton](/docs/installation) {{ acton_version }} or later.
+- [Create or initialize an Acton project](/docs/projects#create-or-initialize-a-project) containing `Acton.toml`.
+- To initialize startup accounts, [configure the wallets](/docs/wallets#create-a-wallet) you want to use.
+- For localnet, install and start Docker according to the [localnet requirements](/docs/environments/localnet/overview#requirements-and-startup).
 
 ## Create the network
 
@@ -33,7 +34,7 @@ acton studio
 
 Studio preselects `[localnet].accounts`, but initializes only the wallets submitted in the form. Each selected wallet starts with 100 GRAM.
 
-![Studio environment creation and startup account selection](../imgs/create-environment-dark.png)
+![Studio environment creation and startup account selection](../../imgs/create-environment-dark.png)
 
 </Tab>
 <Tab value="Simulator CLI">
@@ -64,11 +65,11 @@ acton localnet status dev --json
 
 `deployer` must be a configured wallet. The command waits for readiness and prints endpoint URLs. The port range `19000`–`19004` must be free. Omit `--port-base` to let Acton choose a range. Omit `--accounts` to use `[localnet].accounts`, or use `--accounts ""` for no project wallets.
 
-These options apply to new networks; [resume an existing network](/docs/environments/manage-lifecycle#stop-or-resume-work) without creation options. Without `--detach`, a newly launched service stays in the foreground and <kbd>Ctrl</kbd>+<kbd>C</kbd> stops it.
+These options apply to new networks; [resume an existing network](/docs/environments/how-to/manage-lifecycle#stop-or-resume-work) without creation options. Without `--detach`, a newly launched service stays in the foreground and <kbd>Ctrl</kbd>+<kbd>C</kbd> stops it.
 
 </Tab>
 </Tabs>
 
 ## Verify and continue
 
-In Studio, confirm the environment is running and open <kbd>Home</kbd>. From the CLI, confirm `running: true` for the simulator or `status: "running"` for localnet. [Connect scripts and applications](/docs/environments/connect) using the reported URLs.
+In Studio, confirm the environment is running and open <kbd>Home</kbd>. From the CLI, confirm `running: true` for the simulator or `status: "running"` for localnet. [Connect scripts and applications](/docs/environments/how-to/connect) using the reported URLs.

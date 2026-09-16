@@ -8,9 +8,9 @@ A localnet runs TON validator-engine nodes, consensus, elections, and TON Center
 
 ## Requirements and startup
 
-- [Acton](/docs/installation) {{ acton_version }} or later.
-- [Docker Engine](https://docs.docker.com/engine/install/) with [Compose v2](https://docs.docker.com/compose/install/), or [Docker Desktop](https://docs.docker.com/desktop/setup/install/), installed and running.
-- An `Acton.toml` project for project builds, scripts, and configured wallets.
+- Install [Acton](/docs/installation) {{ acton_version }} or later.
+- Install and start [Docker Engine](https://docs.docker.com/engine/install/) with [Compose v2](https://docs.docker.com/compose/install/), or [Docker Desktop](https://docs.docker.com/desktop/setup/install/).
+- For project builds, scripts, and configured wallets, [create or initialize an Acton project](/docs/projects#create-or-initialize-a-project) containing `Acton.toml`.
 
 Check Docker before creating a localnet:
 
@@ -27,15 +27,15 @@ A full node can take about 20 seconds to start with images already available. Im
 
 ## Create and connect
 
-[Create a localnet](/docs/environments/create-network) and [connect clients](/docs/environments/connect) through Studio or the standalone CLI.
+[Create a localnet](/docs/environments/how-to/create-network) and [connect clients](/docs/environments/how-to/connect) through Studio or the standalone CLI.
 
 ## Localnet controls
 
 - [Manage nodes and validators](/docs/environments/localnet/nodes) to test synchronization and election participation.
-- [Inspect network health](/docs/environments/inspect-network) to diagnose node, API, and indexer failures.
-- [Change blockchain configuration](/docs/environments/change-config) and [generate test traffic](/docs/environments/localnet/activity).
-- [Import accounts](/docs/environments/fork-and-import) or [edit account state](/docs/environments/localnet/admin-actions).
-- [Save snapshots](/docs/environments/snapshots) and [manage lifecycle](/docs/environments/manage-lifecycle).
+- [Inspect network health](/docs/environments/how-to/inspect-network) to diagnose node, API, and indexer failures.
+- [Change blockchain configuration](/docs/environments/how-to/change-config) and [generate test traffic](/docs/environments/localnet/activity).
+- [Import accounts](/docs/environments/how-to/fork-and-import) or [edit account state](/docs/environments/localnet/admin-actions).
+- [Save snapshots](/docs/environments/how-to/snapshots) and [manage lifecycle](/docs/environments/how-to/manage-lifecycle).
 
 ## Timing and API conditions
 

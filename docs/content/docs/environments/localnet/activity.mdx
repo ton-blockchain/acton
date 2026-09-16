@@ -10,7 +10,8 @@ Generate repeatable classes of on-chain activity to observe nodes and indexers u
 
 ## Prerequisites
 
-- A running localnet and sufficient Docker resources for the intended workload.
+- [Create and start a localnet](/docs/environments/how-to/create-network).
+- Check node, API, and indexer readiness under <kbd>Network</kbd> → <kbd>Health</kbd> before adding load.
 
 ## Configure and run traffic
 
@@ -28,7 +29,7 @@ Transfers use fresh wallets; Jetton and NFT scenarios include deployment and sub
 </Tab>
 <Tab value="Localnet CLI">
 
-Use the [control API connection](/docs/environments/connect#localnet-control-api), replacing `<CONTROL_URL>` and `<CONTROL_TOKEN>`. Save this bounded workload as `activity.json`:
+Use the [control API connection](/docs/environments/how-to/connect#localnet-control-api), replacing `<CONTROL_URL>` and `<CONTROL_TOKEN>`. Save this bounded workload as `activity.json`:
 
 ```json title="activity.json"
 {

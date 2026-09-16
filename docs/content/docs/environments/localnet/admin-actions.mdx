@@ -10,9 +10,9 @@ Administrative actions create controlled account states for localnet tests. They
 
 ## Prerequisites
 
-- A running localnet with all its nodes available.
-- A [snapshot](/docs/environments/snapshots) of any state that must be retained.
-- The target account address and replacement value or BoC.
+- [Create and start a localnet](/docs/environments/how-to/create-network), then confirm that all nodes are running under <kbd>Network</kbd> → <kbd>Nodes</kbd>.
+- Copy the target account address. For balance, code, data, or complete account replacements, prepare the new value or BoC.
+- [Save a snapshot](/docs/environments/how-to/snapshots) so you can restore the original state.
 
 ## Apply an account change
 
@@ -24,7 +24,7 @@ Administrative actions create controlled account states for localnet tests. They
 1. Enter the replacement value. Balance uses GRAM; code/data and complete account replacements accept a BoC in hex or base64.
 1. Select <kbd>Apply changes</kbd> and wait for completion. Studio pauses the network, saves recovery snapshots, applies the change on every node, and resumes it.
 
-<kbd>Freeze account</kbd>, <kbd>Make account uninitialized</kbd>, and <kbd>Delete account</kbd> change account status rather than sending ordinary contract messages. To copy state from another network, use [Import accounts](/docs/environments/fork-and-import).
+<kbd>Freeze account</kbd>, <kbd>Make account uninitialized</kbd>, and <kbd>Delete account</kbd> change account status rather than sending ordinary contract messages. To copy state from another network, use [Import accounts](/docs/environments/how-to/fork-and-import).
 
 </Tab>
 <Tab value="Localnet CLI">
@@ -39,7 +39,7 @@ There is no dedicated administrative subcommand. Prepare `account-edit.json`, re
 }
 ```
 
-Use the [control connection](/docs/environments/connect#localnet-control-api), replacing `<CONTROL_URL>` and `<CONTROL_TOKEN>` with the service values:
+Use the [control connection](/docs/environments/how-to/connect#localnet-control-api), replacing `<CONTROL_URL>` and `<CONTROL_TOKEN>` with the service values:
 
 ```bash
 curl --fail '<CONTROL_URL>/v1/network/admin' \

@@ -10,8 +10,9 @@ Configure deployment scripts, RPC clients, and wallet signing for the selected e
 
 ## Prerequisites
 
-- A [running environment](/docs/environments/create-network).
-- An Acton project with a deployment script, or an application with a TON RPC client.
+- [Create and start a virtual environment](/docs/environments/how-to/create-network).
+- Prepare the client you want to connect: an [Acton deployment script](/docs/deploy) or an [application with a TON RPC client](/docs/dapps).
+- To deploy contracts, confirm that the deployment wallet has funds on that environment; [fund it](/docs/environments/how-to/fund-accounts) if needed.
 
 ## Connect a client
 
@@ -25,7 +26,7 @@ Configure deployment scripts, RPC clients, and wallet signing for the selected e
 
 The <kbd>Integrate</kbd> page retains these examples. Generated Studio proxy URLs remain stable across runtime restarts and environment renames. Use the command's generated network name; selecting another browser workspace does not change the CLI destination.
 
-![Studio connection examples for Acton projects, JavaScript applications, and RPC clients](../imgs/environment-dashboard-dark.png)
+![Studio connection examples for Acton projects, JavaScript applications, and RPC clients](../../imgs/environment-dashboard-dark.png)
 
 For dApp signing, open <kbd>Wallets</kbd> and use its TON Connect controls. The wallet connection and RPC client must target the same environment. TON Connect configures signing; <kbd>Integrate</kbd> configures reads and message submission.
 

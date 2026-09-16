@@ -10,9 +10,11 @@ A simulator fork resolves remote accounts on demand from a pinned public-network
 
 ## Prerequisites
 
-- Acton and an `Acton.toml` project.
-- Access to the source RPC provider; historical forks need a provider that serves the selected block.
-- For localnet, its [Docker requirements](/docs/environments/localnet/overview#requirements-and-startup).
+- Install [Acton](/docs/installation) {{ acton_version }} or later.
+- [Create or initialize an Acton project](/docs/projects#create-or-initialize-a-project) containing `Acton.toml`.
+- Choose a source RPC provider and obtain an API key if it requires one. For a historical fork, confirm that it serves the selected block.
+- For localnet, install and start Docker according to the [localnet requirements](/docs/environments/localnet/overview#requirements-and-startup).
+- To import accounts through Studio, copy their addresses from the source network.
 
 ## Select the source state
 
@@ -29,7 +31,7 @@ For a simulator:
 For localnet, add account imports during creation or open <kbd>Import accounts</kbd> on an existing network. Select a source environment, enter each active account address, optionally name the contract, then submit. Imports copy code, data, and balances.
 
 <Callout type="caution">
-  Importing into an existing localnet pauses it for a hardfork, replaces accounts at the selected addresses, then resumes the network. Save a [snapshot](/docs/environments/snapshots) before replacing needed state.
+  Importing into an existing localnet pauses it for a hardfork, replaces accounts at the selected addresses, then resumes the network. Save a [snapshot](/docs/environments/how-to/snapshots) before replacing needed state.
 </Callout>
 
 </Tab>
@@ -63,4 +65,4 @@ acton localnet start imported --accounts-file accounts.json --detach
 
 ## Verify the imported state
 
-In a simulator, inspect the fork block on <kbd>Home</kbd> and open a source account in Explorer. In localnet, inspect imported code, storage, and balance. Source transactions do not appear as local history. [Save a snapshot](/docs/environments/snapshots) before modifying the copied state.
+In a simulator, inspect the fork block on <kbd>Home</kbd> and open a source account in Explorer. In localnet, inspect imported code, storage, and balance. Source transactions do not appear as local history. [Save a snapshot](/docs/environments/how-to/snapshots) before modifying the copied state.

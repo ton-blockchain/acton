@@ -10,7 +10,7 @@ Stop a network to release runtime resources while preserving saved state.
 
 ## Prerequisites
 
-- A created environment and a saved snapshot of any state that must be retained.
+- [Create a virtual environment](/docs/environments/how-to/create-network) to stop, resume, rename, or delete.
 
 ## Stop or resume work
 
@@ -24,7 +24,7 @@ The <kbd>Environment settings</kbd> icon at the bottom of the sidebar opens iden
 1. To rename it, open the sidebar settings, edit <kbd>Name</kbd>, and select <kbd>Save</kbd>.
 1. To remove it permanently, open the settings' <kbd>Danger zone</kbd>, select <kbd>Delete environment</kbd>, and confirm.
 
-A stopped environment still exposes settings and [snapshot controls](/docs/environments/snapshots#save-and-restore-state).
+A stopped environment still exposes settings and [snapshot controls](/docs/environments/how-to/snapshots#save-and-restore-state).
 
 </Tab>
 <Tab value="Simulator CLI">
@@ -35,7 +35,7 @@ Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the simulator terminal. Resume committed s
 acton simulator start --port 5411 --db-path .acton/simulator.sqlite
 ```
 
-For state beyond committed blocks, use [simulator checkpoints](/docs/environments/snapshots#retain-simulator-checkpoints). The standalone simulator CLI has no named-network rename or delete command.
+For state beyond committed blocks, use [simulator checkpoints](/docs/environments/how-to/snapshots#retain-simulator-checkpoints). The standalone simulator CLI has no named-network rename or delete command.
 
 </Tab>
 <Tab value="Localnet CLI">
