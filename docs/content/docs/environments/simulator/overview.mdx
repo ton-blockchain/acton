@@ -1,16 +1,26 @@
 ---
 title: "Simulator networks"
 sidebarTitle: "Overview"
-description: "Develop against a persistent emulated TON network with forks, funding, mining controls, virtual time, and snapshots"
+description: "Simulator network behavior, prerequisites, controls, and compatibility limits"
 ---
 
-A simulator network is Acton's simplified TON implementation, also called simulated localnet. It produces TON-compatible basechain and masterchain blocks without validators or consensus. Acton is the only required runtime; Studio can create a simulator without a project when no project wallets are selected.
+A simulator network is Acton's simplified implementation of TON. It produces basechain and masterchain blocks without validators or consensus. Use it for local contract execution, public-network forks, and tests that need virtual time or manual mining.
+
+Unlike with a [localnet](/docs/environments/localnet/overview), Docker is **not** required.
+
+## Prerequisites
+
+- [Acton](/docs/installation) 1.2 or later installed.
+- An [Acton project](/docs/projects#create-or-initialize-a-project) containing `Acton.toml`.
+- For startup accounts, [configured project wallets](/docs/wallets#create-a-wallet).
+
+[Public-network forks](/docs/environments/how-to/fork-and-import#prerequisites) also require a remote procedure call (RPC) provider and any required API key. Historical forks require access to the selected block.
 
 ## Create and connect
 
 [Create a network](/docs/environments/how-to/create-network) and [connect clients](/docs/environments/how-to/connect) through Studio or the standalone CLI. A standalone simulator serves its bundled explorer at the printed HTTP address, such as `http://127.0.0.1:5411/`.
 
-The [persistence guide](/docs/environments/how-to/snapshots#retain-simulator-checkpoints) covers databases and checkpoints for standalone simulators.
+Standalone simulators [persist committed state in SQLite and runtime state in checkpoints](/docs/environments/how-to/snapshots#retain-simulator-checkpoints).
 
 ## Simulator controls
 
@@ -26,4 +36,4 @@ The simulator exposes TON Center v2/v3, Streaming, Emulate, and optional LiteAPI
 
 Message simulation in <kbd>Transaction emulator</kbd> previews execution without committing it. Sending a message to the simulator network changes its local blockchain.
 
-The simulator does not model validator elections, consensus, or shard split/merge behavior. Use a [localnet](/docs/environments/localnet/overview) for tests that depend on validator or indexer infrastructure.
+The simulator does not model validator elections, consensus, or shard splitting or merging. Use a [localnet](/docs/environments/localnet/overview) for tests that depend on validator or indexer infrastructure.

@@ -4,91 +4,93 @@ sidebarTitle: "API compatibility"
 description: "Coverage matrix for Acton's simulated LiteAPI, TON Center v2/v3, Streaming API, and Emulate API surfaces"
 ---
 
-These matrices document simulator HTTP API coverage. Binary protocol support is documented in the [LiteAPI reference](/docs/environments/simulator/liteapi).
+The simulator implements the HTTP endpoints for TON Center v2/v3, Streaming, and Emulate APIs.
+
+<Callout type="note">
+  The [LiteAPI reference](/docs/environments/simulator/liteapi) covers the binary liteserver protocol.
+</Callout>
 
 ## TON Center v2 coverage matrix
 
-| Method | Endpoint                                | Available in local node | OpenAPI summary                     |
+| Method | Endpoint                                | Supported | Summary                     |
 |--------|-----------------------------------------|-------------------------|-------------------------------------|
-| `GET`  | `/api/v2/detectAddress`                 | ✅                       | Detect address                      |
-| `GET`  | `/api/v2/detectHash`                    | ✅                       | Detect hash                         |
-| `GET`  | `/api/v2/packAddress`                   | ✅                       | Pack address                        |
-| `GET`  | `/api/v2/unpackAddress`                 | ✅                       | Unpack address                      |
-| `GET`  | `/api/v2/getAddressInformation`         | ✅                       | Get Address Information             |
-| `GET`  | `/api/v2/getExtendedAddressInformation` | ✅                       | Get Extended Address Information    |
-| `GET`  | `/api/v2/getShardAccountCell`           | ✅                       | Get Shard Account Cell              |
-| `GET`  | `/api/v2/getWalletInformation`          | ✅                       | Get Wallet Information              |
-| `GET`  | `/api/v2/getAddressBalance`             | ✅                       | Get Address Balance                 |
-| `GET`  | `/api/v2/getAddressState`               | ✅                       | Get Address State                   |
-| `GET`  | `/api/v2/getTokenData`                  | ✅                       | Get Token Data                      |
-| `GET`  | `/api/v2/getMasterchainInfo`            | ✅                       | Get Masterchain Info                |
-| `GET`  | `/api/v2/getMasterchainBlockSignatures` | ❌                       | Get Masterchain Block Signatures    |
-| `GET`  | `/api/v2/getShardBlockProof`            | ❌                       | Get Shard Block Proof               |
-| `GET`  | `/api/v2/getConsensusBlock`             | ✅                       | Get Consensus Block                 |
-| `GET`  | `/api/v2/lookupBlock`                   | ✅                       | Lookup Block                        |
-| `GET`  | `/api/v2/getShards`                     | ✅                       | Get Shards                          |
-| `GET`  | `/api/v2/getBlock`                      | ✅                       | Get raw block BoC                   |
-| `POST` | `/api/v2/getBlock`                      | ✅                       | Get raw block BoC                   |
-| `GET`  | `/api/v2/getBlockHeader`                | ✅                       | Get Block Header                    |
-| `GET`  | `/api/v2/getOutMsgQueueSize`            | ✅                       | Get Out Msg Queue Size              |
-| `GET`  | `/api/v2/getBlockTransactions`          | ✅                       | Get Block Transactions              |
-| `GET`  | `/api/v2/getBlockTransactionsExt`       | ✅                       | Get Block Transactions Extended     |
-| `GET`  | `/api/v2/getTransactions`               | ✅                       | Get Transactions                    |
-| `GET`  | `/api/v2/getTransactionsStd`            | ✅                       | Get Transactions Std                |
-| `GET`  | `/api/v2/tryLocateTx`                   | ✅                       | Try Locate Transaction              |
-| `GET`  | `/api/v2/tryLocateResultTx`             | ✅                       | Try Locate Result Transaction       |
-| `GET`  | `/api/v2/tryLocateSourceTx`             | ✅                       | Try Locate Source Transaction       |
-| `GET`  | `/api/v2/getConfigParam`                | ✅                       | Get Config Parameter                |
-| `GET`  | `/api/v2/getConfigAll`                  | ✅                       | Get All Config                      |
-| `GET`  | `/api/v2/getLibraries`                  | ✅                       | Get Libraries                       |
-| `POST` | `/api/v2/sendBoc`                       | ✅                       | Send serialized BOC                 |
-| `POST` | `/api/v2/sendBocReturnHash`             | ✅                       | Send serialized BOC and return hash |
-| `POST` | `/api/v2/runGetMethod`                  | ✅                       | Run get method                      |
-| `POST` | `/api/v2/runGetMethodStd`               | ✅                       | Run get method with std stack       |
+| `GET`  | `/api/v2/detectAddress`                 | Yes                       | Detect address |
+| `GET`  | `/api/v2/detectHash`                    | Yes                       | Detect hash |
+| `GET`  | `/api/v2/packAddress`                   | Yes                       | Pack address |
+| `GET`  | `/api/v2/unpackAddress`                 | Yes                       | Unpack address |
+| `GET`  | `/api/v2/getAddressInformation`         | Yes                       | Get address information |
+| `GET`  | `/api/v2/getExtendedAddressInformation` | Yes                       | Get extended address information |
+| `GET`  | `/api/v2/getShardAccountCell`           | Yes                       | Get shard account cell |
+| `GET`  | `/api/v2/getWalletInformation`          | Yes                       | Get wallet information |
+| `GET`  | `/api/v2/getAddressBalance`             | Yes                       | Get address balance |
+| `GET`  | `/api/v2/getAddressState`               | Yes                       | Get address state |
+| `GET`  | `/api/v2/getTokenData`                  | Yes                       | Get token data |
+| `GET`  | `/api/v2/getMasterchainInfo`            | Yes                       | Get masterchain info |
+| `GET`  | `/api/v2/getMasterchainBlockSignatures` | No                       | Get masterchain block signatures |
+| `GET`  | `/api/v2/getShardBlockProof`            | No                       | Get shard block proof |
+| `GET`  | `/api/v2/getConsensusBlock`             | Yes                       | Get consensus block |
+| `GET`  | `/api/v2/lookupBlock`                   | Yes                       | Lookup block |
+| `GET`  | `/api/v2/getShards`                     | Yes                       | Get shards |
+| `GET`  | `/api/v2/getBlock`                      | Yes                       | Get raw block BoC |
+| `POST` | `/api/v2/getBlock`                      | Yes                       | Get raw block BoC |
+| `GET`  | `/api/v2/getBlockHeader`                | Yes                       | Get block header |
+| `GET`  | `/api/v2/getOutMsgQueueSize`            | Yes                       | Get out msg queue size |
+| `GET`  | `/api/v2/getBlockTransactions`          | Yes                       | Get block transactions |
+| `GET`  | `/api/v2/getBlockTransactionsExt`       | Yes                       | Get block transactions extended |
+| `GET`  | `/api/v2/getTransactions`               | Yes                       | Get transactions |
+| `GET`  | `/api/v2/getTransactionsStd`            | Yes                       | Get transactions std |
+| `GET`  | `/api/v2/tryLocateTx`                   | Yes                       | Try locate transaction |
+| `GET`  | `/api/v2/tryLocateResultTx`             | Yes                       | Try locate result transaction |
+| `GET`  | `/api/v2/tryLocateSourceTx`             | Yes                       | Try locate source transaction |
+| `GET`  | `/api/v2/getConfigParam`                | Yes                       | Get config parameter |
+| `GET`  | `/api/v2/getConfigAll`                  | Yes                       | Get all config |
+| `GET`  | `/api/v2/getLibraries`                  | Yes                       | Get libraries |
+| `POST` | `/api/v2/sendBoc`                       | Yes                       | Send serialized BoC |
+| `POST` | `/api/v2/sendBocReturnHash`             | Yes                       | Send serialized BoC and return hash |
+| `POST` | `/api/v2/runGetMethod`                  | Yes                       | Run get method |
+| `POST` | `/api/v2/runGetMethodStd`               | Yes                       | Run get method with std stack |
 
 ## TON Center v3 coverage matrix
 
-The matrix below tracks all endpoints from the current TON Center v3 OpenAPI specification.
-
-| Method | Endpoint                                 | Available in local node | Purpose                                                              |
+| Method | Endpoint                                 | Supported | Summary                                                              |
 |--------|------------------------------------------|-------------------------|----------------------------------------------------------------------|
-| `GET`  | `/api/v3/traces`                         | ✅                       | Returns transaction trace tree for a transaction hash.               |
-| `GET`  | `/api/v3/blocks`                         | ✅                       | Returns block metadata with TON Center v3 blockchain filters.         |
-| `GET`  | `/api/v3/accountStates`                  | ✅                       | Returns account states with `interfaces` and token metadata.         |
-| `GET`  | `/api/v3/addressInformation`             | ✅                       | Returns account state in `V2AddressInformation` shape.               |
-| `GET`  | `/api/v3/walletInformation`              | ✅                       | Returns wallet type, state, seqno, and wallet id when available.     |
-| `GET`  | `/api/v3/addressBook`                    | ✅                       | Returns address forms and locally detected interfaces.               |
-| `GET`  | `/api/v3/metadata`                       | ✅                       | Returns locally indexed jetton and NFT metadata.                     |
-| `GET`  | `/api/v3/masterchainInfo`                | ✅                       | Returns the first and latest local masterchain blocks.               |
-| `GET`  | `/api/v3/transactions`                   | ✅                       | Returns transactions with TON Center v3 blockchain filters.           |
-| `GET`  | `/api/v3/messages`                       | ✅                       | Returns messages with TON Center v3 filters.                          |
-| `GET`  | `/api/v3/adjacentTransactions`           | ✅                       | Returns transactions connected by inbound or outbound messages.      |
-| `GET`  | `/api/v3/walletStates`                   | ✅                       | Returns wallet projections for existing account states.              |
-| `GET`  | `/api/v3/topAccountsByBalance`           | ✅                       | Returns accounts sorted by balance.                                  |
-| `GET`  | `/api/v3/transactionsByMasterchainBlock` | ✅                       | Returns transactions included in a masterchain block.                |
-| `GET`  | `/api/v3/transactionsByMessage`          | ✅                       | Returns transactions filtered by message hash/body hash/opcode.      |
-| `GET`  | `/api/v3/pendingTransactions`            | ✅                       | Returns pending transactions filtered by account and trace id.       |
-| `POST` | `/api/v3/message`                        | ✅                       | Sends an external message in BOC and returns message hash fields.    |
-| `POST` | `/api/v3/estimateFee`                    | ✅                       | Estimates fees without committing a transaction.                     |
-| `POST` | `/api/v3/runGetMethod`                   | ✅                       | Runs a get method of a smart contract with an explicit stack.        |
-| `GET`  | `/api/v3/jetton/masters`                 | ✅                       | Returns jetton master metadata with optional filters and pagination. |
-| `GET`  | `/api/v3/jetton/wallets`                 | ✅                       | Returns jetton wallet metadata with optional filters and pagination. |
-| `GET`  | `/api/v3/nft/items`                      | ✅                       | Returns NFT items with optional filters, pagination, and metadata.   |
-| `GET`  | `/api/v3/actions`                        | ❌                       | Returns classified actions.                                          |
-| `GET`  | `/api/v3/decode`                         | ❌                       | Decodes message bodies.                                              |
-| `GET`  | `/api/v3/dns/records`                    | ✅                       | Returns DNS records.                                                 |
-| `GET`  | `/api/v3/jetton/burns`                   | ✅                       | Returns jetton burns.                                                |
-| `GET`  | `/api/v3/jetton/transfers`               | ✅                       | Returns jetton transfers.                                            |
-| `GET`  | `/api/v3/masterchainBlockShardState`     | ✅                       | Returns shard heads referenced by a masterchain block.               |
-| `GET`  | `/api/v3/masterchainBlockShards`         | ✅                       | Returns workchain blocks indexed for a masterchain block.            |
-| `GET`  | `/api/v3/multisig/orders`                | ✅                       | Returns multisig orders.                                             |
-| `GET`  | `/api/v3/multisig/wallets`               | ✅                       | Returns multisig wallets.                                            |
-| `GET`  | `/api/v3/nft/collections`                | ✅                       | Returns NFT collections.                                             |
-| `GET`  | `/api/v3/nft/sales`                      | ✅                       | Returns NFT sales.                                                   |
-| `GET`  | `/api/v3/nft/transfers`                  | ✅                       | Returns NFT transfers.                                               |
-| `GET`  | `/api/v3/pendingActions`                 | ✅                       | Returns an empty pending-actions collection.                         |
-| `GET`  | `/api/v3/pendingTraces`                  | ✅                       | Returns an empty pending-traces collection.                          |
-| `GET`  | `/api/v3/vesting`                        | ✅                       | Returns vesting contract state.                                      |
+| `GET`  | `/api/v3/traces`                         | Yes                       | Returns transaction trace tree for a transaction hash.               |
+| `GET`  | `/api/v3/blocks`                         | Yes                       | Returns block metadata with TON Center v3 blockchain filters.         |
+| `GET`  | `/api/v3/accountStates`                  | Yes                       | Returns account states with `interfaces` and token metadata.         |
+| `GET`  | `/api/v3/addressInformation`             | Yes                       | Returns account state in `V2AddressInformation` shape.               |
+| `GET`  | `/api/v3/walletInformation`              | Yes                       | Returns wallet type, state, seqno, and wallet ID when available.     |
+| `GET`  | `/api/v3/addressBook`                    | Yes                       | Returns address forms and locally detected interfaces.               |
+| `GET`  | `/api/v3/metadata`                       | Yes                       | Returns locally indexed jetton and NFT metadata.                     |
+| `GET`  | `/api/v3/masterchainInfo`                | Yes                       | Returns the first and latest local masterchain blocks.               |
+| `GET`  | `/api/v3/transactions`                   | Yes                       | Returns transactions with TON Center v3 blockchain filters.           |
+| `GET`  | `/api/v3/messages`                       | Yes                       | Returns messages with TON Center v3 filters.                          |
+| `GET`  | `/api/v3/adjacentTransactions`           | Yes                       | Returns transactions connected by inbound or outbound messages.      |
+| `GET`  | `/api/v3/walletStates`                   | Yes                       | Returns wallet projections for existing account states.              |
+| `GET`  | `/api/v3/topAccountsByBalance`           | Yes                       | Returns accounts sorted by balance.                                  |
+| `GET`  | `/api/v3/transactionsByMasterchainBlock` | Yes                       | Returns transactions included in a masterchain block.                |
+| `GET`  | `/api/v3/transactionsByMessage`          | Yes                       | Returns transactions filtered by message hash/body hash/opcode.      |
+| `GET`  | `/api/v3/pendingTransactions`            | Yes                       | Returns pending transactions filtered by account and trace id.       |
+| `POST` | `/api/v3/message`                        | Yes                       | Sends an external message in BoC and returns message hash fields.    |
+| `POST` | `/api/v3/estimateFee`                    | Yes                       | Estimates fees without committing a transaction.                     |
+| `POST` | `/api/v3/runGetMethod`                   | Yes                       | Runs a get method of a smart contract with an explicit stack.        |
+| `GET`  | `/api/v3/jetton/masters`                 | Yes                       | Returns jetton master metadata with optional filters and pagination. |
+| `GET`  | `/api/v3/jetton/wallets`                 | Yes                       | Returns jetton wallet metadata with optional filters and pagination. |
+| `GET`  | `/api/v3/nft/items`                      | Yes                       | Returns NFT items with optional filters, pagination, and metadata.   |
+| `GET`  | `/api/v3/actions`                        | No                       | Returns classified actions.                                          |
+| `GET`  | `/api/v3/decode`                         | No                       | Decodes message bodies.                                              |
+| `GET`  | `/api/v3/dns/records`                    | Yes                       | Returns DNS records.                                                 |
+| `GET`  | `/api/v3/jetton/burns`                   | Yes                       | Returns jetton burns.                                                |
+| `GET`  | `/api/v3/jetton/transfers`               | Yes                       | Returns jetton transfers.                                            |
+| `GET`  | `/api/v3/masterchainBlockShardState`     | Yes                       | Returns shard heads referenced by a masterchain block.               |
+| `GET`  | `/api/v3/masterchainBlockShards`         | Yes                       | Returns workchain blocks indexed for a masterchain block.            |
+| `GET`  | `/api/v3/multisig/orders`                | Yes                       | Returns multisig orders.                                             |
+| `GET`  | `/api/v3/multisig/wallets`               | Yes                       | Returns multisig wallets.                                            |
+| `GET`  | `/api/v3/nft/collections`                | Yes                       | Returns NFT collections.                                             |
+| `GET`  | `/api/v3/nft/sales`                      | Yes                       | Returns NFT sales.                                                   |
+| `GET`  | `/api/v3/nft/transfers`                  | Yes                       | Returns NFT transfers.                                               |
+| `GET`  | `/api/v3/pendingActions`                 | Yes                       | Returns an empty pending-actions collection.                         |
+| `GET`  | `/api/v3/pendingTraces`                  | Yes                       | Returns an empty pending-traces collection.                          |
+| `GET`  | `/api/v3/vesting`                        | Yes                       | Returns vesting contract state.                                      |
 
 `/api/v3/multisig/orders?parse_actions=true` decodes order action envelopes, destinations, values, send modes, and `multisig_update_params`. Other embedded message bodies retain `body_raw` and use `parsed_body_type: "unknown"`.
 
@@ -96,16 +98,16 @@ The matrix below tracks all endpoints from the current TON Center v3 OpenAPI spe
 
 The simulator supports a TON Center Streaming API v2-compatible subset for local tools and the bundled explorer UI. For protocol details, request fields, finality behavior, and notification schemas, use the [official TON Center Streaming API documentation](https://docs.ton.org/api/streaming/overview).
 
-| Transport   | Endpoint                 | Available in local node | Purpose                                      |
+| Transport   | Endpoint                 | Supported | Summary                                      |
 |-------------|--------------------------|-------------------------|----------------------------------------------|
-| `SSE`       | `/api/streaming/v2/sse`  | ✅                       | Opens a `text/event-stream` subscription.    |
-| `WebSocket` | `/api/streaming/v2/ws`   | ✅                       | Opens a WebSocket subscription over JSON.    |
+| Server-sent events (SSE)       | `/api/streaming/v2/sse`  | Yes                       | Opens a `text/event-stream` subscription.    |
+| `WebSocket` | `/api/streaming/v2/ws`   | Yes                       | Opens a WebSocket subscription over JSON.    |
 
-The simulator emits transaction, account-state, jetton-state, and trace updates. Action extraction is not implemented yet, so action notifications should not be used for local indexing.
+The simulator emits transaction, account-state, jetton-state, and trace updates. Action extraction is not implemented; do not use action notifications for local indexing.
 
 ## Emulate API coverage matrix
 
-| Method | Endpoint                            | Available in local node | Purpose                                                                      |
+| Method | Endpoint                            | Supported | Summary                                                                      |
 |--------|-------------------------------------|-------------------------|------------------------------------------------------------------------------|
-| `POST` | `/api/emulate/v1/emulateTrace`      | ✅                       | Emulates external message execution trace against current state (no commit). |
-| `POST` | `/api/emulate/v1/emulateTonConnect` | ✅                       | Emulates a TON Connect transaction request against the sender wallet state.  |
+| `POST` | `/api/emulate/v1/emulateTrace`      | Yes                       | Emulates external message execution trace against current state (no commit). |
+| `POST` | `/api/emulate/v1/emulateTonConnect` | Yes                       | Emulates a TON Connect transaction request against the sender wallet state.  |

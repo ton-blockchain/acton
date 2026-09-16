@@ -1,7 +1,7 @@
 ---
 title: "How to create a virtual network"
 sidebarTitle: "Create a virtual network"
-description: "Create a simulator network or localnet with project wallets using Studio or the CLI"
+description: "Learn how to create a simulator network or localnet with project wallets using Studio or the CLI"
 ---
 
 import {Tabs, Tab} from "fumadocs-ui/components/tabs";
@@ -10,10 +10,10 @@ Create an isolated network for scripts and application integration tests.
 
 ## Prerequisites
 
-- Install [Acton](/docs/installation) {{ acton_version }} or later.
-- [Create or initialize an Acton project](/docs/projects#create-or-initialize-a-project) containing `Acton.toml`.
-- To initialize startup accounts, [configure the wallets](/docs/wallets#create-a-wallet) you want to use.
-- For localnet, install and start Docker according to the [localnet requirements](/docs/environments/localnet/overview#requirements-and-startup).
+- [Acton](/docs/installation) 1.2 or later installed.
+- An [Acton project](/docs/projects#create-or-initialize-a-project) containing `Acton.toml`.
+- For startup accounts, [configure project wallets](/docs/wallets#create-a-wallet). The CLI examples use `deployer`.
+- For localnet, a running Docker engine with [Compose v2](https://docs.docker.com/compose/install/), as specified in the [localnet requirements](/docs/environments/localnet/overview#requirements-and-startup).
 
 ## Create the network
 
@@ -32,7 +32,7 @@ acton studio
 1. Select project wallets under <kbd>Startup accounts</kbd>, or clear the selection for no startup wallets.
 1. Select <kbd>Create environment</kbd> and wait for readiness. Open the resulting environment.
 
-Studio preselects `[localnet].accounts`, but initializes only the wallets submitted in the form. Each selected wallet starts with 100 GRAM.
+Studio preselects [`[localnet].accounts`](/docs/acton-toml#localnet), but initializes only the wallets submitted in the form. Each selected wallet starts with 100 GRAM.
 
 ![Studio environment creation and startup account selection](../../imgs/create-environment-dark.png)
 
@@ -45,7 +45,9 @@ Start a persistent network on port `5411`:
 acton simulator start --port 5411 --db-path .acton/simulator.sqlite --accounts deployer
 ```
 
-`deployer` must be a configured wallet. Omit `--accounts` to use `[localnet].accounts`, or pass `--accounts ""` to select none. Keep this terminal open. In another terminal, inspect readiness:
+The `deployer` must be a configured wallet. Omit [`--accounts`](/docs/commands/simulator#acton-simulator-start) to use `[localnet].accounts`, or pass `--accounts ""` to select none. Keep this terminal open.
+
+In another terminal, inspect readiness:
 
 ```bash
 acton simulator status --port 5411 --json
@@ -63,13 +65,24 @@ acton localnet start dev --port-base 19000 --accounts deployer --detach
 acton localnet status dev --json
 ```
 
-`deployer` must be a configured wallet. The command waits for readiness and prints endpoint URLs. The port range `19000`–`19004` must be free. Omit `--port-base` to let Acton choose a range. Omit `--accounts` to use `[localnet].accounts`, or use `--accounts ""` for no project wallets.
+The command waits for readiness and prints endpoint URLs.
 
-These options apply to new networks; [resume an existing network](/docs/environments/how-to/manage-lifecycle#stop-or-resume-work) without creation options. Without `--detach`, a newly launched service stays in the foreground and <kbd>Ctrl</kbd>+<kbd>C</kbd> stops it.
+<Callout type="note">
+  Without [`--detach`](/docs/commands/localnet#acton-localnet-start), a newly launched service stays in the foreground and <kbd>Ctrl</kbd>+<kbd>C</kbd> would stop it.
+</Callout>
+
+The `deployer` must be a configured wallet. Omit [`--accounts`](/docs/commands/simulator#acton-simulator-start) to use `[localnet].accounts`, or pass `--accounts ""` for no project wallets.
+
+The port range `19000`–`19004` must be free. Omit [`--port-base`](/docs/commands/localnet#acton-localnet-start) to let Acton choose a range.
+
+These options apply to new networks. [Resume an existing network](/docs/environments/how-to/manage-lifecycle#stop-or-resume-work) without creation options.
 
 </Tab>
 </Tabs>
 
 ## Verify and continue
 
-In Studio, confirm the environment is running and open <kbd>Home</kbd>. From the CLI, confirm `running: true` for the simulator or `status: "running"` for localnet. [Connect scripts and applications](/docs/environments/how-to/connect) using the reported URLs.
+- In the Studio, confirm the environment is running and open <kbd>Home</kbd>.
+- From the CLI, confirm `running: true` for the simulator or `status: "running"` for localnet.
+
+Next, [connect scripts and applications](/docs/environments/how-to/connect) using the reported URLs.

@@ -8,10 +8,14 @@ import {Tabs, Tab} from "fumadocs-ui/components/tabs";
 
 Use simulator time controls for expirations, delayed messages, and other time-dependent scenarios. Manual mining queues accepted messages until a block is mined.
 
+<Callout type="caution">
+  Time changes and mining affect the selected simulator network. Advancing time can expire messages or change contract behavior. Restore a saved snapshot to repeat the scenario from its original state.
+</Callout>
+
 ## Prerequisites
 
-- Install [Acton](/docs/installation) {{ acton_version }} or later.
-- If you are changing an existing simulator, [save a snapshot](/docs/environments/how-to/snapshots) to make the scenario repeatable.
+- [Acton](/docs/installation) 1.2 or later installed.
+- For an existing simulator, a [snapshot](/docs/environments/how-to/snapshots) to restore the original scenario.
 
 ## Advance time and mine
 
@@ -30,13 +34,13 @@ The <kbd>Home</kbd> control advances time by an offset. For an absolute time or 
 </Tab>
 <Tab value="Simulator CLI">
 
-Start a network with manual mining and empty blocks enabled:
+Start a network with [manual mining](/docs/commands/simulator#acton-simulator-start) and empty blocks enabled:
 
 ```bash
 acton simulator start --port 5411 --no-mining --mine-empty-blocks
 ```
 
-In another terminal, advance one hour and mine a block:
+In another terminal, advance 1 hour and mine a block:
 
 ```bash
 acton simulator increase-time 3600 --port 5411
@@ -47,11 +51,11 @@ acton simulator status --port 5411 --json
 Replace `<TIMESTAMP>` with a Unix timestamp in seconds at or after the latest mined block time. Choose one of these alternatives:
 
 ```bash
-acton simulator set-time <TIMESTAMP> --port 5411
+acton simulator set-time '<TIMESTAMP>' --port 5411
 ```
 
 ```bash
-acton simulator set-next-block-timestamp <TIMESTAMP> --port 5411
+acton simulator set-next-block-timestamp '<TIMESTAMP>' --port 5411
 acton simulator mine --port 5411
 ```
 
@@ -62,4 +66,4 @@ The next-block override is consumed by the next mined block. With automatic mini
 
 ## Verify the scenario
 
-Check the latest block timestamp in explorer, then rerun the relevant getter or script action. Advancing time alone does not execute a contract; a subsequent message exercises time-dependent code. Restore the checkpoint to repeat the same scenario from its original state.
+Check the latest block timestamp in <kbd>Explorer</kbd>, then rerun the relevant getter or script action. Advancing time alone does not execute a contract — a subsequent message exercises time-dependent code. Restore the checkpoint to repeat the same scenario from its original state.

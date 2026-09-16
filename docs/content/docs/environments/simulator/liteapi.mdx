@@ -4,23 +4,23 @@ sidebarTitle: "LiteAPI support"
 description: "Liteserver binary API coverage in Acton's simulator"
 ---
 
-The simulator exposes a liteserver-compatible binary endpoint for tools that talk to TON nodes through LiteAPI instead of TON Center HTTP APIs. The endpoint supports local indexing, ABI discovery, and get-method execution against simulated state. It returns TON-compatible block cells for the local basechain and masterchain streams.
+The simulator exposes a liteserver-compatible binary endpoint for tools that talk to TON nodes through LiteAPI instead of TON Center HTTP APIs. The endpoint supports local indexing, application binary interface (ABI) discovery, and get-method execution against simulated state. It returns TON-compatible block cells for the local basechain and masterchain streams.
 
 ## Endpoint
 
-LiteAPI is disabled by default. Enable it with `--liteapi`:
+LiteAPI is disabled by default. Enable it with [`--liteapi`](/docs/commands/simulator#acton-simulator-start):
 
 ```bash
 acton simulator start --liteapi
 ```
 
-When the simulator runs on HTTP port `5411`, LiteAPI listens on TCP port `5412` by default. Set another port explicitly with `--liteapi-port`:
+When the simulator runs on HTTP port `5411`, LiteAPI listens on TCP port `5412` by default. Set another port explicitly with [`--liteapi-port`](/docs/commands/simulator#acton-simulator-start):
 
 ```bash
 acton simulator start --liteapi --liteapi-port 15000
 ```
 
-Replace `<PUBLIC_KEY>` with the base64 Ed25519 public key printed by `acton simulator start`. For TON global config JSON, `127.0.0.1` is usually encoded as integer `2130706433`.
+Replace `<PUBLIC_KEY>` with the base64 Ed25519 public key printed by `acton simulator start`. The following JSON is a partial TON global configuration. It encodes `127.0.0.1` as the integer `2130706433`.
 
 ```json
 {
@@ -42,8 +42,8 @@ Replace `<PUBLIC_KEY>` with the base64 Ed25519 public key printed by `acton simu
 `liteServer.getVersion` and `liteServer.getMasterchainInfoExt` report:
 
 | Field | Value | Meaning |
-|-------|-------|---------|
-| `version` | `0x101` | liteserver protocol version `1.1`. |
+|-------|------:|---------|
+| `version` | `0x101` | Liteserver protocol version `1.1`. |
 | `capabilities` | `6` | `+2` for `masterchainInfoExt`, `+4` for `runSmcMethod`. |
 
 The simulator does not advertise capability `+1` because general block proof-chain construction between distinct masterchain blocks is not implemented.
@@ -52,12 +52,12 @@ The simulator does not advertise capability `+1` because general block proof-cha
 
 | Method | Status | Notes |
 |--------|--------|-------|
-| `liteServer.getMasterchainInfo` | Supported | Returns the latest simulator block id and zero-state id. |
+| `liteServer.getMasterchainInfo` | Supported | Returns the latest simulator block ID and zero-state ID. |
 | `liteServer.getMasterchainInfoExt` | Supported | Reports simulator version, capabilities, latest block, and time metadata. |
 | `liteServer.getTime` | Supported | Returns current wall-clock Unix time. |
 | `liteServer.getVersion` | Supported | Reports version `0x101` and capabilities `6`. |
-| `liteServer.getBlock` | Supported | Returns the stored block BoC for the requested masterchain or basechain block. |
-| `liteServer.getBlockHeader` | Supported | Returns block id and a MerkleProof of the stored block root; tonlib extracts header fields from the proof. |
+| `liteServer.getBlock` | Supported | Returns the stored block bag of cells (BoC) for the requested masterchain or basechain block. |
+| `liteServer.getBlockHeader` | Supported | Returns block ID and a Merkle proof of the stored block root; tonlib extracts header fields from the proof. |
 | `liteServer.sendMessage` | Supported | Accepts an external-in message BoC and queues it for simulator execution. |
 | `liteServer.getAccountState` | Supported | Returns account state with local block/state proofs accepted by tonlib account-state validation. |
 | `liteServer.getAccountStatePrunned` | Supported | Same simulator behavior as `getAccountState`. |
@@ -66,7 +66,7 @@ The simulator does not advertise capability `+1` because general block proof-cha
 | `liteServer.getShardInfo` | Limited | Returns the local single-shard descriptor; shard proof validation is not implemented. |
 | `liteServer.getAllShardsInfo` | Limited | Returns local all-shards data; tonlib shard-list proof validation is not implemented. |
 | `liteServer.getOneTransaction` | Limited | Returns transaction data by account and logical time; transaction proof validation is not implemented. |
-| `liteServer.getTransactions` | Supported | Returns account transactions as a multi-root BoC plus containing block ids. |
+| `liteServer.getTransactions` | Supported | Returns account transactions as a multi-root BoC plus containing block IDs. |
 | `liteServer.lookupBlock` | Supported | Resolves by seqno, logical time, or Unix time in the single simulator shard. |
 | `liteServer.lookupBlockWithProof` | Supported | Resolves masterchain and basechain blocks with local Merkle proofs for tonlib lookup validation. |
 | `liteServer.listBlockTransactions` | Limited | Supports `count`, `after`, and `want_proof`; `reverse_order` is not implemented. |
@@ -92,21 +92,23 @@ Unsupported methods return `liteServer.error`.
 | `liteServer.getBlockOutMsgQueueSize` | Not supported | Block queue proof/data is not modeled. |
 | `liteServer.getDispatchQueueInfo` | Not supported | Dispatch queue state is not modeled. |
 | `liteServer.getDispatchQueueMessages` | Not supported | Dispatch queue messages are not modeled. |
-| `liteServer.nonfinal.getValidatorGroups` | Not supported | Non-final validator group API is outside the current simulator model. |
-| `liteServer.nonfinal.getCandidate` | Not supported | Non-final candidate API is outside the current simulator model. |
-| `liteServer.nonfinal.getPendingShardBlocks` | Not supported | Pending shard-block candidate API is outside the current simulator model. |
+| `liteServer.nonfinal.getValidatorGroups` | Not supported | Non-final validator group API is outside the simulator model. |
+| `liteServer.nonfinal.getCandidate` | Not supported | Non-final candidate API is outside the simulator model. |
+| `liteServer.nonfinal.getPendingShardBlocks` | Not supported | Pending shard-block candidate API is outside the simulator model. |
 
 ## Limitations
 
-The simulator mines one executable basechain shard block in workchain `0` and one matching masterchain block in workchain `-1` per seqno. Masterchain blocks carry shard, configuration, and history metadata; their transaction lists are empty. Use basechain blocks to enumerate executed transactions.
+The simulator mines 1 executable basechain shard block in workchain `0` and 1 matching masterchain block in workchain `-1` per seqno. Masterchain blocks carry shard, configuration, and history metadata; their transaction lists are empty. Use basechain blocks to enumerate executed transactions.
 
 Generated BoCs are TON `Block` cells with transaction data and a `state_update`. They omit validator signatures, key-block proof chains, shard split/merge history, and the artifacts listed under [unsupported methods](/docs/environments/simulator/liteapi#unsupported-methods). Method-specific restrictions appear in the coverage tables; transaction listing also omits metadata proof expansion.
 
 ## Proof policy
 
-Header, lookup, configuration, account-state, and transaction-list proofs use the simulator's stored block and state roots. Account-state `proof` and `shard_proof` fields are two-root BoCs containing exotic Merkle proof cells for tonlib validation. These local proofs provide no validator-backed trust guarantees.
+Header, lookup, configuration, account-state, and transaction-list proofs use the simulator's stored block and state roots. Account-state `proof` and `shard_proof` fields are 2-root BoCs containing exotic Merkle proof cells for tonlib validation. These local proofs provide no validator-backed trust guarantees.
 
-For methods whose table entries identify missing proof validation, local clients must use no-proof or unsafe proof mode.
+<Callout type="caution">
+  Use no-proof or unsafe proof mode only with the local simulator for methods lacking proof validation. These modes do not authenticate public-network state. Retain proof validation when connecting to testnet or mainnet.
+</Callout>
 
 ## See also
 

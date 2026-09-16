@@ -1,6 +1,6 @@
 ---
 title: "How to set simulator API conditions"
-sidebarTitle: "Simulate API conditions"
+sidebarTitle: "Set API conditions"
 description: "Set simulator request limits and response delay to test client behavior"
 ---
 
@@ -10,8 +10,8 @@ Use simulator network conditions to test loading states, timeouts, and rate-limi
 
 ## Prerequisites
 
-- Install [Acton](/docs/installation) {{ acton_version }} or later.
-- Prepare an application or RPC client to send requests using the [generated connection settings](/docs/environments/how-to/connect). You will connect it after creating the simulator.
+- [Acton](/docs/installation) 1.2 or later installed.
+- An application or remote procedure call (RPC) client to [connect to the simulator](/docs/environments/how-to/connect).
 
 ## Configure conditions
 
@@ -19,9 +19,9 @@ Use simulator network conditions to test loading states, timeouts, and rate-limi
 <Tab value="UI">
 
 1. In <kbd>Create environment</kbd>, select <kbd>Simulator</kbd> and expand <kbd>Network and mining</kbd>.
-1. Set <kbd>Rate limit</kbd> to `2` requests per second and <kbd>Response delay</kbd> to `300` milliseconds.
+1. Set <kbd>Rate limit</kbd> to 2 requests per second and <kbd>Response delay</kbd> to 300 ms.
 1. Create the environment and connect the client.
-1. To change latency later, open sidebar settings → <kbd>Network</kbd>, adjust <kbd>Response delay</kbd>, and select <kbd>Apply</kbd>. Use `0` to disable the delay.
+1. To change latency later, open sidebar settings → <kbd>Network</kbd>, adjust <kbd>Response delay</kbd>, and select <kbd>Apply</kbd>. Use 0 ms to disable the delay.
 
 The running network's rate limit is displayed for reference. Create another environment to use a different startup rate limit.
 
@@ -32,7 +32,7 @@ The running network's rate limit is displayed for reference. Create another envi
 acton simulator start --port 5411 --rate-limit 2 --response-delay-ms 300
 ```
 
-Change latency while the process runs:
+Change latency with the [network conditions endpoint](/docs/environments/simulator/control-api) while the process runs:
 
 ```bash
 curl --fail http://127.0.0.1:5411/acton_setNetworkConditions \
