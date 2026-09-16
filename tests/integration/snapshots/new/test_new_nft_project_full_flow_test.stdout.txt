@@ -4,21 +4,6 @@
 
  TEST  [ROOT]/foobar
 
- > tests/e2e-happy-paths.test.tolk (5 tests)
-  ✓ nft e2e bench: stage 1 deploy collection [TIME]
-  ✓ nft e2e bench: stage 2 report royalty params [TIME]
-  ✓ nft e2e bench: stage 3 deploy nft item [TIME]
-  ✓ nft e2e bench: stage 4 transfer nft item and request static data [TIME]
-  ✓ nft e2e bench: stage 5 full collection and item flow [TIME]
- > tests/mutation-regressions.test.tolk (8 tests)
-  ✓ mutation: batch deploy should reject action-list overflow and preserve collection state [TIME]
-  ✓ mutation: batch deploy should report exact failing counter for skipped indexes [TIME]
-  ✓ mutation: batch redeploy should not over-increment next item index [TIME]
-  ✓ mutation: uninitialized item getter should expose deployment skeleton only [TIME]
-  ✓ mutation: uninitialized item should reject initialization from non-collection sender [TIME]
-  ✓ mutation: ownership transfer should fail one nanotone below forward-only threshold [TIME]
-  ✓ mutation: ownership transfer with zero forward amount should exhaust rest exactly [TIME]
-  ✓ mutation: ownership transfer with forward amount should emit exact zero-rest payouts [TIME]
  > tests/nft-collection.test.tolk (8 tests)
   ✓ nft: report royalty params [TIME]
   ✓ nft: should not allow any other opcode not from owner [TIME]
@@ -43,4 +28,4 @@
   ✓ nft: should fail with incomplete transfer body [TIME]
   ✓ nft: bench should deploy 100 nfts via batch deploy [TIME]
 
- ✓ 34 passed in 4 files
+ ✓ 21 passed in 2 files

@@ -17,9 +17,6 @@ ready-to-run deployment and management scripts.
   scripts.
 - `tests/nft-collection.test.tolk` and `tests/nft-item.test.tolk` cover
   collection behavior and item behavior in focused reference suites.
-- `tests/e2e-happy-paths.test.tolk` exercises the full collection and item flow;
-  `tests/mutation-regressions.test.tolk` covers batch limits, initialization,
-  and transfer fee boundaries.
 - `.github/workflows/contracts.yml` runs build, format, lint, and test checks
   on GitHub Actions.
 

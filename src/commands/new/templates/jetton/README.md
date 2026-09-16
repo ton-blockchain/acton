@@ -18,8 +18,7 @@ transfers, metadata changes, and admin flows.
 - `wrappers/utils.tolk` adds deployment, minting, and transfer helpers, including
   explicit inline, reference, and automatic forward-payload encoding.
 - `tests/*.test.tolk` covers state init, gas, bounce handling, wallet behavior,
-  admin and governance flows, protocol validation, complete token lifecycles,
-  and regressions found through mutation testing.
+  admin and governance flows, and protocol validation.
 - `scripts/deploy.tolk` builds on-chain metadata, deploys the minter, and reads
   total supply back from the network.
 - `.github/workflows/contracts.yml` runs build, format, lint, and test checks

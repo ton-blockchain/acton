@@ -4,10 +4,8 @@ import "@acton/build"
 import "@acton/emulation/config"
 import "@acton/emulation/network"
 import "@acton/emulation/testing"
-import "@acton/testing/assert"
 import "@acton/testing/expect"
 import "@acton/types/big_array"
-import "@acton/types/message"
 import "@acton/types/out_actions"
 import "@acton/types/transaction"
 import "@contracts/jetton-utils"
@@ -246,18 +244,4 @@ fun mintTo(minter: JettonMinter, admin: Treasury, recipient: address, amount: co
     expect(wallet.getJettonBalance()).toEqual(amount);
     expect(minter.getTotalSupply()).toEqual(supplyBefore + amount);
     return wallet;
-}
-
-fun TlbCommonMessageInfo.toInternal(self): TlbInternalMessage {
-    match (self) {
-        TlbInternalMessage => {
-            return self;
-        }
-        TlbExternalInMessageInfo => {
-            Assert.fail("expected internal message info");
-        }
-        TlbExternalOutMessageInfo => {
-            Assert.fail("expected internal message info");
-        }
-    }
 }

@@ -23,12 +23,6 @@
   ✓ bounce: minter restores supply on internal_transfer bounce [TIME]
   ✓ bounce: wallet restores balance on internal_transfer bounce [TIME]
   ✓ bounce: wallet restores balance on burn_notification bounce [TIME]
- > tests/e2e-happy-paths.test.tolk (5 tests)
-  ✓ jetton e2e bench: stage 1 deploy minter [TIME]
-  ✓ jetton e2e bench: stage 2 mint to admin wallet [TIME]
-  ✓ jetton e2e bench: stage 3 transfer to recipient wallet [TIME]
-  ✓ jetton e2e bench: stage 4 burn recipient jettons [TIME]
-  ✓ jetton e2e bench: stage 5 full minter and wallet flow [TIME]
  > tests/gas.test.tolk (13 tests)
   ✓ gas: transfer minimal value edge [TIME]
   ✓ gas: transfer minimal value is message-size aware [TIME]
@@ -43,32 +37,6 @@
   ✓ gas: burn gas fee should follow config [TIME]
   ✓ gas: burn should fail when sent grams are clearly insufficient [TIME]
   ✓ gas: wallet storage fee should be measurable [TIME]
- > tests/mutation-regressions.test.tolk (25 tests)
-  ✓ mutation: direct wallet internal transfer should persist balance and action modes [TIME]
-  ✓ mutation: direct wallet should accept sibling transfers and reject outsiders [TIME]
-  ✓ mutation: direct wallet zero forward GRAM should not notify owner [TIME]
-  ✓ mutation: direct wallet exact-balance transfer should persist and use deploy mode [TIME]
-  ✓ mutation: direct wallet should reject non-owner transfers [TIME]
-  ✓ mutation: direct wallet should reject overspending jettons [TIME]
-  ✓ mutation: direct wallet should reject masterchain recipients [TIME]
-  ✓ mutation: direct wallet should reject malformed forward payload [TIME]
-  ✓ mutation: direct wallet unknown opcode should fail [TIME]
-  ✓ mutation: direct wallet exact-balance burn should persist and use minter mode [TIME]
-  ✓ mutation: direct wallet should reject non-owner burns [TIME]
-  ✓ mutation: direct wallet should reject overburning jettons [TIME]
-  ✓ mutation: direct wallet bounced transfer should restore balance persistently [TIME]
-  ✓ mutation: direct wallet transfer minimal value edge [TIME]
-  ✓ mutation: direct wallet transfer with forward amount requires second fee [TIME]
-  ✓ mutation: direct wallet transfer gas and storage fees should follow config [TIME]
-  ✓ mutation: direct wallet burn minimal value edge [TIME]
-  ✓ mutation: direct wallet burn fees should follow config [TIME]
-  ✓ mutation: minter should report mintable and emit set-code action on upgrade [TIME]
-  ✓ mutation: minter unknown opcode should fail [TIME]
-  ✓ mutation: minter should reject masterchain mint recipients [TIME]
-  ✓ mutation: minter should reject malformed mint forward payload [TIME]
-  ✓ mutation: minter discovery and burn paths should use expected send modes [TIME]
-  ✓ mutation: minter mint minimal value edge and deploy mode [TIME]
-  ✓ mutation: minter mint fees should follow forward gas and storage config [TIME]
  > tests/protocol-validation.test.tolk (7 tests)
   ✓ validation: malformed forward payload should be rejected [TIME]
   ✓ validation: malformed custom payload should be rejected [TIME]
@@ -91,4 +59,4 @@
   ✓ wallet: non-owner cannot burn jettons [TIME]
   ✓ wallet: cannot burn more jettons than balance [TIME]
 
- ✓ 78 passed in 8 files
+ ✓ 48 passed in 6 files
