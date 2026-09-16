@@ -13,6 +13,9 @@
 /// - `{:ton}`: legacy alias for `{:gram}` / `{:grams}`
 /// - `{:cell-tree}`: cell/slice/builder/Cell<T> formatted as a tree of cell references
 ///
+/// Binary output, hexadecimal prefixes, width, fill, alignment, and sign-aware
+/// zero padding are available since Acton 1.2, as are the `gram` and `grams` aliases.
+///
 /// Placeholder syntax:
 /// - A placeholder is either `{}` or `{:<format-spec>}`.
 /// - `<format-spec>` is `[fill][align][width][type]`; every part is optional,

@@ -60,6 +60,8 @@ output = "Wallet.boc"
 depends = ["Child"]
 ```
 
+Available since Acton 1.1.
+
 For a precompiled contract, keep `src` pointed at the BoC and add `types` when
 you want Acton to emit ABI:
 

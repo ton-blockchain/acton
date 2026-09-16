@@ -10,6 +10,10 @@ acton-verify --- Verify contract source code on the TON verifier service
 
 ## Description
 
+Available since Acton 1.2.
+
+This manual describes the ticket-based source verifier introduced in Acton 1.2.
+
 Verify local contract source code with the TON verifier on TON testnet.
 
 The command compiles the local sources, requests a verification ticket, sends
@@ -62,6 +66,8 @@ Prepare verification without sending the payment or uploading sources.
 {{/option}}
 
 {{#option "`--payment-tx-hash` _payment-tx-hash_" }}
+Available since Acton 1.2.
+
 Reuse a finalized testnet payment transaction.
 
 The transaction must contain the code hash from the current verification.

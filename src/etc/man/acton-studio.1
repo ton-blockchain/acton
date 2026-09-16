@@ -1,0 +1,83 @@
+'\" t
+.TH "ACTON\-STUDIO" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-studio \[em] Open the browser workspace for an Acton project
+.SH "SYNOPSIS"
+\fBacton studio\fR [\fIoptions\fR]
+.SH "DESCRIPTION"
+Available since Acton 1.2.
+.sp
+Start Acton Studio for the selected project and open it in the default browser.
+Studio provides test history, contract inspection, wallets, and local environments.
+It listens on \fB127.0.0.1:3015\fR by default. Keep the command running while using Studio.
+.sp
+Workspace metadata, test history, and managed environment data are stored under
+\fB\&.studio/\fR in the project. Docker is required for Localnet environments;
+Simulator environments do not require Docker.
+.SH "OPTIONS"
+.sp
+\fB\-\-host\fR \fIip\fR
+.RS 4
+Address for the Studio server. Only loopback addresses are accepted.
+.RE
+.sp
+\fB\-\-port\fR \fIport\fR
+.RS 4
+Port for the Studio server. Use a different port if the default is occupied.
+.RE
+.sp
+\fB\-\-no\-open\fR
+.RS 4
+Start Studio without opening the default browser.
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Path to the \fBActon.toml\fR file to use for this invocation.
+.sp
+Use this when running the command outside the project directory or when the
+manifest lives at a non\-default location.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Path to the project root to use for configuration discovery and relative
+defaults.
+.sp
+This conflicts with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "TEST REPORTING"
+CLI test runs report to Studio when it is running for the same project.
+Reporting failures do not change test success or the exit status.
+Use \fBacton test \-\-no\-studio\-reporting\fR or \fB[test].studio\-reporting = false\fR
+to disable reporting.
+.SH "EXAMPLES"
+.sp
+.RS 4
+.nf
+acton studio
+acton studio \-\-port 3020 \-\-no\-open
+acton \-\-project\-root ../my\-project studio
+.fi
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIStudio guide\fR <https://ton\-blockchain.github.io/acton/docs/studio/getting\-started>
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help test\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help simulator\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help localnet\fR
+.RE

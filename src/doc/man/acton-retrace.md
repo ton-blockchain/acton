@@ -21,6 +21,11 @@ the named project contract by recompiling it with debug info and source maps.
 When `--debug` is added, the prepared replay is exposed as a local Debug
 Adapter Protocol (DAP) server for editor integration.
 
+Available since Acton 1.2.
+
+Retrace also supports tick-tock transactions and restores the previous
+masterchain block context used by the original execution.
+
 ## Options
 
 ### Retrace Options
@@ -35,6 +40,10 @@ Transaction hash in hex format.
 Network to retrace from.
 
 Without this flag, Acton tries mainnet first and then falls back to testnet.
+
+Available since Acton 1.2.
+
+`localnet` and `custom:<name>` use TON Center endpoints configured in `Acton.toml`.
 {{/option}}
 
 {{#option "`--verbose`" }}

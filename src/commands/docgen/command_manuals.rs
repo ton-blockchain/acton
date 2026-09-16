@@ -93,6 +93,13 @@ pub(super) const COMMAND_MANUALS: &[CommandManualSpec] = &[
         docs_description: "Reference manual for the acton library command",
     },
     CommandManualSpec {
+        command: "studio",
+        source_name: "acton-studio.md",
+        docs_slug: "studio",
+        docs_title: "acton studio",
+        docs_description: "Reference manual for the acton studio command",
+    },
+    CommandManualSpec {
         command: "simulator",
         source_name: "acton-simulator.md",
         docs_slug: "simulator",

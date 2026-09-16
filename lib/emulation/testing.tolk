@@ -113,6 +113,8 @@ fun testing.createTraceIterationCursor(from: address, message: OutMessage): TxCu
 /// val first = cursor.executeN(1);
 /// cursor.close();
 /// ```
+///
+/// Available since Acton 1.2.
 fun testing.createExternalTraceIterationCursor(message: ExternalInMessage): TxCursor {
     return { id: ffi.startMessageIter(message.messageCell, null) };
 }
@@ -168,6 +170,7 @@ struct Treasury {
 /// Create and fund a treasury in the specified workchain (basechain by default).
 ///
 /// Each call sends 10000 GRAM, minus fees, to the address derived from name and workchain.
+/// The `workchain` parameter is available since Acton 1.2.
 ///
 /// Example:
 /// ```tolk
@@ -268,7 +271,8 @@ fun testing.setNow(now: uint32): void {
 /// Get the current Unix timestamp used in emulation.
 ///
 /// Test and script runs initialize this value from the current wall clock. A
-/// forked run uses the pinned block timestamp instead. Call [testing.setNow] to
+/// fork with an explicit block number uses that block's timestamp instead.
+/// Latest forks use the current wall clock. Call [testing.setNow] to
 /// override it for time-dependent scenarios.
 ///
 /// Example:
@@ -307,6 +311,8 @@ fun testing.getNow(): uint32 {
 /// val seed = testing.setRandomSeed();
 /// println("random seed: {:X}", seed);
 /// ```
+///
+/// Available since Acton 1.2.
 fun testing.setRandomSeed(seed: uint256? = null): uint256 {
     if (seed == null) {
         seed = ffi.generateRandomSeed();
@@ -338,6 +344,8 @@ fun testing.setRandomSeed(seed: uint256? = null): uint256 {
 /// val result = net.sendExternal(message);
 /// testing.setChecksigIgnore(false);
 /// ```
+///
+/// Available since Acton 1.2.
 fun testing.setChecksigIgnore(ignore: bool): void {
     ffi.setChecksigIgnore(ignore);
 }

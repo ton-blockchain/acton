@@ -69,6 +69,8 @@ OPTIONS
            build/cache/masterchain-snapshots/<network>/<seqno>.json.
 
        --no-fork-cache
+           Available since Acton 1.2.
+
            Disable persistent account and library cache. Use this when you want
            every script run to fetch forked accounts and libraries from the
            remote API. This option does not disable the 24-hour masterchain

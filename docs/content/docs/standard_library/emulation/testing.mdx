@@ -140,6 +140,8 @@ such as large cascades and interleaving multiple message chains.
 
 ## `testing.createExternalTraceIterationCursor`
 
+<AvailabilityBadge since="Acton 1.2" />
+
 ```tolk
 fun testing.createExternalTraceIterationCursor(message: ExternalInMessage): TxCursor
 ```
@@ -159,7 +161,7 @@ val first = cursor.executeN(1);
 cursor.close();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L116" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L118" />
 
 ## `testing.processSingleTraceStep`
 
@@ -190,7 +192,7 @@ testing.processSingleTraceStep(notDeployer.address, bouncedMsg);
 
 See [net.send](/docs/standard_library/emulation/network#netsend) or [net.sendExternal](/docs/standard_library/emulation/network#netsendexternal) if you need full recursive trace processing.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L142" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L144" />
 
 ## `testing.runTickTock`
 
@@ -209,7 +211,7 @@ val results = testing.runTickTock(electorAddress, false); // run tick
 val results = testing.runTickTock(electorAddress, true);  // run tock
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L157" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L159" />
 
 ## `Treasury`
 
@@ -223,7 +225,7 @@ Treasury is a special contract that is used to deploy other contracts.
 
 To create a treasury, use the [testing.treasury](#testingtreasury) method.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L164" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L166" />
 
 ## `testing.treasury`
 
@@ -234,6 +236,7 @@ fun testing.treasury(name: string, workchain: int8 = BASECHAIN): Treasury
 Create and fund a treasury in the specified workchain (basechain by default).
 
 Each call sends 10000 GRAM, minus fees, to the address derived from name and workchain.
+The `workchain` parameter is available since Acton 1.2.
 
 Example:
 ```tolk
@@ -245,7 +248,7 @@ get fun `test mint`() {
 
 Note: in scripts always use [scripts.wallet](/docs/standard_library/emulation/scripts#scriptswallet) instead.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L181" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L184" />
 
 ## `testing.getAccountState`
 
@@ -269,7 +272,7 @@ if (state != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L225" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L228" />
 
 ## `testing.getAccountStorageFee`
 
@@ -289,7 +292,7 @@ if (storageFee != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L240" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L243" />
 
 ## `testing.setNow`
 
@@ -315,7 +318,7 @@ val futureTime = testing.getNow() + 1000; // 1000 seconds from now
 testing.setNow(futureTime);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L261" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L264" />
 
 ## `testing.getNow`
 
@@ -326,7 +329,8 @@ fun testing.getNow(): uint32
 Get the current Unix timestamp used in emulation.
 
 Test and script runs initialize this value from the current wall clock. A
-forked run uses the pinned block timestamp instead. Call [testing.setNow](#testingsetnow) to
+fork with an explicit block number uses that block's timestamp instead.
+Latest forks use the current wall clock. Call [testing.setNow](#testingsetnow) to
 override it for time-dependent scenarios.
 
 Example:
@@ -335,9 +339,11 @@ val currentTime = testing.getNow();
 println("Current emulation time: {}", currentTime);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L279" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L283" />
 
 ## `testing.setRandomSeed`
+
+<AvailabilityBadge since="Acton 1.2" />
 
 ```tolk
 fun testing.setRandomSeed(seed: uint256? = null): uint256
@@ -371,9 +377,11 @@ val seed = testing.setRandomSeed();
 println("random seed: {:X}", seed);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L310" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L316" />
 
 ## `testing.setChecksigIgnore`
+
+<AvailabilityBadge since="Acton 1.2" />
 
 ```tolk
 fun testing.setChecksigIgnore(ignore: bool): void
@@ -400,7 +408,7 @@ val result = net.sendExternal(message);
 testing.setChecksigIgnore(false);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L341" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L349" />
 
 ## `testing.topUp`
 
@@ -418,7 +426,7 @@ testing.topUp(address, grams("10"));
 Note: This function for tests only!
 For testnet GRAM airdrop onto your wallet, use `acton wallet airdrop` command.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L354" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L362" />
 
 ## `testing.getAccountBalance`
 
@@ -436,7 +444,7 @@ val balance = testing.getAccountBalance(address);
 println("{:gram}", balance);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L373" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L381" />
 
 ## `testing.getShardAccount`
 
@@ -456,7 +464,7 @@ if (shard != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L388" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L396" />
 
 ## `testing.setShardAccount`
 
@@ -476,7 +484,7 @@ if (shard != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L403" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L411" />
 
 ## `testing.loadAndRegisterLibrary`
 
@@ -489,7 +497,7 @@ in the current emulated blockchain.
 
 Returns false if library is not found.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L415" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L423" />
 
 ## `testing.registerLibrary`
 
@@ -499,7 +507,7 @@ fun testing.registerLibrary(libCell: cell): void
 
 Register a library in the emulated blockchain.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L425" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L433" />
 
 ## `testing.saveSnapshot`
 
@@ -518,7 +526,7 @@ val saved = testing.saveSnapshot("world-state.json");
 expect(saved).toBeTrue();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L439" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L447" />
 
 ## `testing.loadSnapshot`
 
@@ -537,7 +545,7 @@ val loaded = testing.loadSnapshot("world-state.json");
 expect(loaded).toBeTrue();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L453" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L461" />
 
 ## `testing.setConfig`
 
@@ -593,7 +601,7 @@ if (success) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L504" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L512" />
 
 ## `testing.getConfig`
 
@@ -626,7 +634,7 @@ val globalVersion = config.getGlobalVersion();
 println("Network version: {}", globalVersion.version);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L563" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L571" />
 
 ## `testing.isDeployed`
 
@@ -651,7 +659,7 @@ fun JettonWallet.getJettonBalance(self): coins {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L583" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L591" />
 
 ## `testing.outActions`
 
@@ -667,5 +675,5 @@ val outActions = testing.outActions();
 println(outActions.size());
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L594" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L602" />
 

@@ -14,7 +14,8 @@ acton test --save-test-trace
 - `acton test --save-test-trace` without a value writes to `build/traces`.
 - `acton test --save-test-trace custom-traces` writes to the explicit directory instead.
 - Relative trace paths are resolved from the project root, not from the current working directory.
-- Regular test runs do not create trace artifacts unless trace export is enabled.
+- Regular test runs do not create trace artifacts unless trace export, Test UI, or Studio reporting enables them.
+  Since Acton 1.2, an active Studio reporter collects traces for the saved run.
 - Test UI also enables the default trace bundle directory when trace export is not configured explicitly, including when UI is enabled through `[test].ui`.
 
 ## Directory layout
@@ -81,6 +82,7 @@ Each item in `traces` represents one logical message chain:
 - `name`: a custom chain name from `txs.giveName(...)`, or a fallback such as `Trace 1`.
 - `transactions`: ordered transactions in that chain.
 - `failed_messages`: optional failed message attempts attached to the same logical chain.
+- `is_treasury_deploy`: optional marker for treasury deployment traces, added in Acton 1.2 and omitted when false.
 
 To keep exported traces readable, name them explicitly:
 
@@ -92,6 +94,8 @@ txs.giveName("deploy-counter");
 That custom name appears in `traces[].name` and in the Test UI.
 
 ## Skipping traces
+
+<AvailabilityBadge since="Acton 1.2" />
 
 Use [`SendResultList.hideTraceFromUi()`](/docs/standard_library/emulation/network#sendresultlisthidetracefromui) when a transaction chain is useful for test setup but should not appear in saved trace bundles or the Test UI:
 

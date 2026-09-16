@@ -20,7 +20,10 @@ OPTIONS
 
            If omitted, Acton discovers tests from the resolved project root.
 
-           May be passed multiple times.
+           Available since Acton 1.2.
+
+           Multiple positional paths are accepted. Overlapping selections run
+           once.
 
        -f, --filter pattern
            Filter tests by regular expression.
@@ -69,6 +72,8 @@ OPTIONS
            opening the debugger.
 
        --no-capture
+           Available since Acton 1.2.
+
            Print test println and eprintln output as it is produced.
 
            The output is still captured for reporters such as JUnit and the
@@ -122,6 +127,8 @@ OPTIONS
            Requires --baseline-snapshot.
 
        --gas-profile path
+           Available since Acton 1.2.
+
            Write a gas-weighted execution profile.
 
            By default, Acton records contract transactions produced by test
@@ -129,11 +136,15 @@ OPTIONS
            the Test UI.
 
        --gas-profile-format format
+           Available since Acton 1.2.
+
            Execution profile output format.
 
            Possible values: cpuprofile, collapsed. Defaults to cpuprofile.
 
        --gas-profile-include-tests
+           Available since Acton 1.2.
+
            Include .test.tolk unit-test get-method execution in the gas
            profile.
 
@@ -160,6 +171,8 @@ OPTIONS
            Merge all test suites into a single JUnit XML file.
 
        --no-studio-reporting
+           Available since Acton 1.2.
+
            Do not send test run data to Acton Studio for this run.
 
            This overrides [test].studio-reporting = true.
@@ -202,6 +215,8 @@ OPTIONS
            build/cache/masterchain-snapshots/<network>/<seqno>.json.
 
        --no-fork-cache
+           Available since Acton 1.2.
+
            Disable persistent account and library cache. Use this when you want
            every test run to fetch forked accounts and libraries from the
            remote API. This option does not disable the 24-hour masterchain

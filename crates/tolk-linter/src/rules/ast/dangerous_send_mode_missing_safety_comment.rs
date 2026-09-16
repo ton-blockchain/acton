@@ -28,7 +28,7 @@ use tolk_ty::InferenceResult;
 /// outMsg.send(SEND_MODE_CARRY_ALL_BALANCE);
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct DangerousSendModeMissingSafetyComment;
 
 impl Violation for DangerousSendModeMissingSafetyComment {

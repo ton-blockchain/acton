@@ -1,0 +1,65 @@
+ACTON-STUDIO(1)
+
+NAME
+       acton-studio — Open the browser workspace for an Acton project
+
+SYNOPSIS
+       acton studio [options]
+
+DESCRIPTION
+       Available since Acton 1.2.
+
+       Start Acton Studio for the selected project and open it in the default
+       browser. Studio provides test history, contract inspection, wallets, and
+       local environments. It listens on 127.0.0.1:3015 by default. Keep the
+       command running while using Studio.
+
+       Workspace metadata, test history, and managed environment data are
+       stored under .studio/ in the project. Docker is required for Localnet
+       environments; Simulator environments do not require Docker.
+
+OPTIONS
+       --host ip
+           Address for the Studio server. Only loopback addresses are accepted.
+
+       --port port
+           Port for the Studio server. Use a different port if the default is
+           occupied.
+
+       --no-open
+           Start Studio without opening the default browser.
+
+   Project Options
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+TEST REPORTING
+       CLI test runs report to Studio when it is running for the same project.
+       Reporting failures do not change test success or the exit status. Use
+       acton test --no-studio-reporting or [test].studio-reporting = false to
+       disable reporting.
+
+EXAMPLES
+           acton studio
+           acton studio --port 3020 --no-open
+           acton --project-root ../my-project studio
+
+SEE ALSO
+       o  Studio guide
+          <https://ton-blockchain.github.io/acton/docs/studio/getting-started>
+
+       o  acton help test
+
+       o  acton help simulator
+
+       o  acton help localnet
+

@@ -10,6 +10,8 @@ acton-localnet --- Run and manage a local TON network with real validators
 
 ## Description
 
+Available since Acton 1.2.
+
 Localnet runs TON validators, consensus, elections, and a TON Center
 v2/v3 API stack in Docker. Use it to develop contracts and applications that
 depend on full-node behavior or indexed chain data.

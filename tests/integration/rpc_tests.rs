@@ -1281,6 +1281,134 @@ fn test_rpc_trace_show_bodies_uses_verifier_abi_for_local_boc_without_abi() {
     assert_eq!(toncenter_captured.len(), 2);
 }
 
+#[test]
+fn test_rpc_trace_preserves_branches_with_equal_transaction_lts() {
+    let project = ProjectBuilder::new("rpc-trace-equal-lts").build();
+    let log_dir = prepare_log_dir(project.path());
+    let base_response = toncenter_v3_trace_ok_response(
+        MATCHED_INFO_ADDRESS,
+        MATCHED_INFO_OWNER_ADDRESS,
+        &counter_increase_body_boc64(5),
+    );
+    let mut response: JsonValue = serde_json::from_str(&base_response.body).unwrap();
+    let trace = &mut response["traces"][0];
+    let template = trace["transactions"][TRACE_ROOT_HASH].clone();
+
+    // The two siblings at LT 103 share an account hash in different workchains.
+    // The masterchain sibling continues for three more transactions.
+    let addresses = [
+        MATCHED_INFO_ADDRESS,
+        RAW_INFO_ADDRESS,
+        MATCHED_INFO_OWNER_ADDRESS,
+        "-1:3333333333333333333333333333333333333333333333333333333333333333",
+        MATCHED_INFO_OWNER_ADDRESS,
+        "-1:1111111111111111111111111111111111111111111111111111111111111111",
+        "-1:3333333333333333333333333333333333333333333333333333333333333333",
+        RAW_INFO_ADDRESS,
+    ];
+    let lts = [100, 101, 102, 103, 103, 105, 106, 107];
+    let parents = [
+        None,
+        Some(0),
+        Some(1),
+        Some(1),
+        Some(1),
+        Some(3),
+        Some(5),
+        Some(6),
+    ];
+    let hashes = (0..addresses.len())
+        .map(|index| format!("{index:064x}"))
+        .collect::<Vec<_>>();
+    let messages = addresses
+        .iter()
+        .enumerate()
+        .map(|(index, address)| {
+            serde_json::json!({
+                "hash": format!("message-{index}"),
+                "source": parents[index].map_or(MATCHED_INFO_OWNER_ADDRESS, |parent| addresses[parent]),
+                "destination": address,
+                "value": "100000000",
+                "message_content": { "body": counter_increase_body_boc64(index as u32) }
+            })
+        })
+        .collect::<Vec<_>>();
+    trace["transactions"] = serde_json::json!({});
+    trace["transactions_order"] = serde_json::json!(hashes);
+    trace["trace_id"] = hashes[0].clone().into();
+    trace["trace_info"]["transactions"] = 8.into();
+    trace["trace_info"]["messages"] = 8.into();
+    for (index, address) in addresses.iter().enumerate() {
+        let mut transaction = template.clone();
+        transaction["account"] = (*address).into();
+        transaction["hash"] = hashes[index].clone().into();
+        transaction["lt"] = lts[index].to_string().into();
+        transaction["in_msg"] = messages[index].clone();
+        let children = parents
+            .iter()
+            .enumerate()
+            .filter(|(_, parent)| **parent == Some(index))
+            .map(|(child, _)| messages[child].clone())
+            .collect::<Vec<_>>();
+        transaction["description"] = successful_v3_description(children.len() as u16);
+        transaction["out_msgs"] = children.into();
+        trace["transactions"][&hashes[index]] = transaction;
+    }
+
+    let trace_response = ToncenterV2MockResponse {
+        status: 200,
+        body: response.to_string(),
+    };
+    let accounts_response = ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({ "accounts": [] }).to_string(),
+    };
+    let (mock_url, mock_handle, _) = spawn_toncenter_v2_mock(vec![
+        trace_response.clone(),
+        trace_response.clone(),
+        accounts_response.clone(),
+        trace_response,
+        accounts_response,
+    ]);
+    append_custom_network_with_urls(
+        project.path(),
+        "mock",
+        &format!("{mock_url}/api/v2"),
+        &format!("{mock_url}/api/v3"),
+    );
+
+    for (flags, snapshot) in [
+        (
+            vec![],
+            "integration/snapshots/rpc/test_rpc_trace_equal_lts.stdout.txt",
+        ),
+        (
+            vec!["--show-bodies"],
+            "integration/snapshots/rpc/test_rpc_trace_equal_lts_show_bodies.stdout.txt",
+        ),
+        (
+            vec!["--show-bodies", "--verbose"],
+            "integration/snapshots/rpc/test_rpc_trace_equal_lts_verbose.stdout.txt",
+        ),
+    ] {
+        let mut command = project
+            .acton()
+            .current_dir(project.path())
+            .arg("rpc")
+            .arg("trace")
+            .arg(&hashes[0])
+            .arg("--net")
+            .arg("custom:mock")
+            .env("MOCK_API_KEY", "custom-mock-api-key")
+            .env("ACTON_LOG_DIR", &log_dir);
+        for flag in flags {
+            command = command.arg(flag);
+        }
+        command.run().success().assert_snapshot_matches(snapshot);
+    }
+    mock_handle.join().expect("mock server thread must finish");
+}
+
 #[allow(clippy::significant_drop_tightening)]
 #[test]
 fn test_rpc_trace_formats_v3_trace_without_in_msg() {
@@ -1326,6 +1454,52 @@ fn test_rpc_trace_formats_v3_trace_without_in_msg() {
         format!("/api/v3/traces?tx_hash={TRACE_ROOT_HASH}&limit=1"),
         "unexpected trace request path"
     );
+}
+
+#[test]
+fn test_rpc_trace_preserves_equal_lt_roots_and_system_children() {
+    let project = ProjectBuilder::new("rpc-trace-equal-lt-roots").build();
+    let mut response = toncenter_v3_trace_ok_response(
+        MATCHED_INFO_ADDRESS,
+        MATCHED_INFO_OWNER_ADDRESS,
+        &counter_increase_body_boc64(5),
+    );
+    let mut body: JsonValue = serde_json::from_str(&response.body).unwrap();
+    let transactions = &mut body["traces"][0]["transactions"];
+    // A system transaction and an external-in transaction start separate branches
+    // at the same LT. The system transaction still has an internal-message child.
+    transactions[TRACE_ROOT_HASH]["in_msg"] = JsonValue::Null;
+    transactions[TRACE_ROOT_HASH]["out_msgs"]
+        .as_array_mut()
+        .unwrap()
+        .remove(0);
+    transactions[TRACE_ROOT_HASH]["description"] = successful_v3_description(1);
+    transactions[TRACE_CHILD_HASH]["lt"] = "100".into();
+    transactions[TRACE_CHILD_HASH]["in_msg"]["source"] = JsonValue::Null;
+    response.body = body.to_string();
+
+    let (mock_url, mock_handle, _) = spawn_toncenter_v2_mock(vec![response]);
+    append_custom_network_with_urls(
+        project.path(),
+        "mock",
+        &format!("{mock_url}/api/v2"),
+        &format!("{mock_url}/api/v3"),
+    );
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("trace")
+        .arg(TRACE_ROOT_HASH)
+        .arg("--net")
+        .arg("custom:mock")
+        .env("MOCK_API_KEY", "custom-mock-api-key")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_trace_equal_lt_roots.stdout.txt",
+        );
+    mock_handle.join().expect("mock server thread must finish");
 }
 
 fn toncenter_v3_trace_ok_response(

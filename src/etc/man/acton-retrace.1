@@ -18,6 +18,11 @@ When \fB\-\-contract\fR is provided, Acton also prepares a source\-level retrace
 the named project contract by recompiling it with debug info and source maps.
 When \fB\-\-debug\fR is added, the prepared replay is exposed as a local Debug
 Adapter Protocol (DAP) server for editor integration.
+.sp
+Available since Acton 1.2.
+.sp
+Retrace also supports tick\-tock transactions and restores the previous
+masterchain block context used by the original execution.
 .SH "OPTIONS"
 .SS "Retrace Options"
 .sp
@@ -31,6 +36,10 @@ Transaction hash in hex format.
 Network to retrace from.
 .sp
 Without this flag, Acton tries mainnet first and then falls back to testnet.
+.sp
+Available since Acton 1.2.
+.sp
+\fBlocalnet\fR and \fBcustom:<name>\fR use TON Center endpoints configured in \fBActon.toml\fR\&.
 .RE
 .sp
 \fB\-\-verbose\fR

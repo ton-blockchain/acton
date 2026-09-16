@@ -38,6 +38,8 @@ In this mode Acton prints diffs for mismatches and exits non-zero.
 {{/option}}
 
 {{#option "`--stdin`" }}
+Available since Acton 1.1.
+
 Read Tolk source from standard input and write formatted source to standard
 output.
 
@@ -47,6 +49,8 @@ output.
 {{/option}}
 
 {{#option "`--stdin-filepath` _PATH_" }}
+Available since Acton 1.1.
+
 Virtual file path to use for diagnostics when formatting source from standard
 input.
 

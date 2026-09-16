@@ -22,7 +22,9 @@ Test files or directories to run.
 .sp
 If omitted, Acton discovers tests from the resolved project root.
 .sp
-May be passed multiple times.
+Available since Acton 1.2.
+.sp
+Multiple positional paths are accepted. Overlapping selections run once.
 .RE
 .sp
 \fB\-f\fR, \fB\-\-filter\fR \fIpattern\fR
@@ -91,6 +93,8 @@ call stacks without opening the debugger.
 .sp
 \fB\-\-no\-capture\fR
 .RS 4
+Available since Acton 1.2.
+.sp
 Print test \fBprintln\fR and \fBeprintln\fR output as it is produced.
 .sp
 The output is still captured for reporters such as JUnit and the test UI.
@@ -162,6 +166,8 @@ Requires \fB\-\-baseline\-snapshot\fR\&.
 .sp
 \fB\-\-gas\-profile\fR \fIpath\fR
 .RS 4
+Available since Acton 1.2.
+.sp
 Write a gas\-weighted execution profile.
 .sp
 By default, Acton records contract transactions produced by test messages.
@@ -170,6 +176,8 @@ Combine with \fB\-\-ui\fR to browse the profile as a flamegraph in the Test UI.
 .sp
 \fB\-\-gas\-profile\-format\fR \fIformat\fR
 .RS 4
+Available since Acton 1.2.
+.sp
 Execution profile output format.
 .sp
 Possible values: \fBcpuprofile\fR, \fBcollapsed\fR\&.
@@ -178,6 +186,8 @@ Defaults to \fBcpuprofile\fR\&.
 .sp
 \fB\-\-gas\-profile\-include\-tests\fR
 .RS 4
+Available since Acton 1.2.
+.sp
 Include \fB\&.test.tolk\fR unit\-test get\-method execution in the gas profile.
 .sp
 Use this when the expensive work is called directly from a unit test instead of
@@ -211,6 +221,8 @@ Merge all test suites into a single JUnit XML file.
 .sp
 \fB\-\-no\-studio\-reporting\fR
 .RS 4
+Available since Acton 1.2.
+.sp
 Do not send test run data to Acton Studio for this run.
 .sp
 This overrides \fB[test].studio\-reporting = true\fR\&.
@@ -261,6 +273,8 @@ network configuration and, for explicit historical forks, block time for 24 hour
 .sp
 \fB\-\-no\-fork\-cache\fR
 .RS 4
+Available since Acton 1.2.
+.sp
 Disable persistent account and library cache. Use this when you want every test
 run to fetch forked accounts and libraries from the remote API. This option does
 not disable the 24\-hour masterchain snapshot cache. The regular \fB\-\-clear\-cache\fR

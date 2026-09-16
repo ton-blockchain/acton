@@ -35,7 +35,7 @@ use tolk_resolver::resolve_index::Resolved;
 /// - If multiple imports share one line, warning is emitted but autofix is skipped.
 /// - Whole-line autofix also removes inline comments attached to that import line.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct UnusedImport;
 
 impl Violation for UnusedImport {

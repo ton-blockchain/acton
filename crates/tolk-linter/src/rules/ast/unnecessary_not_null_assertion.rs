@@ -8,6 +8,8 @@ use tolk_syntax::ast::expressions::{Expr, NotNull};
 use tolk_syntax::{AstNode, TryFromNode};
 use tolk_ty::InferenceResult;
 
+/// Available since Acton 1.2.
+///
 /// ### What it does
 /// Detects a not-null assertion when the expression's inferred type cannot be `null`.
 ///
@@ -40,7 +42,7 @@ use tolk_ty::InferenceResult;
 /// }
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.2.0")]
 pub struct UnnecessaryNotNullAssertion;
 
 impl Violation for UnnecessaryNotNullAssertion {

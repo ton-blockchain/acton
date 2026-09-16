@@ -42,13 +42,40 @@ Important matcher semantics:
 - Bounced-message opcode matching should be done with `toHaveBouncedTx()` or an explicit `bounced: true` filter.
 - Predicate functions can be useful for custom diagnostics, but runtime errors inside those predicates surface back to the test output.
 
+<AvailabilityBadge since="Acton 1.1" />
+
+The `sendMode` field filters child transactions by the parent send action's mode.
+It accepts an exact value or a predicate, like the other `SearchParams` fields.
+
 Go deeper in:
 
 - [SearchParams](/docs/standard_library/emulation/network#searchparams)
 - [Transaction matchers](/docs/standard_library/emulation/network#expectationsendresultlisttohavesuccessfultx)
 - [Reading Transaction Chains](/docs/testing/reading-transaction-chains)
 
+## Numeric and list matchers
+
+<AvailabilityBadge since="Acton 1.2" />
+
+`toBeInRange(min, max)` includes both bounds. `lisp_list<T>` supports
+`toContain`, `toNotContain`, `toBeEmpty`, `toBeNonEmpty`, and `toHaveLength`.
+
+`toBeApproxEqRel(expected, maxDelta, maxDeltaDenominator)` accepts a
+custom denominator. Its default is `100`; use `1_000_000` for millionths.
+See the [matcher reference](/docs/standard_library/testing/expect).
+
+## Get-method execution metadata
+
+<AvailabilityBadge since="Acton 1.2" />
+
+[`net.runGetMethodExt<Ret>()`](/docs/standard_library/emulation/network#netrungetmethodext)
+returns the saved stack with `meta.gasUsed` and `meta.exitCode`, including VM failures.
+`isSuccess()` accepts exit codes `0` and `1`; `unwrap()` checks success and decodes
+as `Ret`. `expect(result).toHaveExitCode(code)` checks the exit code without decoding.
+
 ## External message matchers
+
+<AvailabilityBadge since="Acton 1.1" />
 
 `net.sendExternal(...)` returns an `ExternalSendResult`. When the external-in message is accepted, `result.transactions` contains the produced transaction trace. When the contract rejects the message before acceptance, the trace is `null` and `result.error` contains emulator metadata such as `externalNotAccepted`, `message` and `vmExitCode`.
 
@@ -66,7 +93,7 @@ result.giveName("external vote");
 
 Available helpers:
 
-- `isAccepted()` returns whether the external-in message produced a trace.
+- `isAccepted()` reports acceptance during local emulation. After a network broadcast, use `waitForFirstTransaction()` or `waitForTrace()` instead.
 - `unwrap()` returns the produced `SendResultList` or fails with the same external diagnostics as `toBeAccepted()`.
 - `at(index)` unwraps the trace and returns one `SendResult`.
 - `giveName(name)` names the external trace for the Test UI and gas/fee reports.

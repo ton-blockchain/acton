@@ -1,4 +1,7 @@
 use super::SearchParamIndex;
+use crate::commands::build::{
+    contract_dependency_order, generate_dependency_files, resolve_build_output_dir,
+};
 use crate::commands::common::error_fmt;
 use crate::context::{
     CompilationResult, Context, DebugStopRequested, FailedSendMessageResult,
@@ -28,7 +31,7 @@ use num_bigint::{BigInt, Sign};
 use num_traits::{Num, ToPrimitive};
 use path_absolutize::Absolutize;
 use rand::RngCore;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -184,26 +187,104 @@ fn missing_generated_dependency_message(error_message: &str, contract_id: &str) 
 
 extension!(build in (Context) with (path: String, id: String) using build_impl);
 fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> anyhow::Result<()> {
+    let code = if path.is_empty() {
+        let code = build_with_dependencies(ctx, &id)?;
+        ctx.build.build_cache.prepared_contracts.insert(id);
+        code
+    } else {
+        build_contract(ctx, &path, &id)?
+    };
+    stk.push(TupleItem::Cell(code));
+    Ok(())
+}
+
+/// Refresh generated code before consulting the parent's compilation cache.
+/// Successful preparations are shared within the run, including diamond dependencies.
+fn build_with_dependencies(ctx: &mut Context, id: &str) -> anyhow::Result<Cell> {
+    if ctx.build.build_cache.prepared_contracts.contains(id)
+        || ctx.env.build_override.contains_key(id)
+        || ctx
+            .env
+            .find_contract(id)
+            .is_none_or(|contract| contract.depends.as_ref().is_none_or(Vec::is_empty))
+    {
+        return build_contract(ctx, "", id);
+    }
+
+    let config = ctx.env.config;
+    let contracts = config.contracts().expect("named contract exists");
+    let order = contract_dependency_order(id, contracts)?;
+    let project_root = ctx.env.project_root.clone();
+    let gen_dir = resolve_build_output_dir(
+        None,
+        config
+            .build
+            .as_ref()
+            .and_then(|build| build.gen_dir.clone()),
+        "gen",
+        &project_root,
+    );
+    let mut compiled_contracts = HashMap::new();
+
+    for name in order {
+        let contract = &contracts[&name];
+        if !ctx.build.build_cache.prepared_contracts.contains(&name) {
+            generate_dependency_files(
+                &name,
+                contract,
+                &compiled_contracts,
+                &BTreeMap::new(),
+                config,
+                &gen_dir,
+                &project_root,
+            )?;
+            // Explicit-path builds may have cached code before shared dependencies
+            // were refreshed by another branch of this dependency tree.
+            ctx.build
+                .build_cache
+                .built
+                .remove(&contract.absolute_source_path(&project_root));
+        }
+
+        let code = build_contract(ctx, "", &name)
+            .with_context(|| format!("Failed to build '{name}' required by '{id}'"))?;
+
+        ctx.build
+            .build_cache
+            .prepared_contracts
+            .insert(name.clone());
+
+        if name == id {
+            return Ok(code);
+        }
+        compiled_contracts.insert(name, Boc::encode_base64(&code));
+    }
+
+    anyhow::bail!("Dependency order does not include requested contract '{id}'")
+}
+
+/// Load or compile one code cell after the caller has prepared its dependencies.
+fn build_contract(ctx: &mut Context, path: &str, id: &str) -> anyhow::Result<Cell> {
     debug!("Building {id}");
     let start_time = Instant::now();
 
     let name_only = path.is_empty();
-    let mut path = PathBuf::from(&path);
-    let mut display_name = id.clone(); // by default display name equal to ID
-    let contract_config = ctx.env.find_contract(&id);
+    let mut path = PathBuf::from(path);
+    let mut display_name = id.to_owned(); // by default display name equal to ID
+    let contract_config = ctx.env.find_contract(id);
 
     if name_only {
         // > build("JettonMinter")
         debug!("No path provided, search in contracts");
 
         let Some(found_contract) = &contract_config else {
-            anyhow::bail!(error_fmt::contract_not_found(ctx.env.config, &id));
+            anyhow::bail!(error_fmt::contract_not_found(ctx.env.config, id));
         };
 
         debug!("Found contract with info: {found_contract:?}");
 
         found_contract
-            .display_name(&id)
+            .display_name(id)
             .clone_into(&mut display_name);
         path = found_contract.absolute_source_path(&ctx.env.project_root);
     } else if !path.is_absolute() {
@@ -217,10 +298,9 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
     // Build overrides used for mutation testing to change actual code of contract
     // with "mutated" one. This way we actually don't need to recompile each test
     // thus greatly increase performance of mutation testing
-    if let Some(override_code) = ctx.env.build_override.get(&id) {
+    if let Some(override_code) = ctx.env.build_override.get(id) {
         debug!("Overriding code for {id}");
-        stk.push(TupleItem::Cell(override_code.clone()));
-        return Ok(());
+        return Ok(override_code.clone());
     }
 
     let path_display = path.display().to_string();
@@ -234,8 +314,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
         let code_cell = Boc::decode_base64(&cached.code_boc64).with_context(|| {
             anyhow::anyhow!("Failed to decode cached code BoC for {path_display}")
         })?;
-        stk.push(TupleItem::Cell(code_cell));
-        return Ok(());
+        return Ok(code_cell);
     }
 
     if is_boc_path(&path) {
@@ -246,8 +325,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
 
         if !name_only {
             // Explicit BoC paths are code-only and must stay independent of manifest metadata.
-            stk.push(TupleItem::Cell(cell));
-            return Ok(());
+            return Ok(cell);
         }
 
         let code_boc64 = Boc::encode_base64(&cell);
@@ -257,7 +335,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             compile_optional_contract_interface(
                 ctx.env.config,
                 &ctx.env.project_root,
-                &id,
+                id,
                 contract_config,
             )?
         } else {
@@ -271,7 +349,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             None => (Arc::new(SourceMap::without_debug_info()), None),
         };
         ctx.build.build_cache.memoize(
-            &id,
+            id,
             &display_name,
             &path,
             &code_boc64,
@@ -280,8 +358,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             abi,
         );
 
-        stk.push(TupleItem::Cell(cell));
-        return Ok(());
+        return Ok(cell);
     }
 
     let allow_no_entrypoint = is_types_tolk_path(&path);
@@ -313,7 +390,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
         let source_map = Arc::new(cached_entry.source_map.clone().unwrap_or_default());
 
         ctx.build.build_cache.memoize(
-            &id,
+            id,
             &display_name,
             &path,
             &cached_entry.code_boc64,
@@ -322,8 +399,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             cached_entry.abi.clone().map(Into::into),
         );
 
-        stk.push(TupleItem::Cell(code_cell));
-        return Ok(());
+        return Ok(code_cell);
     }
 
     // If there is no cache data, rebuild contract from sources.
@@ -358,7 +434,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             let source_map = Arc::new(success.source_map.unwrap_or_default());
 
             ctx.build.build_cache.memoize(
-                &id,
+                id,
                 &display_name,
                 &path,
                 &success.code_boc64,
@@ -367,7 +443,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
                 success.abi.clone().map(Into::into),
             );
 
-            stk.push(TupleItem::Cell(code_cell));
+            Ok(code_cell)
         }
         tolk_compiler::CompilerResult::Error(error) => {
             info!(
@@ -376,12 +452,10 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             );
 
             let message =
-                missing_generated_dependency_message(&error.message, &id).unwrap_or(error.message);
+                missing_generated_dependency_message(&error.message, id).unwrap_or(error.message);
             anyhow::bail!("Compilation failed: {message}");
         }
     }
-
-    Ok(())
 }
 
 fn is_types_tolk_path(path: &Path) -> bool {

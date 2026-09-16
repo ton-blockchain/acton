@@ -58,7 +58,7 @@ use tree_sitter::Node;
 /// - The handler must be declared as `onBouncedMessage` in the same file as the
 ///   `onInternalMessage` entrypoint.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct NoBounceHandler;
 
 impl Violation for NoBounceHandler {

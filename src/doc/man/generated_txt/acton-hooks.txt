@@ -26,6 +26,8 @@ SUBCOMMANDS
 
       Options
           --hook hook
+              Available since Acton 1.2.
+
               When Git runs the generated hook.
 
               Possible values: pre-push, pre-commit

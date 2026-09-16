@@ -1,0 +1,28 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling receiver
+    Finished in [TIME]
+   Compiling worker
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/transaction_helpers.test.tolk (1 test)
+  ✗ send result list get used gas missing transaction [TIME]
+    └─ Error: SendResultList.getUsedGas(expected)
+        N/A -> sender A
+        └── Ping 0.5 GRAM -> worker B                                                   gas=1918
+            └── Notify 0.1 GRAM -> receiver C                                           gas=333
+        
+        Cannot find transaction from sender A kQAXTu..1D67lA to worker B kQDmCU.._yKqfb
+        with:
+          opcode=0xa0c0a003 unknown
+          value=500000000
+          success=true
+      └─ at tests/transaction_helpers.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

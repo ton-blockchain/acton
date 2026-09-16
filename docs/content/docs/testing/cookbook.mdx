@@ -7,6 +7,18 @@ This page is a collection of practical testing patterns. For the full API surfac
 
 For complete real-world suites, use the [`acton-contracts` repository](https://github.com/ton-blockchain/acton-contracts) as a reference: it contains larger Jetton, NFT, wallet, multisig, DNS, elector, and config contract tests built with these patterns.
 
+## Selectively run tests files and folders
+
+Pass multiple files or directories to one test run. Overlapping selections run once:
+
+```bash
+acton test tests/unit tests/integration/wallet.test.tolk
+```
+
+<AvailabilityBadge since="Acton 1.2" />
+
+Pass `--no-capture` for live test output. Start `acton studio` to retain test history and inspect results in the [Studio workspace](/docs/studio#local-tests).
+
 ## Start from a shared setup
 
 Keep deployment and common actors in one helper. Larger projects usually put this in `tests/test-utils.tolk` and import it from scenario files.
@@ -28,6 +40,11 @@ fun setupCounter(): (Counter, Treasury, Treasury) {
     return (counter, deployer, outsider);
 }
 ```
+
+<AvailabilityBadge since="Acton 1.2" />
+
+To create a treasury in another workchain, pass it as the second argument:
+`testing.treasury("owner", MASTERCHAIN)`. The default is `BASECHAIN`.
 
 Use the generated stub when starting a new test file:
 

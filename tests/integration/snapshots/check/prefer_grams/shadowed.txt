@@ -1,0 +1,21 @@
+warning[S009]: prefer `grams()` over `ton()`
+  --> [ROOT]/contracts/main[LINE]
+  |
+1 | fun parameter(grams: int): coins { return ton("0.1"); }
+  |                                           ^^^ use the standard-library function `grams`
+
+warning[S009]: prefer `grams()` over `ton()`
+  --> [ROOT]/contracts/main[LINE]
+  |
+9 |     val callback = fun(): coins { return ton("0.3"); };
+  |                                          ^^^ use the standard-library function `grams`
+
+warning[S009]: prefer `grams()` over `ton()`
+   --> [ROOT]/contracts/main[LINE]
+   |
+14 |     catch (grams) { return ton("0.4"); }
+   |                            ^^^ use the standard-library function `grams`
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain S009

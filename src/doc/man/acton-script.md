@@ -96,6 +96,8 @@ network configuration and, for explicit historical forks, block time for 24 hour
 {{/option}}
 
 {{#option "`--no-fork-cache`" }}
+Available since Acton 1.2.
+
 Disable persistent account and library cache. Use this when you want every
 script run to fetch forked accounts and libraries from the remote API. This
 option does not disable the 24-hour masterchain snapshot cache. The regular

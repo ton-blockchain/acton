@@ -654,7 +654,7 @@ fn test_new_jetton_project_non_interactive() {
 }
 
 #[test]
-fn test_new_jetton_project_script_without_prior_build_reports_current_error() {
+fn test_new_jetton_project_script_without_prior_build_deploys() {
     let project = ProjectBuilder::new("new-jetton-script-without-build")
         .without_acton_toml()
         .build();
@@ -667,9 +667,9 @@ fn test_new_jetton_project_script_without_prior_build_reports_current_error() {
         .script("scripts/deploy.tolk")
         .current_dir(&project_dir)
         .run()
-        .failure()
+        .success()
         .assert_snapshot_matches(
-            "integration/snapshots/new/test_new_jetton_project_script_without_prior_build_reports_current_error.stdout.txt",
+            "integration/snapshots/new/test_new_jetton_project_script_without_prior_build_deploys.stdout.txt",
         );
 }
 

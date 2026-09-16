@@ -14,15 +14,19 @@ Utilities for measuring and profiling Tolk callbacks in tests.
 
 ## `bench`
 
+<AvailabilityBadge since="Acton 1.2" />
+
 ```tolk
 struct bench
 ```
 
 Root namespace for benchmark helpers.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/bench.tolk#L9" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/bench.tolk#L11" />
 
 ## `BenchInstructionInfo`
+
+<AvailabilityBadge since="Acton 1.2" />
 
 ```tolk
 struct BenchInstructionInfo {
@@ -48,9 +52,11 @@ The profiler groups samples by instruction mnemonic. For example, all `LDI`
 executions are merged into one `BenchInstructionInfo` row with the total
 number of executions and min/max gas observed for that mnemonic.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/bench.tolk#L17" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/bench.tolk#L21" />
 
 ## `BenchResult`
+
+<AvailabilityBadge since="Acton 1.2" />
 
 ```tolk
 struct BenchResult<Ret> {
@@ -78,9 +84,11 @@ println(bench.format(profile));
 println(profile.asmCode);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/bench.tolk#L42" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/bench.tolk#L48" />
 
 ## `bench.measure`
+
+<AvailabilityBadge since="Acton 1.2" />
 
 ```tolk
 fun bench.measure<Ret>(
@@ -110,9 +118,11 @@ get fun `test bench parser`() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/bench.tolk#L74" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/bench.tolk#L82" />
 
 ## `bench.format`
+
+<AvailabilityBadge since="Acton 1.2" />
 
 ```tolk
 fun bench.format<Ret>(profile: BenchResult<Ret>): string
@@ -131,9 +141,11 @@ val profile = bench.measure("sum loop", fun() {
 println(bench.format(profile));
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/bench.tolk#L123" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/bench.tolk#L133" />
 
 ## `bench.formatDiff`
+
+<AvailabilityBadge since="Acton 1.2" />
 
 ```tolk
 fun bench.formatDiff<BaselineRet, CurrentRet>(
@@ -159,5 +171,5 @@ val current = bench.measure("manual parsing", fun() {
 println(bench.formatDiff(baseline, current));
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/bench.tolk#L143" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/bench.tolk#L155" />
 

@@ -857,6 +857,21 @@
             }
           ]
         },
+        "prefer-grams": {
+          "title": "S009: prefer-grams",
+          "description": "Available since Acton 1.2.\n\n### What it does\nReplaces the standard library's `ton()` alias with `grams()`.\n\n### Why is this bad?\n`ton()` is the old name of `grams()`. The replacement preserves the amount.\n\n### Behavior notes\nThis rule reports standard-library calls when the standard library provides `grams`.\nIt leaves user-defined functions and older standard libraries without `grams` unchanged.\nIf a local binding shadows `grams`, the rule reports a warning without an automatic fix.\nE003 does not report the same call when this rule reports it.\n\n### Example\n```tolk twoslash\nconst amount = ton(\"0.1\");\n//             ^^^ S009: prefer `grams()` over `ton()`\n```\n\nUse instead:\n```tolk\nconst amount = grams(\"0.1\");\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
         "pure-function-call-unused": {
           "title": "E006: pure-function-call-unused",
           "description": "### What it does\nChecks for calls to `@pure` functions where the result is not used.\n\n### Why is this bad?\n`@pure` functions have no side effects, so calling them without using the result is a no-op and likely a bug.\n\n### Example\n```tolk twoslash\n@pure\nfun add(a: int, b: int): int { return a + b; }\n\nfun main() {\n    add(1, 2);\n//  ^^^^^^^^^ E006: result of pure function is not used\n}\n```",
@@ -979,7 +994,7 @@
         },
         "unnecessary-not-null-assertion": {
           "title": "E031: unnecessary-not-null-assertion",
-          "description": "### What it does\nDetects a not-null assertion when the expression's inferred type cannot be `null`.\n\n### Why is this bad?\nThe `!` operator only removes `null` from a nullable type. Applying it to an expression\nthat is already non-null has no effect and can mislead readers into expecting a nullable value.\n\n### Behavior notes\nFor a direct chain such as `value!!`, E031 reports only the outermost unnecessary `!`.\nWhen E014 is also enabled, E014 owns the chain's auto-fix to avoid overlapping edits.\n\n### Example\n```tolk twoslash\nfun addOne(value: int?): int {\n    if (value != null) {\n        return value! + 1;\n        //          ^ E031: unnecessary not-null assertion\n    }\n    return 0;\n}\n```\n\nUse instead:\n```tolk\nfun addOne(value: int?): int {\n    if (value != null) {\n        return value + 1;\n    }\n    return 0;\n}\n```",
+          "description": "Available since Acton 1.2.\n\n### What it does\nDetects a not-null assertion when the expression's inferred type cannot be `null`.\n\n### Why is this bad?\nThe `!` operator only removes `null` from a nullable type. Applying it to an expression\nthat is already non-null has no effect and can mislead readers into expecting a nullable value.\n\n### Behavior notes\nFor a direct chain such as `value!!`, E031 reports only the outermost unnecessary `!`.\nWhen E014 is also enabled, E014 owns the chain's auto-fix to avoid overlapping edits.\n\n### Example\n```tolk twoslash\nfun addOne(value: int?): int {\n    if (value != null) {\n        return value! + 1;\n        //          ^ E031: unnecessary not-null assertion\n    }\n    return 0;\n}\n```\n\nUse instead:\n```tolk\nfun addOne(value: int?): int {\n    if (value != null) {\n        return value + 1;\n    }\n    return 0;\n}\n```",
           "anyOf": [
             {
               "$ref": "#/definitions/LintRuleLevel"

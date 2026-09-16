@@ -4,6 +4,10 @@ description: "Verify Tolk contract source code with Acton on TON testnet"
 icon: "Lock"
 ---
 
+<AvailabilityBadge since="Acton 1.2" />
+
+The ticket-based verifier workflow described here is available from Acton 1.2.
+
 Source code verification publishes reproducible local Tolk sources for a compiled code hash. Acton compiles the contract, requests a verification ticket, sends the required TON testnet payment, and uploads the source bundle to the TON verifier.
 
 <Callout type="caution">
@@ -18,7 +22,8 @@ Prepare these inputs before running `acton verify`:
 - a `.tolk` contract that is defined in `Acton.toml`
 - enough testnet GRAM for the verifier payment and network fees
 
-Only Tolk contracts can be verified. Arbitrary `.boc` contracts are not supported by the verifier flow.
+The `acton verify` command accepts Tolk contracts. The verifier service also accepts
+FunC and Tact through its own interface and supports mainnet payments; the Acton CLI uses testnet. Arbitrary `.boc` contracts are not supported by the verifier flow.
 
 When `--address` is set, verification fails if the current local sources do not compile to the same bytecode as the deployed contract. Run verification from the same source revision and compiler configuration used for deployment.
 

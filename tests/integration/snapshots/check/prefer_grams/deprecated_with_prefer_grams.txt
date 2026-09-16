@@ -1,0 +1,23 @@
+warning[S009]: prefer `grams()` over `ton()`
+  --> [ROOT]/contracts/main[LINE]
+  |
+2 |                 fun main(): coins { return ton("0.1"); }
+  |                                            ^^^ use the standard-library function `grams`
+
+help: replace `ton` with `grams`
+  --> [ROOT]/contracts/main[LINE]
+  |
+2 |                 fun main(): coins { return ton("0.1"); }
+  |                                            ^^^ grams
+
+warning[S009]: prefer `grams()` over `ton()`
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |                 fun shadowed(grams: int): coins { return ton("0.2"); }
+  |                                                          ^^^ use the standard-library function `grams`
+
+
+1 issue can be fixed automatically, rerun with --fix flag.
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain S009

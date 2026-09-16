@@ -181,6 +181,8 @@ fun Expectation<T>.toBeGreaterOrEqual<U>(self, expected: U): void {
 /// expect(5).toBeInRange(5, 10);
 /// expect(10).toBeInRange(5, 10);
 /// ```
+///
+/// Available since Acton 1.2.
 fun Expectation<T>.toBeInRange<U, V>(self, min: U, max: V): void {
     val isAtLeastMin = ffi.assertBin(
         ">=",
@@ -239,6 +241,7 @@ fun Expectation<int>.toBeApproxEqAbs(self, expected: int, maxDelta: int): void {
 /// Relative delta is computed as:
 /// `floor(abs(actual - expected) * maxDeltaDenominator / abs(actual))`.
 /// The assertion passes when this rounded-down delta is less than or equal to `maxDelta`.
+/// The `maxDeltaDenominator` parameter is available since Acton 1.2.
 ///
 /// If `actual` is zero, only a zero `expected` value passes. A non-zero `expected` value has infinite relative difference.
 ///
@@ -551,6 +554,8 @@ fun Expectation<BigArray<E>>.toHaveLength(self, length: int): void {
 /// val list = lisp_list<int> [1, 2, 3];
 /// expect(list).toContain(2);
 /// ```
+///
+/// Available since Acton 1.2.
 fun Expectation<lisp_list<E>>.toContain<U>(self, expected: U): void {
     var ptr = self.value;
     while (!ptr.isEmpty()) {
@@ -575,6 +580,8 @@ fun Expectation<lisp_list<E>>.toContain<U>(self, expected: U): void {
 /// val list = lisp_list<int> [1, 2, 3];
 /// expect(list).toNotContain(4);
 /// ```
+///
+/// Available since Acton 1.2.
 fun Expectation<lisp_list<E>>.toNotContain<U>(self, expected: U): void {
     var ptr = self.value;
     while (!ptr.isEmpty()) {
@@ -598,6 +605,8 @@ fun Expectation<lisp_list<E>>.toNotContain<U>(self, expected: U): void {
 /// val list = lisp_list<int> [];
 /// expect(list).toBeEmpty();
 /// ```
+///
+/// Available since Acton 1.2.
 fun Expectation<lisp_list<E>>.toBeEmpty(self): void {
     if (!self.value.isEmpty()) {
         self.fail("expect(<actual>).toBeEmpty(<expected>): list is not empty");
@@ -611,6 +620,8 @@ fun Expectation<lisp_list<E>>.toBeEmpty(self): void {
 /// val list = lisp_list<int> [1, 2, 3];
 /// expect(list).toBeNonEmpty();
 /// ```
+///
+/// Available since Acton 1.2.
 fun Expectation<lisp_list<E>>.toBeNonEmpty(self): void {
     if (self.value.isEmpty()) {
         self.fail("expect(<actual>).toBeNonEmpty(<expected>): list is empty");
@@ -624,6 +635,8 @@ fun Expectation<lisp_list<E>>.toBeNonEmpty(self): void {
 /// val list = lisp_list<int> [1, 2, 3];
 /// expect(list).toHaveLength(3);
 /// ```
+///
+/// Available since Acton 1.2.
 fun Expectation<lisp_list<E>>.toHaveLength(self, length: int): void {
     Assert.equal(
         self.value.calculateSize(),

@@ -107,6 +107,8 @@ Baseline: gas-baseline.json (14 traces, captured 2026-02-28 14:49:39 UTC)
 
 ### Write a source-level execution profile
 
+<AvailabilityBadge since="Acton 1.2" />
+
 ```bash
 acton test --gas-profile build/gas.cpuprofile
 ```
@@ -132,6 +134,8 @@ get fun `test heavy job`() {
 ```
 
 ### Inspect profiles in Test UI
+
+<AvailabilityBadge since="Acton 1.2" />
 
 Run the UI together with a gas profile:
 
@@ -176,6 +180,37 @@ acton test --snapshot gas-baseline.json
 <Callout type="info" title="Compare mode does not overwrite snapshot">
   With both `--snapshot` and `--baseline-snapshot`, Acton runs in compare mode and does not rewrite the snapshot file.
 </Callout>
+
+## Measure a callback or one transaction
+
+<AvailabilityBadge since="Acton 1.2" />
+
+Use [`bench.measure()`](/docs/standard_library/testing/bench#benchmeasure) to
+measure a callback independently of a transaction chain:
+
+```tolk
+import "@acton/testing/bench"
+
+val profile = bench.measure("encode payload", fun() {
+    return beginCell().storeUint(42, 32).endCell();
+});
+println(bench.format(profile));
+expect(profile.result.beginParse().loadUint(32)).toEqual(42);
+```
+
+The result includes the callback value, gas usage, instruction statistics, and
+TASM. `bench.formatDiff(baseline, current)` compares two measurements.
+
+For one transaction in a trace, use
+[`SendResultList.getUsedGas()`](/docs/standard_library/emulation/network#sendresultlistgetusedgas):
+
+```tolk
+val gas = txs.getUsedGas<IncreaseCounter>({ to: counter.address });
+expect(gas).toBeLess(10000);
+```
+
+The helper returns gas from the first matching transaction. If none matches,
+it fails with the search parameters and transaction tree.
 
 ## Name trace chains for readable reports
 

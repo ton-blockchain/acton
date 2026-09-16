@@ -40,7 +40,8 @@
     "s005-message-should-be-named",
     "s006-create-message-inline-send",
     "s007-import-path-can-use-mappings",
-    "s008-negated-is-type-can-use-not-is"
+    "s008-negated-is-type-can-use-not-is",
+    "s009-prefer-grams"
   ],
   "title": "Linting rules"
 }

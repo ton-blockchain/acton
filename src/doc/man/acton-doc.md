@@ -19,6 +19,8 @@ instruction lookup through the `tvm` subcommand.
 
 ### acton doc abi
 
+Available since Acton 1.2.
+
 Print compiler ABI JSON for a local or bundled contract name, or for a code hash
 registered in the TON verifier.
 

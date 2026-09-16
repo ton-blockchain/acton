@@ -13,4 +13,12 @@ await generateFiles({
     description: description ?? "",
     sidebarTitle: "Control API",
   }),
+  beforeWrite(files) {
+    for (const file of files) {
+      file.content = file.content.replace(
+        /\n---\n/,
+        '\n---\n\n<AvailabilityBadge since="Acton 1.2" />\n',
+      )
+    }
+  },
 })

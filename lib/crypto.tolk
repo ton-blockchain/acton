@@ -114,6 +114,8 @@ fun crypto.rawSign(privateKey: int, data: int): slice {
 /// val signature = crypto.rawSignSlice(kp.privateKey, message);
 /// // isSliceSignatureValid(message, signature, kp.publicKey) == true
 /// ```
+///
+/// Available since Acton 1.2.
 fun crypto.rawSignSlice(privateKey: int, data: slice): slice {
     return ffi.rawSignSlice(privateKey, data);
 }

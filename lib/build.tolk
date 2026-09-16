@@ -18,6 +18,10 @@
 ///
 /// If `path` is omitted (empty string), Acton looks up the contract name in
 /// `Acton.toml`. If no contract with that name is found, execution fails.
+/// Acton builds the declared `depends`, including their dependencies, and updates
+/// their generated code files before it builds the requested contract.
+/// Unchanged dependencies use the compilation cache. Repeated calls reuse the
+/// result for the current run.
 /// If the resolved manifest source already points to a `.boc` file, the name
 /// lookup still succeeds, but the code is loaded directly from that BoC instead
 /// of being compiled from Tolk source.

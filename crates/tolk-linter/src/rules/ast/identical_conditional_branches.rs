@@ -26,7 +26,7 @@ use tolk_syntax::{If, IfAlt, NodeTraversalExt, Ternary};
 /// //                              ^^^^^^^^^ E021: conditional branches are identical
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct IdenticalConditionalBranches;
 
 impl Violation for IdenticalConditionalBranches {

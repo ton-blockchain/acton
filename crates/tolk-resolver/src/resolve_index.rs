@@ -5,6 +5,7 @@
 
 use crate::file_index::{FileId, Span, SymbolId};
 use std::sync::Arc;
+use tree_sitter::Node;
 
 /// Represents a usage of a name in the source code.
 #[derive(Debug, Clone)]
@@ -73,6 +74,42 @@ pub struct LocalDef {
     pub def_span: Span,
     /// Specific kind of the local definition.
     pub kind: LocalDefKind,
+}
+
+impl LocalDef {
+    /// Returns whether the declaration precedes `offset` in its enclosing lexical scope.
+    /// Includes the declaration's initializer. Does not filter by value or type namespace.
+    #[must_use]
+    pub fn is_visible_at(&self, root: Node<'_>, offset: usize) -> bool {
+        if self.def_span.start() > offset {
+            return false;
+        }
+        let Some(mut node) =
+            root.descendant_for_byte_range(self.def_span.start(), self.def_span.end())
+        else {
+            return false;
+        };
+
+        loop {
+            if matches!(
+                node.kind(),
+                "block_statement"
+                    | "catch_clause"
+                    | "function_declaration"
+                    | "method_declaration"
+                    | "get_method_declaration"
+                    | "lambda_expression"
+                    | "struct_declaration"
+                    | "type_alias_declaration"
+            ) {
+                return node.start_byte() <= offset && offset <= node.end_byte();
+            }
+            let Some(parent) = node.parent() else {
+                return false;
+            };
+            node = parent;
+        }
+    }
 }
 
 /// Distinguishes between different kinds of local definitions.

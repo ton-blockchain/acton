@@ -27,7 +27,9 @@ Test files or directories to run.
 
 If omitted, Acton discovers tests from the resolved project root.
 
-May be passed multiple times.
+Available since Acton 1.2.
+
+Multiple positional paths are accepted. Overlapping selections run once.
 {{/option}}
 
 {{#option "`-f`, `--filter` _pattern_" }}
@@ -96,6 +98,8 @@ call stacks without opening the debugger.
 {{/option}}
 
 {{#option "`--no-capture`" }}
+Available since Acton 1.2.
+
 Print test `println` and `eprintln` output as it is produced.
 
 The output is still captured for reporters such as JUnit and the test UI.
@@ -167,6 +171,8 @@ Requires `--baseline-snapshot`.
 {{/option}}
 
 {{#option "`--gas-profile` _path_" }}
+Available since Acton 1.2.
+
 Write a gas-weighted execution profile.
 
 By default, Acton records contract transactions produced by test messages.
@@ -174,6 +180,8 @@ Combine with `--ui` to browse the profile as a flamegraph in the Test UI.
 {{/option}}
 
 {{#option "`--gas-profile-format` _format_" }}
+Available since Acton 1.2.
+
 Execution profile output format.
 
 Possible values: `cpuprofile`, `collapsed`.
@@ -181,6 +189,8 @@ Defaults to `cpuprofile`.
 {{/option}}
 
 {{#option "`--gas-profile-include-tests`" }}
+Available since Acton 1.2.
+
 Include `.test.tolk` unit-test get-method execution in the gas profile.
 
 Use this when the expensive work is called directly from a unit test instead of
@@ -214,6 +224,8 @@ Merge all test suites into a single JUnit XML file.
 {{/option}}
 
 {{#option "`--no-studio-reporting`" }}
+Available since Acton 1.2.
+
 Do not send test run data to Acton Studio for this run.
 
 This overrides `[test].studio-reporting = true`.
@@ -268,6 +280,8 @@ network configuration and, for explicit historical forks, block time for 24 hour
 {{/option}}
 
 {{#option "`--no-fork-cache`" }}
+Available since Acton 1.2.
+
 Disable persistent account and library cache. Use this when you want every test
 run to fetch forked accounts and libraries from the remote API. This option does
 not disable the 24-hour masterchain snapshot cache. The regular `--clear-cache`

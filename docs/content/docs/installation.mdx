@@ -12,9 +12,9 @@ import {SiApple, SiLinux} from "react-icons/si";
 Acton ships as a single, dependency-free executable. You can install it via the public installer, by downloading a release asset directly, or by using the published Docker image.
 
 <Callout type="info" title="Support policy">
-    Acton is stable on the latest major numbered release. First-class support covers versioned releases on macOS (ARM64 and x86_64) and Linux GNU (x86_64 and ARM64). For Linux, the documented baseline is Ubuntu 22 or newer.
+    Acton is stable on the latest major numbered release. First-class support covers versioned releases on macOS (ARM64 and x86_64) and Linux GNU (x86_64 and ARM64). For Linux, the documented baseline is Ubuntu 22.04 or newer.
 
-    `trunk` builds, WSL installs, and other source-built targets are beta or best-effort surfaces. Native Windows is not supported: install Acton inside WSL with Ubuntu 22 or newer and follow the Linux steps.
+    `trunk` builds, WSL installs, and other source-built targets are beta or best-effort surfaces. Native Windows is not supported: install Acton inside WSL with Ubuntu 22.04 or newer and follow the Linux steps.
 
     See the [platform tiers](#platform-tiers) for the full matrix.
 </Callout>
@@ -38,7 +38,7 @@ Acton ships as a single, dependency-free executable. You can install it via the 
     </Tab>
     <Tab value="WSL">
 
-        Run this inside the WSL shell with Ubuntu 22 or newer, not in PowerShell nor in `cmd.exe`:
+        Run this inside the WSL shell with Ubuntu 22.04 or newer, not in PowerShell nor in `cmd.exe`:
 
         ```bash
         curl -LsSf https://github.com/ton-blockchain/acton/releases/latest/download/acton-installer.sh | sh
@@ -48,7 +48,7 @@ Acton ships as a single, dependency-free executable. You can install it via the 
 </Tabs>
 
 <Callout type="warning" title="Use WSL on Windows">
-    On Windows, use WSL with Ubuntu 22 or newer; native Windows is not supported.
+    On Windows, use WSL with Ubuntu 22.04 or newer; native Windows is not supported.
 
     Run Git and Acton inside the same WSL distribution. In VS Code, install the
     [WSL extension](https://code.visualstudio.com/docs/remote/wsl), then use

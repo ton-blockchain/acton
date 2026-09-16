@@ -28,7 +28,7 @@ use tolk_ty::InferenceResult;
 /// reserveGramsOnBalance(grams("0.1"), RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_AT_MOST);
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct ReserveModeLiteral;
 
 impl Violation for ReserveModeLiteral {

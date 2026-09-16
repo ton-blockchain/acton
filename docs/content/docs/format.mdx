@@ -52,6 +52,19 @@ In this mode, Acton does not rewrite files. It prints a diff for each file that 
 
 Formatting is clean when the command exits with status `0` and prints no diffs.
 
+## Format standard input
+
+<AvailabilityBadge since="Acton 1.1" />
+
+Use `--stdin` for editor integrations. `--stdin-filepath` sets the path shown in diagnostics:
+
+```bash
+acton fmt --stdin --stdin-filepath contracts/main.tolk < contracts/main.tolk
+```
+
+Acton writes the formatted source to standard output. It does not read or write
+the virtual path. Positional file and directory arguments cannot be used with `--stdin`.
+
 ## Adjust formatter defaults
 
 Store formatter defaults in the `[fmt]` section of `Acton.toml`:

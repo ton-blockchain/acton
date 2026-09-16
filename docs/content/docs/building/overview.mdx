@@ -41,6 +41,10 @@ depends = []
 
 See how to [declare contract dependencies](/docs/projects#declare-contract-dependencies) in the project management guide.
 
+In scripts, [`build("Contract")`](/docs/standard_library/build) builds the requested contract and its dependencies, then returns its code cell.
+It updates generated dependency files and reuses the compilation cache for unchanged sources.
+Calls with an explicit source path compile that file without processing `depends` from `Acton.toml`.
+
 ### No circular dependencies
 
 Acton resolves the full dependency graph and compiles contracts in topological order. A circular dependency aborts the build before any contract is compiled:
@@ -68,6 +72,8 @@ Acton uses a shared file-based cache under `build/cache/`. Compilation cache ent
 A cache entry is valid only if the content hash of every imported source file matches the stored hash. This includes helper files generated in `gen/`, so changing a child contract's source also invalidates the cache for any parent that imports the generated helper.
 
 The same cache directory is shared by `acton build`, `acton compile`, and [`acton test`](/docs/commands/test). Recent builds often speed up subsequent test runs.
+
+<AvailabilityBadge since="Acton 1.2" />
 
 Pinned fork runs also store fetched remote accounts in this directory under `build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`. `acton test` and `acton script` reuse those files when the same fork network, block number, and account address are requested again. Fork runs without an explicit block use the same cache after they resolve the latest sequence number.
 

@@ -83,6 +83,15 @@ acton library publish Math --duration 100d --amount 0.2 --wallet my-wallet \
 
 Use `--local` or `--global` to skip the metadata storage prompt and save the library entry to `libraries.toml` or `global.libraries.toml`.
 
+### Existing library checks
+
+<AvailabilityBadge since="Acton 1.1" />
+
+Before publishing, Acton checks local and global metadata for the same code hash
+and network. In interactive mode, it can offer to top up a tracked library instead.
+It also checks whether the library exists on-chain. That check only warns;
+lookup failures do not block publication.
+
 ## Monitoring library status
 
 After publishing, monitor the library balance so storage fees do not drain and freeze the account. Use `acton library info`:

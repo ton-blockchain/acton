@@ -34,6 +34,8 @@ Defaults to `[build].output-abi` when configured, otherwise `build/abi/`.
 {{/option}}
 
 {{#option "`--output-boc` _dir_" }}
+Available since Acton 1.2.
+
 Directory for `<contract-name>.boc` files from compiled `.tolk` contracts and
 precompiled `.boc` inputs.
 
@@ -50,6 +52,8 @@ config value is set, Acton does not write `.fif` files.
 {{/option}}
 
 {{#option "`--output-sources` _dir_" }}
+Available since Acton 1.2.
+
 Directory for source registration artifacts generated from `.tolk` contracts.
 
 Defaults to `[build].output-sources` when configured. If neither the flag nor

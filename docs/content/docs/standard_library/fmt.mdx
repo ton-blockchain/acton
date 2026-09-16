@@ -23,6 +23,9 @@ Supported placeholders:
 - `{:ton}`: legacy alias for `{:gram}` / `{:grams}`
 - `{:cell-tree}`: cell/slice/builder/Cell\<T> formatted as a tree of cell references
 
+Binary output, hexadecimal prefixes, width, fill, alignment, and sign-aware
+zero padding are available since Acton 1.2, as are the `gram` and `grams` aliases.
+
 Placeholder syntax:
 - A placeholder is either `{}` or `{:<format-spec>}`.
 - `<format-spec>` is `[fill][align][width][type]`; every part is optional,
@@ -133,7 +136,7 @@ format("{:X}", true);    // "true"
 format("{:gram}", true); // "true"
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L113" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L116" />
 
 ## `parseInt`
 
@@ -157,7 +160,7 @@ val hex = parseInt("0xff");
 val withWhitespace = parseInt(" 42 ");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L151" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L154" />
 
 ## `parseAddress`
 
@@ -179,7 +182,7 @@ Example:
 val address = parseAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L170" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L173" />
 
 ## `parseCellFromHex`
 
@@ -193,7 +196,7 @@ Decode a root cell from hex-encoded BOC bytes.
 Invalid or malformed input (including non-BOC payloads) fails with an error like
 `Failed to decode cell hex <input>`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L180" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L183" />
 
 ## `parseCellFromBase64`
 
@@ -210,5 +213,5 @@ Decode a root cell from base64-encoded BOC bytes.
 Invalid or malformed input (including non-BOC payloads) fails with an error like
 `Failed to decode cell base64 <input>`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L191" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L194" />
 

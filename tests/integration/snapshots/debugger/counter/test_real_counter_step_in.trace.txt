@@ -402,8 +402,8 @@ Step 24 (step_in):
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     msg: OutMessage = (last seen)
       messageCell: cell = 422 bits, 2 refs, hash: [HASH]
-    res: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -422,8 +422,8 @@ Step 25 (step_in):
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     msg: OutMessage = (last seen)
       messageCell: cell = 422 bits, 2 refs, hash: [HASH]
-    res: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -442,8 +442,8 @@ Step 26 (step_in):
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     msg: OutMessage = (last seen)
       messageCell: cell = 422 bits, 2 refs, hash: [HASH]
-    res: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     (return value): (Counter, Treasury) = 2 items
       0: Counter
       1: Treasury
@@ -597,11 +597,11 @@ Step 35 (step_in):
 
 Step 36 (step_in):
   Code:
-    224| /// ```
-    225| fun testing.getAccountState(addr: address): TlbAccountInfo? {
-    226|     return impl.getAccountState(addr);
+    227| /// ```
+    228| fun testing.getAccountState(addr: address): TlbAccountInfo? {
+    229|     return impl.getAccountState(addr);
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-    227| }
+    230| }
   Variables:
     addr: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
       raw = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
@@ -714,11 +714,11 @@ Step 42 (step_in):
 
 Step 43 (step_in):
   Code:
-    224| /// ```
-    225| fun testing.getAccountState(addr: address): TlbAccountInfo? {
-    226|     return impl.getAccountState(addr);
+    227| /// ```
+    228| fun testing.getAccountState(addr: address): TlbAccountInfo? {
+    229|     return impl.getAccountState(addr);
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    227| }
+    230| }
   Variables:
     addr: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
       raw = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
@@ -1271,8 +1271,8 @@ Step 69 (step_in):
     increaseBy = <optimized out>
     msg: OutMessage = (last seen)
       messageCell: cell = 544 bits, 0 refs, hash: [HASH]
-    (return value): BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    (return value): BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1315,7 +1315,7 @@ Step 71 (step_in):
       addr = <optimized out>
       storageStat = <optimized out>
       storage: TlbAccountStorage
-    res: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell

@@ -34,6 +34,15 @@ A typical library workflow is:
 
 Publish a contract or arbitrary code as a library.
 
+#### Existing library checks
+
+Available since Acton 1.1.
+
+Acton checks local and global metadata for the same code hash and network.
+In interactive mode, it can offer to top up a tracked library instead.
+It also checks whether the library exists on-chain. That check only warns;
+lookup failures do not block publication.
+
 #### Synopsis
 
 `acton library publish` [_options_] [_contract-name_]

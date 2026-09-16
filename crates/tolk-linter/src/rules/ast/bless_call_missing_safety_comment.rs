@@ -35,7 +35,7 @@ use tolk_ty::InferenceResult;
 /// }
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct BlessCallMissingSafetyComment;
 
 impl Violation for BlessCallMissingSafetyComment {

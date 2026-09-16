@@ -1,0 +1,138 @@
+N/A -> kQAzMz..MzMw8H A
+└── 0x7e8764ef 0.1 GRAM -> kQAiIi..IiIiZI B                                     gas=123
+    └── 0x7e8764ef 0.1 GRAM -> kQARER..EREV2Z C                                 gas=123
+        ├── 0x7e8764ef 0.1 GRAM -> kQAzMz..MzMw8H A                             gas=123
+        ├── 0x7e8764ef 0.1 GRAM -> kf8zMz..MzM_BP D                             gas=123
+        │   └── 0x7e8764ef 0.1 GRAM -> kf8RER..EREaLR E                         gas=123
+        │       └── 0x7e8764ef 0.1 GRAM -> kf8zMz..MzM_BP D                     gas=123
+        │           └── 0x7e8764ef 0.1 GRAM -> kQARER..EREV2Z C                 gas=123
+        └── 0x7e8764ef 0.1 GRAM -> kQAzMz..MzMw8H A                             gas=123
+
+  Query Hash:        0000000000000000000000000000000000000000000000000000000000000000
+  Trace ID:          0000000000000000000000000000000000000000000000000000000000000000
+  Time:              2023-11-14 22:13:20 UTC — 2023-11-14 22:13:20 UTC
+  Block:             10000 — 10000
+  Trace Complete:    true
+  Total Txs:         8
+  Total Messages:    8
+
+  tx[1]:
+    hash: 0000000000000000000000000000000000000000000000000000000000000000
+    lt: 100
+    account: [WALLET_ADDRESS_BASE]
+    parent_lt: null
+    child_lts: [101]
+    from: [WALLET_ADDRESS_BASE]
+    to: [WALLET_ADDRESS_BASE]
+    value: 0.1 GRAM
+    opcode: 0x7e8764ef
+    bounced: false
+    branch: message
+    success: true
+    exit_code: 0
+    action_result_code: 0
+  tx[2]:
+    hash: 0000000000000000000000000000000000000000000000000000000000000001
+    lt: 101
+    account: [WALLET_ADDRESS_BASE]
+    parent_lt: 100
+    child_lts: [102, 103]
+    from: [WALLET_ADDRESS_BASE]
+    to: [WALLET_ADDRESS_BASE]
+    value: 0.1 GRAM
+    opcode: 0x7e8764ef
+    bounced: false
+    branch: message
+    success: true
+    exit_code: 0
+    action_result_code: 0
+  tx[3]:
+    hash: 0000000000000000000000000000000000000000000000000000000000000002
+    lt: 102
+    account: [WALLET_ADDRESS_BASE]
+    parent_lt: 101
+    child_lts: []
+    from: [WALLET_ADDRESS_BASE]
+    to: [WALLET_ADDRESS_BASE]
+    value: 0.1 GRAM
+    opcode: 0x7e8764ef
+    bounced: false
+    branch: message
+    success: true
+    exit_code: 0
+    action_result_code: 0
+  tx[4]:
+    hash: 0000000000000000000000000000000000000000000000000000000000000003
+    lt: 103
+    account: Ef8zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM0vF
+    parent_lt: 101
+    child_lts: [105]
+    from: [WALLET_ADDRESS_BASE]
+    to: Ef8zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM0vF
+    value: 0.1 GRAM
+    opcode: 0x7e8764ef
+    bounced: false
+    branch: message
+    success: true
+    exit_code: 0
+    action_result_code: 0
+  tx[5]:
+    hash: 0000000000000000000000000000000000000000000000000000000000000004
+    lt: 103
+    account: [WALLET_ADDRESS_BASE]
+    parent_lt: 101
+    child_lts: []
+    from: [WALLET_ADDRESS_BASE]
+    to: [WALLET_ADDRESS_BASE]
+    value: 0.1 GRAM
+    opcode: 0x7e8764ef
+    bounced: false
+    branch: message
+    success: true
+    exit_code: 0
+    action_result_code: 0
+  tx[6]:
+    hash: 0000000000000000000000000000000000000000000000000000000000000005
+    lt: 105
+    account: Ef8RERERERERERERERERERERERERERERERERERERERERERlb
+    parent_lt: 103
+    child_lts: [106]
+    from: Ef8zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM0vF
+    to: Ef8RERERERERERERERERERERERERERERERERERERERERERlb
+    value: 0.1 GRAM
+    opcode: 0x7e8764ef
+    bounced: false
+    branch: message
+    success: true
+    exit_code: 0
+    action_result_code: 0
+  tx[7]:
+    hash: 0000000000000000000000000000000000000000000000000000000000000006
+    lt: 106
+    account: Ef8zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM0vF
+    parent_lt: 105
+    child_lts: [107]
+    from: Ef8RERERERERERERERERERERERERERERERERERERERERERlb
+    to: Ef8zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM0vF
+    value: 0.1 GRAM
+    opcode: 0x7e8764ef
+    bounced: false
+    branch: message
+    success: true
+    exit_code: 0
+    action_result_code: 0
+  tx[8]:
+    hash: 0000000000000000000000000000000000000000000000000000000000000007
+    lt: 107
+    account: [WALLET_ADDRESS_BASE]
+    parent_lt: 106
+    child_lts: []
+    from: Ef8zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM0vF
+    to: [WALLET_ADDRESS_BASE]
+    value: 0.1 GRAM
+    opcode: 0x7e8764ef
+    bounced: false
+    branch: message
+    success: true
+    exit_code: 0
+    action_result_code: 0

@@ -176,6 +176,8 @@ project-wide value. An explicit per-contract `generate-test = false` overrides
 a project-wide `true`. With `--all`, Acton resolves these settings separately
 for every contract.
 
+Available since Acton 1.1.
+
 For a precompiled `.boc` contract, configure `types` next to `src` so wrapper
 generation can read ABI from the Tolk interface file:
 

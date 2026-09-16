@@ -144,6 +144,8 @@ val signature = crypto.rawSign(kp.privateKey, hash);
 
 ## `crypto.rawSignSlice`
 
+<AvailabilityBadge since="Acton 1.2" />
+
 ```tolk
 fun crypto.rawSignSlice(privateKey: int, data: slice): slice
 ```
@@ -167,7 +169,7 @@ val signature = crypto.rawSignSlice(kp.privateKey, message);
 // isSliceSignatureValid(message, signature, kp.publicKey) == true
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L117" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L119" />
 
 ## `crypto.getSecureRandomBytes`
 
@@ -187,7 +189,7 @@ Example:
 val randomBytes = crypto.getSecureRandomBytes(32);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L132" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L134" />
 
 ## `crypto.getFastRandomBytes`
 
@@ -221,7 +223,7 @@ val b = crypto.getFastRandomBytes(16);
 // `a == b` because both calls started from the same VM random seed
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L164" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L166" />
 
 ## `crypto.generateKeyPair`
 
@@ -239,7 +241,7 @@ Example:
 val kp = crypto.generateKeyPair();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L189" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L191" />
 
 ## `crypto.seedToKeyPair`
 
@@ -256,5 +258,5 @@ Example:
 val kp = crypto.seedToKeyPair(mySeed);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L202" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L204" />
 

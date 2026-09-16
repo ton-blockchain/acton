@@ -74,6 +74,8 @@ Contract address in friendly or raw format.
 .sp
 \fB\-\-abi\fR \fIpath\fR
 .RS 4
+Available since Acton 1.2.
+.sp
 Use compiler ABI JSON or a Tolk ABI source instead of automatic ABI matching.
 Tolk sources are compiled with entrypoints disabled, so standalone
 \fB*.types.tolk\fR interface files are accepted.
@@ -87,6 +89,28 @@ Defaults to \fBtestnet\fR\&.
 .sp
 Supported values include \fBmainnet\fR, \fBtestnet\fR, \fBlocalnet\fR, and
 \fBcustom:<name>\fR\&.
+.RE
+.sp
+\fB\-\-block\-number\fR \fIseqno\fR
+.RS 4
+Available since Acton 1.2.
+.sp
+Query account state at a masterchain block sequence number. For \fBrpc call\fR,
+run the get method against that historical state as well.
+.RE
+.sp
+\fB\-\-json\fR
+.RS 4
+Available since Acton 1.2.
+.sp
+Print machine\-readable account information and inspector results.
+.RE
+.sp
+\fB\-\-raw\fR
+.RS 4
+Available since Acton 1.2.
+.sp
+Skip domain inspectors such as Jetton detection.
 .RE
 .SS "Output"
 \fBacton rpc info\fR prints:
@@ -112,6 +136,8 @@ verifier response has the same \fBcode_hash\fR
 If no ABI match is found, Acton still prints the raw remote account information
 and reports that decoded storage is unavailable.
 .SS "acton rpc call"
+Available since Acton 1.2.
+.sp
 Call a contract get\-method through TON Center.
 .SS "Synopsis"
 \fBacton rpc call\fR [\fIoptions\fR] \fIaddress\fR \fImethod\fR [\fIargs\fR\[u2026]]
@@ -134,6 +160,8 @@ Arguments to pass to the get\-method.
 .sp
 \fB\-\-abi\fR \fIpath\fR
 .RS 4
+Available since Acton 1.2.
+.sp
 Use compiler ABI JSON or a Tolk ABI source instead of automatic ABI matching.
 The explicit ABI controls method lookup, argument parsing, result decoding,
 field comments, and custom exit\-code descriptions.
@@ -165,6 +193,14 @@ field value.
 \fB\-\-raw\fR
 .RS 4
 Print the raw TON Center stack without ABI decoding.
+.RE
+.sp
+\fB\-\-block\-number\fR \fIseqno\fR
+.RS 4
+Available since Acton 1.2.
+.sp
+Query account state at a masterchain block sequence number. For \fBrpc call\fR,
+run the get method against that historical state as well.
 .RE
 .SS "ABI Arguments"
 When \fB\-\-abi\fR is provided, Acton loads that file before making the RPC request

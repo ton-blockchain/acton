@@ -34,7 +34,7 @@ use tolk_syntax::{LambdaParameter, Parameter, TryFromNode};
 /// - Passing a parameter as `mutate a` counts as write usage and suppresses this diagnostic.
 /// - Autofix removes the `mutate` keyword (and one trailing whitespace if present).
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct MutableParameterCanBeImmutable;
 
 impl Violation for MutableParameterCanBeImmutable {

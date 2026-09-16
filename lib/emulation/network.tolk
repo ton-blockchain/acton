@@ -223,6 +223,8 @@ struct ExternalSendResult {
     /// Destination account extracted from the original external-in message.
     destination: address
     /// Whether Acton knows if the destination contract accepted the message.
+    ///
+    /// Available since Acton 1.2.
     acceptanceKnown: bool = true
 }
 
@@ -338,6 +340,8 @@ fun ExternalSendResult.giveName(
 ///
 /// The `location` parameter is filled automatically and is only used for
 /// diagnostics; user code should normally omit it.
+///
+/// Available since Acton 1.2.
 fun ExternalSendResult.hideTraceFromUi(
     self,
     location: string = reflect.sourceLocationAsString(),
@@ -362,6 +366,8 @@ fun SendResultList.giveName(self, nameForUI: string): void {
 /// Hide this trace chain from saved traces and the Test UI.
 ///
 /// The transactions are still available to test code and console assertions.
+///
+/// Available since Acton 1.2.
 fun SendResultList.hideTraceFromUi(self): void {
     ffi.hideTraceFromUi(self);
 }
@@ -775,6 +781,40 @@ fun SendResultList.findTransaction<Msg = unknown>(
     return (tx as Cell<TlbTransaction>).load();
 }
 
+/// Returns the gas used by the first transaction matching `params`.
+///
+/// If `Msg` has a declared serialization prefix, it overrides `params.opcode`.
+/// Fails if no transaction matches, showing the search parameters and available transactions.
+/// The matched transaction must have an ordinary VM compute phase; see [TlbTransaction.getUsedGas].
+///
+/// The `location` parameter is filled automatically for diagnostics.
+///
+/// Example:
+/// ```tolk
+/// val gas = txs.getUsedGas<IncreaseCounter>({ to: counter.address });
+/// expect(gas).toBeLess(10000);
+/// ```
+///
+/// Available since Acton 1.2.
+fun SendResultList.getUsedGas<Msg = unknown>(
+    self,
+    params: SearchParams = {},
+    location: string = reflect.sourceLocationAsString(),
+): int {
+    val declaredPrefix = Msg.__getDeclaredPackPrefix();
+    if (declaredPrefix != -1) {
+        params.opcode = declaredPrefix;
+    }
+
+    val tx = impl.findTransactionOrFail(
+        self,
+        params,
+        "SendResultList.getUsedGas(<expected>)",
+        location,
+    );
+    return (tx as Cell<TlbTransaction>).load().getUsedGas();
+}
+
 /// Send a message from a specified address.
 ///
 /// In broadcast mode (with `--net`), sending to the real network is attempted only when `from`
@@ -827,6 +867,8 @@ struct ExternalInMessage {
     /// Encoded external-in message cell.
     messageCell: cell
     /// Destination account address.
+    ///
+    /// Available since Acton 1.1.
     dest: address
 }
 
@@ -892,6 +934,7 @@ fun net.createExternalMessage<TBody>(
 ///
 /// If the external message is accepted, the returned [ExternalSendResult]
 /// contains the full transaction trace in `transactions`.
+/// The `ExternalSendResult` return type is available since Acton 1.1.
 ///
 /// If the external message is not accepted, the destination account does not
 /// exist, or emulation fails before a trace is produced, the returned result has
@@ -1055,6 +1098,8 @@ fun net.runGetMethod<Ret>(addr: address, idOrName: int | string, args: array<unk
 
 /// Execution metadata from a completed get-method invocation, including VM failures.
 /// These values describe the contract execution, excluding the calling test or script.
+///
+/// Available since Acton 1.2.
 struct GetMethodMeta {
     /// Gas consumed by the get-method execution in the VM.
     gasUsed: int
@@ -1067,6 +1112,8 @@ struct GetMethodMeta {
 /// Use `unwrap()` to read the typed value or report a VM failure.
 /// Metadata is available before decoding, including when Ret does not match the stack.
 /// Each result retains its own diagnostics for the lifetime of the test or script.
+///
+/// Available since Acton 1.2.
 struct GetMethodResult<Ret> {
     /// Gas usage and exit code from this contract execution.
     meta: GetMethodMeta
@@ -1087,6 +1134,8 @@ struct GetMethodResult<Ret> {
 /// val balance = execution.unwrap();
 /// expect(execution.meta.gasUsed).toBeLess(1000);
 /// ```
+///
+/// Available since Acton 1.2.
 fun net.runGetMethodExt<Ret>(
     addr: address,
     idOrName: int | string,
@@ -1129,6 +1178,8 @@ fun GetMethodResult<Ret>.__create(
 
 /// Returns whether the VM completed with exit code 0 or 1.
 /// This check does not decode the stack or validate it against Ret.
+///
+/// Available since Acton 1.2.
 fun GetMethodResult<Ret>.isSuccess(self): bool {
     return self.meta.exitCode == 0 || self.meta.exitCode == 1;
 }
@@ -1137,6 +1188,8 @@ fun GetMethodResult<Ret>.isSuccess(self): bool {
 /// Successful nullable getters return null as a value of Ret.
 /// An incompatible Ret causes a decoding error. Metadata is available before this call.
 /// Repeated calls decode the same stack without executing the getter again.
+///
+/// Available since Acton 1.2.
 fun GetMethodResult<Ret>.unwrap(self): Ret {
     if (!self.isSuccess()) {
         self.__fail();
@@ -1168,6 +1221,8 @@ fun GetMethodResult<Ret>.__fail(self, expectedExitCode: int? = null): never {
 
 /// Expect a specific VM exit code without decoding the saved stack.
 /// A mismatch reports the expected code and the getter's execution diagnostics.
+///
+/// Available since Acton 1.2.
 fun Expectation<GetMethodResult<Ret>>.toHaveExitCode(self, exitCode: int): void {
     if (self.value.meta.exitCode != exitCode) {
         self.value.__fail(exitCode);
@@ -1620,12 +1675,13 @@ fun impl.findTransactionOrFail(
     params: SearchParams,
     message: string,
     location: string,
-): void {
+): cell {
     val tx = impl.findTransaction(txs, params);
     if (tx == null) {
         ffi.failToFindTransactionByParams(location, message, txs, params.__toPredicateFFITuple());
         throw ASSERTION_FAILED;
     }
+    return tx;
 }
 
 fun impl.findNoTransactionOrFail(

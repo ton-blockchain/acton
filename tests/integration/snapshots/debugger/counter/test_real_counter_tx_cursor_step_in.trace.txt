@@ -402,8 +402,8 @@ Step 24 (step_in):
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     msg: OutMessage = (last seen)
       messageCell: cell = 422 bits, 2 refs, hash: [HASH]
-    res: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -422,8 +422,8 @@ Step 25 (step_in):
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     msg: OutMessage = (last seen)
       messageCell: cell = 422 bits, 2 refs, hash: [HASH]
-    res: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -442,8 +442,8 @@ Step 26 (step_in):
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     msg: OutMessage = (last seen)
       messageCell: cell = 422 bits, 2 refs, hash: [HASH]
-    res: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     (return value): (Counter, Treasury) = 2 items
       0: Counter
       1: Treasury
@@ -980,8 +980,8 @@ Step 53 (step_in):
       messageCell: cell = 544 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    res: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1002,8 +1002,8 @@ Step 54 (step_in):
       messageCell: cell = 544 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    res: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1024,8 +1024,8 @@ Step 55 (step_in):
       messageCell: cell = 544 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    res: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1144,8 +1144,8 @@ Step 62 (step_in):
       messageCell: cell = 544 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    res: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1166,7 +1166,7 @@ Step 63 (step_in):
       messageCell: cell = 544 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    res: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell

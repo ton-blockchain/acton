@@ -7,6 +7,11 @@ SYNOPSIS
        acton verify [options] [contract-name]
 
 DESCRIPTION
+       Available since Acton 1.2.
+
+       This manual describes the ticket-based source verifier introduced in
+       Acton 1.2.
+
        Verify local contract source code with the TON verifier on TON testnet.
 
        The command compiles the local sources, requests a verification ticket,
@@ -51,6 +56,8 @@ OPTIONS
            sources.
 
        --payment-tx-hash payment-tx-hash
+           Available since Acton 1.2.
+
            Reuse a finalized testnet payment transaction.
 
            The transaction must contain the code hash from the current

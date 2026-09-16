@@ -442,8 +442,8 @@ Step 28 (step_in):
     config: SendParams
       value: coins = 1000000000 (last seen)
       bounce = <optimized out>
-    (return value): BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    (return value): BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -673,8 +673,8 @@ Step 39 (step_in):
     config: SendParams
       value: coins = 1000000000 (last seen)
       bounce = <optimized out>
-    (return value): BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    (return value): BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1226,8 +1226,8 @@ Step 65 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1251,8 +1251,8 @@ Step 66 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1276,8 +1276,8 @@ Step 67 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1301,8 +1301,8 @@ Step 68 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1326,8 +1326,8 @@ Step 69 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1491,8 +1491,8 @@ Step 79 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1516,8 +1516,8 @@ Step 80 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1541,8 +1541,8 @@ Step 81 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1566,8 +1566,8 @@ Step 82 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1591,8 +1591,8 @@ Step 83 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1616,8 +1616,8 @@ Step 84 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1641,8 +1641,8 @@ Step 85 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1666,8 +1666,8 @@ Step 86 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1955,8 +1955,8 @@ Step 98 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -1980,10 +1980,10 @@ Step 99 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -2007,10 +2007,10 @@ Step 100 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -2034,10 +2034,10 @@ Step 101 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -2061,10 +2061,10 @@ Step 102 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -2088,10 +2088,10 @@ Step 103 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -2255,10 +2255,10 @@ Step 113 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -2282,10 +2282,10 @@ Step 114 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -2309,10 +2309,10 @@ Step 115 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -2476,10 +2476,10 @@ Step 125 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -2503,10 +2503,10 @@ Step 126 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -2530,10 +2530,10 @@ Step 127 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -2557,10 +2557,10 @@ Step 128 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -2584,10 +2584,10 @@ Step 129 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -2611,10 +2611,10 @@ Step 130 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -2772,10 +2772,10 @@ Step 137 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -2799,10 +2799,10 @@ Step 138 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
   Registers:
@@ -2828,10 +2828,10 @@ Step 139 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
   Registers:
@@ -2857,10 +2857,10 @@ Step 140 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
@@ -3363,10 +3363,10 @@ Step 162 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
@@ -3394,16 +3394,17 @@ Step 163 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
       id: int = 2
-    allRemaining: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -3427,16 +3428,17 @@ Step 164 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
       id: int = 2
-    allRemaining: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -3460,16 +3462,17 @@ Step 165 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
       id: int = 2
-    allRemaining: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -3493,16 +3496,17 @@ Step 166 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
       id: int = 2
-    allRemaining: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -3526,16 +3530,17 @@ Step 167 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
       id: int = 2
-    allRemaining: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -3559,16 +3564,17 @@ Step 168 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
       id: int = 2
-    allRemaining: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -3592,16 +3598,17 @@ Step 169 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
       id: int = 2
-    allRemaining: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items (last seen)
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -3625,16 +3632,17 @@ Step 170 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
       id: int = 2
-    allRemaining: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items (last seen)
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -3658,16 +3666,17 @@ Step 171 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
       id: int = 2
-    allRemaining: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items (last seen)
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -3831,16 +3840,17 @@ Step 181 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
       id: int = 2
-    allRemaining: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items (last seen)
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -3864,16 +3874,17 @@ Step 182 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
       id: int = 2
-    allRemaining: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items (last seen)
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -3897,16 +3908,17 @@ Step 183 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
       id: int = 2
-    allRemaining: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items (last seen)
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -4070,16 +4082,17 @@ Step 193 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
       id: int = 2
-    allRemaining: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items (last seen)
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -4103,16 +4116,17 @@ Step 194 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
       id: int = 2
-    allRemaining: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items (last seen)
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -4136,16 +4150,17 @@ Step 195 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor
       id: int = 2
-    allRemaining: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items (last seen)
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -4169,16 +4184,17 @@ Step 196 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor = (last seen)
       id: int = 2
-    allRemaining: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items (last seen)
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -4202,15 +4218,16 @@ Step 197 (step_in):
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     cursor: TxCursor = (last seen)
       id: int = 1
-    firstHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    receiverHop: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    firstHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    receiverHop: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
     secondTrigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
     secondCursor: TxCursor = (last seen)
       id: int = 2
-    allRemaining: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    allRemaining: BigArray<SendResult> = 2 items (last seen)
+      0: SendResult
+      1: SendResult
   Registers:
     c4 (storage): cell = empty cell

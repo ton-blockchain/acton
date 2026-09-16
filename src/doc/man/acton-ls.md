@@ -13,8 +13,8 @@ acton-ls --- Run the Acton language server
 Start the language server used for TON language tooling.
 
 The server boots with the resolved project root, loads import path mappings from
-`Acton.toml` when available, initializes the bundled standard library from
-`.acton/tolk-stdlib`, and serves requests either over stdio or a local TCP
+`Acton.toml` when available, loads the standard library from `--stdlib-path`,
+`.acton/tolk-stdlib`, or the bundled fallback, and serves requests either over stdio or a local TCP
 socket.
 
 ## Options
@@ -39,7 +39,21 @@ Write language-server logs to a custom file.
 Disable language-server logging setup.
 {{/option}}
 
+{{#option "`--log-level` _level_" }}
+Available since Acton 1.2.
+
+Log level: `off`, `error`, `warn`, `info`, `debug`, or `trace`.
+{{/option}}
+
+{{#option "`--stdlib-path` _path_" }}
+Available since Acton 1.2.
+
+Use a physical Tolk standard library directory instead of the bundled library.
+{{/option}}
+
 {{#option "`--profile`" }}
+Available since Acton 1.2.
+
 Collect performance counters and timings for the `ton/profile` LSP request.
 {{/option}}
 
@@ -87,7 +101,8 @@ Before starting the server, Acton:
 
 - resolves the project root and manifest path
 - loads `[import-mappings]` from `Acton.toml` when present
-- preloads `.acton/tolk-stdlib/common.tolk`
+- loads the selected standard library, using the bundled fallback when
+  `.acton/tolk-stdlib` is absent
 
 ## Exit Status
 

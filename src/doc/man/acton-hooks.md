@@ -33,6 +33,8 @@ This command only works when the resolved project root already contains a local
 {{#options command="acton hooks new"}}
 
 {{#option "`--hook` _hook_" }}
+Available since Acton 1.2.
+
 When Git runs the generated hook.
 
 Possible values: `pre-push`, `pre-commit`

@@ -64,6 +64,8 @@ OPTIONS
            build/abi/.
 
        --output-boc dir
+           Available since Acton 1.2.
+
            Directory for <contract-name>.boc files from compiled .tolk
            contracts and precompiled .boc inputs.
 
@@ -78,6 +80,8 @@ OPTIONS
            nor the config value is set, Acton does not write .fif files.
 
        --output-sources dir
+           Available since Acton 1.2.
+
            Directory for source registration artifacts generated from .tolk
            contracts.
 
@@ -116,6 +120,8 @@ CONFIGURATION
            src = "contracts/Wallet.tolk"
            output = "Wallet.boc"
            depends = ["Child"]
+
+       Available since Acton 1.1.
 
        For a precompiled contract, keep src pointed at the BoC and add types
        when you want Acton to emit ABI:

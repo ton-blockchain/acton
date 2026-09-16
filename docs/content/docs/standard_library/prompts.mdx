@@ -13,6 +13,10 @@ Module for user prompts.
 This module enables interactive scripts by providing functions to query information from the user via the command line.
 It is useful for deployment scripts or configuration wizards running in an interactive terminal.
 
+Ctrl+C terminates Acton with exit code `130`. Escape or a terminal I/O error
+terminates Acton with exit code `1`. The script does not continue after an
+interactive prompt is cancelled or fails, even inside a `try` block.
+
 Deterministic fallback matrix:
 - `prompt(...)`: returns `default` in non-interactive mode
 - `select(...)`: returns the `defaultIndex` option in non-interactive mode
@@ -64,7 +68,7 @@ val name = prompt("What is your name?", "type your name", "John");
 println("Hello {}", name);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L51" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L55" />
 
 ## `select`
 
@@ -81,7 +85,6 @@ Input and fallback behavior:
   opens, so the user can accept it by pressing Enter. Out-of-range values
   are clamped to a valid index (defaults to `0`).
 - In non-interactive mode returns the `defaultIndex` option.
-- If interactive prompt execution fails, returns `""`.
 
 Example:
 ```tolk
@@ -89,7 +92,7 @@ val name = select("What is your name?", ["John", "Jane", "Jim"], 1);
 println("Hello {}", name);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L71" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L74" />
 
 ## `confirm`
 
@@ -102,7 +105,6 @@ Prompts the user to confirm an action.
 Default and fallback behavior:
 - `default` is forwarded to the interactive host confirm prompt.
 - In non-interactive mode returns `default`.
-- If interactive prompt execution fails, result is `default`.
 
 Example:
 ```tolk
@@ -112,7 +114,7 @@ if (answer) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L89" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L91" />
 
 ## `promptInt`
 
@@ -135,7 +137,7 @@ Non-interactive behavior:
 - If the selected value is empty or invalid, execution fails with the same
   integer parser error as `parseInt(...)`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L107" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L109" />
 
 ## `promptAddress`
 
@@ -159,7 +161,7 @@ Non-interactive behavior:
 - If the selected value is empty or invalid, execution fails with the same
   address parser error as `parseAddress(...)`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L122" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L124" />
 
 ## `promptWallet`
 
@@ -175,8 +177,7 @@ Behavior (broadcast mode, i.e. `--net` is set):
 - If only one wallet is configured, returns its name automatically.
 - If multiple wallets are configured, shows an interactive selection.
 - In non-interactive mode (e.g. CI), fails with an error asking to specify the wallet explicitly.
-- If the interactive wallet picker is opened but cancelled or otherwise fails,
-  `promptWallet()` throws.
+- Cancelling the interactive wallet picker or a terminal I/O error terminates Acton.
 
 In emulate mode (no `--net`), returns the stable placeholder `"emulated-wallet"`:
 `scripts.wallet(name)` accepts any name in emulate mode, so there is nothing real to pick.
@@ -186,5 +187,5 @@ Example:
 val walletName = promptWallet("Select a wallet:");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L152" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L153" />
 

@@ -28,7 +28,7 @@ use tolk_ty::InferenceResult;
 /// outMsg.send(SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS);
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct SendModeLiteral;
 
 impl Violation for SendModeLiteral {

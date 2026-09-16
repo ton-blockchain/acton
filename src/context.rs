@@ -266,6 +266,9 @@ impl AssertFailure {
 #[derive(Debug, Clone)]
 pub struct BuildCache {
     pub built: FxHashMap<PathBuf, CompilationResult>,
+    /// Named contracts whose generated dependencies are current for this run.
+    /// Explicit-path builds do not prepare manifest dependencies.
+    pub(crate) prepared_contracts: FxHashSet<String>,
 }
 
 impl Default for BuildCache {
@@ -279,6 +282,7 @@ impl BuildCache {
     pub fn new() -> Self {
         Self {
             built: FxHashMap::default(),
+            prepared_contracts: FxHashSet::default(),
         }
     }
 

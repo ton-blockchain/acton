@@ -4,6 +4,7 @@ use clap::Command;
 use similar::{ChangeTag, TextDiff};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
+use std::fmt::Write;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -24,6 +25,30 @@ const ACTON_STDLIB_SRC: &str = "lib";
 const TOLK_STDLIB_SRC: &str = "crates/tolk-compiler/assets/tolk-stdlib";
 const LINTER_RULES_SOURCE_DIR: &str = "crates/tolk-linter/src/rules";
 const GITHUB_SOURCE_BASE: &str = "https://github.com/ton-blockchain/acton/blob/master";
+
+/// Render version notes as site badges while keeping manual sources readable in the CLI.
+/// Code examples retain their literal text, including availability statements.
+fn render_availability_badges(markdown: &str) -> String {
+    let mut in_fenced_code_block = false;
+    let mut rendered = String::new();
+
+    for line in markdown.split_inclusive('\n') {
+        if line.trim_start().starts_with("```") {
+            in_fenced_code_block = !in_fenced_code_block;
+        }
+
+        if !in_fenced_code_block && let Some(since) = stdlib::parse_availability_statement(line) {
+            let _ = write!(rendered, "<AvailabilityBadge since={since:?} />");
+            if line.ends_with('\n') {
+                rendered.push('\n');
+            }
+        } else {
+            rendered.push_str(line);
+        }
+    }
+
+    rendered
+}
 
 #[derive(Debug, Clone)]
 struct DocgenOutputPaths {

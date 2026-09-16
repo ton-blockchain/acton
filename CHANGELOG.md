@@ -30,13 +30,19 @@ and formatter fixes address cases where formatting lost code or broke syntax.
 - `crypto.getFastRandomBytes(bytes)` now consumes the VM random state and no
   longer accepts a seed. For repeatable results, set the seed with
   `testing.setRandomSeed(seed)` or `random.setSeed(seed)` before generating bytes.
-- Local tests and scripts start with the current wall-clock time. Forks use the
-  selected block timestamp. Set `testing.setNow(...)` explicitly when a test
+- Local tests and scripts start with the current wall-clock time. Forks with an explicit block number use the
+  selected block timestamp; latest forks use the current wall-clock time. Set `testing.setNow(...)` explicitly when a test
   requires a fixed time.
 - After a real-network broadcast, `ExternalSendResult.isAccepted()` reports an
   error because submission does not prove acceptance. Use
   `waitForFirstTransaction()` or `waitForTrace()` to inspect execution.
   `acceptanceKnown` indicates whether acceptance is known.
+
+#### Local development commands
+
+- Use `acton simulator` for the lightweight environment previously exposed as
+  `acton localnet`. Its configuration remains in `[localnet]`.
+  `acton localnet` now manages real TON validators in Docker.
 
 #### Wallets and verification
 
@@ -121,6 +127,8 @@ The new source verifier recompiles Tolk, FunC, and Tact contracts and checks the
 resulting code hash. Verified source bundles, compiler details, ABIs, and available
 source maps can be retrieved by code hash or contract address.
 
+- The verifier service supports testnet and mainnet payments and resolves
+  contract code hashes across both networks.
 - `acton verify` handles Tolk source uploads and testnet payments.
   Already verified code succeeds without another payment. Use
   `--payment-tx-hash` to resume an eligible paid attempt.
@@ -141,6 +149,9 @@ Actonscan. Clients solve a proof-of-work challenge before submitting a claim.
 
 ### Build Artifacts
 
+- `build("Contract")` updates generated dependency code before compilation, so
+  scripts use current sources after edits or branch changes without a separate
+  `acton build`.
 - `acton build --output-sources <DIR>` and `[build].output-sources` export
   `<contract>.source.json` bundles for source and ABI import into Explorer.
   Bundles include compiler and debug metadata. Precompiled BoC contracts do not
@@ -165,6 +176,8 @@ Actonscan. Clients solve a proof-of-work challenge before submitting a claim.
 
 ### Project Setup and Scripts
 
+- Cancelling a script prompt stops execution. Ctrl+C exits with code `130`;
+  Escape and terminal I/O errors exit with code `1` instead of accepting a default.
 - Commands load `.env` from the project selected by `--project-root` or
   `--manifest-path`, including RPC commands with an explicit project selection.
 - `acton new` and `acton hooks new` support `pre-push` and `pre-commit` checks.
@@ -189,6 +202,8 @@ Actonscan. Clients solve a proof-of-work challenge before submitting a claim.
 - `rpc info` decodes union and nested storage, Jetton metadata and balances,
   and multisig participants and thresholds. The bundled ABI catalog recognizes
   more contracts and message opcodes.
+- Transaction trees preserve all branches when transactions in different accounts
+  share the same logical time, including in `acton rpc trace`.
 - `acton doc abi <contract-or-code-hash>` prints ABI JSON from the project,
   bundled catalog, or verifier. RPC commands also use verified ABIs when local
   metadata is unavailable.
@@ -210,6 +225,8 @@ Actonscan. Clients solve a proof-of-work challenge before submitting a claim.
 
 ### Testing Helpers
 
+- `SendResultList.getUsedGas<Msg>(params)` returns the gas used by the first matching
+  transaction. If none matches, the error shows the search parameters and transaction tree.
 - `testing.createExternalTraceIterationCursor()` executes an external-in
   message and its descendants step by step.
 - `testing.treasury(name, workchain)` can create treasuries outside the basechain,
@@ -238,8 +255,9 @@ Actonscan. Clients solve a proof-of-work challenge before submitting a claim.
 
 ### Emulation and Forks
 
-- Forked tests and scripts resolve accounts, configuration, libraries, time,
-  and previous-block context from one pinned masterchain snapshot.
+- Forked tests and scripts resolve accounts, configuration, libraries,
+  and previous-block context from one pinned masterchain snapshot. Explicit
+  historical forks also use the block timestamp; latest forks use wall-clock time.
   Caches for the selected block are reused across runs.
 - Remote contracts that use on-chain libraries trigger automatic library
   discovery and registration during emulation and contract inspection.
@@ -323,6 +341,8 @@ Actonscan. Clients solve a proof-of-work challenge before submitting a claim.
 
 ### Linter and Type Analysis
 
+- `S009`, `prefer-grams`, recommends `grams()` instead of standard-library `ton()`.
+  `acton check --fix` replaces calls when no local binding shadows `grams`.
 - `E031`, `unnecessary-not-null-assertion`, detects redundant `!` operators
   and provides an automatic fix.
 - `acton check` tracks mutations through generic method receivers, preventing

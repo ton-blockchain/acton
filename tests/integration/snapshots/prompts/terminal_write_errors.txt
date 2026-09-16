@@ -1,0 +1,6 @@
+text: exit=1, started=true, continued=false, caught=false, next_prompt=false
+integer: exit=1, started=true, continued=false, caught=false, next_prompt=false
+address: exit=1, started=true, continued=false, caught=false, next_prompt=false
+select: exit=1, started=true, continued=false, caught=false, next_prompt=false
+confirm: exit=1, started=true, continued=false, caught=false, next_prompt=false
+wallet: exit=1, started=true, continued=false, caught=false, next_prompt=false

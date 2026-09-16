@@ -75,6 +75,8 @@ Defaults to \fB[build].output\-abi\fR when configured, otherwise \fBbuild/abi/\f
 .sp
 \fB\-\-output\-boc\fR \fIdir\fR
 .RS 4
+Available since Acton 1.2.
+.sp
 Directory for \fB<contract\-name>.boc\fR files from compiled \fB\&.tolk\fR contracts and
 precompiled \fB\&.boc\fR inputs.
 .sp
@@ -93,6 +95,8 @@ config value is set, Acton does not write \fB\&.fif\fR files.
 .sp
 \fB\-\-output\-sources\fR \fIdir\fR
 .RS 4
+Available since Acton 1.2.
+.sp
 Directory for source registration artifacts generated from \fB\&.tolk\fR contracts.
 .sp
 Defaults to \fB[build].output\-sources\fR when configured. If neither the flag nor
@@ -140,6 +144,8 @@ output = "Wallet.boc"
 depends = ["Child"]
 .fi
 .RE
+.sp
+Available since Acton 1.1.
 .sp
 For a precompiled contract, keep \fBsrc\fR pointed at the BoC and add \fBtypes\fR when
 you want Acton to emit ABI:

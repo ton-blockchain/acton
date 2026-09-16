@@ -8,6 +8,10 @@ acton\-verify \[em] Verify contract source code on the TON verifier service
 .SH "SYNOPSIS"
 \fBacton verify\fR [\fIoptions\fR] [\fIcontract\-name\fR]
 .SH "DESCRIPTION"
+Available since Acton 1.2.
+.sp
+This manual describes the ticket\-based source verifier introduced in Acton 1.2.
+.sp
 Verify local contract source code with the TON verifier on TON testnet.
 .sp
 The command compiles the local sources, requests a verification ticket, sends
@@ -63,6 +67,8 @@ Prepare verification without sending the payment or uploading sources.
 .sp
 \fB\-\-payment\-tx\-hash\fR \fIpayment\-tx\-hash\fR
 .RS 4
+Available since Acton 1.2.
+.sp
 Reuse a finalized testnet payment transaction.
 .sp
 The transaction must contain the code hash from the current verification.

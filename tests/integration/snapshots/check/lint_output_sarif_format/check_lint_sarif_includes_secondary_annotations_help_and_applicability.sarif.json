@@ -178,7 +178,7 @@
                 "actonDefinitionFile": "crates/tolk-linter/src/rules/ast/used_ignored_identifier.rs",
                 "actonDefinitionLine": 30,
                 "actonFixAvailability": "Always",
-                "actonRuleGroupSince": "v0.0.1",
+                "actonRuleGroupSince": "v1.0.0",
                 "actonRuleGroupStatus": "stable"
               },
               "shortDescription": {
@@ -202,7 +202,7 @@
                 "actonDefinitionFile": "crates/tolk-linter/src/rules/ast/unused_expression.rs",
                 "actonDefinitionLine": 29,
                 "actonFixAvailability": "None",
-                "actonRuleGroupSince": "v0.0.1",
+                "actonRuleGroupSince": "v1.0.0",
                 "actonRuleGroupStatus": "stable"
               },
               "shortDescription": {

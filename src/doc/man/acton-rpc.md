@@ -59,6 +59,8 @@ Contract address in friendly or raw format.
 {{/option}}
 
 {{#option "`--abi` _path_" }}
+Available since Acton 1.2.
+
 Use compiler ABI JSON or a Tolk ABI source instead of automatic ABI matching.
 Tolk sources are compiled with entrypoints disabled, so standalone
 `*.types.tolk` interface files are accepted.
@@ -71,6 +73,25 @@ Defaults to `testnet`.
 
 Supported values include `mainnet`, `testnet`, `localnet`, and
 `custom:<name>`.
+{{/option}}
+
+{{#option "`--block-number` _seqno_" }}
+Available since Acton 1.2.
+
+Query account state at a masterchain block sequence number. For `rpc call`,
+run the get method against that historical state as well.
+{{/option}}
+
+{{#option "`--json`" }}
+Available since Acton 1.2.
+
+Print machine-readable account information and inspector results.
+{{/option}}
+
+{{#option "`--raw`" }}
+Available since Acton 1.2.
+
+Skip domain inspectors such as Jetton detection.
 {{/option}}
 
 {{/options}}
@@ -90,6 +111,8 @@ If no ABI match is found, Acton still prints the raw remote account information
 and reports that decoded storage is unavailable.
 
 ### acton rpc call
+
+Available since Acton 1.2.
 
 Call a contract get-method through TON Center.
 
@@ -114,6 +137,8 @@ Arguments to pass to the get-method.
 {{/option}}
 
 {{#option "`--abi` _path_" }}
+Available since Acton 1.2.
+
 Use compiler ABI JSON or a Tolk ABI source instead of automatic ABI matching.
 The explicit ABI controls method lookup, argument parsing, result decoding,
 field comments, and custom exit-code descriptions.
@@ -141,6 +166,13 @@ field value.
 
 {{#option "`--raw`" }}
 Print the raw TON Center stack without ABI decoding.
+{{/option}}
+
+{{#option "`--block-number` _seqno_" }}
+Available since Acton 1.2.
+
+Query account state at a masterchain block sequence number. For `rpc call`,
+run the get method against that historical state as well.
 {{/option}}
 
 {{/options}}

@@ -51,7 +51,7 @@ use tolk_ty::GlobalUsages;
 /// - Get method names are ignored because external standards commonly require
 ///   `snake_case` names such as `get_wallet_info`.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct NameCaseChecker;
 
 impl Violation for NameCaseChecker {

@@ -157,6 +157,17 @@ Clicking a node opens detailed transaction view below tree:
 
 ![Transactions tab with trace tree and selected transaction details](../imgs/test-ui-transactions-tree.png)
 
+### Storage, balances, and transaction logs
+
+<AvailabilityBadge since="Acton 1.2" />
+
+Transaction details include decoded storage, storage changes, and final account
+balances. Trace overviews show value flow across accounts and can collapse treasury
+deployment traces.
+
+Use the transaction's log links to open **Logs** at that transaction and expand its
+VM or executor log.
+
 ### Actions details
 
 When action phase has out actions:
@@ -175,11 +186,14 @@ Logs tab shows `Executor Log` and `VM Log` grouped by transaction for the select
 
 ## 7. Profile tab
 
+<AvailabilityBadge since="Acton 1.2" />
+
 When the run includes `acton test --gas-profile build/gas.cpuprofile --ui`, Test UI adds a dedicated `Profile` tab with:
 
 - contract tabs for profiled contracts
 - gas-weighted flamegraph for the selected contract
 - selected frame details: source location, total gas, self gas, and contract share
+- per-frame instruction tables with instruction gas costs and source locations
 
 The global profile view is grouped by contract. Function names inside each
 contract do not repeat the contract prefix, so frames such as

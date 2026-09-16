@@ -3,6 +3,10 @@
 /// This module enables interactive scripts by providing functions to query information from the user via the command line.
 /// It is useful for deployment scripts or configuration wizards running in an interactive terminal.
 ///
+/// Ctrl+C terminates Acton with exit code `130`. Escape or a terminal I/O error
+/// terminates Acton with exit code `1`. The script does not continue after an
+/// interactive prompt is cancelled or fails, even inside a `try` block.
+///
 /// Deterministic fallback matrix:
 /// - `prompt(...)`: returns `default` in non-interactive mode
 /// - `select(...)`: returns the `defaultIndex` option in non-interactive mode
@@ -61,7 +65,6 @@ fun prompt(message: string, placeholder: string = "", default: string = ""): str
 ///   opens, so the user can accept it by pressing Enter. Out-of-range values
 ///   are clamped to a valid index (defaults to `0`).
 /// - In non-interactive mode returns the `defaultIndex` option.
-/// - If interactive prompt execution fails, returns `""`.
 ///
 /// Example:
 /// ```tolk
@@ -77,7 +80,6 @@ fun select(message: string, variants: array<string>, defaultIndex: int = 0): str
 /// Default and fallback behavior:
 /// - `default` is forwarded to the interactive host confirm prompt.
 /// - In non-interactive mode returns `default`.
-/// - If interactive prompt execution fails, result is `default`.
 ///
 /// Example:
 /// ```tolk
@@ -139,8 +141,7 @@ fun promptAddress(
 /// - If only one wallet is configured, returns its name automatically.
 /// - If multiple wallets are configured, shows an interactive selection.
 /// - In non-interactive mode (e.g. CI), fails with an error asking to specify the wallet explicitly.
-/// - If the interactive wallet picker is opened but cancelled or otherwise fails,
-///   `promptWallet()` throws.
+/// - Cancelling the interactive wallet picker or a terminal I/O error terminates Acton.
 ///
 /// In emulate mode (no `--net`), returns the stable placeholder `"emulated-wallet"`:
 /// `scripts.wallet(name)` accepts any name in emulate mode, so there is nothing real to pick.
