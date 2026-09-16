@@ -19,6 +19,8 @@ deploy, install, and remove the extension.
   that adds testing helpers (signed bodies, deploy helpers, action packing).
 - `tests/simple-extension.test.tolk` covers install, payment collection,
   payment interval enforcement, and admin-driven cancellation flows.
+- `tests/wallet*.test.tolk` covers the vendored wallet's signed messages,
+  extension authorization, action validation, and get methods.
 - `.github/workflows/contracts.yml` runs build, format, lint, and test checks
   on GitHub Actions.
 

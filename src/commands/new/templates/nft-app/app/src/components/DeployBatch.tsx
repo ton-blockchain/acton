@@ -79,8 +79,8 @@ export function DeployBatch({
   const skipsAhead = startIdxSafe > nextIndex;
 
   const rawN = parseInt(count, 10) || 0;
-  const n = Math.max(0, Math.min(250, rawN));
-  const overLimit = rawN > 250;
+  const n = Math.max(0, Math.min(249, rawN));
+  const overLimit = rawN > 249;
 
   const items = useMemo(
     () =>
@@ -140,7 +140,7 @@ export function DeployBatch({
         <CardHeader>
           <CardTitle>Deploy Batch</CardTitle>
           <CardDescription>
-            Mints many items in a single transaction · up to 250 per batch
+            Mints many items in a single transaction · up to 249 per batch
           </CardDescription>
         </CardHeader>
 
@@ -171,8 +171,8 @@ export function DeployBatch({
           <div className="grid grid-cols-2 gap-3.5">
             <Field
               label="Batch size"
-              hint="Max 250 per tx"
-              error={overLimit ? 'Max 250' : null}
+              hint="Max 249 per tx"
+              error={overLimit ? 'Max 249' : null}
             >
               <Input
                 value={count}

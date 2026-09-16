@@ -17,6 +17,9 @@ ready-to-run deployment and management scripts.
   scripts.
 - `tests/nft-collection.test.tolk` and `tests/nft-item.test.tolk` cover
   collection behavior and item behavior in focused reference suites.
+- `tests/e2e-happy-paths.test.tolk` exercises the full collection and item flow;
+  `tests/mutation-regressions.test.tolk` covers batch limits, initialization,
+  and transfer fee boundaries.
 - `.github/workflows/contracts.yml` runs build, format, lint, and test checks
   on GitHub Actions.
 
@@ -44,7 +47,7 @@ Scripts in `scripts/` cover deployment and collection or item management:
 
 - `deploy-collection.tolk` — deploys an NFT collection with on-chain metadata and royalty params.
 - `deploy-item.tolk` — mints a single NFT item into an existing collection.
-- `deploy-batch.tolk` — batch-mints multiple items in a single transaction.
+- `deploy-batch.tolk` — batch-mints 1–249 items in a single transaction.
 - `transfer-item.tolk` — transfers an NFT item to a new owner.
 - `change-admin.tolk` — changes the admin address of an existing collection.
 
@@ -56,8 +59,8 @@ generated aliases such as `acton run nft-deploy-item` and
 
 1. Update the contracts under `contracts/` for your NFT metadata, minting, and
    collection policy.
-2. Adjust `wrappers/NftCollection.gen.tolk` and `wrappers/NftItem.gen.tolk` to
-   match the new ABI, or regenerate them with `acton wrapper NftCollection` and
+2. Regenerate `wrappers/NftCollection.gen.tolk` and `wrappers/NftItem.gen.tolk`
+   after ABI changes with `acton wrapper NftCollection` and
    `acton wrapper NftItem`.
 3. Extend the focused test suites under `tests/` with the scenarios you care about.
 4. Update metadata defaults and management flows under `scripts/`.

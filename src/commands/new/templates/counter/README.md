@@ -2,7 +2,7 @@
 
 This project was generated from Acton's `counter` template. It includes a small
 counter contract, generated wrapper helpers, tests, and a ready-to-run
-deployment script.
+deployment and management scripts.
 
 ## What Is Included
 
@@ -14,6 +14,8 @@ deployment script.
   underflow, and invalid-message flows.
 - `scripts/deploy.tolk` deploys the contract with the deployer wallet as owner,
   then reads the owner and counter value back after deployment.
+- `scripts/increase.tolk`, `scripts/reset.tolk`, and `scripts/info.tolk` update or
+  inspect the counter. They deploy it first when no address is configured.
 - `.github/workflows/contracts.yml` runs build, format, lint, and test checks
   on GitHub Actions.
 
@@ -34,6 +36,19 @@ acton test
 ```bash
 acton run deploy-emulation
 ```
+
+## Manage The Counter
+
+```bash
+acton script scripts/increase.tolk
+acton script scripts/reset.tolk
+acton script scripts/info.tolk
+```
+
+The deployer wallet owns the counter and is the only account allowed to
+increase, decrease, or reset it. Scripts accept `COUNTER_ADDRESS` to target an
+existing contract, `COUNTER_DEPLOY_VALUE_NANOS` to set the deployment value
+(default: 5000000), and `COUNTER_DELTA` to set the increment (default: 1).
 
 ## Customize The Starter
 

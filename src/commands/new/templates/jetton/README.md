@@ -15,8 +15,11 @@ transfers, metadata changes, and admin flows.
   messages, storage, fees, sharding helpers, and starter errors.
 - `wrappers/JettonMinter.gen.tolk` and `wrappers/JettonWallet.gen.tolk`
   are the wrappers used by tests and scripts.
+- `wrappers/utils.tolk` adds deployment, minting, and transfer helpers, including
+  explicit inline, reference, and automatic forward-payload encoding.
 - `tests/*.test.tolk` covers state init, gas, bounce handling, wallet behavior,
-  admin and governance flows, and protocol validation.
+  admin and governance flows, protocol validation, complete token lifecycles,
+  and regressions found through mutation testing.
 - `scripts/deploy.tolk` builds on-chain metadata, deploys the minter, and reads
   total supply back from the network.
 - `.github/workflows/contracts.yml` runs build, format, lint, and test checks
@@ -44,7 +47,7 @@ acton run deploy-emulation
 
 Scripts in `scripts/` cover deployment and jetton management:
 
-- `deploy.tolk` — deploys the jetton minter and prints minter/admin wallet info.
+- `deploy.tolk` — deploys the jetton minter with zero total supply and prints minter/admin wallet info.
 - `mint.tolk` — mints jettons to a recipient.
 - `transfer.tolk` — transfers jettons between wallets.
 - `info.tolk` — displays minter and wallet info.

@@ -14,11 +14,7 @@ contract JettonWallet {
     incomingMessages: AllowedMessageToWallet
 }
 
-type AllowedMessageToWallet =
-    | AskToTransfer
-    | AskToBurn
-    | InternalTransferStep
-    | TopUpGrams
+type AllowedMessageToWallet = AskToTransfer | AskToBurn | InternalTransferStep | TopUpGrams
 
 type BounceOpToHandle = InternalTransferStep | BurnNotificationForMinter
 
@@ -27,8 +23,8 @@ fun onBouncedMessage(in: InMessageBounced) {
 
     val msg = lazy BounceOpToHandle.fromSlice(in.bouncedBody);
     val restoreAmount = match (msg) {
-        InternalTransferStep => msg.jettonAmount,
-        BurnNotificationForMinter => msg.jettonAmount,
+        InternalTransferStep => msg.jettonAmount,      // safe to fetch jettonAmount, because
+        BurnNotificationForMinter => msg.jettonAmount, // it's in the beginning of a message
     };
 
     var storage = lazy WalletStorage.load();
@@ -86,7 +82,7 @@ fun onInternalMessage(in: InMessage) {
                     value: 0,
                     body: ReturnExcessesBack { queryId: msg.queryId },
                 });
-                // SAFETY: It is safe because of reserveGramsOnBalance() called earlier
+                // SAFETY: mode SEND_MODE_CARRY_ALL_BALANCE is used after reserveGramsOnBalance()
                 excessesMsg.send(SEND_MODE_CARRY_ALL_BALANCE | SEND_MODE_IGNORE_ERRORS);
             }
         }

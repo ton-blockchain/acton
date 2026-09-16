@@ -39,6 +39,11 @@ fun SnakedExtraActions.getNext(self): SnakedExtraActions {
     return self.preloadRef().beginParse();
 }
 
+struct SnakedExtraActionsClientType {
+    action: ExtraAction
+    next: Cell<SnakedExtraActionsClientType> | void
+}
+
 struct (0x6578746e) ExtensionActionRequest {
     queryId: uint64
     @abi.clientType(Cell<OutActionWithSendMessageOnly>?)

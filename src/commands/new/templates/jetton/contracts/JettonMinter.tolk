@@ -27,6 +27,7 @@ type AllowedMessageToMinter =
 
 fun onBouncedMessage(in: InMessageBounced) {
     in.bouncedBody.skipBouncedPrefix();
+    // process only mint bounces; on other messages, an exception will be thrown, it's okay
     val msg = lazy InternalTransferStep.fromSlice(in.bouncedBody);
 
     var storage = lazy MinterStorage.load();
@@ -35,6 +36,8 @@ fun onBouncedMessage(in: InMessageBounced) {
 }
 
 fun assertSenderIsAdmin(senderAddress: address, adminAddress: address?) {
+    // A dropped admin is null. Comparing it to a sender then fails with TVM
+    // error 7, preventing any further admin operations.
     assert (senderAddress == adminAddress!) throw Errors.NotOwner;
 }
 
@@ -110,6 +113,7 @@ fun onInternalMessage(in: InMessage) {
             val forwardTonAmount = internalTransferMsg.forwardTonAmount;
             internalTransferMsg.forwardPayload.checkIsCorrectTlbEither();
 
+            // a little more than needed, it’s ok since it’s sent by the admin and excesses will return back
             checkAmountIsEnoughToTransfer(msg.tonAmount, forwardTonAmount, in.originalForwardFee);
 
             storage.totalSupply += internalTransferMsg.jettonAmount;
@@ -118,7 +122,7 @@ fun onInternalMessage(in: InMessage) {
             reserveGramsOnBalance(
                 grams("0.01"),
                 RESERVE_MODE_EXACT_AMOUNT,
-            );
+            ); // reserve for storage fees
 
             val jettonWalletCode = jettonWalletCompiledCode();
             val deployMsg = createMessage({

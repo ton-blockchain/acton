@@ -1,3 +1,4 @@
+Deploy value: 5000000
 Awaiting trace... [Attempt 1/20]
 Trace settled with 2 transaction(s)
 N/A -> external
@@ -6,5 +7,6 @@ N/A -> external
         └── account created
 
 Deployed counter to [WALLET_ADDRESS_BASE]
+COUNTER_ADDRESS=[WALLET_ADDRESS_BASE]
 Counter owner is [WALLET_ADDRESS_BASE]
 Counter value is 0

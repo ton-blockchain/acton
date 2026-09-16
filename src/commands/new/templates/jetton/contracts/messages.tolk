@@ -30,7 +30,7 @@ struct (0x7362d09c) TransferNotificationForRecipient {
 struct (0x178d4519) InternalTransferStep {
     queryId: uint64
     jettonAmount: coins
-    transferInitiator: address?
+    transferInitiator: address? // is null when minting (not initiated by another wallet)
     sendExcessesTo: address?
     forwardTonAmount: coins
     @abi.clientType(PayloadInline | PayloadInRef)
@@ -100,9 +100,12 @@ struct (0xcb862902) ChangeMinterMetadata {
 
 struct (0xd372158c) TopUpGrams {}
 
+// "forward payload" is TL/B `(Either Cell ^Cell)`;
+// we want to test, that if ^Cell, no other data exists in a slice
 fun ForwardPayloadRemainder.checkIsCorrectTlbEither(self) {
     var mutableCopy = self;
     if (mutableCopy.loadMaybeRef() != null) {
+        // throw "cell underflow" if there is data besides a ref
         mutableCopy.assertEnd();
     }
 }

@@ -16,7 +16,6 @@ const JETTON_DEFAULT_IMAGE = "https://ton-blockchain.github.io/acton/logo.png"
 const JETTON_DEFAULT_DECIMALS = "9"
 const JETTON_DEFAULT_UPDATED_DESCRIPTION = "Sample jetton (metadata updated from acton-contracts scripts)"
 
-const JETTON_DEFAULT_INITIAL_SUPPLY = "0"
 const JETTON_DEFAULT_MINT_AMOUNT = "100000000000"
 const JETTON_DEFAULT_TRANSFER_AMOUNT = "10000000000"
 

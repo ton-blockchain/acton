@@ -1,9 +1,13 @@
+import "@stdlib/gas-payments"
 import "@stdlib/strings"
 import "@acton/build"
+import "@acton/emulation/config"
 import "@acton/emulation/network"
 import "@acton/emulation/testing"
+import "@acton/testing/assert"
 import "@acton/testing/expect"
 import "@acton/types/big_array"
+import "@acton/types/message"
 import "@acton/types/out_actions"
 import "@acton/types/transaction"
 import "@contracts/jetton-utils"
@@ -70,7 +74,13 @@ fun estimateMessageForwardFee<T>(body: T, dest: address, bounce: bool, value: co
         value,
     });
 
-    return estMsg.estimateFeeWithoutSending(SEND_MODE_REGULAR);
+    val totalForwardFee = estMsg.estimateFeeWithoutSending(SEND_MODE_REGULAR);
+    val prices = testing.getConfig().getMsgForwardPrices(BASECHAIN);
+    val firstPart = (totalForwardFee * prices.firstFrac) / 65536;
+    val remainingForwardFee = totalForwardFee - firstPart;
+
+    // check-disable-next-line deprecated-symbol-use
+    return calculateOriginalForwardFee(BASECHAIN, remainingForwardFee);
 }
 
 fun estimateBodyForwardFee<T>(body: T): coins {
@@ -236,4 +246,18 @@ fun mintTo(minter: JettonMinter, admin: Treasury, recipient: address, amount: co
     expect(wallet.getJettonBalance()).toEqual(amount);
     expect(minter.getTotalSupply()).toEqual(supplyBefore + amount);
     return wallet;
+}
+
+fun TlbCommonMessageInfo.toInternal(self): TlbInternalMessage {
+    match (self) {
+        TlbInternalMessage => {
+            return self;
+        }
+        TlbExternalInMessageInfo => {
+            Assert.fail("expected internal message info");
+        }
+        TlbExternalOutMessageInfo => {
+            Assert.fail("expected internal message info");
+        }
+    }
 }
