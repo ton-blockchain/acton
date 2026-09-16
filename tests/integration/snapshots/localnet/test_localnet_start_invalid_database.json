@@ -1,4 +1,4 @@
 {
-  "stderr": "Error: Failed to initialize Simulator database at invalid.sqlite\n\nCaused by:\n  file is not a database\n\nCaused by:\n  Error code 26: File opened that is not a database file\n",
-  "stdout": "      Notice Acton Simulator is a custom simplified implementation, not a real TON network\n             It provides TON-compatible blocks, LiteAPI, TON Center v2/v3, Streaming API, and Emulate API\n"
+  "stderr": "Error: Failed to initialize simulator database at invalid.sqlite\n\nCaused by:\n  file is not a database\n\nCaused by:\n  Error code 26: File opened that is not a database file\n",
+  "stdout": "      Notice Acton simulator is a custom simplified implementation, not a real TON network\n             It provides TON-compatible blocks, LiteAPI, TON Center v2/v3, Streaming API, and Emulate API\n"
 }

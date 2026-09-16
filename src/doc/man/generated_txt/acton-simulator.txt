@@ -298,8 +298,8 @@ RUNTIME MODEL
        o  acton simulator start runs in the foreground until the process is
           stopped
 
-       o  Acton starts an HTTP server on 127.0.0.1:<port> for Simulator API,
-          control endpoints, and the bundled Simulator UI
+       o  Acton starts an HTTP server on 127.0.0.1:<port> for simulator API,
+          control endpoints, and the bundled simulator UI
 
        o  the server keeps running until the process is stopped, for example
           with Ctrl+C
@@ -425,7 +425,7 @@ CONTROL ENDPOINTS
        Control endpoints are unauthenticated by default for local development.
        Use --require-auth when another local process, browser page, or test
        harness should not be able to read or mutate the running simulator
-       without the token. Do not expose the Simulator server publicly.
+       without the token. Do not expose the simulator server publicly.
 
 PERSISTENCE
        o  --db-path or [localnet].db-path enables persistent SQLite-backed node
@@ -490,7 +490,7 @@ EXAMPLES
 
               acton simulator start --accounts deployer,user --db-path build/localnet.db
 
-       6. Inspect a running Simulator:
+       6. Inspect a running simulator:
 
               acton simulator status --json
 

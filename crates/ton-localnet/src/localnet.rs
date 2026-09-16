@@ -772,7 +772,7 @@ impl Localnet {
                     mining_mode,
                 );
             })
-            .context("Failed to start Simulator node thread")?;
+            .context("Failed to start simulator node thread")?;
 
         ready_rx
             .await
@@ -1894,7 +1894,7 @@ fn run_node_loop(
                 tokio::runtime::Builder::new_current_thread()
                     .enable_time()
                     .build()
-                    .context("Failed to create Simulator node runtime")?,
+                    .context("Failed to create simulator node runtime")?,
             )
         } else {
             None
@@ -1939,8 +1939,8 @@ fn create_node(
     let mut node = Node::with_db_path(executor, config_boc, state_source, db_path.as_deref())
         .with_context(|| {
             db_path.map_or_else(
-                || "Failed to initialize Simulator state".to_owned(),
-                |path| format!("Failed to initialize Simulator database at {path}"),
+                || "Failed to initialize simulator state".to_owned(),
+                |path| format!("Failed to initialize simulator database at {path}"),
             )
         })?;
     node.streaming_events = Some(events_tx);

@@ -509,7 +509,7 @@ Source-of-truth map:
 - `src/etc/man`
 - `src/doc/man/generated_txt`
 
-The Simulator Control API uses a separate generator:
+The Simulator control API uses a separate generator:
 `docs/public/openapi/acton-simulator-control.openapi.json` ->
 `docs/content/docs/simulator/control-api.mdx` through `bun run generated-source`
 in `docs/`.

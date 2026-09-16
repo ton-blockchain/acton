@@ -10,7 +10,7 @@ acton\-simulator \[em] Run Acton\[cq]s simplified TON development environment
 .SH "DESCRIPTION"
 Available since Acton 1.2.
 .sp
-Acton Simulator is a fast, deterministic TON development environment
+Acton simulator is a fast, deterministic TON development environment
 for local execution, forked\-state development, and faucet\-based funding. It
 produces TON\-compatible blocks and provides LiteAPI, TON Center v2/v3, Streaming
 API, and Emulate API surfaces used by many contract and dApp workflows.
@@ -137,7 +137,7 @@ Simulator API token for a server started with \fB\-\-require\-auth\fR\&. If omit
 Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
 .RE
 .SS "acton simulator mine"
-Mine Simulator blocks manually. Empty blocks are skipped unless
+Mine simulator blocks manually. Empty blocks are skipped unless
 \fB\-\-mine\-empty\-blocks\fR was enabled at startup or the mining mode was changed
 through \fBPOST /acton_setMiningMode\fR\&.
 .SS "Synopsis"
@@ -160,14 +160,14 @@ Simulator API token for a server started with \fB\-\-require\-auth\fR\&. If omit
 Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
 .RE
 .SS "acton simulator increase-time"
-Increase the Simulator virtual clock.
+Increase the simulator virtual clock.
 .SS "Synopsis"
 \fBacton simulator increase\-time\fR [\fIoptions\fR] \fIseconds\fR
 .SS "Options"
 .sp
 \fIseconds\fR
 .RS 4
-Seconds to add to the virtual Simulator clock.
+Seconds to add to the virtual simulator clock.
 .RE
 .sp
 \fB\-p\fR, \fB\-\-port\fR \fIport\fR
@@ -181,7 +181,7 @@ Simulator API token for a server started with \fB\-\-require\-auth\fR\&. If omit
 Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
 .RE
 .SS "acton simulator set-time"
-Set the Simulator virtual clock.
+Set the simulator virtual clock.
 .SS "Synopsis"
 \fBacton simulator set\-time\fR [\fIoptions\fR] \fItimestamp\fR
 .SS "Options"
@@ -203,7 +203,7 @@ Simulator API token for a server started with \fB\-\-require\-auth\fR\&. If omit
 Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
 .RE
 .SS "acton simulator set-next-block-timestamp"
-Set a one\-shot timestamp for the next Simulator block.
+Set a one\-shot timestamp for the next simulator block.
 .SS "Synopsis"
 \fBacton simulator set\-next\-block\-timestamp\fR [\fIoptions\fR] \fItimestamp\fR
 .SS "Options"
@@ -226,7 +226,7 @@ Simulator API token for a server started with \fB\-\-require\-auth\fR\&. If omit
 Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
 .RE
 .SS "acton simulator status"
-Inspect the current Simulator status.
+Inspect the current simulator status.
 .SS "Synopsis"
 \fBacton simulator status\fR [\fIoptions\fR]
 .SS "Options"
@@ -247,7 +247,7 @@ Simulator API token for a server started with \fB\-\-require\-auth\fR\&. If omit
 Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
 .RE
 .SS "acton simulator snapshot"
-Save and restore persistent JSON snapshots of a Simulator.
+Save and restore persistent JSON snapshots of a simulator.
 .SS "Synopsis"
 \fBacton simulator snapshot\fR [\fIoptions\fR] \fIcommand\fR
 .SS "Subcommands"
@@ -282,7 +282,7 @@ block and transaction history, registered metadata, pending messages, and
 virtual time. Restoration also updates SQLite when persistence is enabled.
 .sp
 Relative file paths resolve from the Acton project root. These commands call the
-running Simulator control API. Pass \fB\-\-port\fR or \fB\-\-auth\-token\fR when needed, and
+running simulator control API. Pass \fB\-\-port\fR or \fB\-\-auth\-token\fR when needed, and
 \fB\-\-json\fR for structured output. Use the returned ID for restore, delete, and export.
 .SH "CONFIGURATION"
 You can store defaults in \fBActon.toml\fR:
@@ -308,11 +308,11 @@ CLI flags override config values for the current invocation. In particular,
 resolves from the project root, while a relative \fB\-\-db\-path\fR resolves from the
 current working directory.
 .SH "TON CENTER API KEYS"
-When Simulator forks from the built\-in \fBmainnet\fR/\fBtestnet\fR backends,
+When simulator forks from the built\-in \fBmainnet\fR/\fBtestnet\fR backends,
 authenticated requests read \fBTONCENTER_MAINNET_API_KEY\fR or
 \fBTONCENTER_TESTNET_API_KEY\fR\&.
 .sp
-When Simulator forks from \fBcustom:<name>\fR, Acton reads
+When simulator forks from \fBcustom:<name>\fR, Acton reads
 \fB<NORMALIZED_NAME>_API_KEY\fR\&. Custom network names are uppercased and
 non\-alphanumeric characters are replaced with \fB_\fR, so \fBcustom:mock\-remote\fR
 becomes \fBMOCK_REMOTE_API_KEY\fR\&.
@@ -328,7 +328,7 @@ When a protected API request returns \fB401\fR, the bundled UI shows a token ove
 paste the printed token there before using protected API views. The key button
 in the sidebar footer reopens the same overlay.
 .sp
-When auth is enabled, the server prints a Simulator API token. Pass it as either:
+When auth is enabled, the server prints a simulator API token. Pass it as either:
 .sp
 .RS 4
 .nf
@@ -341,9 +341,9 @@ X\-API\-Key: <TOKEN>
 TON Center\-compatible clients. Browser WebSocket clients can pass \fBtoken=<TOKEN>\fR
 only on \fB/api/streaming/v2/ws\fR\&.
 .sp
-For CLI subcommands that call Simulator control routes, pass \fB\-\-auth\-token\fR or
+For CLI subcommands that call simulator control routes, pass \fB\-\-auth\-token\fR or
 set \fBACTON_LOCALNET_AUTH_TOKEN\fR\&. If \fBACTON_LOCALNET_AUTH_TOKEN\fR is set when
-starting with \fB\-\-require\-auth\fR, Simulator uses that value; otherwise it generates
+starting with \fB\-\-require\-auth\fR, simulator uses that value; otherwise it generates
 and prints a fresh token.
 .SH "RUNTIME MODEL"
 .sp
@@ -356,8 +356,8 @@ and prints a fresh token.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'Acton starts an HTTP server on \fB127.0.0.1:<port>\fR for Simulator API, control
-endpoints, and the bundled Simulator UI
+\h'-04'\(bu\h'+03'Acton starts an HTTP server on \fB127.0.0.1:<port>\fR for simulator API, control
+endpoints, and the bundled simulator UI
 .RE
 .sp
 .RS 4
@@ -436,7 +436,7 @@ delayed
 server is running, and \fBGET /acton_nodeInfo\fR reports the current value
 .RE
 .SH "CONTROL ENDPOINTS"
-The Simulator server exposes \fBacton_*\fR control routes for local development
+The simulator server exposes \fBacton_*\fR control routes for local development
 tooling:
 .sp
 .RS 4
@@ -507,7 +507,7 @@ blocks for automatic and manual mining; use \fBtrue\fR to skip them
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fBPOST /acton_increaseTime\fR with \fB{"seconds":3600}\fR adds seconds to the
-virtual Simulator clock
+virtual simulator clock
 .RE
 .sp
 .RS 4
@@ -536,8 +536,8 @@ message.
 .sp
 Control endpoints are unauthenticated by default for local development. Use
 \fB\-\-require\-auth\fR when another local process, browser page, or test harness should
-not be able to read or mutate the running Simulator without the token. Do not
-expose the Simulator server publicly.
+not be able to read or mutate the running simulator without the token. Do not
+expose the simulator server publicly.
 .SH "PERSISTENCE"
 .sp
 .RS 4
@@ -653,7 +653,7 @@ acton simulator start \-\-accounts deployer,user \-\-db\-path build/localnet.db
 .RE
 .sp
 .RS 4
-\h'-04' 6.\h'+01'Inspect a running Simulator:
+\h'-04' 6.\h'+01'Inspect a running simulator:
 .sp
 .RS 4
 .nf
