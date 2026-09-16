@@ -20,9 +20,6 @@ fun main() {
         counter.deploy(deployer.address, { value: deployValue }).waitForFirstTransaction();
     }
 
-    val inc = counter.sendIncreaseCounter(deployer.address, 7);
-    inc.waitForFirstTransaction();
-
     println("Counter before reset: {}", counter.currentCounter());
     val res = counter.sendResetCounter(deployer.address);
     res.waitForFirstTransaction();
