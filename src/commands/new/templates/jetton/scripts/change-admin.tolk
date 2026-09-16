@@ -1,7 +1,7 @@
 import "@acton/io"
 import "@acton/emulation/network"
 import "@acton/emulation/scripts"
-import "@wrappers/JettonMinter.gen"
+import "@wrappers/utils"
 import "utils/common"
 
 fun main() {
@@ -13,12 +13,7 @@ fun main() {
         admin.address,
     );
 
-    val res = minter.sendChangeMinterAdmin(
-        admin.address,
-        0,
-        nextAdmin,
-        { bounce: false, value: grams("0.05") },
-    );
+    val res = minter.sendChangeAdmin(admin.address, nextAdmin);
     println(res.waitForTrace());
 
     println("JETTON NEXT_ADMIN_REQUESTED={}", nextAdmin);

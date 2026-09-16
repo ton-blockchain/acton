@@ -11,8 +11,8 @@ fun main() {
     val collection = promptNftCollection("Enter NFT Collection address");
     val batchOwner = promptNftAddress("Enter NFT batch owner", deployer.address);
     val batchCount = promptInt("Enter batch size", NFT_DEFAULT_BATCH_COUNT);
-    if (batchCount > BATCH_SIZE_LIMIT) {
-        Assert.fail(format("Batch size can't be higher than {}", BATCH_SIZE_LIMIT));
+    if (batchCount <= 0 || batchCount >= BATCH_SIZE_LIMIT) {
+        Assert.fail(format("Batch size must be in range 1..{}", BATCH_SIZE_LIMIT - 1));
     }
 
     val res = deployNftBatch(collection, deployer, batchOwner, batchCount);

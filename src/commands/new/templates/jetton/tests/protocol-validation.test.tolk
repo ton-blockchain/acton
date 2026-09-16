@@ -1,13 +1,11 @@
 import "@acton/emulation/network"
 import "@acton/emulation/testing"
 import "@acton/testing/expect"
-
 import "@contracts/errors"
 import "@contracts/messages"
 import "@wrappers/JettonMinter.gen"
 import "@wrappers/JettonWallet.gen"
 import "@wrappers/utils"
-
 import "test-utils"
 
 get fun `test validation: malformed forward payload should be rejected`() {
@@ -26,7 +24,7 @@ get fun `test validation: malformed forward payload should be rejected`() {
         bounce: true,
         value: DEFAULT_TRANSFER_MSG_VALUE,
         dest: wallet.address,
-        body: buildTransferBody(grams("1"), 0, deployer.address, deployer.address, badPayload),
+        body: buildTransferBody(ton("1"), 0, deployer.address, deployer.address, badPayload),
     });
     val res = net.send(deployer.address, outMessage);
     expect(res).toHaveFailedTx<AskToTransfer>({
@@ -40,7 +38,7 @@ get fun `test validation: malformed custom payload should be rejected`() {
     val (minter, deployer, notDeployer) = setupTest();
     val wallet = mintTo(minter, deployer, deployer.address, DEFAULT_MINTED_JETTONS);
 
-    val sentAmount = grams("0.5");
+    val sentAmount = ton("0.5");
     val forwardAmount = DEFAULT_FORWARD_TON_AMOUNT;
     val forwardPayload = beginCell().storeUint(0x1234567890abcdef, 128).endCell();
     val customPayload = beginCell().storeUint(0xfedcba0987654321, 128).endCell();
@@ -100,37 +98,34 @@ get fun `test validation: malformed custom payload should be rejected`() {
         .endCell();
 
     val okRes = sendRawTransferPayload(deployer.address, wallet.address, validPayload);
-    expect(okRes).toHaveSuccessfulTx<AskToTransfer>({
-        from: deployer.address,
-        to: wallet.address,
-    });
+    expect(okRes).toHaveSuccessfulTx<AskToTransfer>({ from: deployer.address, to: wallet.address });
 }
 
 get fun `test validation: wallet cannot send to masterchain`() {
     val (minter, deployer, _) = setupTest();
-    val wallet = mintTo(minter, deployer, deployer.address, grams("1"));
+    val wallet = mintTo(minter, deployer, deployer.address, ton("1"));
     val masterAddr = address.fromWorkchainAndHash(-1, 0);
 
-    val res = wallet.sendTransfer(
+    val res = wallet.sendTransferPayloadInline(
         deployer.address,
         DEFAULT_TRANSFER_MSG_VALUE,
-        grams("1"),
+        ton("1"),
         masterAddr,
         deployer.address,
         null,
         DEFAULT_FORWARD_TON_AMOUNT,
-        null,
+        createEmptySlice(),
     );
     expect(res).toHaveFailedTx<AskToTransfer>({
         from: deployer.address,
         to: wallet.address,
-        exitCode: Errors.WrongWorkchain,
+        exitCode: ERROR_WRONG_WORKCHAIN,
     });
 }
 
 get fun `test validation: wallet should reject internal transfer from unauthorized sender`() {
     val (minter, deployer, notDeployer) = setupTest();
-    val wallet = mintTo(minter, deployer, deployer.address, grams("2"));
+    val wallet = mintTo(minter, deployer, deployer.address, ton("2"));
     val balanceBefore = wallet.getJettonBalance();
 
     val outMessage = createMessage({
@@ -139,7 +134,7 @@ get fun `test validation: wallet should reject internal transfer from unauthoriz
         dest: wallet.address,
         body: InternalTransferStep {
             queryId: 0,
-            jettonAmount: grams("0.01"),
+            jettonAmount: ton("0.01"),
             transferInitiator: deployer.address,
             sendExcessesTo: deployer.address,
             forwardTonAmount: DEFAULT_FORWARD_TON_AMOUNT,
@@ -150,23 +145,23 @@ get fun `test validation: wallet should reject internal transfer from unauthoriz
     expect(res).toHaveFailedTx<InternalTransferStep>({
         from: notDeployer.address,
         to: wallet.address,
-        exitCode: Errors.NotValidWallet,
+        exitCode: ERROR_NOT_VALID_WALLET,
     });
     expect(wallet.getJettonBalance()).toEqual(balanceBefore);
 }
 
 get fun `test validation: minter accepts burn notification only from wallet`() {
     val (minter, deployer, notDeployer) = setupTest();
-    val wallet = mintTo(minter, deployer, deployer.address, grams("2"));
+    val wallet = mintTo(minter, deployer, deployer.address, ton("2"));
     val wrongSender = testing.treasury("outsider");
 
     val badBurnNotify = createMessage({
         bounce: true,
-        value: grams("0.2"),
+        value: ton("0.2"),
         dest: minter.address,
         body: BurnNotificationForMinter {
             queryId: 0,
-            jettonAmount: grams("1"),
+            jettonAmount: ton("1"),
             burnInitiator: deployer.address,
             sendExcessesTo: notDeployer.address,
         },
@@ -175,35 +170,25 @@ get fun `test validation: minter accepts burn notification only from wallet`() {
     expect(res).toHaveFailedTx<BurnNotificationForMinter>({
         from: wrongSender.address,
         to: minter.address,
-        exitCode: Errors.NotValidWallet,
+        exitCode: ERROR_NOT_VALID_WALLET,
     });
 
-    val burn = wallet.sendAskToBurn(
-        deployer.address,
-        0,
-        grams("1"),
-        deployer.address,
-        null,
-        { bounce: false, value: grams("0.2") },
-    );
-    expect(burn).toHaveSuccessfulTx<AskToBurn>({
-        from: deployer.address,
-        to: wallet.address,
-    });
+    val burn = wallet.sendBurn(deployer.address, ton("0.2"), ton("1"), deployer.address, null);
+    expect(burn).toHaveSuccessfulTx<AskToBurn>({ from: deployer.address, to: wallet.address });
 }
 
 get fun `test validation: minter cannot force burn tokens`() {
     val (minter, deployer, notDeployer) = setupTest();
-    val wallet = mintTo(minter, deployer, notDeployer.address, grams("3"));
+    val wallet = mintTo(minter, deployer, notDeployer.address, ton("3"));
     val balanceBefore = wallet.getJettonBalance();
 
     val burnMsg = createMessage({
         bounce: true,
-        value: grams("1"),
+        value: ton("1"),
         dest: wallet.address,
         body: AskToBurn {
             queryId: 0,
-            jettonAmount: grams("1"),
+            jettonAmount: ton("1"),
             sendExcessesTo: null,
             customPayload: null,
         },
@@ -212,64 +197,51 @@ get fun `test validation: minter cannot force burn tokens`() {
     expect(res).toHaveFailedTx<AskToBurn>({
         from: minter.address,
         to: wallet.address,
-        exitCode: Errors.NotOwner,
+        exitCode: ERROR_NOT_OWNER,
     });
     expect(wallet.getJettonBalance()).toEqual(balanceBefore);
 
-    val ok = wallet.sendAskToBurn(
-        notDeployer.address,
-        0,
-        grams("1"),
-        notDeployer.address,
-        null,
-        { bounce: false, value: grams("0.2") },
-    );
-    expect(ok).toHaveSuccessfulTx<AskToBurn>({
-        from: notDeployer.address,
-        to: wallet.address,
-    });
+    val ok = wallet.sendBurn(notDeployer.address, ton("0.2"), ton("1"), notDeployer.address, null);
+    expect(ok).toHaveSuccessfulTx<AskToBurn>({ from: notDeployer.address, to: wallet.address });
 }
 
 get fun `test validation: minter cannot force transfer tokens`() {
     val (minter, deployer, notDeployer) = setupTest();
-    val wallet = mintTo(minter, deployer, notDeployer.address, grams("2"));
+    val wallet = mintTo(minter, deployer, notDeployer.address, ton("2"));
     val target = testing.treasury("receiver");
     val balanceBefore = wallet.getJettonBalance();
 
     val transferMsg = createMessage({
         bounce: true,
-        value: grams("1"),
+        value: ton("1"),
         dest: wallet.address,
         body: AskToTransfer {
             queryId: 0,
-            jettonAmount: grams("1"),
+            jettonAmount: ton("1"),
             transferRecipient: target.address,
             sendExcessesTo: notDeployer.address,
             customPayload: null,
             forwardTonAmount: 0,
-            forwardPayload: beginCell().storeMaybeRef(null).endCell().beginParse(),
+            forwardPayload: makeTinyForwardPayload(),
         },
     });
     val res = net.send(minter.address, transferMsg);
     expect(res).toHaveFailedTx<AskToTransfer>({
         from: minter.address,
         to: wallet.address,
-        exitCode: Errors.NotOwner,
+        exitCode: ERROR_NOT_OWNER,
     });
     expect(wallet.getJettonBalance()).toEqual(balanceBefore);
 
-    val ok = wallet.sendTransfer(
+    val ok = wallet.sendTransferPayloadInline(
         notDeployer.address,
         DEFAULT_TRANSFER_MSG_VALUE,
-        grams("1"),
+        ton("1"),
         target.address,
         notDeployer.address,
         null,
         0,
-        null,
+        createEmptySlice(),
     );
-    expect(ok).toHaveSuccessfulTx<AskToTransfer>({
-        from: notDeployer.address,
-        to: wallet.address,
-    });
+    expect(ok).toHaveSuccessfulTx<AskToTransfer>({ from: notDeployer.address, to: wallet.address });
 }

@@ -80,7 +80,7 @@ your shell. Metadata and minting scripts also read:
 - `JETTON_DECIMALS`
 - `JETTON_MINT_AMOUNT`
 
-1. Create a local wallet and request testnet GRAM:
+1. Create a local wallet and request testnet TON:
 
 ```bash
 acton wallet new --name deployer --local --airdrop
@@ -119,6 +119,9 @@ The generated project includes `.github/workflows/contracts.yml`, which runs:
 - `acton fmt --check`
 - `acton check --output-format github`
 - `acton test`
+
+The generated lint configuration allows `throw-requires-errors-enum` to preserve
+the upstream contracts' `ERROR_*` constants. Other warnings fail the checks.
 
 ## Documentation
 

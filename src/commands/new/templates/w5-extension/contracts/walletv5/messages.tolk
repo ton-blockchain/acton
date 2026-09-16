@@ -39,7 +39,12 @@ fun SnakedExtraActions.getNext(self): SnakedExtraActions {
     return self.preloadRef().beginParse();
 }
 
-struct (0x6578746e) ExtensionActionRequest {
+struct SnakedExtraActionsClientType {
+    action: ExtraAction
+    next: Cell<SnakedExtraActionsClientType> | void
+}
+
+struct (0x6578746E) ExtensionActionRequest {
     queryId: uint64
     @abi.clientType(Cell<OutActionWithSendMessageOnly>?)
     outActions: OutActionsCell?
@@ -47,7 +52,7 @@ struct (0x6578746e) ExtensionActionRequest {
     extraActions: SnakedExtraActions
 }
 
-struct (0x73696e74) InternalSignedRequest {
+struct (0x73696E74) InternalSignedRequest {
     walletId: uint32
     validUntil: uint32
     seqno: uint32
@@ -58,7 +63,7 @@ struct (0x73696e74) InternalSignedRequest {
     // ends with a signature (512 bits), but it's parsed and compared separately
 }
 
-struct (0x7369676e) ExternalSignedRequest {
+struct (0x7369676E) ExternalSignedRequest {
     walletId: uint32
     validUntil: uint32
     seqno: uint32

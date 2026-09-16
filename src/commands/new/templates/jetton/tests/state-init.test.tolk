@@ -4,17 +4,74 @@ import "@acton/testing/expect"
 import "@acton/tlb/either"
 import "@acton/tlb/maybe"
 import "@acton/types/transaction"
-
 import "@contracts/fees-management"
 import "@contracts/messages"
 import "@contracts/storage"
 import "@wrappers/JettonMinter.gen"
 import "@wrappers/JettonWallet.gen"
 import "@wrappers/utils"
-
 import "test-utils"
+import "../scripts/utils/common"
 
 const MAX_JETTON_VALUE = 0xffffffffffffffffffffffffffffff
+
+get fun `test state: minter deploy helper preserves sharding`() {
+    val deployer = testing.treasury("sharded-minter-deployer");
+    val minter = JettonMinter.fromStorage(
+        {
+            totalSupply: 0,
+            adminAddress: deployer.address,
+            nextAdminAddress: null,
+            metadata: buildTestMetadata("link"),
+        },
+        { fixedPrefixLength: 8, closeTo: deployer.address },
+    );
+
+    val result = minter.sendDeploy(deployer.address, { value: ton("10") });
+    expect(result).toHaveSuccessfulDeploy({ to: minter.address });
+    expect(minter.getJettonData().adminAddress).toEqual(deployer.address);
+}
+
+get fun `test state: minter deploy helper preserves workchain`() {
+    val deployer = testing.treasury("masterchain-minter-deployer");
+    val minter = JettonMinter.fromStorage(
+        {
+            totalSupply: 0,
+            adminAddress: deployer.address,
+            nextAdminAddress: null,
+            metadata: buildTestMetadata("link"),
+        },
+        null,
+        MASTERCHAIN,
+    );
+
+    val result = minter.sendDeploy(deployer.address, { value: ton("10") });
+    expect(result).toHaveSuccessfulDeploy({ to: minter.address });
+    expect(minter.address.getWorkchain()).toEqual(MASTERCHAIN);
+}
+
+get fun `test metadata: script reader accepts inline and referenced snake data`() {
+    val inline = beginCell().storeUint(0, 8).storeSlice("ACTON".beginParse()).endCell();
+    val referenced = SnakeDataReply { string: "ACTON" }.toCell();
+    val continuation = beginCell()
+        .storeUint(0, 8)
+        .storeSlice("AC".beginParse())
+        .storeString("TON")
+        .endCell();
+    val empty = beginCell().storeUint(0, 8).endCell();
+
+    var metadata = OnchainMetadataReply { contentDict: [] };
+    metadata.contentDict.set("inline".sha256(), inline as Cell<SnakeDataReply>);
+    metadata.contentDict.set("referenced".sha256(), referenced);
+    metadata.contentDict.set("continuation".sha256(), continuation as Cell<SnakeDataReply>);
+    metadata.contentDict.set("empty".sha256(), empty as Cell<SnakeDataReply>);
+
+    expect(readOnchainMetadataField(metadata, "inline".sha256())).toEqual("ACTON");
+    expect(readOnchainMetadataField(metadata, "referenced".sha256())).toEqual("ACTON");
+    expect(readOnchainMetadataField(metadata, "continuation".sha256())).toEqual("ACTON");
+    expect(readOnchainMetadataField(metadata, "empty".sha256())).toEqual("");
+    expect(readOnchainMetadataField(metadata, "missing".sha256())).toBeNull();
+}
 
 get fun `test state: should mint max jetton value`() {
     val (minter, deployer, _) = setupTest();
@@ -24,8 +81,8 @@ get fun `test state: should mint max jetton value`() {
         deployer.address,
         deployer.address,
         MAX_JETTON_VALUE,
-        grams("0.05"),
-        grams("0.3"),
+        ton("0.05"),
+        ton("0.3"),
     );
     expect(mintResult).toHaveSuccessfulTx<MintNewJettons>({
         from: deployer.address,
@@ -45,13 +102,7 @@ get fun `test state: wallet storage and init-state bounds should match fee const
     val recipient = randomAddress();
     val recipientWallet = userWallet(minter, recipient);
 
-    val mintResult = minter.sendMint(
-        deployer.address,
-        recipient,
-        TEST_JETTON_UNIT,
-        0,
-        grams("0.3"),
-    );
+    val mintResult = minter.sendMint(deployer.address, recipient, TEST_JETTON_UNIT, 0, ton("0.3"));
     expect(mintResult).toHaveSuccessfulTx<InternalTransferStep>({
         from: minter.address,
         to: recipientWallet.address,

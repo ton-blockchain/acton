@@ -1,7 +1,7 @@
 import { beginCell, Cell, Dictionary } from '@ton/core';
+import { SnakeDataReply } from '@wrappers/JettonMinter.gen';
 
 const ONCHAIN_CONTENT_PREFIX = 0x00;
-const SNAKE_DATA_PREFIX = 0x00;
 
 const sha256Keys: Record<string, Buffer> = {};
 
@@ -12,41 +12,6 @@ async function sha256(key: string): Promise<Buffer> {
     sha256Keys[key] = Buffer.from(hash);
   }
   return sha256Keys[key]!;
-}
-
-function makeSnakeCell(data: Buffer): Cell {
-  const firstChunkSize = 126;
-  const chunkSize = 127;
-
-  if (data.length <= firstChunkSize) {
-    return beginCell()
-      .storeUint(SNAKE_DATA_PREFIX, 8)
-      .storeBuffer(data)
-      .endCell();
-  }
-
-  const chunks: Buffer[] = [];
-  chunks.push(data.subarray(0, firstChunkSize));
-  let offset = firstChunkSize;
-  while (offset < data.length) {
-    const end = Math.min(offset + chunkSize, data.length);
-    chunks.push(data.subarray(offset, end));
-    offset = end;
-  }
-
-  let cell: Cell | null = null;
-  for (let i = chunks.length - 1; i >= 0; i--) {
-    const builder = beginCell();
-    if (i === 0) {
-      builder.storeUint(SNAKE_DATA_PREFIX, 8);
-    }
-    builder.storeBuffer(chunks[i]!);
-    if (cell) {
-      builder.storeRef(cell);
-    }
-    cell = builder.endCell();
-  }
-  return cell!;
 }
 
 export interface JettonMetadata {
@@ -77,7 +42,9 @@ export async function buildOnchainMetadata(
 
   for (const [key, value] of entries) {
     const keyHash = await sha256(key);
-    const valueCell = makeSnakeCell(Buffer.from(value, 'utf-8'));
+    const valueCell = SnakeDataReply.toCell(
+      SnakeDataReply.create({ string: value }),
+    );
     dict.set(keyHash, valueCell);
   }
 

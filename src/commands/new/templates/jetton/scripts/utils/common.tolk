@@ -1,5 +1,5 @@
-import "@stdlib/strings"
 import "@acton/env"
+import "@acton/fmt"
 import "@acton/io"
 import "@acton/prompts"
 import "@acton/emulation/network"
@@ -12,11 +12,10 @@ import "@wrappers/utils"
 const JETTON_DEFAULT_NAME = "Acton Sample Jetton"
 const JETTON_DEFAULT_SYMBOL = "ACTON"
 const JETTON_DEFAULT_DESCRIPTION = "Sample jetton deployed from acton-contracts scripts"
-const JETTON_DEFAULT_IMAGE = "https://ton-blockchain.github.io/acton/logo.png"
+const JETTON_DEFAULT_IMAGE = "https://ton.org/download/ton_symbol.png"
 const JETTON_DEFAULT_DECIMALS = "9"
 const JETTON_DEFAULT_UPDATED_DESCRIPTION = "Sample jetton (metadata updated from acton-contracts scripts)"
 
-const JETTON_DEFAULT_INITIAL_SUPPLY = "0"
 const JETTON_DEFAULT_MINT_AMOUNT = "100000000000"
 const JETTON_DEFAULT_TRANSFER_AMOUNT = "10000000000"
 
@@ -29,27 +28,47 @@ struct JettonMetadata {
 }
 
 fun promptJettonString(envName: string, message: string, default: string): string {
-    return env<string>(envName) ?? prompt(message, "", default);
+    val fromEnv = env<string>(envName);
+    if (fromEnv != null) {
+        return fromEnv;
+    }
+    return prompt(message, "", default);
 }
 
-fun promptJettonIntString(envName: string, message: string, default: string): string {
-    return (env<int>(envName) ?? promptInt(message, default)).toDecimalString();
+fun promptJettonAddress(envName: string, message: string, default: address): address {
+    val fromEnv = env<address>(envName);
+    if (fromEnv != null) {
+        return fromEnv;
+    }
+    return parseAddress(prompt(message, "", format("{}", default)));
 }
 
-fun promptJettonAddress(envName: string, message: string, default: address? = null): address {
-    return env<address>(envName) ?? promptAddress(message, default);
+fun promptJettonAddressRequired(envName: string, message: string): address {
+    val fromEnv = env<address>(envName);
+    if (fromEnv != null) {
+        return fromEnv;
+    }
+    return parseAddress(prompt(message, "EQ... / kQ...", ""));
 }
 
 fun promptJettonCoins(envName: string, message: string, default: string): coins {
-    return env<coins>(envName) ?? promptInt(message, default, "in nanograms/nano-jettons");
+    val fromEnv = env<coins>(envName);
+    if (fromEnv != null) {
+        return fromEnv;
+    }
+    return parseInt(prompt(message, "in nanotons/nano-jettons", default));
 }
 
 fun promptJettonWallet(envName: string, message: string): ActonWallet {
-    return scripts.wallet(env<string>(envName) ?? promptWallet(message));
+    val nameFromEnv = env<string>(envName);
+    if (nameFromEnv != null) {
+        return scripts.wallet(nameFromEnv);
+    }
+    return scripts.wallet(promptWallet(message));
 }
 
 fun promptJettonMinter(message: string): JettonMinter {
-    val addr = promptJettonAddress("JETTON_MINTER_ADDRESS", message);
+    val addr = promptJettonAddressRequired("JETTON_MINTER_ADDRESS", message);
     return JettonMinter.fromAddress(addr);
 }
 
@@ -63,7 +82,7 @@ fun promptJettonMetadata(descriptionDefault: string): JettonMetadata {
             descriptionDefault,
         ),
         image: promptJettonString("JETTON_IMAGE", "Enter jetton image URL", JETTON_DEFAULT_IMAGE),
-        decimals: promptJettonIntString(
+        decimals: promptJettonString(
             "JETTON_DECIMALS",
             "Enter jetton decimals",
             JETTON_DEFAULT_DECIMALS,
@@ -73,11 +92,15 @@ fun promptJettonMetadata(descriptionDefault: string): JettonMetadata {
 
 fun buildJettonMetadataCell(info: JettonMetadata): cell {
     var metadata: OnchainMetadataReply = { contentDict: [] };
-    metadata.contentDict.set("name".sha256(), info.name.prefixWith00());
-    metadata.contentDict.set("symbol".sha256(), info.symbol.prefixWith00());
-    metadata.contentDict.set("description".sha256(), info.description.prefixWith00());
-    metadata.contentDict.set("image".sha256(), info.image.prefixWith00());
-    metadata.contentDict.set("decimals".sha256(), info.decimals.prefixWith00());
+    metadata.contentDict.set("name".sha256(), SnakeDataReply { string: info.name }.toCell());
+    metadata.contentDict.set("symbol".sha256(), SnakeDataReply { string: info.symbol }.toCell());
+    metadata
+        .contentDict
+        .set("description".sha256(), SnakeDataReply { string: info.description }.toCell());
+    metadata.contentDict.set("image".sha256(), SnakeDataReply { string: info.image }.toCell());
+    metadata
+        .contentDict
+        .set("decimals".sha256(), SnakeDataReply { string: info.decimals }.toCell());
     return metadata.toCell();
 }
 
@@ -92,20 +115,22 @@ fun promptJettonMinterStorage(admin: address): MinterStorage {
 
 fun deployJettonMinter(deployer: ActonWallet, storage: MinterStorage): JettonMinter {
     val minter = JettonMinter.fromStorage(storage);
-    val res = minter.sendDeploy(deployer.address, { value: grams("0.05") });
+    val res = minter.sendDeploy(deployer.address, { value: ton("0.05") });
     res.waitForFirstTransaction();
     return minter;
 }
 
 fun readOnchainMetadataField(metadata: OnchainMetadataReply, key: uint256): string? {
-    val entry = metadata.contentDict.get(key);
-    if (!entry.isFound) {
+    val valueCell = metadata.contentDict.get(key);
+    if (!valueCell.isFound) {
         return null;
     }
-    val prefixed = entry.loadValue();
-    var s = (prefixed as unknown as cell).beginParse();
-    s.loadUint(8);
-    return s.loadString();
+    var value = valueCell.loadValue().beginParse();
+    if (value.loadUint(8) != 0) {
+        return null;
+    }
+    // Snake data may start inline or in a reference after the prefix.
+    return beginCell().storeSlice(value).endCell() as unknown as string;
 }
 
 fun printMetadataField(label: string, fieldName: string, value: string?) {

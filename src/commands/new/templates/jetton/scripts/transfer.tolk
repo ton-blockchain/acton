@@ -9,7 +9,7 @@ import "utils/common"
 fun main() {
     val sender = promptJettonWallet("JETTON_SENDER", "Select Jetton Sender ActonWallet");
     val minter = promptJettonMinter("Enter Jetton Minter address");
-    val recipient = promptJettonAddress(
+    val recipient = promptJettonAddressRequired(
         "JETTON_TRANSFER_RECIPIENT",
         "Enter transfer recipient",
     );
@@ -20,15 +20,15 @@ fun main() {
     );
 
     val senderWallet = JettonWallet { address: minter.getWalletAddress(sender.address) };
-    val res = senderWallet.sendTransfer(
+    val res = senderWallet.sendTransferPayloadInline(
         sender.address,
-        grams("0.08"),
+        ton("0.08"),
         transferAmount,
         recipient,
         sender.address,
         null,
         1,
-        null,
+        createEmptySlice(),
     );
     println(res.waitForTrace());
 

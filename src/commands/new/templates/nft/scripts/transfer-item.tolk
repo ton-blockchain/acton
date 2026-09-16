@@ -16,7 +16,7 @@ fun main() {
         null,
         0,
         createEmptySlice(),
-        { value: grams("0.05"), bounce: true },
+        { value: ton("0.05"), bounce: true },
     );
     println(res.waitForTrace());
 

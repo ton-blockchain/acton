@@ -20,9 +20,9 @@
   ✓ admin: admin should be able to upgrade minter code and data [TIME]
   ✓ shard: wallet address should keep owner shard prefix in get/discovery/transfer [TIME]
  > tests/bounce-handling.test.tolk (3 tests)
-  ✓ bounce: minter restores supply on internal_transfer bounce [TIME]
-  ✓ bounce: wallet restores balance on internal_transfer bounce [TIME]
-  ✓ bounce: wallet restores balance on burn_notification bounce [TIME]
+  ✓ minter restores supply on internal_transfer bounce [TIME]
+  ✓ wallet restores balance on internal_transfer bounce [TIME]
+  ✓ wallet restores balance on burn_notification bounce [TIME]
  > tests/gas.test.tolk (13 tests)
   ✓ gas: transfer minimal value edge [TIME]
   ✓ gas: transfer minimal value is message-size aware [TIME]
@@ -30,12 +30,12 @@
   ✓ gas: transfer forward fees should follow config [TIME]
   ✓ gas: transfer gas fee should follow config [TIME]
   ✓ gas: transfer storage fee should follow config [TIME]
-  ✓ gas: forward GRAM transfer should fail when fees are insufficient [TIME]
+  ✓ gas: forward ton transfer should fail when fees are insufficient [TIME]
   ✓ gas: burn minimal value edge [TIME]
   ✓ gas: burn custom payload should not affect minimal value [TIME]
   ✓ gas: burn forward fee should follow config [TIME]
   ✓ gas: burn gas fee should follow config [TIME]
-  ✓ gas: burn should fail when sent grams are clearly insufficient [TIME]
+  ✓ gas: burn should fail when sent tons are clearly insufficient [TIME]
   ✓ gas: wallet storage fee should be measurable [TIME]
  > tests/protocol-validation.test.tolk (7 tests)
   ✓ validation: malformed forward payload should be rejected [TIME]
@@ -45,18 +45,21 @@
   ✓ validation: minter accepts burn notification only from wallet [TIME]
   ✓ validation: minter cannot force burn tokens [TIME]
   ✓ validation: minter cannot force transfer tokens [TIME]
- > tests/state-init.test.tolk (2 tests)
+ > tests/state-init.test.tolk (5 tests)
+  ✓ state: minter deploy helper preserves sharding [TIME]
+  ✓ state: minter deploy helper preserves workchain [TIME]
+  ✓ metadata: script reader accepts inline and referenced snake data [TIME]
   ✓ state: should mint max jetton value [TIME]
   ✓ state: wallet storage and init-state bounds should match fee constants [TIME]
  > tests/wallet-behavior.test.tolk (9 tests)
   ✓ wallet: owner can send jettons [TIME]
   ✓ wallet: non-owner cannot send jettons [TIME]
   ✓ wallet: cannot send more jettons than balance [TIME]
-  ✓ wallet: zero forward GRAM means no transfer notification [TIME]
+  ✓ wallet: zero forward ton means no transfer notification [TIME]
   ✓ wallet: transfer notification should preserve forward payload [TIME]
   ✓ wallet: transfer to undeployed recipient wallet should still work [TIME]
   ✓ wallet: owner can burn jettons [TIME]
   ✓ wallet: non-owner cannot burn jettons [TIME]
   ✓ wallet: cannot burn more jettons than balance [TIME]
 
- ✓ 48 passed in 6 files
+ ✓ 51 passed in 6 files

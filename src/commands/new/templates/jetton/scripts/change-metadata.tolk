@@ -1,7 +1,7 @@
 import "@acton/io"
 import "@acton/emulation/network"
 import "@acton/emulation/scripts"
-import "@wrappers/JettonMinter.gen"
+import "@wrappers/utils"
 import "utils/common"
 
 fun main() {
@@ -9,12 +9,7 @@ fun main() {
     val minter = promptJettonMinter("Enter Jetton Minter address");
     val metadata = promptJettonMetadata(JETTON_DEFAULT_UPDATED_DESCRIPTION);
 
-    val res = minter.sendChangeMinterMetadata(
-        admin.address,
-        0,
-        buildJettonMetadataCell(metadata),
-        { bounce: false, value: grams("0.05") },
-    );
+    val res = minter.sendChangeMetadata(admin.address, buildJettonMetadataCell(metadata));
     println(res.waitForTrace());
 
     printJettonMinterInfo(minter, "JETTON");

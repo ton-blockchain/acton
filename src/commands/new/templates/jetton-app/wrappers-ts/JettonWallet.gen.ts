@@ -588,32 +588,32 @@ export const BurnNotificationForMinter = {
 }
 
 /**
- > struct (0xd372158c) TopUpGrams {
+ > struct (0xd372158c) TopUpTons {
  > }
  */
-export interface TopUpGrams {
-    readonly $: 'TopUpGrams'
+export interface TopUpTons {
+    readonly $: 'TopUpTons'
 }
 
-export const TopUpGrams = {
+export const TopUpTons = {
     PREFIX: 0xd372158c,
 
-    create(): TopUpGrams {
+    create(): TopUpTons {
         return {
-            $: 'TopUpGrams',
+            $: 'TopUpTons',
         }
     },
-    fromSlice(s: c.Slice): TopUpGrams {
-        loadAndCheckPrefix32(s, 0xd372158c, 'TopUpGrams');
+    fromSlice(s: c.Slice): TopUpTons {
+        loadAndCheckPrefix32(s, 0xd372158c, 'TopUpTons');
         return {
-            $: 'TopUpGrams',
+            $: 'TopUpTons',
         }
     },
-    store(self: TopUpGrams, b: c.Builder): void {
+    store(self: TopUpTons, b: c.Builder): void {
         b.storeUint(0xd372158c, 32);
     },
-    toCell(self: TopUpGrams): c.Cell {
-        return makeCellFrom<TopUpGrams>(self, TopUpGrams.store);
+    toCell(self: TopUpTons): c.Cell {
+        return makeCellFrom<TopUpTons>(self, TopUpTons.store);
     }
 }
 
@@ -750,11 +750,11 @@ export class JettonWallet implements c.Contract {
     static CodeCell = c.Cell.fromBase64('te6ccgECCgEAArgAART/APSkE/S88sgLAQIBYgIDA8TQ+JGONNMfMdcsILxqKMyW0z8x+gAwjhHXLCPe7L70kvI/4dM/MfoAMOLtRND6AAKgyAH6As7J7VTg1ywgvGoozOMC1ywgfFP1LOMC1ywiyvg95OMC1ywmm5CsZDHchA/y8AQFBgAdoPYF2omh9AH0kfSQYfBVAubtRNAB0z/6APpQ+lD6AAb6ACD6SPpIMPiSIccFkTCOOviS+CooyM+EIPpSE/pSyXgpVBJCyM+DywTPhaDMzPkWhPewE4ALUATXJMjPigBAzhLL989QxwXy4EriUSagyAH6As7J7VQhk1s0W+MNIW6RW+MOBwgB/tM/+gD6SPpQ9AH6ACD0BAFukTCR0eIj+kQw8tFN+Jf4k3D4OiNyceME+DkgboEYtyLjBCFugR0TWAPjBFAjqCWgc4EDLHD4PKABcPg2oAFw+Dagc4EEAoIQCWYBgHD4N6C88rDtRND6ACD6SPpIMPiSIscF8uBJUzi+8q9ROKEJAOD4l/g5IG6BEJ5Y4wRxgQLycPg4AXD4NqCBD+dw+DagvPKw7UTQ+gAg+kj6SDD4kiLHBfLgSQTTP/oA+lAwU1G+8q9RUaHIAfoCFM7J7VTIz5Hvdl96yz9Y+gL6UvpUycjPhYgS+lJxzwtuzMmAUPsAAFLIz5HNi0JyJs8LP1AF+gIT+lQVzsnIz4UIE/pSAfoCcc8LaszJgBH7AABo+CdvEPiXofgvoHOBBAKCEAlmAYBw+De2CXL7AsjPhQgS+lKCENUydtvPC47LP8mBAIL7AADAyAH6AhLOye1U+ComyM+EIPpSE/pSyXjIz5BeNRRmGss/UAj6AvpUFPpUWPoCzsnIz4mIAVR0JcjPg8sEz4WgzMz5FoT3sASACyfXJDYVzhLL94EVDc8LeczMzMmAUPsA');
 
     static Errors = {
-        'Errors.BalanceError': 47,
-        'Errors.NotEnoughGas': 48,
-        'Errors.NotOwner': 73,
-        'Errors.NotValidWallet': 74,
-        'Errors.WrongWorkchain': 333,
+        'ERROR_BALANCE_ERROR': 47,
+        'ERROR_NOT_ENOUGH_GAS': 48,
+        'ERROR_NOT_OWNER': 73,
+        'ERROR_NOT_VALID_WALLET': 74,
+        'ERROR_WRONG_WORKCHAIN': 333,
     }
 
     readonly address: c.Address
@@ -814,9 +814,9 @@ export class JettonWallet implements c.Contract {
         return InternalTransferStep.toCell(InternalTransferStep.create(body));
     }
 
-    static createCellOfTopUpGrams(body: {
+    static createCellOfTopUpTons(body: {
     }) {
-        return TopUpGrams.toCell(TopUpGrams.create());
+        return TopUpTons.toCell(TopUpTons.create());
     }
 
     async sendDeploy(provider: ContractProvider, via: Sender, msgValue: coins, extraOptions?: ExtraSendOptions) {
@@ -871,11 +871,11 @@ export class JettonWallet implements c.Contract {
         });
     }
 
-    async sendTopUpGrams(provider: ContractProvider, via: Sender, msgValue: coins, body: {
+    async sendTopUpTons(provider: ContractProvider, via: Sender, msgValue: coins, body: {
     }, extraOptions?: ExtraSendOptions) {
         return provider.internal(via, {
             value: msgValue,
-            body: TopUpGrams.toCell(TopUpGrams.create()),
+            body: TopUpTons.toCell(TopUpTons.create()),
             ...extraOptions
         });
     }

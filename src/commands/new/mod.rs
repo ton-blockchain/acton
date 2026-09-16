@@ -4,8 +4,8 @@ use crate::commands::hooks::{GitHook, scaffold_and_install_default_hooks, select
 use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
-    ActonConfig, ContractConfig, ContractDependency, ContractsConfig, ToolchainConfig,
-    default_project_mappings,
+    ActonConfig, ContractConfig, ContractDependency, ContractsConfig, LintConfig, LintEntry,
+    LintLevel, LintRules, ToolchainConfig, default_project_mappings,
 };
 use anyhow::anyhow;
 use inquire::{Confirm, Select, Text};
@@ -203,6 +203,20 @@ pub fn new_cmd(
     config.contracts = Some(ContractsConfig { contracts });
 
     config.test = Some(Default::default());
+
+    if template == ProjectTemplate::Jetton {
+        // Keep the reference contracts' error codes and lint policy.
+        config.lint = Some(LintConfig {
+            max_warnings: 0,
+            rules: Some(LintRules {
+                entries: BTreeMap::from([(
+                    "throw-requires-errors-enum".to_owned(),
+                    LintEntry::Level(LintLevel::Allow),
+                )]),
+            }),
+            ..Default::default()
+        });
+    }
 
     let mut scripts = BTreeMap::new();
     scripts.insert(

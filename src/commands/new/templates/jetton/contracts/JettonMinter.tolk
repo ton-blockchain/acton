@@ -7,11 +7,11 @@ import "sharding"
 import "storage"
 
 contract JettonMinter {
-    author: "__ACTON_AUTHOR__"
-    version: "1.0.0"
+    author: "The Tolk Team"
+    version: "2.1"
     description: "Standard Jetton Minter. TEP-74 and TEP-89 compliant"
-    storage: MinterStorage
     incomingMessages: AllowedMessageToMinter
+    storage: MinterStorage
 }
 
 type AllowedMessageToMinter =
@@ -23,10 +23,11 @@ type AllowedMessageToMinter =
     | DropMinterAdmin
     | ChangeMinterMetadata
     | UpgradeMinterCode
-    | TopUpGrams
+    | TopUpTons
 
 fun onBouncedMessage(in: InMessageBounced) {
     in.bouncedBody.skipBouncedPrefix();
+    // process only mint bounces; on other messages, an exception will be thrown, it's okay
     val msg = lazy InternalTransferStep.fromSlice(in.bouncedBody);
 
     var storage = lazy MinterStorage.load();
@@ -35,7 +36,14 @@ fun onBouncedMessage(in: InMessageBounced) {
 }
 
 fun assertSenderIsAdmin(senderAddress: address, adminAddress: address?) {
-    assert (senderAddress == adminAddress!) throw Errors.NotOwner;
+    // theoretically, minter's admin can be dropped and be `null`, so being precise, we should check:
+    // ```
+    // assert (adminAddress != null) throw ERROR_NOT_OWNER;
+    // ```
+    // but in practice, the above assertion is redundant, we just bypass the nullability check:
+    assert (
+        senderAddress == adminAddress!
+    ) throw ERROR_NOT_OWNER;                                       // then, if admin is `null`, error code 7 will be thrown (while executing operator `==`),// it's suitable for current implementation
 }
 
 fun onInternalMessage(in: InMessage) {
@@ -52,7 +60,7 @@ fun onInternalMessage(in: InMessage) {
                     contract.getAddress(),
                     jettonWalletCode,
                 )
-            ) throw Errors.NotValidWallet;
+            ) throw ERROR_NOT_VALID_WALLET;
             storage.totalSupply -= msg.jettonAmount;
             storage.save();
 
@@ -102,23 +110,24 @@ fun onInternalMessage(in: InMessage) {
         MintNewJettons => {
             var storage = lazy MinterStorage.load();
             assertSenderIsAdmin(in.senderAddress, storage.adminAddress);
-            assert (msg.mintRecipient.getWorkchain() == MY_WORKCHAIN) throw Errors.WrongWorkchain;
+            assert (msg.mintRecipient.getWorkchain() == MY_WORKCHAIN) throw ERROR_WRONG_WORKCHAIN;
 
             val internalTransferMsg = lazy msg
                 .internalTransferMsg
-                .load({ throwIfOpcodeDoesNotMatch: Errors.InvalidOp });
+                .load({ throwIfOpcodeDoesNotMatch: ERROR_INVALID_OP });
             val forwardTonAmount = internalTransferMsg.forwardTonAmount;
             internalTransferMsg.forwardPayload.checkIsCorrectTlbEither();
 
+            // a little more than needed, it’s ok since it’s sent by the admin and excesses will return back
             checkAmountIsEnoughToTransfer(msg.tonAmount, forwardTonAmount, in.originalForwardFee);
 
             storage.totalSupply += internalTransferMsg.jettonAmount;
             storage.save();
 
             reserveGramsOnBalance(
-                grams("0.01"),
+                ton("0.01"),
                 RESERVE_MODE_EXACT_AMOUNT,
-            );
+            ); // reserve for storage fees
 
             val jettonWalletCode = jettonWalletCompiledCode();
             val deployMsg = createMessage({
@@ -171,8 +180,8 @@ fun onInternalMessage(in: InMessage) {
             contract.setData(msg.newData);
         }
 
-        TopUpGrams => {
-            // just accept grams
+        TopUpTons => {
+            // just accept tons
         }
 
         else => throw 0xFFFF,

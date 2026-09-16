@@ -5,11 +5,11 @@ import "messages"
 import "types"
 
 contract NftCollection {
-    author: "__ACTON_AUTHOR__"
-    version: "1.0.0"
+    author: "The Tolk Team"
+    version: "1.1"
     description: "Standard NFT Collection. TEP-62 and TEP-64 compliant"
-    storage: NftCollectionStorage
     incomingMessages: AllowedMessageToNftCollection
+    storage: NftCollectionStorage
 }
 
 fun deployNftItem(
@@ -146,7 +146,7 @@ get fun get_nft_content(
     // construct a response from "common content" and "individual content";
     // for example:
     // common content = "https://site.org/my-collection/"
-    // individual nft = "my-picture-123.png"  (probably, a long string, snake-encoded)
+    // individual nft-v1.1 = "my-picture-123.png"  (probably, a long string, snake-encoded)
     // result         = concatenation
     var b = StringBuilder.create();
     b.append(content.commonContent);

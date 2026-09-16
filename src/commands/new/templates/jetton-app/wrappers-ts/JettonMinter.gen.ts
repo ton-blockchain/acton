@@ -778,32 +778,32 @@ export const ChangeMinterMetadata = {
 }
 
 /**
- > struct (0xd372158c) TopUpGrams {
+ > struct (0xd372158c) TopUpTons {
  > }
  */
-export interface TopUpGrams {
-    readonly $: 'TopUpGrams'
+export interface TopUpTons {
+    readonly $: 'TopUpTons'
 }
 
-export const TopUpGrams = {
+export const TopUpTons = {
     PREFIX: 0xd372158c,
 
-    create(): TopUpGrams {
+    create(): TopUpTons {
         return {
-            $: 'TopUpGrams',
+            $: 'TopUpTons',
         }
     },
-    fromSlice(s: c.Slice): TopUpGrams {
-        loadAndCheckPrefix32(s, 0xd372158c, 'TopUpGrams');
+    fromSlice(s: c.Slice): TopUpTons {
+        loadAndCheckPrefix32(s, 0xd372158c, 'TopUpTons');
         return {
-            $: 'TopUpGrams',
+            $: 'TopUpTons',
         }
     },
-    store(self: TopUpGrams, b: c.Builder): void {
+    store(self: TopUpTons, b: c.Builder): void {
         b.storeUint(0xd372158c, 32);
     },
-    toCell(self: TopUpGrams): c.Cell {
-        return makeCellFrom<TopUpGrams>(self, TopUpGrams.store);
+    toCell(self: TopUpTons): c.Cell {
+        return makeCellFrom<TopUpTons>(self, TopUpTons.store);
     }
 }
 
@@ -899,19 +899,19 @@ export const JettonDataReply = {
 
 /**
  > struct (0x00) OnchainMetadataReply {
- >     contentDict: map<uint256, string_prefixed0x>
+ >     contentDict: map<uint256, Cell<SnakeDataReply>>
  > }
  */
 export interface OnchainMetadataReply {
     readonly $: 'OnchainMetadataReply'
-    contentDict: c.Dictionary<uint256, string_prefixed0x>
+    contentDict: c.Dictionary<uint256, CellRef<SnakeDataReply>>
 }
 
 export const OnchainMetadataReply = {
     PREFIX: 0x00,
 
     create(args: {
-        contentDict: c.Dictionary<uint256, string_prefixed0x>
+        contentDict: c.Dictionary<uint256, CellRef<SnakeDataReply>>
     }): OnchainMetadataReply {
         return {
             $: 'OnchainMetadataReply',
@@ -922,12 +922,18 @@ export const OnchainMetadataReply = {
         loadAndCheckPrefix(s, 0x00, 8, 'OnchainMetadataReply');
         return {
             $: 'OnchainMetadataReply',
-            contentDict: c.Dictionary.load<uint256, string_prefixed0x>(c.Dictionary.Keys.BigUint(256), createDictionaryValue<string_prefixed0x>(string_prefixed0x.fromSlice, string_prefixed0x.store), s),
+            contentDict: c.Dictionary.load<uint256, CellRef<SnakeDataReply>>(c.Dictionary.Keys.BigUint(256), createDictionaryValue<CellRef<SnakeDataReply>>(
+                (s) => loadCellRef<SnakeDataReply>(s, SnakeDataReply.fromSlice),
+                (v,b) => storeCellRef<SnakeDataReply>(v, b, SnakeDataReply.store)
+            ), s),
         }
     },
     store(self: OnchainMetadataReply, b: c.Builder): void {
         b.storeUint(0x00, 8);
-        b.storeDict<uint256, string_prefixed0x>(self.contentDict, c.Dictionary.Keys.BigUint(256), createDictionaryValue<string_prefixed0x>(string_prefixed0x.fromSlice, string_prefixed0x.store));
+        b.storeDict<uint256, CellRef<SnakeDataReply>>(self.contentDict, c.Dictionary.Keys.BigUint(256), createDictionaryValue<CellRef<SnakeDataReply>>(
+            (s) => loadCellRef<SnakeDataReply>(s, SnakeDataReply.fromSlice),
+            (v,b) => storeCellRef<SnakeDataReply>(v, b, SnakeDataReply.store)
+        ));
     },
     toCell(self: OnchainMetadataReply): c.Cell {
         return makeCellFrom<OnchainMetadataReply>(self, OnchainMetadataReply.store);
@@ -935,19 +941,39 @@ export const OnchainMetadataReply = {
 }
 
 /**
- > type string_prefixed0x = string
+ > struct (0x00) SnakeDataReply {
+ >     string: string
+ > }
  */
-export type string_prefixed0x = string
+export interface SnakeDataReply {
+    readonly $: 'SnakeDataReply'
+    string: string
+}
 
-export const string_prefixed0x = {
-    fromSlice(s: c.Slice): string_prefixed0x {
-        return s.loadStringRefTail();
+export const SnakeDataReply = {
+    PREFIX: 0x00,
+
+    create(args: {
+        string: string
+    }): SnakeDataReply {
+        return {
+            $: 'SnakeDataReply',
+            ...args
+        }
     },
-    store(self: string_prefixed0x, b: c.Builder): void {
-        b.storeStringRefTail(self);
+    fromSlice(s: c.Slice): SnakeDataReply {
+        loadAndCheckPrefix(s, 0x00, 8, 'SnakeDataReply');
+        return {
+            $: 'SnakeDataReply',
+            string: s.loadStringRefTail(),
+        }
     },
-    toCell(self: string_prefixed0x): c.Cell {
-        return makeCellFrom<string_prefixed0x>(self, string_prefixed0x.store);
+    store(self: SnakeDataReply, b: c.Builder): void {
+        b.storeUint(0x00, 8);
+        b.storeStringRefTail(self.string);
+    },
+    toCell(self: SnakeDataReply): c.Cell {
+        return makeCellFrom<SnakeDataReply>(self, SnakeDataReply.store);
     }
 }
 
@@ -993,11 +1019,11 @@ export class JettonMinter implements c.Contract {
     static CodeCell = c.Cell.fromBase64('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');
 
     static Errors = {
-        'Errors.NotEnoughGas': 48,
-        'Errors.InvalidOp': 72,
-        'Errors.NotOwner': 73,
-        'Errors.NotValidWallet': 74,
-        'Errors.WrongWorkchain': 333,
+        'ERROR_NOT_ENOUGH_GAS': 48,
+        'ERROR_INVALID_OP': 72,
+        'ERROR_NOT_OWNER': 73,
+        'ERROR_NOT_VALID_WALLET': 74,
+        'ERROR_WRONG_WORKCHAIN': 333,
     }
 
     readonly address: c.Address
@@ -1086,9 +1112,9 @@ export class JettonMinter implements c.Contract {
         return UpgradeMinterCode.toCell(UpgradeMinterCode.create(body));
     }
 
-    static createCellOfTopUpGrams(body: {
+    static createCellOfTopUpTons(body: {
     }) {
-        return TopUpGrams.toCell(TopUpGrams.create());
+        return TopUpTons.toCell(TopUpTons.create());
     }
 
     async sendDeploy(provider: ContractProvider, via: Sender, msgValue: coins, extraOptions?: ExtraSendOptions) {
@@ -1191,11 +1217,11 @@ export class JettonMinter implements c.Contract {
         });
     }
 
-    async sendTopUpGrams(provider: ContractProvider, via: Sender, msgValue: coins, body: {
+    async sendTopUpTons(provider: ContractProvider, via: Sender, msgValue: coins, body: {
     }, extraOptions?: ExtraSendOptions) {
         return provider.internal(via, {
             value: msgValue,
-            body: TopUpGrams.toCell(TopUpGrams.create()),
+            body: TopUpTons.toCell(TopUpTons.create()),
             ...extraOptions
         });
     }
