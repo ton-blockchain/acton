@@ -8,6 +8,8 @@ Most contracts in an Acton project start from `.tolk` files. Sometimes there is 
 In that case, you can still make the contract feel like a normal Acton contract. Start by teaching Acton where the BoC is. If you later want typed wrappers or ABI JSON, add a small Tolk file that describes the contract interface.
 
 <Callout type="tip">
+  <AvailabilityBadge since="Acton 1.2" />
+
   Exercise the configured contract in local tests, then on a [simulator network](/docs/environments/simulator/overview), before testnet and mainnet. [Acton Studio](/docs/studio) can use its supplied ABI for decoding — precompiled bytecode alone does not provide source-level inspection.
 </Callout>
 

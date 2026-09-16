@@ -6,13 +6,11 @@ icon: FileText
 
 The `Acton.toml` file is the project manifest. It defines package metadata, contract definitions, test settings, and custom scripts.
 
-<Callout type="tip">
-  [Acton Studio](/docs/studio) watches this manifest and rebuilds project artifacts. Its workflow proceeds from local tests through a [simulator network](/docs/environments/simulator/overview) to testnet and mainnet.
-
-  Use [generated connection settings](/docs/environments/how-to/connect) for network entries.
-</Callout>
-
 The manifest conforms to the [TOML 1.1 specification](https://toml.io/en/v1.1.0).
+
+<AvailabilityBadge since="Acton 1.2" />
+
+[Acton Studio](/docs/studio) watches this manifest and rebuilds project artifacts.
 
 ## Project Root Resolution
 
@@ -269,8 +267,7 @@ CLI flags still override config values for a single run (for example `acton fmt 
 
 ## `[localnet]`
 
-Configures simulator defaults and the shared localnet target. The `acton simulator` command reads
-this table.
+Configures simulator defaults and the shared localnet target. The `acton simulator` command reads this table.
 
 Docker-based `acton localnet` shares the startup `accounts` selection — its node, timing, storage, and API settings use its own command options.
 

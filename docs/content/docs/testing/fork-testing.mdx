@@ -8,6 +8,8 @@ Fork testing runs tests against blockchain state by loading accounts and librari
 Acton resolves one masterchain block when the fork starts. Account state and the network configuration come from that block. With an explicit `--fork-block-number`, Unix time also comes from the selected block. A latest fork uses the current system Unix time.
 
 <Callout type="tip">
+  <AvailabilityBadge since="Acton 1.2" />
+
   Fork tests stay in the local emulator. For a persistent fork shared by scripts and frontends, use a [simulator network](/docs/environments/how-to/fork-and-import) in the [Acton Studio](/docs/studio).
 </Callout>
 

@@ -6,6 +6,8 @@ description: "Learn how to generate Tolk wrappers and use them in tests and scri
 [`acton wrapper`](/docs/commands/wrapper) generates a typed Tolk wrapper from a contract's compiler ABI. The wrapper exposes methods to create, deploy, send messages to, and call get methods on the contract — the same API works in both tests and scripts.
 
 <Callout type="tip">
+  <AvailabilityBadge since="Acton 1.2" />
+
   Reuse generated wrappers through the [Studio workflow](/docs/studio): local emulator tests, scripts connected to a [simulator network](/docs/environments/how-to/connect), then testnet and mainnet. The `--net` option selects the destination network.
 </Callout>
 
