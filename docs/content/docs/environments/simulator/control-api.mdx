@@ -90,6 +90,9 @@ _openapi:
       title: List startup accounts
       url: '#list-startup-accounts'
     - depth: 2
+      title: Set empty-block mining mode
+      url: '#set-empty-block-mining-mode'
+    - depth: 2
       title: Mine simulator blocks
       url: '#mine-simulator-blocks'
     - depth: 2
@@ -159,6 +162,8 @@ _openapi:
         id: send-a-raw-internal-message
       - content: List startup accounts
         id: list-startup-accounts
+      - content: Set empty-block mining mode
+        id: set-empty-block-mining-mode
       - content: Mine simulator blocks
         id: mine-simulator-blocks
       - content: Increase virtual time
@@ -271,6 +276,11 @@ _openapi:
           started.
         heading: list-startup-accounts
       - content: >-
+          Controls whether automatic and manual mining skip blocks with no
+          pending messages. Set skip_empty_blocks to false to produce empty
+          blocks. This does not enable or disable automatic mining.
+        heading: set-empty-block-mining-mode
+      - content: >-
           Manually mines queued and/or empty simulator blocks. When the request
           body is omitted or blocks is not provided, one block is mined.
         heading: mine-simulator-blocks
@@ -307,4 +317,4 @@ Acton-only control routes for local state, wallets, address names, compiler ABI 
 
 These routes are intended for local development tooling and should not be exposed publicly. When simulator is started with --require-auth, these routes require the simulator API token. Rate limiting applies only to /api routes, and response delay applies only to TON Center-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled.
 
-<APIPage document={"./public/openapi/acton-simulator-control.openapi.json"} webhooks={[]} operations={[{"path":"/acton_fundAccount","method":"post"},{"path":"/acton_fundJetton","method":"post"},{"path":"/acton_getAddressName","method":"get"},{"path":"/acton_setAddressName","method":"post"},{"path":"/acton_getCompilerAbi","method":"get"},{"path":"/acton_listCompilerAbis","method":"get"},{"path":"/acton_deleteCompilerAbi","method":"post"},{"path":"/acton_getVerifiedSource","method":"get"},{"path":"/acton_getRegisteredVerifiedSource","method":"get"},{"path":"/acton_listVerifiedSources","method":"get"},{"path":"/acton_deleteVerifiedSource","method":"post"},{"path":"/acton_registerCompilerAbis","method":"post"},{"path":"/acton_registerVerifiedSources","method":"post"},{"path":"/acton_createSnapshot","method":"post"},{"path":"/acton_listSnapshots","method":"get"},{"path":"/acton_restoreSnapshot","method":"post"},{"path":"/acton_deleteSnapshot","method":"post"},{"path":"/acton_exportSnapshot","method":"get"},{"path":"/acton_importSnapshot","method":"post"},{"path":"/acton_setConfig","method":"post"},{"path":"/acton_setConfigParam","method":"post"},{"path":"/acton_setShardAccount","method":"post"},{"path":"/acton_changeAccountState","method":"post"},{"path":"/acton_sendInternalMessage","method":"post"},{"path":"/acton_getStartupAccounts","method":"get"},{"path":"/acton_mine","method":"post"},{"path":"/acton_increaseTime","method":"post"},{"path":"/acton_setTime","method":"post"},{"path":"/acton_setNextBlockTimestamp","method":"post"},{"path":"/acton_setNetworkConditions","method":"post"},{"path":"/acton_nodeInfo","method":"get"}]} showTitle />
+<APIPage document={"./public/openapi/acton-simulator-control.openapi.json"} webhooks={[]} operations={[{"path":"/acton_fundAccount","method":"post"},{"path":"/acton_fundJetton","method":"post"},{"path":"/acton_getAddressName","method":"get"},{"path":"/acton_setAddressName","method":"post"},{"path":"/acton_getCompilerAbi","method":"get"},{"path":"/acton_listCompilerAbis","method":"get"},{"path":"/acton_deleteCompilerAbi","method":"post"},{"path":"/acton_getVerifiedSource","method":"get"},{"path":"/acton_getRegisteredVerifiedSource","method":"get"},{"path":"/acton_listVerifiedSources","method":"get"},{"path":"/acton_deleteVerifiedSource","method":"post"},{"path":"/acton_registerCompilerAbis","method":"post"},{"path":"/acton_registerVerifiedSources","method":"post"},{"path":"/acton_createSnapshot","method":"post"},{"path":"/acton_listSnapshots","method":"get"},{"path":"/acton_restoreSnapshot","method":"post"},{"path":"/acton_deleteSnapshot","method":"post"},{"path":"/acton_exportSnapshot","method":"get"},{"path":"/acton_importSnapshot","method":"post"},{"path":"/acton_setConfig","method":"post"},{"path":"/acton_setConfigParam","method":"post"},{"path":"/acton_setShardAccount","method":"post"},{"path":"/acton_changeAccountState","method":"post"},{"path":"/acton_sendInternalMessage","method":"post"},{"path":"/acton_getStartupAccounts","method":"get"},{"path":"/acton_setMiningMode","method":"post"},{"path":"/acton_mine","method":"post"},{"path":"/acton_increaseTime","method":"post"},{"path":"/acton_setTime","method":"post"},{"path":"/acton_setNextBlockTimestamp","method":"post"},{"path":"/acton_setNetworkConditions","method":"post"},{"path":"/acton_nodeInfo","method":"get"}]} showTitle />

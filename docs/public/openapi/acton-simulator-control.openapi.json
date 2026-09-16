@@ -662,6 +662,29 @@
         }
       }
     },
+    "/acton_setMiningMode": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setMiningMode",
+        "summary": "Set empty-block mining mode",
+        "description": "Controls whether automatic and manual mining skip blocks with no pending messages. Set skip_empty_blocks to false to produce empty blocks. This does not enable or disable automatic mining.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MiningMode"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MiningModeResponse"
+          }
+        }
+      }
+    },
     "/acton_mine": {
       "post": {
         "tags": ["Localnet Control"],
@@ -1195,6 +1218,28 @@
                       "items": {
                         "$ref": "#/components/schemas/SnapshotResult"
                       }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "MiningModeResponse": {
+        "description": "Successful mining mode update response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/MiningMode"
                     }
                   }
                 }
@@ -1982,6 +2027,16 @@
             "type": "integer",
             "minimum": 0,
             "description": "Response delay in milliseconds for /api/v2, /api/v3, and /api/emulate/v1 responses. Use 0 to disable."
+          }
+        }
+      },
+      "MiningMode": {
+        "type": "object",
+        "required": ["skip_empty_blocks"],
+        "properties": {
+          "skip_empty_blocks": {
+            "type": "boolean",
+            "description": "Skip mining when no messages are pending. The startup default is true."
           }
         }
       },
