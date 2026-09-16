@@ -531,7 +531,7 @@ export const SettingsPage: FC<SettingsPageProps> = ({
           <SettingsSectionHeader
             id="docker-settings-title"
             title="Docker"
-            description="The container running the primary full localnet node"
+            description="The container running the primary localnet node"
           />
           <div className={styles.settingsRows}>
             <SettingsValueRow

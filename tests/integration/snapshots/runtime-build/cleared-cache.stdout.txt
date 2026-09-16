@@ -1,0 +1,4 @@
+  ✓ Cache cleared
+left version: 2
+right version: 2
+repeated build matches: true

@@ -256,6 +256,66 @@ error: Studio stopped before the test run finished"]]
     .assert_eq(&actual);
 }
 
+#[tokio::test]
+async fn shutdown_preserves_reported_results_and_persists_cancelled_runs() {
+    let workspace = tempfile::tempdir().expect("temporary Studio workspace must be created");
+    let executable = workspace.path().join("slow-acton");
+    std::fs::write(&executable, "#!/bin/sh\nexec sleep 60\n")
+        .expect("fake Acton executable must be written");
+    std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o755))
+        .expect("fake Acton executable must be executable");
+
+    let mut outcomes = Vec::new();
+    for reported in [
+        Some(TestRunStatus::Passed),
+        Some(TestRunStatus::Failed),
+        None,
+    ] {
+        let runtime =
+            LocalProcessTestRunRuntime::new(&executable, workspace.path(), "http://127.0.0.1:3016");
+        let started = runtime
+            .start(StartTestRunRequest::default())
+            .await
+            .expect("test process must start");
+        if let Some(status) = reported {
+            let mut finished = started.clone();
+            finished.status = status;
+            finished.finished_at = Some(chrono::Utc::now());
+            finished.exit_code = Some(i32::from(status != TestRunStatus::Passed));
+            runtime
+                .ingest(TestRunEventEnvelope {
+                    format_version: STUDIO_TEST_RUN_FORMAT_VERSION,
+                    run_id: started.id.clone(),
+                    sequence: 1,
+                    event: TestRunEvent::RunFinished { run: finished },
+                })
+                .await
+                .expect("final report must be accepted before the process exits");
+        }
+
+        let mut events = runtime.subscribe();
+        runtime.shutdown().await.expect("test processes must stop");
+        let restarted =
+            LocalProcessTestRunRuntime::new(&executable, workspace.path(), "http://127.0.0.1:3016");
+        let restored = restarted.get(&started.id).await.expect("saved test run");
+        // The monitor must finish saving history before a new Studio instance opens it.
+        events
+            .try_recv()
+            .expect("final history event must be published");
+        outcomes.push(format!(
+            "reported: {reported:?}, restored: {:?}, exit: {:?}, error: {:?}",
+            restored.status, restored.exit_code, restored.error,
+        ));
+    }
+
+    expect![[r#"
+        reported: Some(Passed), restored: Passed, exit: Some(0), error: None
+        reported: Some(Failed), restored: Failed, exit: Some(1), error: None
+        reported: None, restored: Cancelled, exit: None, error: Some("Test run was cancelled")
+    "#]]
+    .assert_eq(&(outcomes.join("\n") + "\n"));
+}
+
 async fn wait_for_finished(runtime: &LocalProcessTestRunRuntime, run_id: &str) -> TestRunRecord {
     for _ in 0..100 {
         let run = runtime

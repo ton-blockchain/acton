@@ -249,6 +249,164 @@ get fun `test am transaction get used gas for root and child`() {
 }
 
 #[test]
+fn send_result_list_get_used_gas_matches_first_typed_and_filtered_transactions() {
+    run_success_case(
+        "send-result-list-get-used-gas",
+        r#"
+import "../../lib/io"
+
+get fun `test send result list get used gas`() {
+    val (sender, workerAddress, receiverAddress) = deployAmHarness();
+    val txs = sendPing(sender, workerAddress, receiverAddress, 42, 10);
+
+    expect(txs).toHaveLength(2);
+    expect(txs.getUsedGas()).toEqual(txs.at(0).gasUsed);
+    expect(txs.getUsedGas<Ping>()).toEqual(txs.at(0).gasUsed);
+    expect(txs.getUsedGas<Notify>()).toEqual(txs.at(1).gasUsed);
+    expect(txs.getUsedGas({
+        from: workerAddress,
+        to: receiverAddress,
+        success: true,
+        opcode: Notify.__getDeclaredPackPrefix(),
+    })).toEqual(txs.at(1).gasUsed);
+    expect(txs.getUsedGas<Notify>({
+        opcode: Ping.__getDeclaredPackPrefix(),
+    })).toEqual(txs.at(1).gasUsed);
+    expect(txs.getUsedGas<Notify>({
+        to: fun(addr: address): bool {
+            println("gas search predicate");
+            return addr == receiverAddress;
+        },
+    })).toEqual(txs.at(1).gasUsed);
+}
+"#,
+        "integration/snapshots/test-runner/send_result_list_get_used_gas/matching.stdout.txt",
+    );
+}
+
+#[test]
+fn send_result_list_get_used_gas_reports_missing_transaction_filters() {
+    let source = with_source(
+        r#"
+get fun `test send result list get used gas missing transaction`() {
+    val (sender, workerAddress, receiverAddress) = deployAmHarness();
+    val txs = sendPing(sender, workerAddress, receiverAddress, 43, 10);
+
+    txs.getUsedGas<Other>({
+        from: sender.address,
+        to: workerAddress,
+        value: grams("0.5"),
+        success: true,
+        opcode: Ping.__getDeclaredPackPrefix(),
+    });
+}
+"#,
+    );
+    ProjectBuilder::new("send-result-list-get-used-gas-missing")
+        .file("contracts/messages", AM_MESSAGES)
+        .contract("worker", AM_WORKER_CONTRACT)
+        .contract("receiver", AM_RECEIVER_CONTRACT)
+        .test_file("transaction_helpers", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/send_result_list_get_used_gas/missing.stdout.txt",
+        );
+}
+
+#[test]
+fn send_result_list_get_used_gas_reports_predicate_filters() {
+    let source = with_source(
+        r#"
+get fun `test send result list get used gas missing predicate`() {
+    val (sender, workerAddress, receiverAddress) = deployAmHarness();
+    val txs = sendPing(sender, workerAddress, receiverAddress, 44, 10);
+
+    txs.getUsedGas<Notify>({
+        to: receiverAddress,
+        value: fun(value: coins): bool { return value > grams("1"); },
+    });
+}
+"#,
+    );
+    ProjectBuilder::new("send-result-list-get-used-gas-predicate")
+        .file("contracts/messages", AM_MESSAGES)
+        .contract("worker", AM_WORKER_CONTRACT)
+        .contract("receiver", AM_RECEIVER_CONTRACT)
+        .test_file("transaction_helpers", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/send_result_list_get_used_gas/predicate.stdout.txt",
+        );
+}
+
+#[test]
+fn send_result_list_get_used_gas_reports_empty_list() {
+    ProjectBuilder::new("send-result-list-get-used-gas-empty")
+        .test_file(
+            "empty",
+            r#"
+import "../../lib/emulation/network"
+import "../../lib/types/big_array"
+
+get fun `test send result list get used gas empty`() {
+    val txs: SendResultList = SendResultList.createEmpty();
+    txs.getUsedGas();
+}
+"#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/send_result_list_get_used_gas/empty.stdout.txt",
+        );
+}
+
+#[test]
+fn send_result_list_get_used_gas_reports_skipped_compute_phase() {
+    ProjectBuilder::new("send-result-list-get-used-gas-skipped")
+        .test_file(
+            "skipped",
+            r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+
+get fun `test send result list get used gas skipped`() {
+    val sender = testing.treasury("sender");
+    val txs = net.send(sender.address, createMessage({
+        dest: randomAddress("undeployed"),
+        bounce: false,
+        value: grams("0.2"),
+    }));
+    txs.getUsedGas();
+}
+"#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/send_result_list_get_used_gas/skipped.stdout.txt",
+        );
+}
+
+#[test]
 fn transaction_get_used_gas_reports_skipped_compute_phase_for_undeployed_destination() {
     run_success_case(
         "am-stdlib-transaction-get-used-gas-skipped-compute",

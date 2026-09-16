@@ -75,32 +75,36 @@ fun main() {
 }
 ```
 
-The same pattern works for more complex contracts. Prepare dictionaries, cells, metadata, and contract code inside the script before calling the wrapper's deployment helper.
+The same pattern works for more complex contracts. In a project created with `acton new --template jetton`, use its metadata helper before calling the wrapper's deployment helper.
 
 ```tolk title="scripts/deploy.tolk"
+import "@acton/io"
+import "@acton/emulation/network"
 import "@acton/emulation/scripts"
 import "@acton/build"
 import "@acton/prompts"
 import "@acton/testing/assert"
 
 import "@wrappers/JettonMinter.gen"
-import "@contracts/types"
+import "@contracts/storage"
+import "utils/common"
 
 fun main() {
     val deployer = scripts.wallet(promptWallet("Select a wallet:"));
 
-    val content = buildOnchainMetadata({
+    val metadata = buildJettonMetadataCell({
         name: "ActonJetton",
         symbol: "ACTON",
         description: "It is time to act on TON!",
         image: "https://ton-blockchain.github.io/acton/logo.png",
+        decimals: "9",
     });
 
     val minter = JettonMinter.fromStorage({
-        totalSupply: 1_000_000_000,
+        totalSupply: 0,
         adminAddress: deployer.address,
-        content: content,
-        jettonWalletCode: build("JettonWallet"),
+        nextAdminAddress: null,
+        metadata,
     });
 
     val trace = minter.deploy(deployer.address, { value: grams("0.05") }).waitForTrace();

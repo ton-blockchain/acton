@@ -25,7 +25,10 @@ use tycho_types::models::{ComputePhase, MsgInfo, TxInfo};
 
 const SIGNIFICANT_PERCENT_CHANGE: f64 = 5.0;
 
-pub(super) fn collect_profile(runner: &TestRunner) -> anyhow::Result<Option<UiGasProfileReport>> {
+pub(super) fn collect_profile(
+    runner: &TestRunner,
+    collect_viewer_report: bool,
+) -> anyhow::Result<Option<UiGasProfileReport>> {
     let collect_snapshot_stats =
         runner.config.snapshot.is_some() || runner.config.baseline_snapshot.is_some();
     let mut ui_gas_profile = None;
@@ -97,7 +100,7 @@ pub(super) fn collect_profile(runner: &TestRunner) -> anyhow::Result<Option<UiGa
             &runner.project_root,
             gas_profile_filename,
         )?;
-        if runner.config.ui {
+        if collect_viewer_report {
             ui_gas_profile = Some(build_ui_gas_profile(
                 &execution_samples,
                 &acton_profile_roots(runner),
@@ -194,10 +197,7 @@ fn decode_declared_message_name(
         MsgInfo::ExtOut(_) => return None,
     };
 
-    let mut body = in_message.body;
-    if bounced && body.skip_first(32, 0).is_err() {
-        return None;
-    }
+    let body = tvm_ffi::message::original_message_body(in_message.body, bounced)?;
     let opcode = {
         let mut parser = body;
         parser.load_u32().ok()

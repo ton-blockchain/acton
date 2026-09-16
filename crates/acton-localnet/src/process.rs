@@ -40,7 +40,7 @@ impl Launcher {
         command
             .arg("--project-root")
             .arg(&self.project_root)
-            .args(["full-localnet", "--state-dir"])
+            .args(["localnet", "--state-dir"])
             .arg(&self.catalog_root)
             .arg(action)
             .arg(&network.network.id)
@@ -53,6 +53,8 @@ impl Launcher {
     /// Stops a foreground owner even when its control service is still being
     /// discovered. Waiting for discovery avoids signalling the CLI before its
     /// graceful signal handler has been installed during startup.
+    /// The service's durable cleanup result remains authoritative when the owner
+    /// exits unsuccessfully because of an earlier startup failure.
     pub async fn shutdown_started(
         &self,
         network: &NetworkDirectory,
@@ -63,8 +65,18 @@ impl Launcher {
             if let Ok(client) = Client::connect(&network.path).await {
                 // Signal the foreground owner first so cancellation during
                 // startup follows its normal success path, then confirm the service.
-                terminate(child).await?;
-                return client.shutdown().await;
+                return match terminate(child).await {
+                    // A failed startup can publish its error before the owner
+                    // exits. Its exit code must not prevent retrying once the
+                    // service confirms cleanup; actual cleanup failures still
+                    // come from the durable shutdown result below.
+                    Ok(())
+                    | Err(Error::Internal {
+                        code: "shutdown_failed",
+                        ..
+                    }) => client.shutdown().await,
+                    Err(error) => Err(error),
+                };
             }
             if child.try_wait().map_err(process_error)?.is_some() {
                 return Ok(());

@@ -113,7 +113,7 @@ export const HealthPage: FC<HealthPageProps> = ({environment}) => {
         </div>
       ) : undefined}
 
-      <section className={styles.summary} aria-label="Full localnet health summary">
+      <section className={styles.summary} aria-label="Localnet health summary">
         <HealthSummaryCard health={health} />
         <ApiSummaryCard api={health.apiV2} icon={Server} label="API v2" />
         <ApiSummaryCard
@@ -173,7 +173,7 @@ const HealthSummaryCard: FC<{readonly health: NetworkHealth}> = ({health}) => (
   <div className={styles.summaryCard}>
     <span className={styles.summaryHeading}>
       <Gauge size={16} aria-hidden="true" />
-      Full localnet
+      Localnet
     </span>
     <strong className={styles.statusValue} data-status={health.status}>
       <span className={styles.statusDot} aria-hidden="true" />
@@ -294,7 +294,7 @@ const MetricChart: FC<MetricChartProps> = ({
 
 const ServicesTable: FC<{readonly services: readonly ServiceHealth[]}> = ({services}) => (
   <DataTable title="Services" minWidth="44rem">
-    <DataTableTable aria-label="Full localnet services">
+    <DataTableTable aria-label="Localnet services">
       <DataTableHead>
         <DataTableRow>
           <DataTableHeaderCell columnWidth="28%">Service</DataTableHeaderCell>
@@ -351,7 +351,7 @@ const HealthPageSkeleton: FC = () => (
   <div className={styles.page} aria-label="Loading health data">
     <section className={styles.summary}>
       {[
-        {icon: Gauge, label: "Full localnet"},
+        {icon: Gauge, label: "Localnet"},
         {icon: Server, label: "API v2"},
         {icon: Database, label: "API v3"},
         {icon: Clock3, label: "Latest block"},
@@ -373,7 +373,7 @@ const HealthPageSkeleton: FC = () => (
     </section>
 
     <DataTable title="Services" minWidth="44rem">
-      <DataTableTable aria-label="Loading Full localnet services">
+      <DataTableTable aria-label="Loading Localnet services">
         <DataTableHead>
           <DataTableRow>
             <DataTableHeaderCell>Service</DataTableHeaderCell>

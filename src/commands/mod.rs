@@ -23,7 +23,7 @@ pub mod retrace;
 pub mod rpc;
 pub mod run;
 pub mod script;
-pub mod simulated_localnet;
+pub mod simulator;
 pub mod studio;
 pub mod test;
 pub mod up;

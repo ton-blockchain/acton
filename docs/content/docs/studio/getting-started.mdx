@@ -3,14 +3,16 @@ title: "Getting Started"
 description: "Start Acton Studio for a project and complete a first test and local environment workflow"
 ---
 
-This guide starts Studio for an existing Acton project, runs a test suite, creates a Simulated
-localnet, and connects the project to that network.
+<AvailabilityBadge since="Acton 1.2" />
+
+This guide starts Studio for an existing Acton project, runs a test suite, creates a Simulator,
+and connects the project to that environment.
 
 ## Prerequisites
 
 - [Acton installed](/docs/installation)
 - an Acton project with an `Acton.toml` file
-- Docker only if you plan to create a Full localnet
+- Docker only if you plan to create a Localnet
 
 If you do not have a project yet, create one first:
 
@@ -74,19 +76,19 @@ After the run finishes:
 You can also run `acton test` in another terminal. Studio records the run automatically while the
 daemon for this project is available.
 
-## 4. Create a Simulated localnet
+## 4. Create a Simulator
 
-Open **Virtual Environments**, select **Create environment**, and keep **Simulated localnet** selected.
+Open **Virtual Environments**, select **Create environment**, and keep **Simulator** selected.
 
 <figure className="theme-image my-6">
   <img
     src="/docs/studio/create-environment-light.png"
-    alt="Create environment dialog in light theme configured for a Simulated localnet"
+    alt="Create environment dialog in light theme configured for a Simulator"
     className="theme-image-light rounded-lg border shadow-sm"
   />
   <img
     src="/docs/studio/create-environment-dark.png"
-    alt="Create environment dialog in dark theme configured for a Simulated localnet"
+    alt="Create environment dialog in dark theme configured for a Simulator"
     className="theme-image-dark rounded-lg border shadow-sm"
   />
 </figure>
@@ -94,12 +96,11 @@ Open **Virtual Environments**, select **Create environment**, and keep **Simulat
 For the first environment, use these defaults:
 
 - **Name:** keep the generated name or choose a project-specific name
-- **Local port:** leave empty so Studio selects an available environment runtime port; this is
-  separate from the Studio port such as `3015`
 - **Initial state:** choose **Clean network**
 - **Startup accounts:** select project wallets to initialize and fund each with 100 GRAM
 
-Select **Create environment**. Studio starts the runtime and opens it when it becomes ready.
+Select **Create environment**. Studio selects an available runtime port, starts the runtime,
+and opens it when it becomes ready. The runtime port is separate from the Studio port such as `3015`.
 
 ## 5. Connect the project
 

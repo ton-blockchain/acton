@@ -4,6 +4,7 @@
 //! live executors and later pop back to the parent.
 
 use crate::core::evaluate::{evaluate_condition_expression, evaluate_expression};
+use crate::is_internal_function_name;
 use crate::multi::dap_transport::{DapMessage, DapTransport};
 use crate::multi::session::ChildDebugContextSpec;
 use crate::replayer::{
@@ -164,7 +165,7 @@ impl ReplayerDebugSession {
             },
         );
 
-        if leaf_function_name.starts_with("__") {
+        if is_internal_function_name(function_name) {
             return true;
         }
 
@@ -182,6 +183,7 @@ impl ReplayerDebugSession {
             (receiver_name, leaf_function_name),
             (Some("net"), "send")
                 | (Some("net"), "sendExternal")
+                | (Some("GetMethodResult"), "unwrap" | "isSuccess")
                 | (Some("testing"), "processSingleTraceStep")
                 | (Some("testing"), "createTraceIterationCursor")
                 | (Some("testing"), "createExternalTraceIterationCursor")

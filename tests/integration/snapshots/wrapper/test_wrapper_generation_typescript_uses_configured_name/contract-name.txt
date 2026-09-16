@@ -1,1 +1,1 @@
-"FriendlyWallet"
+"ConfiguredId"

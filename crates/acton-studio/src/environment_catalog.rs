@@ -133,7 +133,7 @@ impl EnvironmentRuntime for EnvironmentCatalogRuntime {
             return Box::pin(async {
                 Err(EnvironmentRuntimeError::Conflict {
                     code: "environment_health_unavailable",
-                    message: "Health diagnostics are available for Full localnet environments"
+                    message: "Health diagnostics are available for Localnet environments"
                         .to_owned(),
                 })
             });

@@ -35,6 +35,11 @@ fun setupCounter(): (Counter, Treasury, Treasury) {
 }
 ```
 
+<AvailabilityBadge since="Acton 1.2" />
+
+To create a treasury in another workchain, pass it as the second argument:
+`testing.treasury("owner", MASTERCHAIN)`. The default is `BASECHAIN`.
+
 Use the generated stub when starting a new test file:
 
 ```bash
@@ -202,6 +207,8 @@ expect(event!.loadBody()).toEqual(TransferEvent { value: 123 });
 
 ## Test accepted external-in messages
 
+<AvailabilityBadge since="Acton 1.1" />
+
 `net.sendExternal(...)` and generated `sendExternal*` wrapper methods return
 `ExternalSendResult`. Assert acceptance before unwrapping the trace.
 
@@ -234,6 +241,8 @@ expect(trace).toBeNotNull();
 ```
 
 ## Test rejected external-in messages
+
+<AvailabilityBadge since="Acton 1.1" />
 
 For an external-in rejection, assert the external status directly. Do not
 unwrap it just to check for `null`.
@@ -318,6 +327,11 @@ for details.
 
 ## Control time
 
+<AvailabilityBadge since="Acton 1.2" />
+
+Tests start with the current system Unix time. An explicit `--fork-block-number`
+uses that block's timestamp instead; a latest fork uses the current system time.
+
 Use `testing.setNow(...)` for expiration windows, replay protection, and
 time-dependent get methods.
 
@@ -350,6 +364,11 @@ config.setMsgForwardPrices(prices, BASECHAIN);
 
 expect(testing.setConfig(config)).toEqual(true);
 ```
+
+<AvailabilityBadge since="Acton 1.2" />
+
+`BlockchainConfigMap.setParamRaw()` and `getParamRaw()` accept signed 32-bit
+parameter IDs, including negative IDs for out-of-consensus parameters.
 
 ## Work with deterministic addresses
 

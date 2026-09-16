@@ -1,9 +1,9 @@
 import path from "node:path"
 
 import {Address} from "@ton/core"
-import {PanelLeft} from "lucide-react"
+import {PanelLeft, ScrollText} from "lucide-react"
 import type React from "react"
-import {useEffect, useMemo, useState} from "react"
+import {useEffect, useMemo, useRef, useState} from "react"
 import {
   FiArrowUpRight,
   FiCheck,
@@ -32,6 +32,7 @@ import {
   GramAmount,
   getIdeUrl,
   IdeSelector,
+  InlineButton,
   RawDataBlock,
   SourceLocationValue,
   Tooltip,
@@ -115,10 +116,7 @@ const isExternalMessageNotAcceptedError = (error: string): boolean => {
   return mentionsExternal && mentionsRejectedExternal
 }
 
-const MISSING_VM_LOG_HINT = [
-  "No VM logs were collected for this trace",
-  "Re-run with --verbose flag",
-].join("\n")
+const MISSING_VM_LOG_HINT = "No VM logs were collected — re-run with --verbose"
 const VALUE_FLOW_EXPANDED_STORAGE_KEY = "valueFlowExpanded"
 
 const toIdeSourceLocation = (location: SourceLocation) => ({
@@ -166,11 +164,21 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     const saved = localStorage.getItem(`selectedTraceIndex:${test.suite_name}::${test.name}`)
     return saved ? Number.parseInt(saved, 10) : 0
   })
+  const [selectedLogLt, setSelectedLogLt] = useState<string>()
+  const selectedLogRef = useRef<HTMLDivElement>(null)
   const [isValueFlowExpanded, setIsValueFlowExpanded] = useState(() => {
     return localStorage.getItem(VALUE_FLOW_EXPANDED_STORAGE_KEY) === "true"
   })
   const [isTreasuryDeployTracesExpanded, setIsTreasuryDeployTracesExpanded] = useState(false)
   const [selectedIde, selectIde] = useIdePreference()
+
+  useEffect(() => {
+    if (activeTab !== "logs" || !selectedLogLt) return
+
+    // Move keyboard focus with the viewport after the Logs tab mounts its content.
+    selectedLogRef.current?.scrollIntoView({block: "start"})
+    selectedLogRef.current?.focus({preventScroll: true})
+  }, [activeTab, selectedLogLt])
 
   const contractNames = useMemo(() => {
     const names = new Set<string>(trace?.contracts ?? [])
@@ -522,6 +530,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   }, [regularTraceEntries, trace, test.suite_name, test.name])
 
   const handleSelectTraceIndex = (index: number) => {
+    setSelectedLogLt(undefined)
     setSelectedTraceIndex(index)
     localStorage.setItem(`selectedTraceIndex:${test.suite_name}::${test.name}`, index.toString())
   }
@@ -549,8 +558,14 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   }, [activeTab, gasProfileAvailabilityLoaded, gasProfileAvailable])
 
   const handleTabChange = (tab: TestDetailsTab) => {
+    setSelectedLogLt(undefined)
     setActiveTab(tab)
     localStorage.setItem("activeTab", tab)
+  }
+
+  const handleOpenTransactionLogs = (tx: TransactionInfo) => {
+    handleTabChange("logs")
+    setSelectedLogLt(tx.lt)
   }
 
   const handleOpenTraceTransactions = (index: number) => {
@@ -636,7 +651,9 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
               copyLabel="VM log"
               defaultExpanded={false}
               title="VM Log"
-              value={hasVmLog ? (failedMessage.vm_log_diff ?? "") : MISSING_VM_LOG_HINT}
+              empty={!hasVmLog}
+              emptyContent={MISSING_VM_LOG_HINT}
+              value={failedMessage.vm_log_diff ?? ""}
             />
           </div>
         </div>
@@ -982,7 +999,14 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
             if (!hasVmLog && !hasExecutorLog) return null
 
             return (
-              <div key={tx.lt} className={styles.txLogs}>
+              <div
+                key={tx.lt}
+                ref={selectedLogLt === tx.lt ? selectedLogRef : undefined}
+                className={styles.txLogs}
+                role="region"
+                aria-label={`Transaction #${idx + 1} logs`}
+                tabIndex={-1}
+              >
                 <div className={styles.txHeader}>
                   <span>Transaction #{idx + 1}</span>
                 </div>
@@ -991,7 +1015,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
                     <RawDataBlock
                       collapsible
                       copyLabel="Executor log"
-                      defaultExpanded={false}
+                      defaultExpanded={selectedLogLt === tx.lt && !hasVmLog}
                       title="Executor Log"
                       value={tx.executor_logs}
                       data-visual-dynamic="executor-log"
@@ -1003,9 +1027,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
                   <RawDataBlock
                     collapsible
                     copyLabel="VM log"
-                    defaultExpanded={false}
+                    defaultExpanded={selectedLogLt === tx.lt && hasVmLog}
                     title="VM Log"
-                    value={hasVmLog ? tx.vm_log_diff : MISSING_VM_LOG_HINT}
+                    empty={!hasVmLog}
+                    emptyContent={MISSING_VM_LOG_HINT}
+                    value={tx.vm_log_diff}
                     data-visual-dynamic="vm-log"
                     data-visual-placeholder="<vm log>"
                   />
@@ -1028,7 +1054,9 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
                 copyLabel="VM log"
                 defaultExpanded={false}
                 title="VM Log"
-                value={MISSING_VM_LOG_HINT}
+                empty
+                emptyContent={MISSING_VM_LOG_HINT}
+                value=""
                 data-visual-dynamic="vm-log"
                 data-visual-placeholder="<vm log>"
               />
@@ -1099,6 +1127,17 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
               contracts={contracts}
               allContracts={allContracts}
               renderSourceLocation={renderSourceLocation}
+              renderSelectedTransactionMessageRouteAction={tx =>
+                (hasNonEmptyLog(tx.vmLogDiff) || hasNonEmptyLog(tx.executorLogs)) && (
+                  <InlineButton
+                    variant="accent"
+                    leadingIcon={<ScrollText />}
+                    onClick={() => handleOpenTransactionLogs(tx)}
+                  >
+                    View logs
+                  </InlineButton>
+                )
+              }
             />
           </div>
           {failedMessages.length > 0 && <div>{renderFailedMessages(failedMessages)}</div>}

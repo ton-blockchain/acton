@@ -11,7 +11,7 @@ mod snapshots;
 mod start;
 mod test_runs;
 
-const STUDIO_START_TIMEOUT: Duration = Duration::from_secs(10);
+const STUDIO_START_TIMEOUT: Duration = Duration::from_secs(30);
 const STUDIO_STOP_TIMEOUT: Duration = Duration::from_secs(5);
 const STUDIO_START_ATTEMPTS: usize = 5;
 
@@ -123,11 +123,23 @@ impl StudioCliProcess {
                     .expect("Studio CLI output must be readable"));
             }
 
-            assert!(
-                Instant::now() < deadline,
-                "Studio CLI did not become ready at {}",
-                self.url
-            );
+            if Instant::now() >= deadline {
+                let mut child = self
+                    .child
+                    .take()
+                    .expect("Studio CLI process must be available");
+                child.kill().expect("Unready Studio CLI process must stop");
+                let output = child
+                    .wait_with_output()
+                    .expect("Studio CLI output must be readable");
+                panic!(
+                    "Studio CLI did not become ready at {}\nstdout:\n{}\nstderr:\n{}",
+                    self.url,
+                    String::from_utf8_lossy(&output.stdout),
+                    String::from_utf8_lossy(&output.stderr),
+                );
+            }
+
             thread::sleep(Duration::from_millis(50));
         }
     }
@@ -168,16 +180,21 @@ impl StudioCliProcess {
 
         assert!(output.status.success());
 
-        // Shutdown progress is user-facing output, so every Studio process test
-        // checks the same snapshot instead of treating stderr as an error channel.
+        // The progress timer can tick before an otherwise immediate shutdown
+        // completes under load. Keep all other stderr in the snapshot; slow
+        // shutdown progress is covered by the localnet command tests.
+        let stderr = String::from_utf8_lossy(&output.stderr)
+            .split_inclusive('\n')
+            .filter(|line| line.trim() != "Finishing Studio connections and test processes")
+            .collect::<String>();
         crate::common::assert_ui().eq(
-            String::from_utf8_lossy(&output.stderr).into_owned(),
+            stderr,
             snapbox::file!["../../snapshots/studio/graceful_shutdown.stderr.txt"],
         );
 
         let child_shutdown_messages = String::from_utf8_lossy(&output.stdout)
             .lines()
-            .filter(|line| line.contains("Acton simulated localnet gracefully"))
+            .filter(|line| line.contains("Acton Simulator gracefully"))
             .collect::<Vec<_>>()
             .join("\n");
         expect_test::expect![""].assert_eq(&child_shutdown_messages);

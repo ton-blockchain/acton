@@ -1,10 +1,13 @@
 use crate::commands::common::{error_fmt, format_nanograms};
 use crate::context::{BuildCache, Context, to_cell};
-use crate::ffi::emulation::{compilation_result_for_code, normalize_address_input};
+use crate::ffi::emulation::{
+    compilation_result_for_code, normalize_address_input, parse_integer_input,
+};
 use crate::formatter::FormatterContext;
 use acton_config::color::OwoColorize;
 use acton_debug::render_tuple_item_as_tolk_type;
 use anyhow::{Context as AnyhowContext, anyhow, bail};
+use inquire::error::{InquireError, InquireResult};
 use inquire::validator::{ErrorMessage, Validation};
 use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
@@ -787,6 +790,25 @@ fn format_send_result_list(
     }
 }
 
+// Host FFI errors alone do not stop the VM. A cancelled or failed prompt must
+// terminate the process before the script can perform another action, even if
+// it ignores the result or catches TVM exceptions. Inquire restores the terminal
+// before returning its result.
+fn prompt_or_exit<T>(message: &str, result: InquireResult<T>) -> T {
+    match result {
+        Ok(value) => value,
+        Err(InquireError::OperationInterrupted) => std::process::exit(130),
+        Err(error) => {
+            let _ = writeln!(
+                io::stderr(),
+                "{} Prompt {message:?}: {error}",
+                "Error:".red()
+            );
+            std::process::exit(1);
+        }
+    }
+}
+
 extension!(prompt in (Context) with (default: String, placeholder: String, message: String) using prompt_impl);
 fn prompt_impl(
     _ctx: &mut Context,
@@ -800,20 +822,13 @@ fn prompt_impl(
         if !default.is_empty() {
             text = text.with_default(&default);
         }
-        text.prompt().unwrap_or_else(|_| default.clone())
+        prompt_or_exit(&message, text.prompt())
     } else {
         default
     };
 
     stack.push_string(&text);
     Ok(())
-}
-
-fn parse_prompt_int(input: &str) -> anyhow::Result<BigInt> {
-    input
-        .trim()
-        .parse::<BigInt>()
-        .with_context(|| format!("Failed to parse integer from '{input}'"))
 }
 
 extension!(prompt_int in (Context) with (default: String, placeholder: String, message: String) using prompt_int_impl);
@@ -830,22 +845,23 @@ fn prompt_int_impl(
             text = text.with_default(&default);
         }
 
-        text.with_validator(|input: &str| {
-            if parse_prompt_int(input).is_ok() {
-                Ok(Validation::Valid)
-            } else {
-                Ok(Validation::Invalid(ErrorMessage::Custom(
-                    "Enter a valid integer".to_owned(),
-                )))
-            }
-        })
-        .prompt()
-        .unwrap_or_else(|_| default.clone())
+        let result = text
+            .with_validator(|input: &str| {
+                if parse_integer_input(input).is_ok() {
+                    Ok(Validation::Valid)
+                } else {
+                    Ok(Validation::Invalid(ErrorMessage::Custom(
+                        "Enter a valid integer".to_owned(),
+                    )))
+                }
+            })
+            .prompt();
+        prompt_or_exit(&message, result)
     } else {
         default
     };
 
-    stack.push(TupleItem::Int(parse_prompt_int(&input)?));
+    stack.push(TupleItem::Int(parse_integer_input(&input)?));
     Ok(())
 }
 
@@ -869,17 +885,18 @@ fn prompt_address_impl(
             text = text.with_default(&default);
         }
 
-        text.with_validator(|input: &str| {
-            if parse_prompt_address(input).is_ok() {
-                Ok(Validation::Valid)
-            } else {
-                Ok(Validation::Invalid(ErrorMessage::Custom(
-                    "Enter a valid TON address".to_owned(),
-                )))
-            }
-        })
-        .prompt()
-        .unwrap_or_else(|_| default.clone())
+        let result = text
+            .with_validator(|input: &str| {
+                if parse_prompt_address(input).is_ok() {
+                    Ok(Validation::Valid)
+                } else {
+                    Ok(Validation::Invalid(ErrorMessage::Custom(
+                        "Enter a valid TON address".to_owned(),
+                    )))
+                }
+            })
+            .prompt();
+        prompt_or_exit(&message, result)
     } else {
         default
     };
@@ -897,15 +914,15 @@ fn select_impl(
     variants: Vec<String>,
     message: String,
 ) -> anyhow::Result<()> {
-    let result = if stdin().is_terminal() {
+    let result = if stdin().is_terminal() && !variants.is_empty() {
         let cursor = default_index
             .to_usize()
             .unwrap_or(0)
             .min(variants.len().saturating_sub(1));
-        Select::new(&message, variants)
+        let result = Select::new(&message, variants)
             .with_starting_cursor(cursor)
-            .prompt()
-            .unwrap_or_default()
+            .prompt();
+        prompt_or_exit(&message, result)
     } else {
         default_select_value(&default_index, &variants)
     };
@@ -935,11 +952,11 @@ fn confirm_impl(
 ) -> anyhow::Result<()> {
     let default = default != BigInt::ZERO;
     let res = if stdin().is_terminal() {
-        Confirm::new(&message)
+        let result = Confirm::new(&message)
             .with_default(default)
             .with_help_message(&help_message)
-            .prompt()
-            .unwrap_or(default)
+            .prompt();
+        prompt_or_exit(&message, result)
     } else {
         default
     };
@@ -986,13 +1003,10 @@ fn prompt_wallet_impl(ctx: &mut Context, stack: &mut Tuple, message: String) -> 
         return Ok(());
     }
 
-    let Ok(result) = Select::new(&message, wallet_names)
+    let result = Select::new(&message, wallet_names)
         .with_starting_cursor(0)
-        .prompt()
-    else {
-        stack.push(TupleItem::Null);
-        return Ok(());
-    };
+        .prompt();
+    let result = prompt_or_exit(&message, result);
 
     stack.push_string(&result);
     Ok(())

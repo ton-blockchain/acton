@@ -5,7 +5,7 @@ description: "Generate a TypeScript wrapper, scaffold a TON dApp with Vite + Rea
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/en/download/) 22 or later
+- [Node.js](https://nodejs.org/en/download/) 22.12 or later
 - A deployed poll on [testnet](/docs/tutorial/testnet)
 
 ## Scaffold the dApp
@@ -335,7 +335,7 @@ npm run dev -- --host 127.0.0.1
 ```
 
 ```acton-cli noCopy title="terminal"
-  VITE v6.x.x  ready in 312 ms
+  VITE v8.x.x  ready in 312 ms
   ➜  Local:   http://127.0.0.1:5173/
 ```
 
@@ -354,7 +354,7 @@ The project now includes:
 
 - Smart contracts in Tolk (`Poll.tolk`, `Voter.tolk`) with bounce-based duplicate vote prevention
 - Integration tests with multi-contract traces, coverage, mutation, and fuzz testing
-- Deploy and vote scripts for localnet and testnet
+- Deploy and vote scripts for local emulation and testnet
 - Verified source on verifier.ton.org
 - React frontend with live results and TON Connect wallet integration
 

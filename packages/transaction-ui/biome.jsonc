@@ -3,7 +3,7 @@
   "root": false,
   "extends": "//",
   "files": {
-    "includes": ["**"]
+    "includes": ["**", "!!test/fixtures/abiRendering.json"]
   },
   "linter": {
     "rules": {

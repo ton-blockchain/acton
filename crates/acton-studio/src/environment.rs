@@ -193,7 +193,7 @@ pub enum EnvironmentSnapshotOperationPhase {
 
 pub use acton_localnet::StartupTimings as EnvironmentStartupTimings;
 
-/// Browser-facing snapshot of a Full localnet startup operation
+/// Browser-facing snapshot of a Localnet startup operation
 ///
 /// Studio exposes only progress fields that help explain startup. The local
 /// filesystem log path and operation result remain owned by the localnet process
@@ -207,7 +207,7 @@ pub struct EnvironmentStartupOperation {
     pub completed_steps: Vec<acton_localnet::OperationStep>,
 }
 
-/// Bounded live startup diagnostics displayed while a Full localnet opens
+/// Bounded live startup diagnostics displayed while a Localnet opens
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvironmentStartupState {
@@ -515,15 +515,15 @@ impl EnvironmentConfig {
                 supports_actions: false,
             },
             Self::ActonSimulatedLocalnet { .. } => EnvironmentNetwork {
-                id: "acton-simulated-localnet".to_owned(),
-                label: "Simulated localnet".to_owned(),
+                id: "acton-simulator".to_owned(),
+                label: "Simulator".to_owned(),
                 chain_id: -3,
                 test_only: true,
                 supports_actions: false,
             },
             Self::FullTonNetwork { .. } => EnvironmentNetwork {
                 id: "full-ton-network".to_owned(),
-                label: "Full localnet".to_owned(),
+                label: "Localnet".to_owned(),
                 chain_id: -3,
                 test_only: true,
                 supports_actions: true,
@@ -562,7 +562,7 @@ pub enum EnvironmentRuntimeError {
     Internal { code: &'static str, message: String },
 }
 
-/// A simulator commits during the request; full localnet confirmation runs independently.
+/// A simulator commits during the request; localnet confirmation runs independently.
 /// Only pending changes need durable operation polling, never a repeated submission.
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(
@@ -584,7 +584,7 @@ pub type EnvironmentRuntimeFuture<'a, T> =
     Pin<Box<dyn Future<Output = Result<T, EnvironmentRuntimeError>> + Send + 'a>>;
 
 pub trait EnvironmentRuntime: Send + Sync {
-    /// Delegates background traffic to a managed full localnet. The localnet process
+    /// Delegates background traffic to a managed localnet. The localnet process
     /// owns scheduling, credentials, cancellation and persistent run counters.
     fn network_activity(
         &self,
@@ -594,8 +594,7 @@ pub trait EnvironmentRuntime: Send + Sync {
         Box::pin(async {
             Err(EnvironmentRuntimeError::Conflict {
                 code: "environment_activity_unavailable",
-                message: "Activity generation is available for Full localnet environments"
-                    .to_owned(),
+                message: "Activity generation is available for Localnet environments".to_owned(),
             })
         })
     }
@@ -644,14 +643,13 @@ pub trait EnvironmentRuntime: Send + Sync {
         Box::pin(async {
             Err(EnvironmentRuntimeError::Conflict {
                 code: "environment_startup_state_unavailable",
-                message: "Startup diagnostics are available for Full localnet environments"
-                    .to_owned(),
+                message: "Startup diagnostics are available for Localnet environments".to_owned(),
             })
         })
     }
 
     /// Delegates a parameter mutation to its network owner and reports completion or progress.
-    /// Studio never signs full localnet changes or edits the simulator's database directly.
+    /// Studio never signs localnet changes or edits the simulator's database directly.
     fn update_network_config(
         &self,
         _environment_id: &str,

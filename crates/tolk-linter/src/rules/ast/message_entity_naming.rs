@@ -35,7 +35,7 @@ use tolk_ty::InferenceResult;
 /// The rule checks local variables named exactly `msg` or `message` whose
 /// initializer resolves to `createMessage(...)`.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct MessageShouldBeNamed;
 
 impl Violation for MessageShouldBeNamed {
@@ -65,7 +65,7 @@ impl Violation for MessageShouldBeNamed {
 /// deployMessage.send(SEND_MODE_REGULAR);
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct CreateMessageInlineSend;
 
 impl Violation for CreateMessageInlineSend {

@@ -75,6 +75,8 @@ Defaults to \fB[build].output\-abi\fR when configured, otherwise \fBbuild/abi/\f
 .sp
 \fB\-\-output\-boc\fR \fIdir\fR
 .RS 4
+Available since Acton 1.2.
+.sp
 Directory for \fB<contract\-name>.boc\fR files from compiled \fB\&.tolk\fR contracts and
 precompiled \fB\&.boc\fR inputs.
 .sp
@@ -93,6 +95,8 @@ config value is set, Acton does not write \fB\&.fif\fR files.
 .sp
 \fB\-\-output\-sources\fR \fIdir\fR
 .RS 4
+Available since Acton 1.2.
+.sp
 Directory for source registration artifacts generated from \fB\&.tolk\fR contracts.
 .sp
 Defaults to \fB[build].output\-sources\fR when configured. If neither the flag nor
@@ -140,6 +144,8 @@ output = "Wallet.boc"
 depends = ["Child"]
 .fi
 .RE
+.sp
+Available since Acton 1.1.
 .sp
 For a precompiled contract, keep \fBsrc\fR pointed at the BoC and add \fBtypes\fR when
 you want Acton to emit ABI:
@@ -242,9 +248,9 @@ later parent contract may then fail because its generated import is missing.
 When you build a specific \fB_contract\-name_\fR, Acton limits the build set to that
 contract and its transitive dependencies.
 .SH "SIDE EFFECTS"
-\fBacton build\fR writes artifacts, cache entries, and optional graph output under
-the resolved project root. If one contract fails after earlier contracts were
-built successfully, the successful artifacts remain on disk.
+\fBacton build\fR writes artifacts and optional graph output to the configured paths,
+and cache entries under the resolved project root. If one contract fails after
+earlier contracts were built successfully, the successful artifacts remain on disk.
 .sp
 Before compiling, \fBacton build\fR normally refreshes the bundled standard library
 under \fB\&.acton/\fR\&. Set \fBACTON_DISABLE_AUTO_STDLIB=1\fR to skip that automatic

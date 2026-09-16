@@ -280,20 +280,13 @@ pub(crate) fn calculate_sent_total(tx: &tycho_types::models::Transaction) -> Tok
 
 /// Extracts the operation opcode from the incoming message of a transaction.
 ///
-/// Handles both regular internal messages and bounced messages (skipping the bounce tag).
+/// Uses the original payload for both legacy and rich bounced messages.
 pub(crate) fn tx_opcode(tx: &tycho_types::models::Transaction) -> Option<u32> {
     let in_msg = tx.load_in_msg().ok()??;
-    let mut slice = in_msg.body;
-
-    if let MsgInfo::Int(info) = in_msg.info
-        && info.bounced
-    {
-        // skip 0xFFFF..
-        let _ = slice.load_u32().ok()?;
-    }
-
-    let opcode = slice.load_u32().ok()?;
-    Some(opcode)
+    let bounced = matches!(&in_msg.info, MsgInfo::Int(info) if info.bounced);
+    tvm_ffi::message::original_message_body(in_msg.body, bounced)?
+        .load_u32()
+        .ok()
 }
 
 /// Assembles final execution data from successful emulation results.

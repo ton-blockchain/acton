@@ -1,0 +1,35 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/malformed_literals.test.tolk (12 tests)
+  ✗ parseInt missing hex digits [TIME]
+    └─ Error: Failed to parse integer from '0x': invalid digit found in string
+  ✗ promptInt missing hex digits [TIME]
+    └─ Error: Failed to parse integer from '0x': invalid digit found in string
+  ✗ parseInt invalid hex digit [TIME]
+    └─ Error: Failed to parse integer from '0xgg': invalid digit found in string
+  ✗ promptInt invalid hex digit [TIME]
+    └─ Error: Failed to parse integer from '0xgg': invalid digit found in string
+  ✗ parseInt sign after prefix [TIME]
+    └─ Error: Failed to parse integer from '0x-1': invalid digit found in string
+  ✗ promptInt sign after prefix [TIME]
+    └─ Error: Failed to parse integer from '0x-1': invalid digit found in string
+  ✗ parseInt multiple signs [TIME]
+    └─ Error: Failed to parse integer from '+-0x1': invalid digit found in string
+  ✗ promptInt multiple signs [TIME]
+    └─ Error: Failed to parse integer from '+-0x1': invalid digit found in string
+  ✗ parseInt invalid binary digit [TIME]
+    └─ Error: Failed to parse integer from '0b102': invalid digit found in string
+  ✗ promptInt invalid binary digit [TIME]
+    └─ Error: Failed to parse integer from '0b102': invalid digit found in string
+  ✗ parseInt empty input [TIME]
+    └─ Error: Failed to parse integer from '': cannot parse integer from empty string
+  ✗ promptInt empty input [TIME]
+    └─ Error: Failed to parse integer from '': cannot parse integer from empty string
+
+ ✗ 12 failed in 1 file
+
+Some tests failed.

@@ -66,7 +66,7 @@ test("Docker recovery stays on the startup page and retries without reloading St
   await expect(page).toHaveURL(/environment-1\/dashboard$/)
 })
 
-test("full localnet ignores a stale browser token and never requests one after a 401", async ({
+test("localnet ignores a stale browser token and never requests one after a 401", async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -97,7 +97,7 @@ test("full localnet ignores a stale browser token and never requests one after a
   await expect(page.getByRole("dialog", {name: /Localnet API token/})).toHaveCount(0)
 })
 
-test("simulated localnet keeps browser token access", async ({page}) => {
+test("simulator keeps browser token access", async ({page}) => {
   await page.route("**/api/v1/**", async route => {
     const path = new URL(route.request().url()).pathname
     let body: unknown = []

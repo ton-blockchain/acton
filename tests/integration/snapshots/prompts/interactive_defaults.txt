@@ -1,0 +1,2 @@
+empty=''
+text=Guest, integer=42, address_matches=true, choice=two, confirmed=true

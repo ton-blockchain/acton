@@ -341,7 +341,7 @@ fn skip_symbol(s: &SymbolInfo) -> bool {
         || s.name.contains("__")
 }
 
-fn split_availability_statement(doc_text: &str) -> (Option<String>, Option<String>) {
+pub(super) fn split_availability_statement(doc_text: &str) -> (Option<String>, Option<String>) {
     let mut availability = None;
     let mut lines = Vec::new();
     let mut in_fenced_code_block = false;
@@ -370,7 +370,7 @@ fn split_availability_statement(doc_text: &str) -> (Option<String>, Option<Strin
     (availability, doc_text)
 }
 
-fn parse_availability_statement(line: &str) -> Option<String> {
+pub(super) fn parse_availability_statement(line: &str) -> Option<String> {
     let statement = line.trim().strip_prefix("Available since ")?;
     let statement = statement.trim_end_matches('.').trim();
     (!statement.is_empty()).then(|| statement.to_owned())

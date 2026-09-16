@@ -343,21 +343,28 @@ pub fn has_fmt_ignore(ctx: &Context<'_>, comments: Option<&Vec<Comment>>) -> boo
 }
 
 #[must_use]
+pub(crate) fn has_inline_line_comments_on_node(ctx: &Context<'_>, node: Node<'_>) -> bool {
+    ctx.comments.get(&node).is_some_and(|comments| {
+        comments.iter().any(|comment| {
+            comment.kind == CommentKind::Inline
+                && comment.nodes.iter().any(|comment_node| {
+                    comment_node
+                        .utf8_text(ctx.code.as_ref().as_ref())
+                        .ok()
+                        .is_some_and(|text| text.trim_start().starts_with("//"))
+                })
+        })
+    })
+}
+
+#[must_use]
 pub fn has_inline_line_comment_in_subtree(ctx: &Context<'_>, root: Node<'_>) -> bool {
     let root_start = root.start_byte();
     let root_end = root.end_byte();
 
-    ctx.comments.iter().any(|(owner, comments)| {
+    ctx.comments.keys().any(|owner| {
         owner.start_byte() >= root_start
             && owner.end_byte() <= root_end
-            && comments.iter().any(|comment| {
-                comment.kind == CommentKind::Inline
-                    && comment.nodes.iter().any(|comment_node| {
-                        comment_node
-                            .utf8_text(ctx.code.as_ref().as_ref())
-                            .ok()
-                            .is_some_and(|text| text.trim_start().starts_with("//"))
-                    })
-            })
+            && has_inline_line_comments_on_node(ctx, *owner)
     })
 }

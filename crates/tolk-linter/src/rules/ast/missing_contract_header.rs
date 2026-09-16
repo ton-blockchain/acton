@@ -33,7 +33,7 @@ use tolk_syntax::{CONTRACT_ENTRYPOINTS, HasName, TopLevel};
 /// }
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct MissingContractHeader;
 
 impl Violation for MissingContractHeader {

@@ -41,7 +41,7 @@ pub mod analysis;
 /// It also follows function calls, so helper functions that initialize random
 /// are taken into account.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.1")]
+#[violation_metadata(preview_since = "v1.0.0")]
 pub struct RandomRequiresInitialization;
 
 impl Violation for RandomRequiresInitialization {

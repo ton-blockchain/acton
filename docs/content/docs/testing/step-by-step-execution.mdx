@@ -60,6 +60,25 @@ The main cursor methods are:
 - [`isDone()`](/docs/standard_library/emulation/testing#txcursorisdone) — check whether the cursor has no more pending transactions
 - [`close()`](/docs/standard_library/emulation/testing#txcursorclose) — discard the remaining tail
 
+## External-in messages
+
+<AvailabilityBadge since="Acton 1.2" />
+
+Use [`testing.createExternalTraceIterationCursor()`](/docs/standard_library/emulation/testing#testingcreateexternaltraceiterationcursor)
+for an external-in message from `net.createExternalMessage()`:
+
+```tolk
+val message = net.createExternalMessage(contractAddress, body);
+val iter = testing.createExternalTraceIterationCursor(message);
+val first = iter.executeN(1);
+val tail = iter.executeAllRemaining();
+```
+
+Creating the cursor queues the message without executing it. The cursor uses
+no internal sender and retains the external source and optional state init.
+If the contract rejects the external message, advancing the cursor fails the test.
+This API is available only in emulation.
+
 ## Execute the first hop, then drain the rest
 
 Suppose a contract forwards a message and the state should be checked between the first and second hop:

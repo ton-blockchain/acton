@@ -34,7 +34,7 @@ use tolk_syntax::{AstNode, InstanceArg};
 /// }
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct FieldInitCanBeFolded;
 
 impl Violation for FieldInitCanBeFolded {

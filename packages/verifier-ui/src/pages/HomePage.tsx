@@ -1,8 +1,25 @@
+import {ThemeProvider} from "@acton/ui"
+
 import {AppShell} from "../components/AppShell"
 import {SearchBox} from "../components/SearchBox"
 import styles from "./HomePage.module.css"
 
+const COMING_SOON = true
+
 export function HomePage() {
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: Keep the launch screen enabled until the verifier UI is ready
+  if (COMING_SOON) {
+    return (
+      <ThemeProvider storageKey="ton-verifier-theme">
+        <main className={styles.comingSoon} aria-labelledby="coming-soon-title">
+          <h1 id="coming-soon-title" className={styles.comingSoonTitle}>
+            Coming soon
+          </h1>
+        </main>
+      </ThemeProvider>
+    )
+  }
+
   return (
     <AppShell>
       <div className={styles.inputPage}>

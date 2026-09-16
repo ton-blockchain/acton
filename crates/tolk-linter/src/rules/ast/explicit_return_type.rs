@@ -32,7 +32,7 @@ use tolk_ty::{InferenceResult, TyData, TyId, TypeInterner};
 /// - Contract entrypoints `main`, `onInternalMessage`, `onExternalMessage`, `onRunTickTock`, `onSplitPrepare`, `onSplitInstall`, and `onBouncedMessage` are ignored by this rule.
 /// - Functions whose inferred return type is `void` are ignored by this rule.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct ExplicitReturnType;
 
 const EXEMPT_ENTRYPOINTS: [&str; 7] = [

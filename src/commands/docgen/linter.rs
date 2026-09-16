@@ -14,6 +14,7 @@ struct LinterRuleDoc {
     group: RuleGroup,
     fix: FixAvailability,
     explanation: String,
+    available_since: Option<String>,
     summary: String,
     source_file: String,
     source_line: u32,
@@ -45,6 +46,9 @@ fn collect_linter_rules() -> Vec<LinterRuleDoc> {
                 .to_string();
             let rule_name = rule.name().to_string();
             let explanation = rule.explanation().unwrap_or_default().trim().to_string();
+            let (available_since, explanation) =
+                super::stdlib::split_availability_statement(&explanation);
+            let explanation = explanation.unwrap_or_default();
             let summary = extract_rule_summary(&explanation);
             let source_file = rule.file().replace('\\', "/");
 
@@ -61,6 +65,7 @@ fn collect_linter_rules() -> Vec<LinterRuleDoc> {
                 group: rule.group(),
                 fix: rule.fixable(),
                 explanation,
+                available_since,
                 summary,
                 source_file,
                 source_line: rule.line(),
@@ -184,6 +189,10 @@ fn write_linter_rule_page(out_dir: &Path, rule: &LinterRuleDoc) -> anyhow::Resul
     mdx_content.push_str(&generated_notice_from_path(Path::new(
         rule.source_file.as_str(),
     )));
+
+    if let Some(since) = &rule.available_since {
+        let _ = writeln!(mdx_content, "<AvailabilityBadge since={since:?} />\n");
+    }
 
     mdx_content.push_str("## Metadata\n\n");
     let _ = writeln!(mdx_content, "- `Code`: `{}`", rule.code);

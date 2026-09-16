@@ -240,14 +240,14 @@ fn test_wrapper_generation_without_test_stub() {
 }
 
 #[test]
-fn test_wrapper_generation_uses_configured_name() {
+fn test_wrapper_generation_uses_contract_id_for_names() {
     let project = ProjectBuilder::new("wrapper_configured_name")
         .without_acton_toml()
         .raw_file(
             "Acton.toml",
             r#"[package]
 name = "wrapper-configured-name"
-description = "Wrapper identity comes from project configuration"
+description = "Wrapper identity comes from the contract ID"
 version = "0.1.0"
 
 [contracts.configured_id]
@@ -281,7 +281,7 @@ src = "contracts/contract.tolk"
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/FriendlyWallet.gen.tolk")
+                .join("wrappers/ConfiguredId.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_uses_configured_name/wrapper.tolk.txt",
@@ -297,7 +297,7 @@ fn test_wrapper_all_with_identical_source_filenames() {
             "Acton.toml",
             r#"[package]
 name = "wrapper-identical-filenames"
-description = "Wrappers use display names or contract IDs instead of filenames"
+description = "Wrappers use contract IDs independently of display names"
 version = "0.1.0"
 
 [contracts.first_id]
@@ -305,6 +305,7 @@ display-name = "First Wallet"
 src = "contracts/first/contract.tolk"
 
 [contracts.second_id]
+display-name = "First Wallet"
 src = "contracts/second/contract.tolk"
 
 [contracts.third_id]
@@ -329,12 +330,12 @@ acton = ".acton"
         )
         .raw_file(
             "tests/combined.test.tolk",
-            r#"import "../wrappers/FirstWallet.gen"
+            r#"import "../wrappers/FirstId.gen"
 import "../wrappers/SecondId.gen"
 import "../wrappers/ThirdId.gen"
 
 get fun `test wrappers build distinct contracts`() {
-    val first = FirstWallet.fromStorage();
+    val first = FirstId.fromStorage();
     val second = SecondId.fromStorage();
     val third = ThirdId.fromStorage();
     assert(first.address != second.address, 101);
@@ -355,7 +356,7 @@ get fun `test wrappers build distinct contracts`() {
     output.assert_snapshot_matches(
         "integration/snapshots/wrapper/test_wrapper_all_with_identical_source_filenames/output.txt",
     );
-    for name in ["FirstWallet", "SecondId", "ThirdId"] {
+    for name in ["FirstId", "SecondId", "ThirdId"] {
         output.assert_file_snapshot_matches(
             project
                 .path()
@@ -375,7 +376,7 @@ get fun `test wrappers build distinct contracts`() {
 
 #[test]
 fn test_wrapper_all_rejects_conflicting_names_before_writing() {
-    for (case, second_name, third_name) in [
+    for (case, second_id, third_id) in [
         ("normalized", "shared_name", "shared-name"),
         ("case_insensitive", "SharedName", "SHAREDNAME"),
     ] {
@@ -398,12 +399,12 @@ version = "0.1.0"
 [contracts.first]
 src = "contracts/contract.tolk"
 
-[contracts.second]
-display-name = "{second_name}"
+[contracts.{second_id}]
+display-name = "Second Wrapper"
 src = "contracts/contract.tolk"
 
-[contracts.third]
-display-name = "{third_name}"
+[contracts.{third_id}]
+display-name = "Third Wrapper"
 src = "contracts/contract.tolk"
 "#,
                     ),
@@ -440,8 +441,8 @@ src = "contracts/contract.tolk"
 }
 
 #[test]
-fn test_wrapper_generation_rejects_invalid_names() {
-    for (case, name) in [
+fn test_wrapper_generation_rejects_invalid_contract_ids() {
+    for (case, contract_id) in [
         ("path", "../outside"),
         ("numeric", "123-wallet"),
         ("punctuation", "!!!"),
@@ -453,11 +454,11 @@ fn test_wrapper_generation_rejects_invalid_names() {
                 &format!(
                     r#"[package]
 name = "wrapper-invalid-name"
-description = "Display names must produce valid wrapper identifiers"
+description = "Contract IDs must produce valid wrapper identifiers"
 version = "0.1.0"
 
-[contracts.configured_id]
-display-name = "{name}"
+[contracts."{contract_id}"]
+display-name = "Valid Display Name"
 src = "contracts/contract.tolk"
 "#
                 ),
@@ -467,7 +468,7 @@ src = "contracts/contract.tolk"
 
         project
             .acton()
-            .wrapper("configured_id")
+            .wrapper(contract_id)
             .run()
             .failure()
             .assert_stderr_snapshot_matches(&format!(
@@ -995,18 +996,18 @@ fn test_wrapper_generation_test_output_dir_flag() {
 
 #[cfg(unix)]
 #[test]
-fn test_wrapper_generation_typescript_uses_configured_name() {
+fn test_wrapper_generation_typescript_uses_contract_id_for_names() {
     let project = ProjectBuilder::new("wrapper_typescript_configured_name")
         .without_acton_toml()
         .raw_file(
             "Acton.toml",
             r#"[package]
 name = "wrapper-typescript-configured-name"
-description = "The TypeScript class and filename use the configured wrapper name"
+description = "The TypeScript filename and class use the contract ID"
 version = "0.1.0"
 
 [contracts.configured_id]
-display-name = "Friendly wallet"
+display-name = "Friendly wallet (admin)"
 src = "contracts/contract.tolk"
 "#,
         )

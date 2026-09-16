@@ -9,13 +9,97 @@ use base64::Engine as _;
 use serde_json::{Value, json};
 use ton_api::toncenter::v2::{requests as v2_requests, responses as v2_responses};
 use ton_api::toncenter::v3::responses as v3_responses;
-use tycho_types::boc::Boc;
+use tycho_types::boc::{Boc, BocRepr};
 use tycho_types::cell::CellBuilder;
-use tycho_types::models::{CurrencyCollection, ExtraCurrencyCollection};
+use tycho_types::models::{CurrencyCollection, ExtraCurrencyCollection, MsgInfo, OwnedMessage};
 use tycho_types::num::VarUint248;
 
 const TEXT_COMMENT: &str = "typed message with extra currencies";
 const LARGE_EXTRA_CURRENCY: &str = "340282366920938463463374607431768211456";
+
+#[test]
+fn rich_bounced_opcodes_are_indexed_through_public_message_apis() -> anyhow::Result<()> {
+    let project = ProjectBuilder::new("localnet-rich-bounced-opcodes").build();
+    let node = project.localnet().start();
+    let mut cases = Vec::new();
+
+    for (index, case) in ["legacy", "rich", "unmarked", "missing_ref", "short_ref"]
+        .into_iter()
+        .enumerate()
+    {
+        let destination = test_std_addr(0x30 + u8::try_from(index)?);
+        let mut body = CellBuilder::new();
+        body.store_u32(if case == "legacy" {
+            0xffff_ffff
+        } else {
+            0xffff_fffe
+        })?;
+        if case == "legacy" || case == "missing_ref" {
+            body.store_u32(0x1234_5678)?;
+        } else {
+            let original = if case == "short_ref" {
+                let mut short = CellBuilder::new();
+                short.store_uint(7, 3)?;
+                short.build()?
+            } else {
+                CellBuilder::build_from(0x1234_5678u32)?
+            };
+            body.store_reference(original)?;
+            let mut original_info = CellBuilder::new();
+            original_info.store_zeros(101)?;
+            body.store_reference(original_info.build()?)?;
+            body.store_u8(0)?;
+            body.store_u32((-14_i32) as u32)?;
+            body.store_bit_zero()?;
+        }
+        let body = body.build()?;
+        let body_boc = Boc::encode_base64(&body);
+        let mut message: OwnedMessage =
+            BocRepr::decode(build_internal_message_boc_with_currency_and_body(
+                test_std_addr(0x11),
+                destination.clone(),
+                CurrencyCollection::new(50_000_000),
+                body,
+            ))?;
+        if let MsgInfo::Int(info) = &mut message.info {
+            info.bounce = false;
+            info.bounced = case != "unmarked";
+        }
+        let sent: v2_responses::TonlibResponse<v2_responses::InternalMessageInfo> = node
+            .post_json_as(
+                "/acton_sendInternalMessage",
+                &v2_requests::SendBocRequest {
+                    boc: Boc::encode_base64(CellBuilder::build_from(message)?),
+                },
+            );
+        let (transaction, _) = find_v2_internal_message_by_hash(&node, &sent.result.hash);
+        let transactions: v3_responses::TransactionsResponse = node.get_json_as(&format!(
+            "/api/v3/transactions?account={destination}&limit=100"
+        ));
+        let incoming = transactions
+            .transactions
+            .iter()
+            .find(|tx| tx.hash == transaction.transaction_id.hash)
+            .and_then(|tx| tx.in_msg.as_ref())
+            .expect("indexed incoming message");
+        let messages: Value = node.get_json(&format!("/api/v3/messages?destination={destination}"));
+        let indexed = &messages["messages"][0];
+        cases.push(json!({
+            "case": case,
+            "sent": sent.ok,
+            "transaction": { "opcode": incoming.opcode, "bounced": incoming.bounced,
+                "body_preserved": incoming.message_content.as_ref().and_then(|content| content.body.as_deref()) == Some(body_boc.as_str()) },
+            "message": { "opcode": indexed["opcode"], "bounced": indexed["bounced"],
+                "body_preserved": indexed["message_content"]["body"] == body_boc },
+        }));
+    }
+    assertion().eq(
+        pretty_json_for_snapshot(&json!(cases), project.path()),
+        snapbox::file!("snapshots/v3_rich_bounced_opcodes.json"),
+    );
+    node.stop();
+    Ok(())
+}
 
 #[test]
 fn transaction_messages_match_decoded_and_raw_upstream_dtos() {

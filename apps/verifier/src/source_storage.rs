@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     path::{Component, Path, PathBuf},
     sync::{
         Arc,
@@ -122,7 +123,8 @@ pub struct GitSourceStorage {
     push_enabled: bool,
     author_name: String,
     author_email: String,
-    startup_validated: Arc<OnceCell<()>>,
+    startup_checks_completed: Arc<OnceCell<()>>,
+    shard_dirs: Arc<Mutex<HashSet<String>>>,
     pending_push: Arc<AtomicBool>,
     lock: Arc<Mutex<()>>,
 }
@@ -139,24 +141,87 @@ impl GitSourceStorage {
             push_enabled: config.source_repository_push_enabled(),
             author_name: config.source_repository_author_name().to_owned(),
             author_email: config.source_repository_author_email().to_owned(),
-            startup_validated: Arc::new(OnceCell::new()),
+            startup_checks_completed: Arc::new(OnceCell::new()),
+            shard_dirs: Arc::new(Mutex::new(HashSet::new())),
             pending_push: Arc::new(AtomicBool::new(true)),
             lock: Arc::new(Mutex::new(())),
         }
     }
 
-    async fn ensure_startup_validated(&self, repo_path: &Path) -> Result<(), SourceStorageError> {
-        self.startup_validated
-            .get_or_try_init(|| async {
-                ensure_source_repository_initialized(repo_path, &self.storage_root).await?;
-                if self.commit_enabled {
-                    recover_uncommitted_storage(repo_path, &self.storage_root).await?;
-                }
-                ensure_source_repository_clean(repo_path).await?;
-                ensure_current_source_attributes(repo_path, &self.storage_root).await?;
-                Ok(())
-            })
+    /// Prepares the repository for a storage operation.
+    ///
+    /// Every repository-backed operation must enter through this method. It
+    /// runs the checks required for every operation and lazily completes the
+    /// startup-only checks before returning the repository path.
+    async fn repository_for_operation(&self) -> Result<&Path, SourceStorageError> {
+        let repo_path = self.run_operation_checks()?;
+        self.ensure_startup_checks(repo_path).await?;
+        Ok(repo_path)
+    }
+
+    /// Runs checks that must remain valid throughout the process lifetime.
+    ///
+    /// Checks added here run before the first operation and every subsequent
+    /// operation. Currently this layer ensures that the repository path is
+    /// configured and returns it to the caller.
+    fn run_operation_checks(&self) -> Result<&Path, SourceStorageError> {
+        let repo_path = self
+            .repo_path
+            .as_deref()
+            .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
+        Ok(repo_path)
+    }
+
+    /// Ensures that the startup-only checks have completed successfully.
+    ///
+    /// Successful completion is shared by all clones of this storage and is
+    /// cached for their lifetime. A failed attempt is not cached, so a later
+    /// operation can retry the startup checks.
+    async fn ensure_startup_checks(&self, repo_path: &Path) -> Result<(), SourceStorageError> {
+        self.startup_checks_completed
+            .get_or_try_init(|| self.run_startup_checks(repo_path))
             .await?;
+        Ok(())
+    }
+
+    /// Runs repository validation, recovery, and cache initialization once.
+    ///
+    /// Only checks that may be safely cached for the storage lifetime belong
+    /// here. Checks that must detect changes made after startup belong in
+    /// `run_operation_checks` instead.
+    async fn run_startup_checks(&self, repo_path: &Path) -> Result<(), SourceStorageError> {
+        ensure_git_repo(repo_path).await?;
+        ensure_source_repository_initialized(repo_path, &self.storage_root).await?;
+        recover_uncommitted_storage(repo_path, &self.storage_root).await?;
+        ensure_source_repository_clean(repo_path).await?;
+        ensure_current_source_attributes(repo_path, &self.storage_root).await?;
+
+        let shard_dirs = discover_shard_dirs(repo_path, &self.storage_root).await?;
+        tracing::debug!(
+            shard_count = shard_dirs.len(),
+            "cached source storage shard directories"
+        );
+        *self.shard_dirs.lock().await = shard_dirs;
+        Ok(())
+    }
+
+    async fn ensure_shard_dir(
+        &self,
+        repo_path: &Path,
+        shard: &str,
+    ) -> Result<(), SourceStorageError> {
+        if self.shard_dirs.lock().await.contains(shard) {
+            return Ok(());
+        }
+
+        let shard_dir = repo_path.join(&self.storage_root).join(shard);
+        fs::create_dir_all(&shard_dir)
+            .await
+            .map_err(|source| SourceStorageError::CreateDir {
+                path: shard_dir,
+                source,
+            })?;
+        self.shard_dirs.lock().await.insert(shard.to_owned());
         Ok(())
     }
 
@@ -178,25 +243,38 @@ impl GitSourceStorage {
         &self,
         request: StoreSourceBundleRequest,
     ) -> Result<SourceStorageReceipt, SourceStorageError> {
-        let repo_path = self
-            .repo_path
-            .as_deref()
-            .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
-        ensure_git_repo(repo_path).await?;
-        self.ensure_startup_validated(repo_path).await?;
-        if self.commit_enabled {
-            recover_uncommitted_storage(repo_path, &self.storage_root).await?;
-            ensure_source_repository_clean(repo_path).await?;
-        }
+        let repo_path = self.repository_for_operation().await?;
 
         let bundle_path = bundle_relative_path(&self.storage_root, &request.code_hash)?;
         let bundle_dir = repo_path.join(&bundle_path);
-        let existing_revision = if fs::try_exists(bundle_dir.join("manifest.json"))
-            .await
-            .map_err(|source| SourceStorageError::ReadDir {
-                path: bundle_dir.clone(),
-                source,
-            })? {
+        let has_existing_bundle = if self.commit_enabled {
+            let committed = git_has_committed_files(repo_path, &bundle_path).await?;
+            if !committed
+                && fs::try_exists(&bundle_dir).await.map_err(|source| {
+                    SourceStorageError::ReadDir {
+                        path: bundle_dir.clone(),
+                        source,
+                    }
+                })?
+            {
+                tracing::warn!(
+                    code_hash = %request.code_hash,
+                    bundle_path,
+                    "removing an uncommitted source bundle left by an interrupted verification"
+                );
+                cleanup_uncommitted_bundle(repo_path, &bundle_path, &bundle_dir).await?;
+            }
+            committed
+        } else {
+            fs::try_exists(bundle_dir.join("manifest.json"))
+                .await
+                .map_err(|source| SourceStorageError::ReadDir {
+                    path: bundle_dir.clone(),
+                    source,
+                })?
+        };
+
+        let existing_revision = if has_existing_bundle {
             let bundle = read_bundle(repo_path, &bundle_path).await?;
             Some(bundle.storage_revision)
         } else {
@@ -204,7 +282,16 @@ impl GitSourceStorage {
                 let verified_at = request
                     .verified_at
                     .map_or_else(current_unix_timestamp, Ok)?;
+                let (shard, _) = request.code_hash.split_at(2);
+                self.ensure_shard_dir(repo_path, shard).await?;
+
                 let files_dir = bundle_dir.join("files");
+                fs::create_dir_all(&bundle_dir).await.map_err(|source| {
+                    SourceStorageError::CreateDir {
+                        path: bundle_dir.clone(),
+                        source,
+                    }
+                })?;
                 fs::create_dir_all(&files_dir).await.map_err(|source| {
                     SourceStorageError::CreateDir {
                         path: files_dir.clone(),
@@ -217,19 +304,15 @@ impl GitSourceStorage {
 
                 if self.commit_enabled {
                     git(repo_path, &["add", "--", &bundle_path]).await?;
-
-                    let staged = git_has_staged_changes(repo_path, &bundle_path).await?;
-                    if staged {
-                        let message = commit_message(&request, &manifest_hash);
-                        git_with_author(
-                            repo_path,
-                            &["commit", "-m", &message, "--", &bundle_path],
-                            self,
-                            verified_at,
-                        )
-                        .await?;
-                        self.pending_push.store(true, Ordering::Release);
-                    }
+                    let message = commit_message(&request, &manifest_hash);
+                    git_with_author(
+                        repo_path,
+                        &["commit", "-m", &message, "--", &bundle_path],
+                        self,
+                        verified_at,
+                    )
+                    .await?;
+                    self.pending_push.store(true, Ordering::Release);
                 }
 
                 Ok::<(), SourceStorageError>(())
@@ -266,11 +349,7 @@ impl GitSourceStorage {
         &self,
         code_hash: &str,
     ) -> Result<Option<StoredSourceBundle>, SourceStorageError> {
-        let repo_path = self
-            .repo_path
-            .as_deref()
-            .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
-        ensure_git_repo(repo_path).await?;
+        let repo_path = self.repository_for_operation().await?;
 
         let bundle_path = bundle_relative_path(&self.storage_root, code_hash)?;
         let bundle_dir = repo_path.join(&bundle_path);
@@ -287,58 +366,19 @@ impl GitSourceStorage {
     }
 
     async fn list_code_hashes_locked(&self) -> Result<Vec<String>, SourceStorageError> {
-        let repo_path = self
-            .repo_path
-            .as_deref()
-            .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
-        ensure_git_repo(repo_path).await?;
+        let repo_path = self.repository_for_operation().await?;
 
         let storage_dir = repo_path.join(&self.storage_root);
-        if !fs::try_exists(&storage_dir)
+        let shard_dirs = self
+            .shard_dirs
+            .lock()
             .await
-            .map_err(|source| SourceStorageError::ReadDir {
-                path: storage_dir.clone(),
-                source,
-            })?
-        {
-            return Ok(Vec::new());
-        }
-
-        let mut shard_entries =
-            fs::read_dir(&storage_dir)
-                .await
-                .map_err(|source| SourceStorageError::ReadDir {
-                    path: storage_dir.clone(),
-                    source,
-                })?;
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
         let mut code_hashes = Vec::new();
-        while let Some(shard_entry) =
-            shard_entries
-                .next_entry()
-                .await
-                .map_err(|source| SourceStorageError::ReadDir {
-                    path: storage_dir.clone(),
-                    source,
-                })?
-        {
-            let file_type =
-                shard_entry
-                    .file_type()
-                    .await
-                    .map_err(|source| SourceStorageError::ReadDir {
-                        path: shard_entry.path(),
-                        source,
-                    })?;
-            if !file_type.is_dir() {
-                continue;
-            }
-
-            let shard = shard_entry.file_name().to_string_lossy().into_owned();
-            if shard.len() != 2 {
-                continue;
-            }
-
-            let shard_dir = shard_entry.path();
+        for shard in shard_dirs {
+            let shard_dir = storage_dir.join(&shard);
             let mut bundle_entries =
                 fs::read_dir(&shard_dir)
                     .await
@@ -375,13 +415,7 @@ impl GitSourceStorage {
     }
 
     async fn current_revision_locked(&self) -> Result<Option<String>, SourceStorageError> {
-        let repo_path = self
-            .repo_path
-            .as_deref()
-            .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
-        ensure_git_repo(repo_path).await?;
-        self.ensure_startup_validated(repo_path).await?;
-        ensure_current_source_attributes(repo_path, &self.storage_root).await?;
+        let repo_path = self.repository_for_operation().await?;
         if self.commit_enabled && self.push_enabled {
             self.push_pending_head(repo_path).await?;
         }
@@ -527,6 +561,57 @@ async fn remove_bundle_dir(bundle_dir: &Path) -> Result<(), SourceStorageError> 
     }
 }
 
+async fn discover_shard_dirs(
+    repo_path: &Path,
+    storage_root: &str,
+) -> Result<HashSet<String>, SourceStorageError> {
+    let storage_dir = checked_join(repo_path, storage_root)?;
+    if !fs::try_exists(&storage_dir)
+        .await
+        .map_err(|source| SourceStorageError::ReadDir {
+            path: storage_dir.clone(),
+            source,
+        })?
+    {
+        return Ok(HashSet::new());
+    }
+
+    let mut entries =
+        fs::read_dir(&storage_dir)
+            .await
+            .map_err(|source| SourceStorageError::ReadDir {
+                path: storage_dir.clone(),
+                source,
+            })?;
+    let mut shard_dirs = HashSet::new();
+    while let Some(entry) =
+        entries
+            .next_entry()
+            .await
+            .map_err(|source| SourceStorageError::ReadDir {
+                path: storage_dir.clone(),
+                source,
+            })?
+    {
+        let file_type = entry
+            .file_type()
+            .await
+            .map_err(|source| SourceStorageError::ReadDir {
+                path: entry.path(),
+                source,
+            })?;
+        if !file_type.is_dir() {
+            continue;
+        }
+
+        let shard = entry.file_name().to_string_lossy().into_owned();
+        if shard.len() == 2 {
+            shard_dirs.insert(shard);
+        }
+    }
+    Ok(shard_dirs)
+}
+
 async fn recover_uncommitted_storage(
     repo_path: &Path,
     storage_root: &str,
@@ -556,7 +641,11 @@ async fn recover_uncommitted_storage(
         return Ok(());
     }
 
-    tracing::warn!(%changes, "recovering interrupted source storage write");
+    tracing::warn!(
+        storage_root,
+        %changes,
+        "recovering interrupted source storage writes at startup"
+    );
     git(repo_path, &["reset", "--", storage_root]).await?;
     if !git_output(repo_path, &["ls-files", "--", storage_root])
         .await?
@@ -926,23 +1015,16 @@ async fn git_output_untrimmed(
     })
 }
 
-async fn git_has_staged_changes(
+async fn git_has_committed_files(
     repo_path: &Path,
     bundle_path: &str,
 ) -> Result<bool, SourceStorageError> {
-    let output = git_command(
+    git_output(
         repo_path,
-        &["diff", "--cached", "--quiet", "--", bundle_path],
+        &["ls-tree", "-r", "--name-only", "HEAD", "--", bundle_path],
     )
-    .await?;
-    match output.status.code() {
-        Some(0) => Ok(false),
-        Some(1) => Ok(true),
-        _ => Err(git_error(
-            &["diff", "--cached", "--quiet", "--", bundle_path],
-            &output,
-        )),
-    }
+    .await
+    .map(|output| !output.is_empty())
 }
 
 async fn git_with_author(

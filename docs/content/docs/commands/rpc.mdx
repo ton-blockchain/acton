@@ -35,8 +35,12 @@ The command works without a project manifest for raw remote inspection.
 
 When Acton can resolve a local project and finds a contract with the same
 compiled `code_hash`, it also prints the matched contract name and decodes the
-account storage using the local compiler ABI. If no local match exists, Acton
-falls back to the bundled ABI catalog and then the TON verifier API.
+account storage using the local compiler ABI.
+
+<AvailabilityBadge since="Acton 1.2" />
+
+If no local match exists, Acton falls back to the bundled ABI catalog and then
+the TON verifier API.
 Successful verifier ABI responses are cached in `build/cache/verifier-abi` for
 24 hours. If the verifier is unavailable, an expired cache entry is still used
 when available. Set `ACTON_VERIFY_BACKEND` to override the verifier backend,
@@ -76,6 +80,8 @@ Contract address in friendly or raw format.
 
 </CommandOptionTitle>
 
+<AvailabilityBadge since="Acton 1.2" />
+
 Use compiler ABI JSON or a Tolk ABI source instead of automatic ABI matching.
 Tolk sources are compiled with entrypoints disabled, so standalone
 `*.types.tolk` interface files are accepted.
@@ -104,6 +110,49 @@ Supported values include `mainnet`, `testnet`, `localnet`, and
 </CommandOption>
 
 
+<CommandOption>
+<CommandOptionTitle>
+
+`--block-number` _seqno_
+
+</CommandOptionTitle>
+
+<AvailabilityBadge since="Acton 1.2" />
+
+Query account state at a masterchain block sequence number. For `rpc call`,
+run the get method against that historical state as well.
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
+`--json`
+
+</CommandOptionTitle>
+
+<AvailabilityBadge since="Acton 1.2" />
+
+Print machine-readable account information and inspector results.
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
+`--raw`
+
+</CommandOptionTitle>
+
+<AvailabilityBadge since="Acton 1.2" />
+
+Skip domain inspectors such as Jetton detection.
+
+</CommandOption>
+
+
 </CommandOptions>
 
 #### Output
@@ -121,6 +170,8 @@ If no ABI match is found, Acton still prints the raw remote account information
 and reports that decoded storage is unavailable.
 
 ### acton rpc call
+
+<AvailabilityBadge since="Acton 1.2" />
 
 Call a contract get-method through TON Center.
 
@@ -181,6 +232,8 @@ May be passed multiple times.
 `--abi` _path_
 
 </CommandOptionTitle>
+
+<AvailabilityBadge since="Acton 1.2" />
 
 Use compiler ABI JSON or a Tolk ABI source instead of automatic ABI matching.
 The explicit ABI controls method lookup, argument parsing, result decoding,
@@ -257,6 +310,21 @@ Print the raw TON Center stack without ABI decoding.
 `--with-comments`
 
 </CommandOptionMeta>
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
+`--block-number` _seqno_
+
+</CommandOptionTitle>
+
+<AvailabilityBadge since="Acton 1.2" />
+
+Query account state at a masterchain block sequence number. For `rpc call`,
+run the get method against that historical state as well.
 
 </CommandOption>
 

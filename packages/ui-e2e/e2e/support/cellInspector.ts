@@ -194,7 +194,7 @@ export function describeCellInspector({app, route}: CellInspectorSuiteOptions): 
       ).toHaveAttribute(
         "href",
         app === "localnet"
-          ? `https://verifier-staging.ton.org/${TVM_CODE_HASH}`
+          ? `https://verifier.ton.org/${TVM_CODE_HASH}`
           : `/verified/${TVM_CODE_HASH}`,
       )
       await expect(page.getByText("TON block.tlb · StateInit", {exact: true})).toHaveCount(0)
@@ -279,7 +279,7 @@ async function installRegistryAbiRoute(
     await page.route("**/acton_getCompilerAbi?**", route => route.fulfill({json: {}}))
   }
 
-  await page.route("https://verifier-staging.ton.org/api/v1/abi?**", route =>
+  await page.route("https://verifier.ton.org/api/v1/abi?**", route =>
     route.fulfill({
       json: {
         items: [
@@ -304,7 +304,7 @@ async function installVerifiedSourceRoute(
     return
   }
 
-  await page.route("https://verifier-staging.ton.org/api/v1/verification/source?**", route =>
+  await page.route("https://verifier.ton.org/api/v1/verification/source?**", route =>
     route.fulfill({json: CELL_INSPECTOR_VERIFIED_SOURCE}),
   )
 }

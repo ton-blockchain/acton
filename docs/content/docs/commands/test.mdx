@@ -40,6 +40,10 @@ Acton discovers tests from the resolved project root.
 
 </CommandOptionMeta>
 
+<AvailabilityBadge since="Acton 1.2" />
+
+Multiple positional paths are accepted. Overlapping selections run once.
+
 <CommandOptionMeta label="Repeatable">
 
 May be passed multiple times.
@@ -231,6 +235,8 @@ call stacks without opening the debugger.
 
 </CommandOptionTitle>
 
+<AvailabilityBadge since="Acton 1.2" />
+
 Print test `println` and `eprintln` output as it is produced.
 
 The output is still captured for reporters such as JUnit and the test UI.
@@ -406,6 +412,8 @@ Exit non-zero when the current run differs from the baseline snapshot.
 
 </CommandOptionTitle>
 
+<AvailabilityBadge since="Acton 1.2" />
+
 Write a gas-weighted execution profile.
 
 By default, Acton records contract transactions produced by test messages.
@@ -420,6 +428,8 @@ Combine with `--ui` to browse the profile as a flamegraph in the Test UI.
 `--gas-profile-format` _format_
 
 </CommandOptionTitle>
+
+<AvailabilityBadge since="Acton 1.2" />
 
 Execution profile output format.
 
@@ -438,6 +448,8 @@ Execution profile output format.
 `--gas-profile-include-tests`
 
 </CommandOptionTitle>
+
+<AvailabilityBadge since="Acton 1.2" />
 
 Include `.test.tolk` unit-test get-method execution in the gas profile.
 
@@ -526,6 +538,8 @@ Merge all test suites into a single JUnit XML file.
 `--no-studio-reporting`
 
 </CommandOptionTitle>
+
+<AvailabilityBadge since="Acton 1.2" />
 
 Do not send test run data to Acton Studio for this run.
 
@@ -644,6 +658,8 @@ network configuration and, for explicit historical forks, block time for 24 hour
 `--no-fork-cache`
 
 </CommandOptionTitle>
+
+<AvailabilityBadge since="Acton 1.2" />
 
 Disable persistent account and library cache. Use this when you want every test
 run to fetch forked accounts and libraries from the remote API. This option does
@@ -1157,8 +1173,8 @@ CLI flags override config values for the current invocation.
 - `0`: All selected tests passed, or a non-mutating reporting mode completed
   successfully.
 - `1`: At least one test failed, profiling drift was detected with
-  `--fail-on-diff`, line coverage was below the configured minimum in non-UI
-  coverage mode, mutation score was below the configured minimum in mutation
+  `--fail-on-diff`, the blended coverage score was below the configured minimum
+  in non-UI coverage mode, mutation score was below the configured minimum in mutation
   mode, no tests matched after filtering, or infrastructure such as
   compilation, trace export, UI startup, or remote-state resolution failed.
 
@@ -1195,7 +1211,7 @@ CLI flags override config values for the current invocation.
                                                 --junit-path test-results
    ```
 
-6. Fail the run when line coverage drops below 85%:
+6. Fail the run when the blended coverage score drops below 85%:
 
    ```bash
    acton test --coverage --coverage-minimum-percent 85

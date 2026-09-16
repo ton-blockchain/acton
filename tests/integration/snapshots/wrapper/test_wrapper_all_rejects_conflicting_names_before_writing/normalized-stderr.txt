@@ -1,4 +1,4 @@
-Error: Contracts second and third have conflicting wrapper name SharedName
+Error: Contracts shared-name and shared_name have conflicting wrapper name SharedName
 
-Set distinct display-name values in Acton.toml
+Set distinct contract IDs in Acton.toml
 Wrapper names must differ after PascalCase conversion, ignoring case

@@ -113,6 +113,8 @@ fun testing.createTraceIterationCursor(from: address, message: OutMessage): TxCu
 /// val first = cursor.executeN(1);
 /// cursor.close();
 /// ```
+///
+/// Available since Acton 1.2.
 fun testing.createExternalTraceIterationCursor(message: ExternalInMessage): TxCursor {
     return { id: ffi.startMessageIter(message.messageCell, null) };
 }
@@ -165,20 +167,21 @@ struct Treasury {
     address: address
 }
 
-/// Create a treasury with a specified name.
+/// Create and fund a treasury in the specified workchain (basechain by default).
 ///
-/// Calling this method with same name will return the same treasury (the same address).
+/// Each call sends 10000 GRAM, minus fees, to the address derived from name and workchain.
+/// The `workchain` parameter is available since Acton 1.2.
 ///
 /// Example:
 /// ```tolk
 /// get fun `test mint`() {
 ///     val treasury = testing.treasury("treasury");
-///     // ...
+///     val masterchainTreasury = testing.treasury("owner", MASTERCHAIN);
 /// }
 /// ```
 ///
 /// Note: in scripts always use [scripts.wallet] instead.
-fun testing.treasury(name: string): Treasury {
+fun testing.treasury(name: string, workchain: int8 = BASECHAIN): Treasury {
     if (net.isBroadcasting()) {
         Assert.fail("Cannot use treasury with `--net`, don't use `testing.treasury()` in scripts, use `scripts.wallet()` instead");
     }
@@ -189,13 +192,13 @@ fun testing.treasury(name: string): Treasury {
     };
 
     val deployer = address("0:0000000000000000000000000000000000000000000000000000000000000000");
-    val address = AutoDeployAddress { stateInit }.calculateAddress();
+    val address = AutoDeployAddress { workchain, stateInit }.calculateAddress();
     net.registerAddress(address, name);
 
     val deployMsg = createMessage({
         bounce: false,
         value: grams("10000"),
-        dest: { workchain: 0, stateInit },
+        dest: { workchain, stateInit },
     });
     // Deploy treasury
     net.send(deployer, deployMsg);
@@ -207,8 +210,8 @@ fun impl.treasuryCode(): cell asm """
     "te6cckEBBAEARQABFP8A9KQT9LzyyAsBAgEgAwIAWvLT/+1E0NP/0RK68qL0BNH4AH+OFiGAEPR4b6UgmALTB9QwAfsAkTLiAbPmWwAE0jD+omUe" base64>B B>boc PUSHREF
 """
 
-/// Returns current account state for address or null if no information available or
-/// contract is not deployed.
+/// Returns current account state, including uninitialized accounts.
+/// Returns `null` if no account state is available.
 ///
 /// The account state includes balance, storage information, and other account data.
 /// See [TlbAccountInfo] type for more information.
@@ -228,7 +231,7 @@ fun testing.getAccountState(addr: address): TlbAccountInfo? {
 
 /// Returns storage fee for address for specified amount of seconds.
 ///
-/// Returns `null` if the contract with given address is not deployed.
+/// Returns `null` if no account state is available. Uses basechain storage prices.
 ///
 /// Example:
 /// ```tolk
@@ -267,8 +270,9 @@ fun testing.setNow(now: uint32): void {
 
 /// Get the current Unix timestamp used in emulation.
 ///
-/// Test and script runs initialize this value from the current wall clock. A
-/// forked run uses the pinned block timestamp instead. Call [testing.setNow] to
+/// Since Acton 1.2, test and script runs initialize this value from the current wall clock. A
+/// fork with an explicit block number uses that block's timestamp instead.
+/// Latest forks use the current wall clock. Call [testing.setNow] to
 /// override it for time-dependent scenarios.
 ///
 /// Example:
@@ -307,6 +311,8 @@ fun testing.getNow(): uint32 {
 /// val seed = testing.setRandomSeed();
 /// println("random seed: {:X}", seed);
 /// ```
+///
+/// Available since Acton 1.2.
 fun testing.setRandomSeed(seed: uint256? = null): uint256 {
     if (seed == null) {
         seed = ffi.generateRandomSeed();
@@ -338,6 +344,8 @@ fun testing.setRandomSeed(seed: uint256? = null): uint256 {
 /// val result = net.sendExternal(message);
 /// testing.setChecksigIgnore(false);
 /// ```
+///
+/// Available since Acton 1.2.
 fun testing.setChecksigIgnore(ignore: bool): void {
     ffi.setChecksigIgnore(ignore);
 }
@@ -363,7 +371,7 @@ fun testing.topUp(to: address, amount: coins): void {
 
 /// Get the balance of an address.
 ///
-/// Returns 0 if the address is not deployed.
+/// Returns 0 if no account state is available.
 ///
 /// Example:
 /// ```tolk
@@ -477,7 +485,7 @@ fun testing.loadSnapshot(pathToJsonFile: string): bool {
 /// [TON Blockchain Configuration Reference](https://docs.ton.org/foundations/config).
 ///
 /// Parameters:
-/// - `config`: The new [BlockchainConfigMap] map containing configuration parameters (indices 0-90)
+/// - `config`: The new [BlockchainConfigMap] map containing configuration parameters indexed by signed 32-bit integers
 ///
 /// Returns: `true` if the configuration was successfully updated, `false` if
 /// validation failed. On failure, neither the emulator world state nor the C7
@@ -538,7 +546,7 @@ fun testing.setConfig(config: BlockchainConfigMap): bool {
 
 /// Retrieves the current blockchain configuration.
 ///
-/// Returns a map of all blockchain configuration parameters indexed from 0-90.
+/// Returns a map of all blockchain configuration parameters indexed by signed 32-bit integers.
 /// The configuration includes gas prices, storage costs, validator settings, and other
 /// network parameters. Use specialized getter functions like [BlockchainConfigMap.getGasPrices],
 /// [BlockchainConfigMap.getStoragePrices], or [BlockchainConfigMap.getGlobalVersion]

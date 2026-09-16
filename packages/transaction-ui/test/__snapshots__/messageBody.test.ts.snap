@@ -1,5 +1,30 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
+exports[`decodeMessageBody decodes rich bounced bodies from the original payload reference 1`] = `
+{
+  "name": "OriginalOutgoing",
+  "opcode": 1,
+  "value": {
+    "entries": [
+      {
+        "key": "value",
+        "value": {
+          "kind": "scalar",
+          "typeName": "uint32",
+          "value": "42",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "OriginalOutgoing",
+  },
+}
+`;
+
+exports[`decodeMessageBody does not use rich bounce diagnostics as an opcode when the original ref is missing 1`] = `undefined`;
+
+exports[`decodeMessageBody does not use rich bounce diagnostics as an opcode when the original ref is missing 2`] = `undefined`;
+
 exports[`decodeMessageBody decodes a single prefixless Wallet V4 external message before a text comment 1`] = `
 {
   "decodedOpcode": undefined,

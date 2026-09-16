@@ -2,10 +2,18 @@
   padding: 20px 24px 24px;
 }
 
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
 .searchBox {
   width: min(360px, 100%);
+  min-width: 0;
   min-height: 44px;
-  margin-bottom: 24px;
   box-sizing: border-box;
   border: 1px solid transparent;
   border-radius: 12px;
@@ -41,6 +49,62 @@
 
 .searchBox input::placeholder {
   color: var(--acton-color-text-muted);
+}
+
+.metadataFilter {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: fit-content;
+  flex: 0 0 auto;
+  padding: 3px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--acton-color-canvas) 72%, transparent);
+}
+
+.filterOption {
+  display: grid;
+  place-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--acton-color-text-muted);
+  font: inherit;
+  font-size: var(--acton-font-size-xs);
+  font-weight: 400;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
+}
+
+.filterOption > span {
+  grid-area: 1 / 1;
+}
+
+/* Reserve the selected label's width so changing its weight does not resize the control. */
+.filterOption > span[aria-hidden="true"] {
+  visibility: hidden;
+  font-weight: 600;
+}
+
+.filterOption:hover {
+  color: var(--acton-color-text);
+}
+
+.filterOption[aria-pressed="true"] {
+  background: var(--acton-color-surface-active);
+  color: var(--acton-color-text);
+  font-weight: 600;
+}
+
+.filterOption:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
 }
 
 .list {
@@ -199,9 +263,15 @@
     padding: 16px;
   }
 
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
   .searchBox {
     width: 100%;
-    margin-bottom: 16px;
   }
 
   .list {
@@ -211,6 +281,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .filterOption {
+    transition: none;
+  }
+
   .skeleton,
   .skeletonLine {
     animation: none;

@@ -28,6 +28,35 @@ mod tests {
     use tolk_syntax::{TopLevel, parse};
 
     #[test]
+    fn builds_control_flow_for_direct_match_arm_statements() {
+        let source = r"
+            fun main(x: int) {
+                match (x) {
+                    0 => while (x < 2) { x += 1; }
+                    else => if (x > 0) { return x; } else { throw 123; }
+                }
+            }
+        ";
+        let file = parse(source).expect("failed to parse");
+        assert!(!file.has_errors());
+        let top_level = file.top_levels().next().expect("function is expected");
+        let file_index = FileResolveIndex {
+            file_id: 0,
+            locals: vec![],
+            uses: vec![],
+        };
+        let cfg = build_cfg_for_top_level(&top_level, &file_index).expect("cfg is expected");
+
+        // These arms need their own branches and loop edge, not opaque expression nodes.
+        let dot = cfg.to_dot();
+        assert!(dot.contains("LoopBack"));
+        assert!(dot.contains("TrueBranch"));
+        assert!(dot.contains("FalseBranch"));
+        assert!(dot.contains("Return"));
+        assert!(dot.contains("Throw"));
+    }
+
+    #[test]
     fn builds_cfg_for_function_body() {
         let source = r"
             fun main(x: int) {

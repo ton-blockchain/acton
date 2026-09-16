@@ -8,7 +8,7 @@ use crate::ast::{
     import_path_can_use_mappings, message_entity_naming, method_can_be_static,
     missing_contract_header, mutable_parameter_can_be_immutable, mutable_variable_can_be_immutable,
     name_case_checker, negated_is_type_can_use_not_is, no_bounce_handler, no_global_variables,
-    pure_function_call_unused, reserve_mode_literal, send_mode_literal,
+    prefer_grams, pure_function_call_unused, reserve_mode_literal, send_mode_literal,
     several_not_null_assertions, throw_requires_documented_error_value, throw_requires_errors_enum,
     unnecessary_not_null_assertion, unused_expression, unused_import, unused_variable,
     used_ignored_identifier, write_only_variable,
@@ -102,6 +102,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Tolk, "S006") => message_entity_naming::CreateMessageInlineSend,
         (Tolk, "S007") => import_path_can_use_mappings::ImportPathCanUseMappings,
         (Tolk, "S008") => negated_is_type_can_use_not_is::NegatedIsTypeCanUseNotIs,
+        (Tolk, "S009") => prefer_grams::PreferGrams,
         _ => return None,
     })
 }

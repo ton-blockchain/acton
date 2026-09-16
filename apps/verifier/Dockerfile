@@ -69,7 +69,7 @@ USER node
 ENV VERIFIER_CONFIG=/etc/verifier/config.toml \
     VERIFIER_BIND_ADDR=0.0.0.0:3000 \
     VERIFIER_LOG_LEVEL=info \
-    VERIFIER_NETWORK=testnet \
+    VERIFIER_PAYMENT_PRIMARY_NETWORK=testnet \
     SOURCE_REPOSITORY_PATH=/var/lib/verifier/source-repo \
     SOURCE_REPOSITORY_REMOTE=origin \
     SOURCE_REPOSITORY_STORAGE_ROOT=sources \

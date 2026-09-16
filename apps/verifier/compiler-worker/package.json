@@ -74,5 +74,6 @@
   "overrides": {
     "protobufjs": "7.6.5",
     "qs": "6.16.0"
-  }
+  },
+  "packageManager": "npm@10.9.8"
 }

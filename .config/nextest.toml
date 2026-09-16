@@ -9,6 +9,19 @@ status-level = "pass"
 # Retrace hits rate-limited remote APIs, so keep its tests mutually exclusive.
 max-threads = 1
 
+[test-groups.localnet-serial]
+# Independent fixture catalogs can select the same default ports before mock APIs
+# bind. The in-process fixture mutex cannot serialize nextest's test processes.
+max-threads = 1
+
+[[profile.default.overrides]]
+filter = 'binary(localnet_command) | package(acton-localnet)'
+test-group = 'localnet-serial'
+
+[[profile.ci.overrides]]
+filter = 'binary(localnet_command) | package(acton-localnet)'
+test-group = 'localnet-serial'
+
 [[profile.default.overrides]]
 filter = 'package(ton-retrace)'
 test-group = 'retrace-serial'

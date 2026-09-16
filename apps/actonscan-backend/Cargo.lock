@@ -21,6 +21,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "tvm-ffi",
  "tycho-types",
  "utoipa",
 ]
@@ -2168,6 +2169,19 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "tvm-ffi"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "num-bigint",
+ "num-traits",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tycho-types",
 ]
 
 [[package]]

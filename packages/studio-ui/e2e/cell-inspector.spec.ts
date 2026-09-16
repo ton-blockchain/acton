@@ -45,7 +45,7 @@ test("opens Cell Inspector verification in the verifier", async ({page}) => {
     })
   })
 
-  await page.route("https://verifier-staging.ton.org/api/v1/verification/source?**", route =>
+  await page.route("https://verifier.ton.org/api/v1/verification/source?**", route =>
     route.fulfill({json: CELL_INSPECTOR_VERIFIED_SOURCE}),
   )
 
@@ -55,7 +55,7 @@ test("opens Cell Inspector verification in the verifier", async ({page}) => {
   const verificationLink = page.getByRole("link", {name: "View verification", exact: true})
   await expect(verificationLink).toHaveAttribute(
     "href",
-    `https://verifier-staging.ton.org/${TVM_CODE_HASH}`,
+    `https://verifier.ton.org/${TVM_CODE_HASH}`,
   )
   await expect(verificationLink).toHaveAttribute("target", "_blank")
 })

@@ -206,10 +206,14 @@ fn load_opcode_with_skip_bounce_supports_new_fffffffe_prefix() {
         "ak-stdlib-load-opcode-new-bounce-prefix-with-skip",
         r"
 get fun `test ak stdlib load opcode new bounce prefix with skip`() {
-    val body = beginCell()
+    var body = beginCell()
         .storeBool(false)
         .storeUint(0xFFFFFFFE, 32)
-        .storeUint(0x3456CDEF, 32)
+        .storeRef(beginCell().storeUint(0x3456CDEF, 32).endCell())
+        .storeRef(beginCell().storeCoins(0).storeBool(false).storeUint(0, 96).endCell())
+        .storeUint(0, 8)
+        .storeInt(-14, 32)
+        .storeBool(false)
         .endCell()
         .beginParse();
 
@@ -221,6 +225,28 @@ get fun `test ak stdlib load opcode new bounce prefix with skip`() {
 
     expect(msg.loadOpcode(false)).toEqual(0xFFFFFFFE);
     expect(msg.loadOpcode(true)).toEqual(0x3456CDEF);
+
+    val referenced = TlbMessageRelaxedGeneric {
+        info: akIntInfo(),
+        init: akNoInit(),
+        body: beginCell().storeBool(true).storeRef(body.skipBits(1).toCell()).endCell().beginParse(),
+    };
+    expect(referenced.loadOpcode(true)).toEqual(0x3456CDEF);
+
+    val missingOriginalBody = TlbMessageRelaxedGeneric {
+        info: akIntInfo(),
+        init: akNoInit(),
+        body: beginCell().storeBool(false).storeUint(0xFFFFFFFE, 32).storeUint(123, 32).endCell().beginParse(),
+    };
+    expect(missingOriginalBody.loadOpcode(true)).toBeNull();
+
+    val shortOriginalBody = TlbMessageRelaxedGeneric {
+        info: akIntInfo(),
+        init: akNoInit(),
+        body: beginCell().storeBool(false).storeUint(0xFFFFFFFE, 32)
+            .storeRef(beginCell().storeUint(7, 3).endCell()).endCell().beginParse(),
+    };
+    expect(shortOriginalBody.loadOpcode(true)).toBeNull();
 }
 ",
         "integration/snapshots/test-runner/load_opcode_reads_opcode_from_either_left_body/load_opcode_with_skip_bounce_supports_new_fffffffe_prefix.stdout.txt",

@@ -18,7 +18,7 @@ pub(super) fn network(network: &Network, json: bool) -> anyhow::Result<()> {
     }
 
     let status = format!("{:?}", network.status);
-    println!("\nFull localnet \"{}\"", network.name);
+    println!("\nLocalnet \"{}\"", network.name);
     println!("  Status:    {}", status.to_lowercase());
     println!("  Network:   {}", network.id);
     if let Some(state) = &network.state {

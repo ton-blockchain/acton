@@ -421,7 +421,10 @@ impl RenderedValue {
             RenderedValue::Tensor { items, .. } => {
                 write_collection_pretty(out, indent, items, '(', ')', options, field_comment)
             }
-            RenderedValue::ArrayOf { items, .. } => {
+            RenderedValue::ArrayOf { type_name, items } => {
+                if type_name.starts_with("BigArray<") {
+                    write!(out, "{} ", pretty_type_name(type_name, options))?;
+                }
                 write_collection_pretty(out, indent, items, '[', ']', options, field_comment)
             }
             RenderedValue::LastSeen { inner } => {
@@ -1008,7 +1011,10 @@ impl fmt::Display for RenderedValue {
                 }
                 write!(f, ")")
             }
-            RenderedValue::ArrayOf { items, .. } => {
+            RenderedValue::ArrayOf { type_name, items } => {
+                if type_name.starts_with("BigArray<") {
+                    write!(f, "{type_name} ")?;
+                }
                 write!(f, "[")?;
                 for (i, item) in items.iter().enumerate() {
                     if i > 0 {
@@ -1820,9 +1826,9 @@ fn render_abi_data(
     match data {
         UnpackedValue::Object { name, fields } => {
             let object_ty_idx = abi_object_context_ty(symbols, &name, ty_idx).unwrap_or(ty_idx);
-            RenderedValue::Struct {
-                type_name: name.clone(),
-                fields: fields
+            render_struct_value(
+                name.clone(),
+                fields
                     .into_iter()
                     .map(|(field_name, value)| {
                         let field_ty_idx =
@@ -1831,7 +1837,7 @@ fn render_abi_data(
                         (field_name, render_abi_data(symbols, value, field_ty_idx))
                     })
                     .collect(),
-            }
+            )
         }
         UnpackedValue::Array(items) => RenderedValue::ArrayOf {
             type_name,
@@ -2478,6 +2484,43 @@ fn render_empty_map(
     }
 }
 
+/// Present the stdlib's chunked array as logical elements in both stack and ABI views.
+/// Keep the original fields when the layout or length is inconsistent, so inspecting a
+/// malformed value (or an unrelated struct with the same name) does not hide its contents.
+fn render_struct_value(
+    type_name: String,
+    mut fields: Vec<(String, RenderedValue)>,
+) -> RenderedValue {
+    if type_name.starts_with("BigArray<")
+        && let [(name, RenderedValue::ArrayOf { items: state, .. })] = fields.as_mut_slice()
+        && name == "arr"
+        && let [
+            RenderedValue::ArrayOf { items: chunks, .. },
+            RenderedValue::Leaf {
+                value: length,
+                type_field,
+            },
+        ] = state.as_mut_slice()
+        && type_field.as_deref() == Some("int")
+        && let Some(item_count) = chunks.iter().try_fold(0, |count, chunk| match chunk {
+            RenderedValue::ArrayOf { items, .. } => Some(count + items.len()),
+            _ => None,
+        })
+        && length.parse::<usize>() == Ok(item_count)
+    {
+        let items = std::mem::take(chunks)
+            .into_iter()
+            .flat_map(|chunk| match chunk {
+                RenderedValue::ArrayOf { items, .. } => items,
+                _ => unreachable!("chunk layout was checked above"),
+            })
+            .collect();
+        return RenderedValue::ArrayOf { type_name, items };
+    }
+
+    RenderedValue::Struct { type_name, fields }
+}
+
 // ---------------------------------------------------------------------------
 // debug_format — recursive type-aware renderer (uses StackReader cursor)
 // ---------------------------------------------------------------------------
@@ -2778,10 +2821,7 @@ fn debug_format(
                 let field_val = debug_format(symbols, r, f.ty_idx, false);
                 fields.push((f.name, field_val));
             }
-            RenderedValue::Struct {
-                type_name: ty_name,
-                fields,
-            }
+            render_struct_value(ty_name, fields)
         }
 
         Ty::AliasRef { .. } => {
@@ -2941,13 +2981,17 @@ pub fn render_tuple_as_tolk_type(
     debug_print_from_stack(symbols, &slots, ty_idx)
 }
 
+/// Render a reflected value after the caller removes its one-slot wrapper.
+///
+/// Multi-slot values still arrive as tuple frames; for a one-slot value, including
+/// a struct with a tuple field, the tuple is the value itself.
 pub fn render_tuple_item_as_tolk_type(
     symbols: &SourceMap,
     item: &TupleItem,
     ty_idx: TyIdx,
 ) -> RenderedValue {
     match item {
-        TupleItem::Tuple(tuple) if top_level_tuple_is_stack_frame(symbols, ty_idx) => {
+        TupleItem::Tuple(tuple) if calc_width_on_stack(symbols, ty_idx) != 1 => {
             render_tuple_as_tolk_type(symbols, tuple, ty_idx)
         }
         _ => {
@@ -2955,31 +2999,6 @@ pub fn render_tuple_item_as_tolk_type(
             let slots = [SlotValue::Live(&stack_value)];
             debug_print_from_stack(symbols, &slots, ty_idx)
         }
-    }
-}
-
-fn top_level_tuple_is_stack_frame(symbols: &dyn UnpackSchema, ty_idx: TyIdx) -> bool {
-    let Some(ty) = symbols.ty_by_idx(ty_idx) else {
-        return false;
-    };
-    match ty {
-        Ty::Tensor { .. } | Ty::StructRef { .. } => true,
-        Ty::Nullable {
-            inner_ty_idx,
-            stack_width,
-            ..
-        } => {
-            stack_width.is_some_and(|w| w != 1)
-                || top_level_tuple_is_stack_frame(symbols, *inner_ty_idx)
-        }
-        Ty::Union {
-            stack_width: Some(stack_width),
-            ..
-        } => *stack_width != 1,
-        Ty::AliasRef { .. } => symbols
-            .alias_target_for(ty_idx)
-            .is_some_and(|target| top_level_tuple_is_stack_frame(symbols, target.ty_idx)),
-        _ => false,
     }
 }
 

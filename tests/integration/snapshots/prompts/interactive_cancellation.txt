@@ -1,0 +1,12 @@
+text ctrl-c: exit=130, continued=false, caught=false, next_prompt=false
+integer ctrl-c: exit=130, continued=false, caught=false, next_prompt=false
+address ctrl-c: exit=130, continued=false, caught=false, next_prompt=false
+select ctrl-c: exit=130, continued=false, caught=false, next_prompt=false
+confirm ctrl-c: exit=130, continued=false, caught=false, next_prompt=false
+wallet ctrl-c: exit=130, continued=false, caught=false, next_prompt=false
+text escape: exit=1, continued=false, caught=false, next_prompt=false
+integer escape: exit=1, continued=false, caught=false, next_prompt=false
+address escape: exit=1, continued=false, caught=false, next_prompt=false
+select escape: exit=1, continued=false, caught=false, next_prompt=false
+confirm escape: exit=1, continued=false, caught=false, next_prompt=false
+wallet escape: exit=1, continued=false, caught=false, next_prompt=false

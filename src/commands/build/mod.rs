@@ -49,6 +49,22 @@ pub(crate) fn contract_compilation_order(
     dep_graph::build_dependency_graph(&flatten_contracts)
 }
 
+/// Order one contract's dependency closure without validating unrelated contracts.
+/// Runtime `build()` uses this to prepare only the code requested by a script.
+pub(crate) fn contract_dependency_order(
+    target: &str,
+    contracts: &BTreeMap<String, ContractConfig>,
+) -> anyhow::Result<Vec<String>> {
+    let mut dependencies = dep_graph::collect_dependencies_for_contract(target, contracts)?;
+    dependencies.insert(target.to_owned());
+    let contracts = contracts
+        .iter()
+        .filter(|(name, _)| dependencies.contains(*name))
+        .collect::<Vec<_>>();
+
+    dep_graph::build_dependency_graph(&contracts)
+}
+
 pub fn build_cmd(options: BuildCommandOptions) -> anyhow::Result<()> {
     let BuildCommandOptions {
         contract_id,

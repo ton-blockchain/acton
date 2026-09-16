@@ -81,7 +81,7 @@ export const codeViewerGallery = {
         <CodeViewer
           files={sourceFiles}
           entrypoint="contracts/JettonWallet.tolk"
-          externalActionUrl="https://verifier-staging.ton.org/example"
+          externalActionUrl="https://verifier.ton.org/example"
           externalActionLabel="View verification"
         />
       ),

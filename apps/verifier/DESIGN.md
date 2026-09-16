@@ -18,9 +18,9 @@ rebuilt from the Git repository by scanning
 where `code_hash_prefix` is the first two characters of the code hash and
 `code_hash_suffix` is the rest. The storage root defaults to `sources`.
 
-The verifier uses TON testnet payments to limit automated spam. A separate
-SQLite ledger prevents payment replay. The backend rebuilds this ledger from
-the payment wallet history after each restart.
+The verifier uses TON payments on the configured network to limit automated
+spam. A separate SQLite ledger prevents payment replay. The backend rebuilds
+this ledger from the payment wallet history after each restart.
 
 ## Goals
 
@@ -31,7 +31,8 @@ the payment wallet history after each restart.
 - Keep exactly one current source bundle for each code hash.
 - Make the registry rebuildable from Git without relying on process-local state.
 - Keep the registry implementation pluggable behind Rust traits.
-- Require one testnet payment for each new public verification attempt.
+- Require one payment on the configured network for each new public
+  verification attempt.
 - Bind each payment to one code hash through the transaction comment.
 - Rebuild payment replay state from TON history after a server restart.
 
@@ -99,10 +100,12 @@ Responsibilities:
 
 ### Payment Verification
 
-`acton verify` uses TON verifier and pays for verification on TON testnet.
-Verification records are keyed by code hash, so the same verified code can be
-used on any TON network. Address lookups through this backend use its configured
-testnet provider.
+The verifier backend supports payments on TON mainnet and testnet. The current
+`acton verify` client remains testnet-only. Verification records are keyed by
+code hash, so the same verified code can be used on any TON network. Address
+lookups query both configured TON Center providers. If an address exists on
+both networks, the backend returns `409 Conflict` with a `matches` array that
+contains the network and code hash for both variants.
 
 Acton validates portable source paths before payment. Uploads accept at most
 256 files. Source paths are relative, at most 128 ASCII characters, and contain
@@ -119,9 +122,14 @@ payment claim.
 `POST /api/v1/take_ticket` accepts a code hash. If the code hash is verified,
 the endpoint returns the stored bundle metadata. No payment is necessary.
 
+When `server.read_only` is enabled, `/take_ticket` and `/verify` return `503`
+for code hashes that are not already registered. Existing bundles and all read
+endpoints remain available, and repeated submissions still return
+`already_verified`.
+
 For new code, the endpoint returns:
 
-- The testnet payment address.
+- The payment network and address.
 - The minimum amount in nanoGRAM.
 - The exact comment `acton-verify:v1:<code_hash>`.
 
@@ -169,10 +177,11 @@ transaction hash in lowercase hexadecimal form. The source manifest and lookup
 API include this hash. The verifier UI links the hash to Actonscan testnet.
 
 At startup, the payment verifier is not ready. It reads every page of incoming
-testnet history up to a captured chain tip. It preserves `consumed` ledger
-entries, releases interrupted `processing` claims as `retryable`, and adds
-previously unseen funded protocol payments as `retryable`. It then marks every
-payment referenced by the published source manifests as `consumed`. The merge
+history on the selected payment network up to a captured chain tip. It
+preserves `consumed` ledger entries, releases interrupted `processing` claims
+as `retryable`, and adds previously unseen funded protocol payments as
+`retryable`. It then marks every payment referenced by the published source
+manifests as `consumed`. The merge
 never deletes existing replay evidence.
 
 The startup scan ignores payments below the configured minimum. These payments
@@ -191,9 +200,11 @@ attempt also becomes claimable again while it remains within the three-attempt
 limit.
 
 Another request can verify the code after ticket issuance but before source
-submission. In this race, `/verify` returns `already_verified` without claiming
-the payment. The payment cannot verify another code hash and recovery later
-marks it as consumed.
+submission. A request without a payment transaction returns `already_verified`
+immediately. When a payment transaction is supplied, `/verify` claims it and
+checks the registry again before compilation. If the code hash is already
+verified, compilation is skipped, the normal payment finalization marks the
+claim as `consumed`, and the request returns `already_verified`.
 
 The payment ledger is a local SQLite database. The current claim and recovery
 protocol supports one write-capable verifier process for each payment wallet.
@@ -331,7 +342,7 @@ not expose a base64 source-content field.
 1. Acton compiles the local contract and computes its code hash.
 2. Acton sends the code hash to `/take_ticket`.
 3. If the code hash is verified, Acton stops successfully without payment.
-4. For new code, the backend returns a testnet payment quote.
+4. For new code, the backend returns a payment quote with its network.
 5. Acton validates source paths, gets wallet approval and sends the payment with the exact comment.
 6. Acton waits for the finalized recipient transaction.
 7. Acton sends the sources and recipient transaction hash to `/verify`.
@@ -384,6 +395,8 @@ Status responses include:
 
 - `code_hash`
 - `verified`
+- `status`: `unverified`, `queued`, `compiling`, or `verified`; `queued` means
+  that the request is waiting for a compiler concurrency slot
 
 Source responses include:
 
@@ -438,7 +451,8 @@ Important cases:
 - Git write fails: verification request fails.
 - Stored bundle cannot be re-read or validated: verification request fails.
 - Backend process state is lost: the registry is rebuilt from Git.
-- Payment database state is lost: the ledger is rebuilt from testnet history.
+- Payment database state is lost: the ledger is rebuilt from history on the
+  selected payment network.
 - Git content is unavailable: source lookup is temporarily unavailable.
 
 The backend keeps writes deterministic by using `code_hash` as the storage key

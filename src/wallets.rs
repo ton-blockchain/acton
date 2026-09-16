@@ -22,7 +22,7 @@ use ton_retrace::Network;
 
 const WALLET_MESSAGE_TTL_SECONDS: u64 = 600;
 
-/// Initial funding shared by simulated startup and full-localnet genesis wallets.
+/// Initial funding shared by simulated startup and localnet genesis wallets.
 pub const STARTUP_ACCOUNT_BALANCE_NANOGRAMS: u128 = 100_000_000_000;
 
 const KEYRING_SERVICE: &str = "ton.acton.wallet";
@@ -352,7 +352,7 @@ pub fn open_wallets(
     Ok(open_wallets)
 }
 
-/// Freezes selected project wallets' public state for a new full localnet.
+/// Freezes selected project wallets' public state for a new localnet.
 ///
 /// Keys remain in Acton; resuming the network does not repeat funding or deployment.
 pub fn prepare_localnet_wallets(
@@ -379,7 +379,7 @@ pub fn prepare_localnet_wallets(
         .map(|(name, wallet)| {
             anyhow::ensure!(
                 wallet.wallet.address.workchain == 0,
-                "Startup wallet '{name}' must be in workchain 0 for Full localnet"
+                "Startup wallet '{name}' must be in workchain 0 for Localnet"
             );
 
             let address = wallet.address();

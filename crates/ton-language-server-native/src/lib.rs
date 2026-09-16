@@ -3,8 +3,8 @@ use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -12,6 +12,7 @@ use tasm_core::decompile::Disassembler;
 use tasm_core::printer::FormatOptions as TasmFormatOptions;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
+use tokio::sync::oneshot;
 use ton_language_server_core::languages::fift::FiftLanguage;
 use ton_language_server_core::languages::tasm::{STACK_EFFECT_CODE_LENS_COMMAND, TasmLanguage};
 use ton_language_server_core::languages::tlb::TlbLanguage;
@@ -32,6 +33,7 @@ use ton_language_server_core::{
     SignatureInformation, TextEdit, TextIndex, TypeAtPosition, WorkspaceConfig, WorkspaceEdit,
     WorkspaceSymbol,
 };
+use tower::ServiceExt;
 use tower_lsp::jsonrpc;
 use tower_lsp::lsp_types as lsp;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
@@ -163,6 +165,10 @@ impl NativeLoggingConfig {
     }
 }
 
+/// Serves one LSP session over standard input and output.
+///
+/// Tokio cannot cancel a pending blocking stdin read. When terminating the process,
+/// the caller must shut down its runtime without waiting for that read to finish.
 pub async fn serve_stdio(config: ServerConfig) -> anyhow::Result<()> {
     install_logging(config.logging.as_ref())?;
     serve_stream(config, tokio::io::stdin(), tokio::io::stdout()).await
@@ -182,6 +188,11 @@ pub async fn serve_tcp(config: ServerConfig, port: u16) -> anyhow::Result<()> {
     serve_stream(config, reader, writer).await
 }
 
+/// Serves one LSP session until `exit` or transport EOF.
+///
+/// `shutdown` acknowledges the request without closing the transport. An `exit`
+/// notification stops the transport without waiting for EOF and returns an error
+/// if the client has not completed shutdown, so the process can exit with code 1.
 pub async fn serve_stream<R, W>(config: ServerConfig, reader: R, writer: W) -> anyhow::Result<()>
 where
     R: AsyncRead + Unpin,
@@ -196,7 +207,32 @@ where
             .custom_method(PROFILE_REQUEST, NativeLanguageServer::profile)
             .custom_method(DISASSEMBLE_REQUEST, NativeLanguageServer::disassemble)
             .finish();
-    Server::new(reader, writer, socket).serve(service).await;
+    let shutdown_requested = service.inner().shutdown_requested.clone();
+    let (exit_sender, mut exit_receiver) = oneshot::channel();
+    let mut exit_sender = Some(exit_sender);
+    let service = service.map_request(move |request: jsonrpc::Request| {
+        if request.method() == "exit"
+            && request.id().is_none()
+            && let Some(sender) = exit_sender.take()
+        {
+            let _ = sender.send(shutdown_requested.load(Ordering::Acquire));
+        }
+        request
+    });
+
+    // tower-lsp stops its service on exit, but its transport still waits for input.
+    // Cancel that transport once exit arrives, including when stdin remains open.
+    let shutdown_requested = tokio::select! {
+        exit = &mut exit_receiver => Some(exit?),
+        // EOF can arrive in the same poll as exit. Preserve the exit status then too.
+        () = Server::new(reader, writer, socket).serve(service) => exit_receiver.try_recv().ok(),
+    };
+    if let Some(shutdown_requested) = shutdown_requested {
+        anyhow::ensure!(
+            shutdown_requested,
+            "language server received exit before shutdown"
+        );
+    }
     Ok(())
 }
 
@@ -210,6 +246,7 @@ pub struct NativeLanguageServer {
     startup_warnings: Mutex<Vec<String>>,
     documents: Mutex<HashMap<String, OpenDocument>>,
     supports_dynamic_file_watching: AtomicBool,
+    shutdown_requested: Arc<AtomicBool>,
 }
 
 #[derive(Clone, Debug)]
@@ -270,6 +307,7 @@ impl NativeLanguageServer {
             startup_warnings: Mutex::new(Vec::new()),
             documents: Mutex::new(HashMap::new()),
             supports_dynamic_file_watching: AtomicBool::new(false),
+            shutdown_requested: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -750,6 +788,7 @@ impl LanguageServer for NativeLanguageServer {
     }
 
     async fn shutdown(&self) -> jsonrpc::Result<()> {
+        self.shutdown_requested.store(true, Ordering::Release);
         Ok(())
     }
 
@@ -1540,7 +1579,7 @@ fn workspace_config(
     root_uri: DocumentUri,
     manifest_uri: Option<DocumentUri>,
     tolk_stdlib_root_uri: Option<DocumentUri>,
-    manifest_text: impl Into<std::sync::Arc<str>>,
+    manifest_text: impl Into<Arc<str>>,
 ) -> WorkspaceConfig {
     let config = WorkspaceConfig::new(root_uri, manifest_uri, manifest_text);
     match tolk_stdlib_root_uri {

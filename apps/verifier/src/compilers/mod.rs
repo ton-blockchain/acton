@@ -7,7 +7,6 @@ use thiserror::Error;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     process::Command,
-    sync::Semaphore,
     time::{self, Duration},
 };
 
@@ -25,7 +24,6 @@ pub struct NodeCompilerService {
     node_bin: String,
     worker_path: PathBuf,
     timeout: Duration,
-    compilation_slots: Option<Semaphore>,
 }
 
 impl NodeCompilerService {
@@ -35,7 +33,6 @@ impl NodeCompilerService {
             node_bin: config.compiler_node_bin().to_owned(),
             worker_path: config.compiler_worker_path().to_path_buf(),
             timeout: config.compiler_timeout(),
-            compilation_slots: config.max_concurrent_compilations().map(Semaphore::new),
         }
     }
 }
@@ -43,16 +40,6 @@ impl NodeCompilerService {
 #[async_trait]
 impl CompilerService for NodeCompilerService {
     async fn compile(&self, request: CompileRequest) -> Result<CompileOutput, CompilerError> {
-        let _permit = if let Some(slots) = &self.compilation_slots {
-            Some(
-                slots
-                    .acquire()
-                    .await
-                    .map_err(|_| CompilerError::ConcurrencyLimiterClosed)?,
-            )
-        } else {
-            None
-        };
         let input = serde_json::to_vec(&request).map_err(CompilerError::SerializeInput)?;
         let worker_path = dunce::canonicalize(&self.worker_path).map_err(|source| {
             CompilerError::ResolveWorkerPath {
@@ -261,48 +248,6 @@ pub enum CompilerError {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn compiler_waits_for_an_available_compilation_slot() {
-        let service = NodeCompilerService {
-            node_bin: "node".to_owned(),
-            worker_path: PathBuf::from("missing-worker.mjs"),
-            timeout: Duration::from_secs(1),
-            compilation_slots: Some(Semaphore::new(1)),
-        };
-        let occupied_slot = service
-            .compilation_slots
-            .as_ref()
-            .expect("test compiler must have a compilation limiter")
-            .acquire()
-            .await
-            .expect("compilation limiter must be open");
-        let compilation = service.compile(CompileRequest {
-            language: "tolk".to_owned(),
-            compiler_version: "1.4.2".to_owned(),
-            entrypoint: "main.tolk".to_owned(),
-            import_mappings: BTreeMap::new(),
-            compile_params: Value::Null,
-            sources: Vec::new(),
-        });
-        tokio::pin!(compilation);
-
-        assert!(
-            time::timeout(Duration::from_millis(20), compilation.as_mut())
-                .await
-                .is_err(),
-            "a second compilation must wait while the only slot is occupied"
-        );
-
-        drop(occupied_slot);
-        let result = time::timeout(Duration::from_secs(1), compilation)
-            .await
-            .expect("compilation must resume after the slot is released");
-        assert!(matches!(
-            result,
-            Err(CompilerError::ResolveWorkerPath { .. })
-        ));
-    }
-
     // Exercise the real process boundary: mocks cannot reproduce a full stdin
     // pipe or a worker that writes output before it reads the request.
     async fn run_worker_script(
@@ -316,7 +261,6 @@ mod tests {
             node_bin: "node".to_owned(),
             worker_path,
             timeout,
-            compilation_slots: Some(Semaphore::new(1)),
         };
         time::timeout(
             Duration::from_secs(5),

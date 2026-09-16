@@ -68,20 +68,21 @@ write_generated_config() {
         printf '[server]\n'
         printf 'bind_addr = "%s"\n' "$(toml_escape "${VERIFIER_BIND_ADDR:-0.0.0.0:3000}")"
         write_optional_string api_key "${VERIFIER_API_KEY:-}"
+        printf 'read_only = %s\n' "${VERIFIER_READ_ONLY:-false}"
         printf '\n'
 
         printf '[logging]\n'
         printf 'level = "%s"\n\n' "$(toml_escape "${VERIFIER_LOG_LEVEL:-info}")"
 
-        printf '[network]\n'
-        printf 'name = "%s"\n\n' "$(toml_escape "${VERIFIER_NETWORK:-testnet}")"
-
         printf '[toncenter]\n'
-        write_optional_string base_url "${VERIFIER_TONCENTER_BASE_URL:-}"
-        write_optional_string api_key "${VERIFIER_TONCENTER_API_KEY:-}"
+        write_optional_string mainnet_base_url "${VERIFIER_TONCENTER_MAINNET_BASE_URL:-}"
+        write_optional_string mainnet_api_key "${VERIFIER_TONCENTER_MAINNET_API_KEY:-}"
+        write_optional_string testnet_base_url "${VERIFIER_TONCENTER_TESTNET_BASE_URL:-}"
+        write_optional_string testnet_api_key "${VERIFIER_TONCENTER_TESTNET_API_KEY:-}"
         printf '\n'
 
         printf '[payment]\n'
+        printf 'primary_network = "%s"\n' "$(toml_escape "${VERIFIER_PAYMENT_PRIMARY_NETWORK:-testnet}")"
         write_optional_string address "${VERIFIER_PAYMENT_ADDRESS:-}"
         write_optional_int min_amount_nano "${VERIFIER_PAYMENT_MIN_AMOUNT_NANO:-}"
         write_optional_string ledger_path "${VERIFIER_PAYMENT_LEDGER_PATH:-/var/lib/verifier/payment-ledger/payment-ledger.sqlite3}"

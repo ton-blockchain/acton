@@ -70,7 +70,7 @@ export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({
     const id = explorerNetworkId(networkIdentity?.id)
     return {
       id,
-      label: networkIdentity?.label ?? "Simulated localnet",
+      label: networkIdentity?.label ?? "Simulator",
       testOnly: networkIdentity?.testOnly ?? true,
       supportsActions: networkIdentity?.supportsActions ?? (id === "mainnet" || id === "testnet"),
       api,
@@ -130,7 +130,7 @@ export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({
 
 function explorerNetworkId(id: string | undefined): ExplorerNetworkInfo["id"] {
   const normalized = id?.trim().toLocaleLowerCase()
-  if (!normalized || normalized === "localnet" || normalized === "acton-simulated-localnet") {
+  if (!normalized || normalized === "localnet" || normalized === "acton-simulator") {
     return "localnet"
   }
   if (normalized === "mainnet" || normalized === "testnet") return normalized

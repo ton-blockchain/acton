@@ -32,8 +32,8 @@ const MANUAL_COMMANDS: &[&str] = &[
     "library",
     "wallet",
     "rpc",
-    "simulated-localnet",
-    "full-localnet",
+    "simulator",
+    "localnet",
     "doc",
     "ls",
     "up",
@@ -210,7 +210,7 @@ fn test_acton_library_publish_rejects_local_and_global_together() {
 fn test_acton_localnet_airdrop_rejects_non_positive_amount() {
     snapbox::cmd::Command::acton_ui()
         .args([
-            "simulated-localnet",
+            "simulator",
             "airdrop",
             "UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM",
             "--amount",

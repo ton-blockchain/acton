@@ -1,0 +1,21 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/treasury_workchains.test.tolk (3 tests)
+  ✓ treasury addresses and initial funding [TIME]
+    └─ Test output:
+       basechain: workchain=0, hash=6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707, balance=9999999979399
+       masterchain: workchain=-1, hash=6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707, balance=9999996910000
+  ✓ repeated treasury calls fund the same address in each workchain [TIME]
+    └─ Test output:
+       basechain: before=9999999979399, after=19999999958798
+       masterchain: before=9999996910000, after=19999993820000
+  ✓ treasury transfers between basechain and masterchain [TIME]
+    └─ Test output:
+       0 -> -1: transactions=1, balance=9999996910000 -> 10000993820000
+       -1 -> 0: transactions=1, balance=9999999979399 -> 10000999958798
+
+ ✓ 3 passed in 1 file

@@ -1,5 +1,6 @@
 import type {Page} from "@playwright/test"
 import {Cell, loadMessage} from "@ton/core"
+import type {Trace} from "../src/types/test"
 
 import {
   expect,
@@ -150,6 +151,41 @@ const openFanoutGraphScenario = async (
   await firstTransaction.click()
   await expect(page.getByText("Message Route", {exact: true})).toBeVisible()
 }
+
+test("opens and scrolls to the fifth transaction logs in a twenty-transaction trace", async ({
+  loggedFanoutGraphUi,
+  page,
+}) => {
+  const traceResponse = page.waitForResponse("**/api/trace/**")
+  await page.goto(loggedFanoutGraphUi.baseUrl)
+  await openFanoutGraphScenario(page, {
+    testName: "chain graph has twenty transactions",
+    traceName: "chain 20",
+  })
+  const trace = (await (await traceResponse).json()) as Trace
+  const transactions = trace.traces.find(entry => entry.name === "chain 20")?.transactions ?? []
+  expect(transactions).toHaveLength(20)
+
+  const fifth = transactions[4]
+  const id = Cell.fromBase64(fifth.raw_transaction).hash().toString("hex")
+  await page.getByRole("button", {name: `Transaction ${id}`, exact: true}).click()
+  await page.getByRole("button", {name: "View logs", exact: true}).click()
+
+  await expect(page.getByRole("tab", {name: "Logs", exact: true})).toHaveAttribute(
+    "aria-selected",
+    "true",
+  )
+  await expect(page.getByRole("region", {name: /^Transaction #\d+ logs$/})).toHaveCount(20)
+  const logs = page.getByRole("region", {name: "Transaction #5 logs", exact: true})
+  await expect(logs).toBeFocused()
+  await expect(logs.getByText("Transaction #5", {exact: true})).toBeInViewport()
+
+  const content = page.getByTestId("test-details-content")
+  expect(await content.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+  expect((await logs.boundingBox())?.y).toBeCloseTo((await content.boundingBox())?.y ?? -1, 0)
+  await expect(logs.getByRole("button", {name: "Collapse VM Log", exact: true})).toBeVisible()
+  await expect(logs.locator("pre")).toHaveText(fifth.vm_log_diff)
+})
 
 test.describe("Fanout graph visual snapshots", () => {
   test.skip(

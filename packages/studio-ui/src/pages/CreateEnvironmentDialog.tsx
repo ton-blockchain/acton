@@ -28,7 +28,7 @@ import {WalletNamesInput} from "./WalletNamesInput"
 import styles from "./CreateEnvironmentDialog.module.css"
 
 const FULL_LOCALNET_DOCKER_NOTICE_DISMISSED_STORAGE_KEY =
-  "acton-studio:full-localnet-docker-notice-dismissed"
+  "acton-studio:localnet-docker-notice-dismissed"
 
 interface CreateEnvironmentDialogProps {
   readonly environments: readonly StudioEnvironment[]
@@ -279,7 +279,7 @@ export function CreateEnvironmentDialog({
                     className={styles.environmentTypeLink}
                     onClick={() => updateKind("fullTonNetwork")}
                   >
-                    Full localnet
+                    Localnet
                   </button>{" "}
                   for real TON validators and full-node behavior
                 </>
@@ -293,7 +293,7 @@ export function CreateEnvironmentDialog({
                     className={styles.environmentTypeLink}
                     onClick={() => updateKind("actonSimulatedLocalnet")}
                   >
-                    Simulated localnet
+                    Simulator
                   </button>{" "}
                   for instant, lightweight development, forks, and deterministic network control
                 </>
@@ -303,8 +303,8 @@ export function CreateEnvironmentDialog({
             autoFocus
             onChange={event => updateKind(event.target.value as EnvironmentFormState["kind"])}
           >
-            <option value="actonSimulatedLocalnet">Simulated localnet</option>
-            <option value="fullTonNetwork">Full localnet</option>
+            <option value="actonSimulatedLocalnet">Simulator</option>
+            <option value="fullTonNetwork">Localnet</option>
           </Select>
 
           {form.kind === "fullTonNetwork" && !isDockerNoticeDismissed ? (
@@ -523,7 +523,7 @@ function defaultEnvironmentName(
   kind: EnvironmentFormState["kind"],
   environments: readonly StudioEnvironment[],
 ): string {
-  const prefix = kind === "actonSimulatedLocalnet" ? "Simulated localnet" : "Full localnet"
+  const prefix = kind === "actonSimulatedLocalnet" ? "Simulator" : "Localnet"
   const names = new Set(environments.map(environment => environment.name))
   let suffix = 1
 

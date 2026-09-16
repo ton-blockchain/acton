@@ -956,19 +956,19 @@ enum Commands {
     },
     #[command(
         about = "Run an instant local TON simulation with minimal resource use",
-        long_about = "Run Acton's fast, deterministic TON development environment for local execution, forked-state workflows, and faucet funding. It starts instantly, uses very few system resources, and exposes TON-compatible blocks, LiteAPI, TON Center-compatible v2/v3 APIs, Streaming API, and Emulate API.\n\nSimulated localnet is a simplified implementation for contract and dApp development. It does not run validators, consensus, shard elections, or the full production node and indexer stack. Use `acton full-localnet` when you need real TON validators and full-node behavior",
-        after_help = detailed_help_pointer("simulated-localnet")
+        long_about = "Run Acton's fast, deterministic TON development environment for local execution, forked-state workflows, and faucet funding. It starts instantly, uses very few system resources, and exposes TON-compatible blocks, LiteAPI, TON Center-compatible v2/v3 APIs, Streaming API, and Emulate API.\n\nSimulator is a simplified implementation for contract and dApp development. It does not run validators, consensus, shard elections, or the full production node and indexer stack. Use `acton localnet` when you need real TON validators and full-node behavior",
+        after_help = detailed_help_pointer("simulator")
     )]
-    SimulatedLocalnet {
+    Simulator {
         #[command(subcommand)]
-        command: SimulatedLocalnetCommand,
+        command: SimulatorCommand,
     },
     #[command(
         about = "Run a complete local TON network with real validators and consensus",
-        long_about = "Run a complete TON development environment with local validators, the TON Center v2 API, and a TON Center v3 indexer. It supports workflows that depend on validators, consensus, elections, full-node APIs, or indexed chain data.\n\nFull localnet runs TON nodes and supporting services in Docker. It supports administrative APIs, account imports, and cold snapshots, but starts more slowly and uses more CPU, memory, and disk space. Use `acton simulated-localnet` when startup speed, low resource use, forks, or deterministic network control matter more than validator fidelity",
-        after_help = detailed_help_pointer("full-localnet")
+        long_about = "Run a complete TON development environment with local validators, the TON Center v2 API, and a TON Center v3 indexer. It supports workflows that depend on validators, consensus, elections, full-node APIs, or indexed chain data.\n\nLocalnet runs TON nodes and supporting services in Docker. It supports administrative APIs, account imports, and cold snapshots, but starts more slowly and uses more CPU, memory, and disk space. Use `acton simulator` when startup speed, low resource use, forks, or deterministic network control matter more than validator fidelity",
+        after_help = detailed_help_pointer("localnet")
     )]
-    FullLocalnet {
+    Localnet {
         #[command(flatten)]
         args: commands::localnet::LocalnetArgs,
     },
@@ -1159,13 +1159,10 @@ enum Commands {
 }
 
 #[derive(Subcommand, Clone)]
-pub enum SimulatedLocalnetCommand {
+pub enum SimulatorCommand {
     #[command(about = "Start Acton's simplified TON development environment")]
     Start {
-        #[arg(
-            long,
-            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
-        )]
+        #[arg(long, help = "Simulator HTTP port (default: [localnet].port or 5411)")]
         port: Option<u16>,
         #[arg(
             long,
@@ -1213,7 +1210,7 @@ pub enum SimulatedLocalnetCommand {
         block_time_ms: Option<u64>,
         #[arg(
             long,
-            help = "Disable automatic block production; mine blocks manually with `acton simulated-localnet mine` (default: [localnet].no-mining)"
+            help = "Disable automatic block production; mine blocks manually with `acton simulator mine` (default: [localnet].no-mining)"
         )]
         no_mining: bool,
         #[arg(
@@ -1224,7 +1221,7 @@ pub enum SimulatedLocalnetCommand {
         #[arg(
             long,
             value_name = "PATH",
-            help = "Snapshot directory (defaults to a directory next to the database, or .acton/simulated-localnet/<port>/snapshots)"
+            help = "Snapshot directory (defaults to a directory next to the database, or .acton/simulator/<port>/snapshots)"
         )]
         snapshots_dir: Option<PathBuf>,
         #[arg(
@@ -1261,7 +1258,7 @@ pub enum SimulatedLocalnetCommand {
         #[arg(
             long,
             short,
-            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
+            help = "Simulator HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1279,7 +1276,7 @@ pub enum SimulatedLocalnetCommand {
         #[arg(
             long,
             short,
-            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
+            help = "Simulator HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1296,7 +1293,7 @@ pub enum SimulatedLocalnetCommand {
         #[arg(
             long,
             short,
-            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
+            help = "Simulator HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1309,7 +1306,7 @@ pub enum SimulatedLocalnetCommand {
         #[arg(
             long,
             short,
-            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
+            help = "Simulator HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1325,7 +1322,7 @@ pub enum SimulatedLocalnetCommand {
         #[arg(
             long,
             short,
-            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
+            help = "Simulator HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
@@ -1336,7 +1333,7 @@ pub enum SimulatedLocalnetCommand {
         #[arg(
             long,
             short,
-            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
+            help = "Simulator HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(long, help = "Print machine-readable JSON")]
@@ -1347,12 +1344,12 @@ pub enum SimulatedLocalnetCommand {
     #[command(about = "Manage persistent JSON snapshots")]
     Snapshot {
         #[command(subcommand)]
-        command: commands::simulated_localnet::SnapshotCommand,
+        command: commands::simulator::SnapshotCommand,
         #[arg(
             long,
             short,
             global = true,
-            help = "Simulated localnet HTTP port (default: [localnet].port or 5411)"
+            help = "Simulator HTTP port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
         #[arg(
@@ -1662,8 +1659,8 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("rpc", "<COMMAND>"),
         ("verify", "[CONTRACT_NAME]"),
         ("library", "<COMMAND>"),
-        ("simulated-localnet", "<COMMAND>"),
-        ("full-localnet", "<COMMAND>"),
+        ("simulator", "<COMMAND>"),
+        ("localnet", "<COMMAND>"),
         // ("studio", "<COMMAND>"),
         ("retrace", "<TX_HASH>"),
     ];
@@ -2032,10 +2029,7 @@ fn load_project_dotenv(project_roots_configured: bool) {
 
 fn configure_studio_public_network_routing(command: &Commands, project_roots_configured: bool) {
     if !project_roots_configured
-        || matches!(
-            command,
-            Commands::Studio { .. } | Commands::FullLocalnet { .. }
-        )
+        || matches!(command, Commands::Studio { .. } | Commands::Localnet { .. })
         || !configured_manifest_path().is_file()
     {
         return;
@@ -2577,7 +2571,7 @@ fn main() {
                 .enable_all()
                 .build()
                 .expect("Failed to initialize tokio runtime for language server");
-            rt.block_on(ls_cmd(
+            let result = rt.block_on(ls_cmd(
                 port,
                 stdio,
                 log_file,
@@ -2585,10 +2579,15 @@ fn main() {
                 log_level,
                 stdlib_path,
                 profile,
-            ))
+            ));
+
+            // Tokio's blocking stdin read cannot be cancelled. The LSP session has
+            // finished, so process shutdown must not wait for the client to send EOF.
+            rt.shutdown_background();
+            result
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
-        Commands::FullLocalnet { args } => commands::localnet::localnet_cmd(args),
+        Commands::Localnet { args } => commands::localnet::localnet_cmd(args),
         Commands::Studio {
             host,
             port,
@@ -2600,8 +2599,8 @@ fn main() {
                 .expect("Failed to initialize tokio runtime for Studio");
             rt.block_on(commands::studio::studio_start_cmd(host, port, !no_open))
         }
-        Commands::SimulatedLocalnet { command } => match command {
-            SimulatedLocalnetCommand::Start {
+        Commands::Simulator { command } => match command {
+            SimulatorCommand::Start {
                 port,
                 fork_net,
                 fork_block_number,
@@ -2634,7 +2633,7 @@ fn main() {
                     .build()
                     .expect("Failed to build tokio runtime");
                 rt.block_on(async {
-                    commands::simulated_localnet::simulated_localnet_start_cmd(
+                    commands::simulator::simulator_start_cmd(
                         resolved_localnet.port,
                         resolved_localnet.db_path,
                         resolved_localnet.fork_net,
@@ -2653,7 +2652,7 @@ fn main() {
                     .await
                 })
             }
-            SimulatedLocalnetCommand::Airdrop {
+            SimulatorCommand::Airdrop {
                 address,
                 amount,
                 port,
@@ -2665,13 +2664,11 @@ fn main() {
                     .build()
                     .expect("Failed to build tokio runtime");
                 rt.block_on(async {
-                    commands::simulated_localnet::simulated_localnet_airdrop_cmd(
-                        &address, amount, port, auth_token,
-                    )
-                    .await
+                    commands::simulator::simulator_airdrop_cmd(&address, amount, port, auth_token)
+                        .await
                 })
             }
-            SimulatedLocalnetCommand::Mine {
+            SimulatorCommand::Mine {
                 blocks,
                 port,
                 auth_token,
@@ -2682,13 +2679,10 @@ fn main() {
                     .build()
                     .expect("Failed to build tokio runtime");
                 rt.block_on(async {
-                    commands::simulated_localnet::simulated_localnet_mine_cmd(
-                        blocks, port, auth_token,
-                    )
-                    .await
+                    commands::simulator::simulator_mine_cmd(blocks, port, auth_token).await
                 })
             }
-            SimulatedLocalnetCommand::IncreaseTime {
+            SimulatorCommand::IncreaseTime {
                 seconds,
                 port,
                 auth_token,
@@ -2699,13 +2693,11 @@ fn main() {
                     .build()
                     .expect("Failed to build tokio runtime");
                 rt.block_on(async {
-                    commands::simulated_localnet::simulated_localnet_increase_time_cmd(
-                        seconds, port, auth_token,
-                    )
-                    .await
+                    commands::simulator::simulator_increase_time_cmd(seconds, port, auth_token)
+                        .await
                 })
             }
-            SimulatedLocalnetCommand::SetTime {
+            SimulatorCommand::SetTime {
                 timestamp,
                 port,
                 auth_token,
@@ -2716,13 +2708,10 @@ fn main() {
                     .build()
                     .expect("Failed to build tokio runtime");
                 rt.block_on(async {
-                    commands::simulated_localnet::simulated_localnet_set_time_cmd(
-                        timestamp, port, auth_token,
-                    )
-                    .await
+                    commands::simulator::simulator_set_time_cmd(timestamp, port, auth_token).await
                 })
             }
-            SimulatedLocalnetCommand::SetNextBlockTimestamp {
+            SimulatorCommand::SetNextBlockTimestamp {
                 timestamp,
                 port,
                 auth_token,
@@ -2733,13 +2722,13 @@ fn main() {
                     .build()
                     .expect("Failed to build tokio runtime");
                 rt.block_on(async {
-                    commands::simulated_localnet::simulated_localnet_set_next_block_timestamp_cmd(
+                    commands::simulator::simulator_set_next_block_timestamp_cmd(
                         timestamp, port, auth_token,
                     )
                     .await
                 })
             }
-            SimulatedLocalnetCommand::Status {
+            SimulatorCommand::Status {
                 port,
                 json,
                 auth_token,
@@ -2750,13 +2739,10 @@ fn main() {
                     .build()
                     .expect("Failed to build tokio runtime");
                 rt.block_on(async {
-                    commands::simulated_localnet::simulated_localnet_status_cmd(
-                        port, json, auth_token,
-                    )
-                    .await
+                    commands::simulator::simulator_status_cmd(port, json, auth_token).await
                 })
             }
-            SimulatedLocalnetCommand::Snapshot {
+            SimulatorCommand::Snapshot {
                 command,
                 port,
                 auth_token,
@@ -2767,11 +2753,9 @@ fn main() {
                     .enable_all()
                     .build()
                     .expect("Failed to build tokio runtime");
-                rt.block_on(
-                    commands::simulated_localnet::simulated_localnet_snapshot_cmd(
-                        command, port, auth_token, json,
-                    ),
-                )
+                rt.block_on(commands::simulator::simulator_snapshot_cmd(
+                    command, port, auth_token, json,
+                ))
             }
         },
     };
@@ -2802,7 +2786,7 @@ const fn command_checks_toolchain_version(command: &Commands) -> bool {
                 | Commands::Completions { .. }
                 | Commands::Doctor
                 | Commands::Studio { .. }
-                | Commands::FullLocalnet { .. }
+                | Commands::Localnet { .. }
         )
 }
 

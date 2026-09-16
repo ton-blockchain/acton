@@ -15,7 +15,7 @@ fun onInternalMessage(in: InMessage) {
     val gasConsumedForCalculation = getGasConsumedAtTheMoment() - gasConsumedBeforeCalculation;
 
     val toReserve = calculateGasFeeWithoutFlatPrice(MASTERCHAIN, gasConsumedForCalculation) +
-    calculateStorageFee(MASTERCHAIN, DEFAULT_DURATION, libraryBits, libraryRefs);
+        calculateStorageFee(MASTERCHAIN, DEFAULT_DURATION, libraryBits, libraryRefs);
 
     reserveGramsOnBalance(toReserve, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 

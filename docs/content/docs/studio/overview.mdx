@@ -3,6 +3,8 @@ title: "Overview"
 description: "Understand what Acton Studio is, when to use it, and how its workspace, tests, and environments fit together"
 ---
 
+<AvailabilityBadge since="Acton 1.2" />
+
 Acton Studio is a local browser workspace for developing and debugging TON applications with Acton.
 It brings test history, isolated networks, an explorer, contract metadata, wallets, simulation, and
 API diagnostics into one interface. Acton CLI remains the execution layer.
@@ -29,8 +31,8 @@ terminal output, a standalone explorer, and several localnet tools.
   results, and environment health on one page.
 - **Run and investigate tests.** Start the same `acton test` workflow from the browser or inspect
   runs reported by the CLI, including failures, traces, logs, source locations, and runner output.
-- **Create isolated TON networks.** Use a fast simulated localnet for daily work or a Docker-based
-  Full localnet when validator and indexer fidelity matters.
+- **Create isolated TON networks.** Use a fast simulator for daily work or a Docker-based
+  Localnet when validator and indexer fidelity matters.
 - **Debug the application, not only the contract.** Follow blocks and transactions, inspect known
   contracts, simulate messages, review API calls, and connect a frontend to a stable Studio RPC URL.
 
@@ -47,11 +49,11 @@ explorer, wallets, simulator, contracts, and API tools. Studio exposes three env
 
 | Environment | Purpose |
 | --- | --- |
-| Simulated localnet | Fast contract and dApp environment with compatible blocks and APIs; Acton's custom simplified implementation, not a real TON network |
-| Full localnet | Local validators and indexers in Docker for behavior closer to a full TON network |
+| Simulator | Fast contract and dApp environment with compatible blocks and APIs; Acton's custom simplified implementation, not a real TON network |
+| Localnet | Local validators and indexers in Docker for behavior closer to a full TON network |
 | Testnet and Mainnet | Persistent external network entries for inspecting and interacting with public TON networks |
 
-Features appear only when the selected environment supports them. For example, a Full localnet has
+Features appear only when the selected environment supports them. For example, a Localnet has
 cold snapshots, while Testnet and Mainnet do not expose lifecycle or mining controls.
 
 ## Studio and the CLI
@@ -80,7 +82,7 @@ Studio is not running, the normal CLI behavior and exit codes stay unchanged.
     Run tests from Studio or the CLI and investigate failures with saved artifacts.
   </Card>
   <Card href="/docs/studio/environments" title="Environments">
-    Choose between Simulated localnet, Full localnet, Testnet, and Mainnet.
+    Choose between Simulator, Localnet, Testnet, and Mainnet.
   </Card>
   <Card href="/docs/studio/workspace" title="Environment Workspace">
     Connect projects and applications, use wallets and faucets, and review API traffic.
@@ -92,7 +94,7 @@ Studio is not running, the normal CLI behavior and exit codes stay unchanged.
     Emulate messages against an environment and decode TON cells.
   </Card>
   <Card href="/docs/studio/snapshots-and-settings" title="Snapshots and Settings">
-    Save Full localnet state, inspect configuration, and manage an environment.
+    Save Localnet state, inspect configuration, and manage an environment.
   </Card>
   <Card href="/docs/studio/troubleshooting" title="Troubleshooting">
     Diagnose Studio, test reporting, environment, Explorer, and API problems.

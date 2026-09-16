@@ -34,7 +34,7 @@ pub mod analysis;
 /// - tracks locals tainted by division through assignments and warns when
 ///   such values are later used in multiplication.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.1")]
+#[violation_metadata(preview_since = "v1.0.0")]
 pub struct DivideBeforeMultiply;
 
 impl Violation for DivideBeforeMultiply {

@@ -80,7 +80,7 @@ impl WalletRuntime for ProjectWalletRuntime {
                 name: wallet.name.clone(),
                 address: wallet.wallet.address.to_base64(false, false, true),
                 public_key: format!("0x{}", hex::encode(wallet.wallet.key_pair.public_key)),
-                version: crate::commands::simulated_localnet::wallet_version_to_string(
+                version: crate::commands::simulator::wallet_version_to_string(
                     wallet.wallet.version,
                 )
                 .to_owned(),

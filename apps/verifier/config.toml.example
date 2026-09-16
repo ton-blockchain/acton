@@ -1,21 +1,22 @@
 [server]
 bind_addr = "127.0.0.1:3000"
 # api_key = "migration-api-key"
+read_only = false
 
 [logging]
 # Supported values: trace, debug, info, warn, error.
 level = "info"
 
-[network]
-# Payment verification supports only testnet.
-name = "testnet"
-
 [toncenter]
-# base_url = "https://testnet.toncenter.com"
-# api_key = "your-api-key"
+# mainnet_base_url = "https://toncenter.com"
+# mainnet_api_key = "your-api-key"
+# testnet_base_url = "https://testnet.toncenter.com"
+# testnet_api_key = "your-api-key"
 
 [payment]
-# Required in production. Use a raw basechain address.
+# Supported values: mainnet, testnet.
+primary_network = "testnet"
+# Required in production. Use a raw basechain address on the selected network.
 # address = "0:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 # min_amount_nano = 500000000 # 0.5 GRAM
 ledger_path = "verifier-payments.sqlite3"

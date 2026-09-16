@@ -231,6 +231,38 @@ const externalOutMessage = (body: Cell) => ({
 })
 
 describe("decodeMessageBody", () => {
+  test("decodes rich bounced bodies from the original payload reference", () => {
+    const receiverAbi = createUintMessageAbi({
+      contractName: "BouncedReceiver",
+      messageName: "OriginalOutgoing",
+      direction: "outgoing",
+      prefix: 1,
+    })
+    const original = beginCell().storeUint(1, 32).storeUint(42, 32).endCell()
+    const body = beginCell()
+      .storeUint(0xff_ff_ff_fe, 32)
+      .storeRef(original)
+      .storeRef(beginCell().storeCoins(0n).storeBit(false).storeUint(0, 96).endCell())
+      .storeUint(0, 8)
+      .storeInt(-14, 32)
+      .storeBit(false)
+      .endCell()
+
+    expect(
+      decodeMessageBody(
+        internalMessage(body, true),
+        contractsByAddress([receiverAddress, receiverAbi]),
+      ),
+    ).toMatchSnapshot()
+  })
+
+  test("does not use rich bounce diagnostics as an opcode when the original ref is missing", () => {
+    const body = beginCell().storeUint(0xff_ff_ff_fe, 32).storeUint(1, 32).endCell()
+
+    expect(getMessageOpcode(internalMessage(body, true))).toMatchSnapshot()
+    expect(decodeMessageBody(internalMessage(body, true), new Map())).toMatchSnapshot()
+  })
+
   test("decodes a single prefixless Wallet V4 external message before a text comment", () => {
     const body = beginCell()
       .storeUint(0n, 512)

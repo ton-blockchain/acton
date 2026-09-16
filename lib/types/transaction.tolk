@@ -16,7 +16,7 @@
 /// if (description is TlbTransOrd) {
 ///     val compute = description.computePh;
 ///     if (compute is TlbTrComputeVm) {
-///         println("VM exit code: {}", compute.exitCode);
+///         println("VM exit code: {}", compute.data.load().exitCode);
 ///     }
 /// }
 /// ```
@@ -164,7 +164,7 @@ struct TlbTransactionMessages {
     outMsgs: map<uint15, Cell<TlbMessageRelaxedGeneric>>
 }
 
-/// Represents merkle update for proof-of-work.
+/// Represents a Merkle update between two states.
 struct (0b0100) TlbMerkleUpdate<X> {
     /// Old hash.
     oldHash: bits256

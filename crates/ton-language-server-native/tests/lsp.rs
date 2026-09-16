@@ -8,6 +8,23 @@ use ton_language_server_native::ServerConfig;
 use tower_lsp::lsp_types::Url;
 
 #[tokio::test]
+async fn exit_before_initialize_reports_an_error_even_with_eof() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    let body = r#"{"jsonrpc":"2.0","method":"exit"}"#;
+    let input = format!("Content-Length: {}\r\n\r\n{body}", body.len());
+    let result = ton_language_server_native::serve_stream(
+        ServerConfig::new(workspace.path()),
+        std::io::Cursor::new(input),
+        tokio::io::sink(),
+    )
+    .await;
+
+    expect![[r#"Err("language server received exit before shutdown")"#]]
+        .assert_eq(&format!("{:?}", result.map_err(|error| error.to_string())));
+    Ok(())
+}
+
+#[tokio::test]
 async fn dynamically_registers_workspace_file_watchers() -> anyhow::Result<()> {
     let workspace = tempfile::tempdir()?;
     fs::write(workspace.path().join("Acton.toml"), "")?;

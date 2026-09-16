@@ -1,0 +1,17 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/empty.test.tolk (1 test)
+  ✗ send result list get used gas empty [TIME]
+    └─ Error: SendResultList.getUsedGas(expected)
+        
+        Cannot find transaction from <any> to <any>
+        with:
+      └─ at tests/empty.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

@@ -15,11 +15,10 @@ use serde_json::Value;
 use tokio::time::{sleep, timeout};
 
 #[tokio::test]
-async fn project_artifacts_are_published_to_public_networks_without_a_managed_environment() {
+async fn project_artifacts_wait_for_manifest_and_publish_without_a_managed_environment() {
     let temp = tempfile::tempdir_in("/tmp").expect("temporary workspace");
     let project_root = temp.path().join("project");
     fs::create_dir(&project_root).expect("project directory");
-    fs::write(project_root.join("Acton.toml"), "[contracts]\n").expect("Acton manifest");
     fs::write(project_root.join("counter.tolk"), "fun main() {}\n").expect("contract source");
 
     let build_count_path = temp.path().join("build-count.txt");
@@ -37,6 +36,15 @@ async fn project_artifacts_are_published_to_public_networks_without_a_managed_en
     )
     .await
     .expect("environment runtime");
+
+    // Allow the coordinator to observe stable sources without a manifest before
+    // making the project buildable. This used to start a failing background build.
+    sleep(Duration::from_millis(1_500)).await;
+    assert!(
+        !build_count_path.exists(),
+        "Studio must not build sources without an Acton manifest"
+    );
+    fs::write(project_root.join("Acton.toml"), "[contracts]\n").expect("Acton manifest");
 
     let mut registries = Vec::new();
     for environment_id in PUBLIC_TON_ENVIRONMENT_IDS {

@@ -5,5 +5,5 @@ services:
       dockerfile: apps/verifier/Dockerfile
     image: ton-verifier:local
     environment:
-      VERIFIER_NETWORK: testnet
-      VERIFIER_TONCENTER_BASE_URL: ${VERIFIER_TONCENTER_BASE_URL:-https://testnet.toncenter.com}
+      VERIFIER_TONCENTER_MAINNET_BASE_URL: ${VERIFIER_TONCENTER_MAINNET_BASE_URL:-https://toncenter.com}
+      VERIFIER_TONCENTER_TESTNET_BASE_URL: ${VERIFIER_TONCENTER_TESTNET_BASE_URL:-https://testnet.toncenter.com}

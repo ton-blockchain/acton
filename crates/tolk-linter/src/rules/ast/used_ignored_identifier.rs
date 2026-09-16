@@ -28,7 +28,7 @@ use tolk_resolver::file_index::FileId;
 /// }
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct UsedIgnoredIdentifier;
 
 impl Violation for UsedIgnoredIdentifier {

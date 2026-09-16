@@ -8,14 +8,16 @@ use serde::Serialize;
 use utoipa::ToSchema;
 
 use crate::{
-    compilers::CompilerError, payment::PaymentError, registry::RegistryError,
-    registry_index::VerificationIndexError, source_bundle::SourceBundleError,
-    source_storage::SourceStorageError, verification::VerificationError,
+    blockchain::BlockchainError, compilers::CompilerError, config::TonNetwork,
+    payment::PaymentError, registry::RegistryError, registry_index::VerificationIndexError,
+    source_bundle::SourceBundleError, source_storage::SourceStorageError,
+    verification::VerificationError,
 };
 
 const INTERNAL_ERROR_MESSAGE: &str = "internal verifier error";
 const RETRYABLE_SOURCE_STORAGE_ERROR: &str =
     "verification_retryable: source storage is temporarily unavailable";
+const READ_ONLY_ERROR: &str = "verifier_read_only: verification of new contracts is disabled";
 
 #[derive(Debug)]
 pub struct ApiError {
@@ -24,6 +26,7 @@ pub struct ApiError {
     expose_message: bool,
     public_fallback: &'static str,
     payment_retryable: bool,
+    code_hash_matches: Option<Vec<CodeHashMatch>>,
 }
 
 impl ApiError {
@@ -34,6 +37,7 @@ impl ApiError {
             expose_message: true,
             public_fallback: INTERNAL_ERROR_MESSAGE,
             payment_retryable: false,
+            code_hash_matches: None,
         }
     }
 
@@ -44,6 +48,7 @@ impl ApiError {
             expose_message: true,
             public_fallback: INTERNAL_ERROR_MESSAGE,
             payment_retryable: false,
+            code_hash_matches: None,
         }
     }
 
@@ -54,6 +59,7 @@ impl ApiError {
             expose_message: false,
             public_fallback: INTERNAL_ERROR_MESSAGE,
             payment_retryable: false,
+            code_hash_matches: None,
         }
     }
 
@@ -68,6 +74,7 @@ impl ApiError {
             expose_message: false,
             public_fallback: RETRYABLE_SOURCE_STORAGE_ERROR,
             payment_retryable: true,
+            code_hash_matches: None,
         }
     }
 
@@ -78,6 +85,7 @@ impl ApiError {
             expose_message: true,
             public_fallback: INTERNAL_ERROR_MESSAGE,
             payment_retryable: false,
+            code_hash_matches: None,
         }
     }
 
@@ -88,6 +96,7 @@ impl ApiError {
             expose_message: true,
             public_fallback: INTERNAL_ERROR_MESSAGE,
             payment_retryable: false,
+            code_hash_matches: None,
         }
     }
 
@@ -98,6 +107,7 @@ impl ApiError {
             expose_message: true,
             public_fallback: INTERNAL_ERROR_MESSAGE,
             payment_retryable: false,
+            code_hash_matches: None,
         }
     }
 
@@ -108,7 +118,12 @@ impl ApiError {
             expose_message: true,
             public_fallback: INTERNAL_ERROR_MESSAGE,
             payment_retryable: false,
+            code_hash_matches: None,
         }
+    }
+
+    pub fn read_only() -> Self {
+        Self::service_unavailable(READ_ONLY_ERROR.to_owned())
     }
 
     #[must_use]
@@ -123,6 +138,31 @@ impl ApiError {
             expose_message: true,
             public_fallback: INTERNAL_ERROR_MESSAGE,
             payment_retryable: false,
+            code_hash_matches: None,
+        }
+    }
+
+    fn ambiguous_address(
+        address: &str,
+        mainnet_code_hash: String,
+        testnet_code_hash: String,
+    ) -> Self {
+        Self {
+            status: StatusCode::CONFLICT,
+            message: format!("address {address} has code_hash on both TON mainnet and testnet"),
+            expose_message: true,
+            public_fallback: INTERNAL_ERROR_MESSAGE,
+            payment_retryable: false,
+            code_hash_matches: Some(vec![
+                CodeHashMatch {
+                    network: TonNetwork::Mainnet,
+                    code_hash: mainnet_code_hash,
+                },
+                CodeHashMatch {
+                    network: TonNetwork::Testnet,
+                    code_hash: testnet_code_hash,
+                },
+            ]),
         }
     }
 }
@@ -131,6 +171,11 @@ impl From<VerificationError> for ApiError {
     fn from(err: VerificationError) -> Self {
         match err {
             VerificationError::CodeHashNotFound { .. } => Self::not_found(err.to_string()),
+            VerificationError::Blockchain(BlockchainError::AddressFoundOnBothNetworks {
+                address,
+                mainnet_code_hash,
+                testnet_code_hash,
+            }) => Self::ambiguous_address(&address, mainnet_code_hash, testnet_code_hash),
             VerificationError::Blockchain(blockchain_err) => {
                 Self::hidden_bad_gateway(blockchain_err.to_string())
             }
@@ -233,24 +278,47 @@ impl From<PaymentError> for ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        let message = if self.expose_message {
-            self.message
+        let Self {
+            status,
+            message,
+            expose_message,
+            public_fallback,
+            payment_retryable: _,
+            code_hash_matches,
+        } = self;
+        let (message, code_hash_matches) = if expose_message {
+            (message, code_hash_matches)
         } else {
             tracing::error!(
-                status = %self.status,
-                error = %self.message,
+                status = %status,
+                error = %message,
                 "verifier operation failed"
             );
-            self.public_fallback.to_owned()
+            (public_fallback.to_owned(), None)
         };
 
-        (self.status, Json(ErrorResponse { error: message })).into_response()
+        (
+            status,
+            Json(ErrorResponse {
+                error: message,
+                matches: code_hash_matches,
+            }),
+        )
+            .into_response()
     }
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ErrorResponse {
     pub error: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub matches: Option<Vec<CodeHashMatch>>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CodeHashMatch {
+    pub network: TonNetwork,
+    pub code_hash: String,
 }
 
 #[cfg(test)]
@@ -438,6 +506,26 @@ mod tests {
         assert_eq!(
             response_body(response).await,
             r#"{"error":"internal verifier error"}"#
+        );
+    }
+
+    #[tokio::test]
+    async fn address_found_on_both_networks_is_an_exposed_conflict() {
+        let error = VerificationError::from(BlockchainError::AddressFoundOnBothNetworks {
+            address: "EQduplicate".to_owned(),
+            mainnet_code_hash: "a".repeat(64),
+            testnet_code_hash: "b".repeat(64),
+        });
+        let response = ApiError::from(error).into_response();
+
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+        assert_eq!(
+            response_body(response).await,
+            format!(
+                r#"{{"error":"address EQduplicate has code_hash on both TON mainnet and testnet","matches":[{{"network":"mainnet","code_hash":"{}"}},{{"network":"testnet","code_hash":"{}"}}]}}"#,
+                "a".repeat(64),
+                "b".repeat(64),
+            )
         );
     }
 

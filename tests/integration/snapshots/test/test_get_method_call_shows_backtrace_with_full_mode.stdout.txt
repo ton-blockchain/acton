@@ -15,8 +15,9 @@
       ├─ Backtrace:
       │     currentCounterFail   at contracts/simple[LINE]
       ├─ Called from:
-      │     net.runGetMethod<int>   at ../lib/emulation/network[LINE]
-      │     test foo                at tests/test.test[LINE]
+      │     GetMethodResult<int>.unwrap   at ../lib/emulation/network[LINE]
+      │     net.runGetMethod<int>         at ../lib/emulation/network[LINE]
+      │     test foo                      at tests/test.test[LINE]
       ├─ Description: Dictionary error
       └─ Phase: Compute phase
 

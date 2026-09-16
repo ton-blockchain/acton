@@ -3,23 +3,25 @@ title: "Snapshots and Settings"
 description: "Save and restore localnet state, inspect environment configuration, tune supported runtime behavior, and delete environments"
 ---
 
+<AvailabilityBadge since="Acton 1.2" />
+
 Managed environments expose configuration and lifecycle controls through the settings icon at the
-bottom of the environment sidebar. Both Simulated and Full localnet have a **Snapshots** page
+bottom of the environment sidebar. Both Simulator and Localnet have a **Snapshots** page
 for returning the environment to a known state.
 
-## Full localnet snapshots
+## Localnet snapshots
 
 Open **Snapshots** and select **Create snapshot**. Enter a name that describes the scenario, then confirm creation.
 
 <figure className="theme-image my-6">
   <img
     src="/docs/studio/snapshots-light.png"
-    alt="Full localnet Snapshots page in light theme with saved block, archive size, state size, and actions"
+    alt="Localnet Snapshots page in light theme with saved block, archive size, state size, and actions"
     className="theme-image-light rounded-lg border shadow-sm"
   />
   <img
     src="/docs/studio/snapshots-dark.png"
-    alt="Full localnet Snapshots page in dark theme with saved block, archive size, state size, and actions"
+    alt="Localnet Snapshots page in dark theme with saved block, archive size, state size, and actions"
     className="theme-image-dark rounded-lg border shadow-sm"
   />
 </figure>
@@ -32,7 +34,7 @@ The table records:
 - compressed archive size
 - uncompressed network state size
 
-Snapshot creation stops a running Full localnet while Docker state is archived, then starts it again.
+Snapshot creation stops a running Localnet while Docker state is archived, then starts it again.
 The progress panel separates the operation into prepare, stop network, create archive, and start
 network phases, then shows Docker Compose, TON node, API, and indexer readiness.
 
@@ -41,7 +43,7 @@ same progress when you return.
 
 ### Restore a snapshot
 
-Select the restore action in the snapshot row and confirm. Restore replaces the current Full localnet
+Select the restore action in the snapshot row and confirm. Restore replaces the current Localnet
 state with the archive, restarts network services, and rebuilds the index before the environment is
 available again.
 
@@ -56,7 +58,7 @@ running state.
 Snapshots can be large. Delete snapshots that are no longer needed and keep enough disk space for
 both the compressed archive and working state during creation or restore.
 
-## Simulated localnet snapshots
+## Simulator snapshots
 
 Open **Snapshots** to create a named snapshot of accounts, block and transaction history,
 registered metadata, pending messages, and virtual time. Each snapshot is a JSON file
@@ -83,13 +85,13 @@ Renaming changes labels throughout Studio but keeps the environment ID and endpo
 The **Network** section shows the environment type, network identity, supported endpoint URLs, and
 type-specific creation data.
 
-For a Simulated localnet it also shows:
+For a Simulator it also shows:
 
 - assigned runtime port
 - clean or forked initial state and selected block
 - current response delay and rate limit
 
-For a Full localnet it shows the validator count and the V2, V3, Admin, and Config endpoints that are
+For a Localnet it shows the validator count and the V2, V3, Admin, and Config endpoints that are
 available.
 
 When the runtime supports network controls, set **Response delay** to emulate a slower API. Use `0`
@@ -98,7 +100,7 @@ scenario needs a different startup rate configuration.
 
 ## Mining settings
 
-Mining settings appear only for a running Simulated localnet:
+Mining settings appear only for a running Simulator:
 
 - whether automatic mining is enabled
 - automatic block time
@@ -112,7 +114,7 @@ Manual mining and the initial automatic-mining choice are selected when creating
 The **Danger zone** is available for managed environments even when the runtime is stopped or failed.
 Select **Delete environment**, read the confirmation, and confirm deletion.
 
-Deletion removes the environment metadata and all Studio-managed saved data. For a Full localnet,
+Deletion removes the environment metadata and all Studio-managed saved data. For a Localnet,
 this includes its Docker state and snapshots. This action cannot be undone. Do not delete the
 environment if you still need its state or snapshots.
 

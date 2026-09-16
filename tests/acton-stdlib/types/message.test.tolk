@@ -100,7 +100,15 @@ get fun `test load opcode for new bounced message prefix`() {
         dest,
         body: beginCell()
             .storeUint(0xFFFFFFFE, 32)
-            .storeUint(reflect.serializationPrefixOf<IncreaseCounter>().0, 32)
+            .storeRef(
+                beginCell()
+                    .storeUint(reflect.serializationPrefixOf<IncreaseCounter>().0, 32)
+                    .endCell(),
+            )
+            .storeRef(beginCell().storeCoins(0).storeBool(false).storeUint(0, 96).endCell())
+            .storeUint(0, 8)
+            .storeInt(-14, 32)
+            .storeBool(false)
             .endCell(),
     });
     msg.send(SEND_MODE_REGULAR | SEND_MODE_BOUNCE_ON_ACTION_FAIL);

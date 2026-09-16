@@ -51,10 +51,11 @@ struct TlbMessageRelaxedGeneric {
 /// - body does not contain the `TlbEither` branch bit;
 /// - body marks `TlbEitherRight` but does not contain a body reference;
 /// - decoded body has fewer than 32 bits for the first opcode;
-/// - [skipBounce] is true, first opcode is a bounce prefix (`0xFFFFFFFF` or `0xFFFFFFFE`),
-///   and fewer than 32 bits remain for the second opcode.
+/// - [skipBounce] is true and the original bounced payload is missing or too short.
 ///
-/// If [skipBounce] is true, bounce prefixes `0xFFFFFFFF` and `0xFFFFFFFE` are skipped.
+/// If [skipBounce] is true, `0xFFFFFFFF` is skipped inline, while `0xFFFFFFFE`
+/// loads the original body from the first reference. For other prefixes, returns the first 32-bit opcode.
+/// Rich bounce (`0xFFFFFFFE`) payload decoding is supported since Acton 1.2.
 ///
 /// Example:
 /// ```tolk
@@ -83,8 +84,10 @@ struct TlbExtMessageRelaxedGeneric {
 ///
 /// Same behavior as [TlbMessageRelaxedGeneric.loadOpcode]:
 /// - returns the first 32-bit opcode by default;
-/// - if [skipBounce] is true, bounce prefixes `0xFFFFFFFF` and `0xFFFFFFFE` are skipped;
+/// - if [skipBounce] is true, legacy and rich bounce envelopes are unwrapped;
 /// - returns `null` for malformed or too-short body data.
+///
+/// Rich bounce (`0xFFFFFFFE`) payload decoding is supported since Acton 1.2.
 fun TlbExtMessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int? {
     return impl.loadOpcode(self.body, skipBounce);
 }
@@ -285,6 +288,13 @@ fun impl.loadOpcode(body: slice, skipBounce: bool): int? {
 
     val opcode = slice.loadUint(32);
     if (skipBounce && (opcode == 0xFFFFFFFF || opcode == 0xFFFFFFFE)) {
+        if (opcode == 0xFFFFFFFE) {
+            if (slice.remainingRefsCount() == 0) {
+                return null;
+            }
+            // Rich bounces keep phase diagnostics inline and the original payload in a ref.
+            slice = slice.loadRef().beginParse();
+        }
         if (slice.remainingBitsCount() < 32) {
             return null;
         }

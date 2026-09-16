@@ -123,6 +123,7 @@ async fn add_reports_child_failure_when_stdin_closes_early() {
             block_time_ms: None,
             election_time_seconds: None,
             imported_account_bocs: vec![],
+            startup_wallets: vec![],
         },
         docker_target: super::super::DockerTarget::Context("unused".into()),
         isolated_docker_config_dir: None,

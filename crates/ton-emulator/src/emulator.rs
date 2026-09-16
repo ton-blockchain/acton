@@ -714,20 +714,16 @@ pub struct SendMessageResultSuccess {
 impl SendMessageResultSuccess {
     /// Extracts the opcode from the incoming message body.
     ///
-    /// If the message is a bounced message, it tries to extract the opcode
-    /// following the initial 32-bit `0xffffffff` prefix.
+    /// Bounced messages use the original payload: inline after `0xffffffff`,
+    /// or in the first reference of a rich `0xfffffffe` bounce.
     #[must_use]
     pub fn opcode(&self) -> Option<u32> {
         let in_msg = self.transaction.in_msg.as_deref()?;
-        let mut in_msg = in_msg.parse::<RelaxedMessage<'_>>().ok()?;
-        let opcode = in_msg.body.load_u32().ok()?;
-        if let RelaxedMsgInfo::Int(info) = &in_msg.info
-            && info.bounced
-        {
-            let opcode = in_msg.body.load_u32().ok()?;
-            return Some(opcode);
-        }
-        Some(opcode)
+        let in_msg = in_msg.parse::<RelaxedMessage<'_>>().ok()?;
+        let bounced = matches!(&in_msg.info, RelaxedMsgInfo::Int(info) if info.bounced);
+        tvm_ffi::message::original_message_body(in_msg.body, bounced)?
+            .load_u32()
+            .ok()
     }
 
     /// Returns the amount of gas used during the computation phase.

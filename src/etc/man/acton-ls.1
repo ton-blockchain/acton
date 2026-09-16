@@ -11,8 +11,8 @@ acton\-ls \[em] Run the Acton language server
 Start the language server used for TON language tooling.
 .sp
 The server boots with the resolved project root, loads import path mappings from
-\fBActon.toml\fR when available, initializes the bundled standard library from
-\fB\&.acton/tolk\-stdlib\fR, and serves requests either over stdio or a local TCP
+\fBActon.toml\fR when available, loads the standard library from \fB\-\-stdlib\-path\fR,
+\fB\&.acton/tolk\-stdlib\fR, or the bundled fallback, and serves requests either over stdio or a local TCP
 socket.
 .SH "OPTIONS"
 .SS "LSP Options"
@@ -37,8 +37,24 @@ Write language\-server logs to a custom file.
 Disable language\-server logging setup.
 .RE
 .sp
+\fB\-\-log\-level\fR \fIlevel\fR
+.RS 4
+Available since Acton 1.2.
+.sp
+Log level: \fBoff\fR, \fBerror\fR, \fBwarn\fR, \fBinfo\fR, \fBdebug\fR, or \fBtrace\fR\&.
+.RE
+.sp
+\fB\-\-stdlib\-path\fR \fIpath\fR
+.RS 4
+Available since Acton 1.2.
+.sp
+Use a physical Tolk standard library directory instead of the bundled library.
+.RE
+.sp
 \fB\-\-profile\fR
 .RS 4
+Available since Acton 1.2.
+.sp
 Collect performance counters and timings for the \fBton/profile\fR LSP request.
 .RE
 .SS "Display Options"
@@ -114,7 +130,8 @@ Before starting the server, Acton:
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'preloads \fB\&.acton/tolk\-stdlib/common.tolk\fR
+\h'-04'\(bu\h'+03'loads the selected standard library, using the bundled fallback when
+\fB\&.acton/tolk\-stdlib\fR is absent
 .RE
 .SH "EXIT STATUS"
 .sp

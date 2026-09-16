@@ -3,6 +3,8 @@ title: "Environment Workspace"
 description: "Use an environment dashboard, wallets, faucets, integration setup, API calls, and API reference pages"
 ---
 
+<AvailabilityBadge since="Acton 1.2" />
+
 Opening an environment switches the left navigation from the Studio workspace to tools scoped to
 that network. Every address, transaction, contract, wallet, simulation, and API call shown in this
 mode belongs to the selected environment.
@@ -18,12 +20,12 @@ The **Home** page is the starting point for application integration and network 
 <figure className="theme-image my-6">
   <img
     src="/docs/studio/environment-dashboard-light.png"
-    alt="Full localnet environment Home page in light theme with integration setup, node information, and recent transactions"
+    alt="Localnet environment Home page in light theme with integration setup, node information, and recent transactions"
     className="theme-image-light rounded-lg border shadow-sm"
   />
   <img
     src="/docs/studio/environment-dashboard-dark.png"
-    alt="Full localnet environment Home page in dark theme with integration setup, node information, and recent transactions"
+    alt="Localnet environment Home page in dark theme with integration setup, node information, and recent transactions"
     className="theme-image-dark rounded-lg border shadow-sm"
   />
 </figure>
@@ -56,15 +58,15 @@ cannot work for the selected network.
 
 ✅ means the tool is available for the environment. ❌ means Studio does not expose it there.
 
-| Tool | Simulated localnet | Full localnet | Testnet and Mainnet |
+| Tool | Simulator | Localnet | Testnet and Mainnet |
 | --- | :---: | :---: | :---: |
 | Explorer, blocks, tokens, NFTs | ✅ | ✅ | ✅ |
 | Contracts, sources, ABI | ✅ | ✅ | ✅ |
 | Simulator and Cell Inspector | ✅ | ✅ | ✅ |
 | Wallets | ✅ | ✅ | ✅ |
-| GRAM faucet | ✅ | ✅ | ❌ |
+| GRAM faucet | ✅ | ✅ | Testnet only |
 | Jetton faucet | ✅ | ❌ | ❌ |
-| Full network snapshots | ❌ | ✅ | ❌ |
+| Network snapshots | ✅ | ✅ | ❌ |
 | Integrate and API Calls | ✅ | ✅ | ✅ |
 | V2 and V3 API reference | ✅ | ✅ | ✅ |
 | Control API reference | ✅ | ❌ | ❌ |
@@ -91,16 +93,16 @@ RPC integration and wallet connection solve different tasks. Use **Integrate** t
 application's TON client and RPC endpoints. Use **Connect** on a wallet to establish a TON Connect
 session with a dApp. An application can use both connections.
 
-For a Simulated localnet, add frequently used project wallets as startup accounts when creating the
+For a Simulator, add frequently used project wallets as startup accounts when creating the
 environment. They are available as soon as the runtime starts.
 
 ## Faucet
 
-Use **Faucet** to fund an address inside a managed local environment. A Simulated localnet can expose
-both GRAM and Jetton funding; a Full localnet exposes the GRAM funding supported by its runtime.
+Use **Faucet** to fund an address inside a managed local environment. A Simulator can expose
+both GRAM and Jetton funding; a Localnet exposes the GRAM funding supported by its runtime.
 
 The environment dashboard also provides **Fund** and **Send** shortcuts when the selected network
-supports them. Faucets do not appear for Testnet or Mainnet.
+supports them. Testnet has a separate faucet for testnet GRAM; Mainnet has no faucet.
 
 ## Integrate
 
@@ -162,9 +164,9 @@ The **API Reference** group contains interactive OpenAPI documentation for endpo
 the environment:
 
 - **v2 API** and **v3 API** for TON-compatible reads and submissions
-- **Control API** for Simulated localnet network operations
-- **Admin API** for Full localnet service management
-- **Config API** for Full localnet configuration and connection information
+- **Control API** for Simulator network operations
+- **Admin API** for Localnet service management
+- **Config API** for Localnet configuration and connection information
 
 Select an operation, enter its parameters, and execute it against the current environment. If an
 endpoint requires authentication, select the key icon at the bottom of the sidebar and enter the

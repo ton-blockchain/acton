@@ -1,7 +1,10 @@
 use super::SearchParamIndex;
+use crate::commands::build::{
+    contract_dependency_order, generate_dependency_files, resolve_build_output_dir,
+};
 use crate::commands::common::error_fmt;
 use crate::context::{
-    AssertFailure, CompilationResult, Context, DebugStopRequested, FailedSendMessageResult,
+    CompilationResult, Context, DebugStopRequested, FailedSendMessageResult,
     GetMethodAssertFailure, KnownAddress, MessageIterState, ParsedSearchParams, PendingMessageStep,
     SearchField, Wallet, code_lookup_hash, compile_project_contract_with_cache,
     is_treasury_code_hash, to_cell,
@@ -25,10 +28,10 @@ use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use log::{debug, info, warn};
 use num_bigint::{BigInt, Sign};
-use num_traits::ToPrimitive;
+use num_traits::{Num, ToPrimitive};
 use path_absolutize::Absolutize;
 use rand::RngCore;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -36,6 +39,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
+use tolk_syntax::ast::expressions::parse_tolk_int_literal;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton_api::{Network, TonApiClient, toncenter::v3};
@@ -183,26 +187,104 @@ fn missing_generated_dependency_message(error_message: &str, contract_id: &str) 
 
 extension!(build in (Context) with (path: String, id: String) using build_impl);
 fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> anyhow::Result<()> {
+    let code = if path.is_empty() {
+        let code = build_with_dependencies(ctx, &id)?;
+        ctx.build.build_cache.prepared_contracts.insert(id);
+        code
+    } else {
+        build_contract(ctx, &path, &id)?
+    };
+    stk.push(TupleItem::Cell(code));
+    Ok(())
+}
+
+/// Refresh generated code before consulting the parent's compilation cache.
+/// Successful preparations are shared within the run, including diamond dependencies.
+fn build_with_dependencies(ctx: &mut Context, id: &str) -> anyhow::Result<Cell> {
+    if ctx.build.build_cache.prepared_contracts.contains(id)
+        || ctx.env.build_override.contains_key(id)
+        || ctx
+            .env
+            .find_contract(id)
+            .is_none_or(|contract| contract.depends.as_ref().is_none_or(Vec::is_empty))
+    {
+        return build_contract(ctx, "", id);
+    }
+
+    let config = ctx.env.config;
+    let contracts = config.contracts().expect("named contract exists");
+    let order = contract_dependency_order(id, contracts)?;
+    let project_root = ctx.env.project_root.clone();
+    let gen_dir = resolve_build_output_dir(
+        None,
+        config
+            .build
+            .as_ref()
+            .and_then(|build| build.gen_dir.clone()),
+        "gen",
+        &project_root,
+    );
+    let mut compiled_contracts = HashMap::new();
+
+    for name in order {
+        let contract = &contracts[&name];
+        if !ctx.build.build_cache.prepared_contracts.contains(&name) {
+            generate_dependency_files(
+                &name,
+                contract,
+                &compiled_contracts,
+                &BTreeMap::new(),
+                config,
+                &gen_dir,
+                &project_root,
+            )?;
+            // Explicit-path builds may have cached code before shared dependencies
+            // were refreshed by another branch of this dependency tree.
+            ctx.build
+                .build_cache
+                .built
+                .remove(&contract.absolute_source_path(&project_root));
+        }
+
+        let code = build_contract(ctx, "", &name)
+            .with_context(|| format!("Failed to build '{name}' required by '{id}'"))?;
+
+        ctx.build
+            .build_cache
+            .prepared_contracts
+            .insert(name.clone());
+
+        if name == id {
+            return Ok(code);
+        }
+        compiled_contracts.insert(name, Boc::encode_base64(&code));
+    }
+
+    anyhow::bail!("Dependency order does not include requested contract '{id}'")
+}
+
+/// Load or compile one code cell after the caller has prepared its dependencies.
+fn build_contract(ctx: &mut Context, path: &str, id: &str) -> anyhow::Result<Cell> {
     debug!("Building {id}");
     let start_time = Instant::now();
 
     let name_only = path.is_empty();
-    let mut path = PathBuf::from(&path);
-    let mut display_name = id.clone(); // by default display name equal to ID
-    let contract_config = ctx.env.find_contract(&id);
+    let mut path = PathBuf::from(path);
+    let mut display_name = id.to_owned(); // by default display name equal to ID
+    let contract_config = ctx.env.find_contract(id);
 
     if name_only {
         // > build("JettonMinter")
         debug!("No path provided, search in contracts");
 
         let Some(found_contract) = &contract_config else {
-            anyhow::bail!(error_fmt::contract_not_found(ctx.env.config, &id));
+            anyhow::bail!(error_fmt::contract_not_found(ctx.env.config, id));
         };
 
         debug!("Found contract with info: {found_contract:?}");
 
         found_contract
-            .display_name(&id)
+            .display_name(id)
             .clone_into(&mut display_name);
         path = found_contract.absolute_source_path(&ctx.env.project_root);
     } else if !path.is_absolute() {
@@ -216,10 +298,9 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
     // Build overrides used for mutation testing to change actual code of contract
     // with "mutated" one. This way we actually don't need to recompile each test
     // thus greatly increase performance of mutation testing
-    if let Some(override_code) = ctx.env.build_override.get(&id) {
+    if let Some(override_code) = ctx.env.build_override.get(id) {
         debug!("Overriding code for {id}");
-        stk.push(TupleItem::Cell(override_code.clone()));
-        return Ok(());
+        return Ok(override_code.clone());
     }
 
     let path_display = path.display().to_string();
@@ -233,8 +314,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
         let code_cell = Boc::decode_base64(&cached.code_boc64).with_context(|| {
             anyhow::anyhow!("Failed to decode cached code BoC for {path_display}")
         })?;
-        stk.push(TupleItem::Cell(code_cell));
-        return Ok(());
+        return Ok(code_cell);
     }
 
     if is_boc_path(&path) {
@@ -245,8 +325,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
 
         if !name_only {
             // Explicit BoC paths are code-only and must stay independent of manifest metadata.
-            stk.push(TupleItem::Cell(cell));
-            return Ok(());
+            return Ok(cell);
         }
 
         let code_boc64 = Boc::encode_base64(&cell);
@@ -256,7 +335,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             compile_optional_contract_interface(
                 ctx.env.config,
                 &ctx.env.project_root,
-                &id,
+                id,
                 contract_config,
             )?
         } else {
@@ -270,7 +349,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             None => (Arc::new(SourceMap::without_debug_info()), None),
         };
         ctx.build.build_cache.memoize(
-            &id,
+            id,
             &display_name,
             &path,
             &code_boc64,
@@ -279,8 +358,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             abi,
         );
 
-        stk.push(TupleItem::Cell(cell));
-        return Ok(());
+        return Ok(cell);
     }
 
     let allow_no_entrypoint = is_types_tolk_path(&path);
@@ -312,7 +390,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
         let source_map = Arc::new(cached_entry.source_map.clone().unwrap_or_default());
 
         ctx.build.build_cache.memoize(
-            &id,
+            id,
             &display_name,
             &path,
             &cached_entry.code_boc64,
@@ -321,8 +399,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             cached_entry.abi.clone().map(Into::into),
         );
 
-        stk.push(TupleItem::Cell(code_cell));
-        return Ok(());
+        return Ok(code_cell);
     }
 
     // If there is no cache data, rebuild contract from sources.
@@ -357,7 +434,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             let source_map = Arc::new(success.source_map.unwrap_or_default());
 
             ctx.build.build_cache.memoize(
-                &id,
+                id,
                 &display_name,
                 &path,
                 &success.code_boc64,
@@ -366,7 +443,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
                 success.abi.clone().map(Into::into),
             );
 
-            stk.push(TupleItem::Cell(code_cell));
+            Ok(code_cell)
         }
         tolk_compiler::CompilerResult::Error(error) => {
             info!(
@@ -375,12 +452,10 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             );
 
             let message =
-                missing_generated_dependency_message(&error.message, &id).unwrap_or(error.message);
+                missing_generated_dependency_message(&error.message, id).unwrap_or(error.message);
             anyhow::bail!("Compilation failed: {message}");
         }
     }
-
-    Ok(())
 }
 
 fn is_types_tolk_path(path: &Path) -> bool {
@@ -2102,16 +2177,14 @@ fn transaction_matches_predicates(
         if let MsgInfo::Int(info) = &in_msg.info {
             check!(predicates.bounced, bool_item(info.bounced));
             if let Some(ref field) = predicates.opcode {
-                let mut slice = in_msg.body;
-                let Ok(mut opcode) = slice.load_u32() else {
+                let opcode = tvm_ffi::message::original_message_body(
+                    in_msg.body,
+                    info.bounced && predicates.bounced.is_some(),
+                )
+                .and_then(|mut body| body.load_u32().ok());
+                let Some(opcode) = opcode else {
                     return Ok(false);
                 };
-                if info.bounced && predicates.bounced.is_some() {
-                    let Ok(bounced_opcode) = slice.load_u32() else {
-                        return Ok(false);
-                    };
-                    opcode = bounced_opcode;
-                }
                 if !call_predicate(executor, &field.predicate, int_item(i64::from(opcode)))? {
                     return Ok(false);
                 }
@@ -2218,16 +2291,14 @@ fn transaction_matches_scalar_params(
 
         if let MsgInfo::Int(info) = &in_msg.info {
             if let Some(expected_opcode) = &params.opcode {
-                let mut slice = in_msg.body;
-                let Ok(mut opcode) = slice.load_u32() else {
+                let opcode = tvm_ffi::message::original_message_body(
+                    in_msg.body,
+                    info.bounced && params.bounced == Some(true),
+                )
+                .and_then(|mut body| body.load_u32().ok());
+                let Some(opcode) = opcode else {
                     return false;
                 };
-                if info.bounced && params.bounced == Some(true) {
-                    let Ok(bounced_opcode) = slice.load_u32() else {
-                        return false;
-                    };
-                    opcode = bounced_opcode;
-                }
                 if *expected_opcode != opcode {
                     return false;
                 }
@@ -2656,65 +2727,80 @@ fn run_get_method_impl(
 
     match result {
         GetMethodResult::Success(result) => {
-            ctx.chain
-                .emulations
-                .save_get_method(&ctx.env.running_id, result.clone());
-
             let cell =
                 Boc::decode_base64(result.stack.as_ref()).context("Failed to decode stack BoC")?;
             let tuple = Tuple::deserialize(&cell).context("Failed to deserialize tuple")?;
 
-            if result.vm_exit_code != 0 && result.vm_exit_code != 1 {
-                let get_method = abi
-                    .as_deref()
-                    .and_then(|abi| abi.find_get_method_by_id(method_id));
+            let get_method = abi
+                .as_deref()
+                .and_then(|abi| abi.find_get_method_by_id(method_id));
 
-                let id_presentation = format!("({id})");
-                let id_presentation = id_presentation.dimmed();
+            let id_presentation = format!("({id})");
+            let id_presentation = id_presentation.dimmed();
 
-                let get_method_presentation = if let Some(get_method) = get_method {
-                    format!("{} {id_presentation}", get_method.name.yellow())
-                } else if name.is_empty() {
-                    format!("'' {id_presentation}")
-                } else {
-                    format!("{} {id_presentation}", name.yellow())
-                };
+            let get_method_presentation = if let Some(get_method) = get_method {
+                format!("{} {id_presentation}", get_method.name.yellow())
+            } else if name.is_empty() {
+                format!("'' {id_presentation}")
+            } else {
+                format!("{} {id_presentation}", name.yellow())
+            };
 
-                let suggested_name = if result.vm_exit_code == 11 {
-                    // TODO: right now get methods may not include all get methods
-                    let get_methods: Vec<&str> = abi
-                        .as_ref()
-                        .map(|abi| abi.get_methods.iter().map(|m| m.name.as_str()).collect())
-                        .unwrap_or_default();
-                    suggest_name(&name, &get_methods).map(ToOwned::to_owned)
-                } else {
-                    None
-                };
+            let suggested_name = if result.vm_exit_code == 11 {
+                // TODO: right now get methods may not include all get methods
+                let get_methods: Vec<&str> = abi
+                    .as_ref()
+                    .map(|abi| abi.get_methods.iter().map(|m| m.name.as_str()).collect())
+                    .unwrap_or_default();
+                suggest_name(&name, &get_methods).map(ToOwned::to_owned)
+            } else {
+                None
+            };
 
-                let location =
-                    retrace::find_exception_info(&result.vm_log, &source_map).map(|info| info.loc);
+            let location = if result.vm_exit_code != 0 && result.vm_exit_code != 1 {
+                retrace::find_exception_info(&result.vm_log, &source_map).map(|info| info.loc)
+            } else {
+                None
+            };
 
-                *ctx.asserts.assert_failure =
-                    Some(AssertFailure::GetMethod(GetMethodAssertFailure {
+            // Keep each invocation's context until a caller unwraps or asserts its result.
+            // Successful executions also need diagnostics when an expected exit code differs.
+            ctx.chain
+                .emulations
+                .save_get_method(&ctx.env.running_id, result.clone());
+            let diagnostic_id =
+                ctx.chain
+                    .emulations
+                    .save_get_method_diagnostic(GetMethodAssertFailure {
+                        message: None,
                         get_method_presentation,
                         vm_exit_code: result.vm_exit_code,
                         suggested_name,
                         vm_log: result.vm_log,
                         missing_libraries,
                         source_map,
-                        abi: abi.clone(),
+                        abi,
                         caller_trace: None,
                         location,
-                    }));
+                    });
 
-                stack.push(TupleItem::Null);
-                return Ok(());
-            }
-
-            stack.push(TupleItem::Tuple(tuple));
+            // Keep the method's stack nested so metadata never participates in Ret decoding.
+            let gas_used = result
+                .gas_used
+                .parse::<u64>()
+                .context("Invalid gas usage returned by get-method executor")?;
+            stack.push(TupleItem::Tuple(Tuple(vec![
+                TupleItem::Tuple(tuple),
+                TupleItem::Int(gas_used.into()),
+                TupleItem::Int(result.vm_exit_code.into()),
+                TupleItem::Int(diagnostic_id.into()),
+            ])));
         }
         GetMethodResult::Error(result) => {
-            println!("Error: {}", result.error);
+            anyhow::bail!(
+                "Cannot execute get method {method_id} at {addr}: {}",
+                result.error
+            );
         }
     }
 
@@ -2906,12 +2992,28 @@ fn parse_cell_from_base64_impl(
 
 extension!(parse_int in (Context) with (x: String) using parse_int_impl);
 fn parse_int_impl(_: &mut Context, stack: &mut Tuple, x: String) -> anyhow::Result<()> {
-    let value = x
-        .trim()
-        .parse::<BigInt>()
-        .with_context(|| format!("Failed to parse integer from '{x}'"))?;
-    stack.push(TupleItem::Int(value));
+    stack.push(TupleItem::Int(parse_integer_input(&x)?));
     Ok(())
+}
+
+/// Keeps runtime integer parsing and prompt validation consistent with Tolk literals.
+/// Trims user input, handles a leading sign, and preserves parser diagnostics on failure.
+pub(super) fn parse_integer_input(input: &str) -> anyhow::Result<BigInt> {
+    let trimmed = input.trim();
+    let unsigned = trimmed.strip_prefix(['+', '-']).unwrap_or(trimmed);
+    let value = if let Some(literal) = parse_tolk_int_literal(unsigned) {
+        BigInt::from_str_radix(literal.digits(), literal.radix()).map(|value| {
+            if trimmed.starts_with('-') {
+                -value
+            } else {
+                value
+            }
+        })
+    } else {
+        trimmed.parse::<BigInt>()
+    };
+
+    value.with_context(|| format!("Failed to parse integer from '{input}'"))
 }
 
 extension!(load_library_by_hash in (Context) with (hash: String) using load_library_by_hash_impl);
@@ -4214,7 +4316,7 @@ fn wait_for_trace_impl(
             println!("Awaiting trace... [Attempt {attempt}/{attempts}]");
         }
 
-        match poll_send_results_by_trace(&api_client, &msg_hash_hex) {
+        match poll_send_results_by_trace(&api_client, &msg_hash_hex, ctx.execution_started_at) {
             Ok(TracePollOutcome::Settled(send_results)) => {
                 if !quiet {
                     println!("Trace settled with {} transaction(s)", send_results.len());
@@ -4298,15 +4400,22 @@ enum TracePollOutcome {
 
 /// One polling step for a full trace.
 ///
-/// Returns `NotYet` when the indexer hasn't yet built the trace or referenced txs aren't
-/// resolvable yet, `Incomplete` when the indexer explicitly flagged the trace as truncated,
-/// and `Err` for transport / parse failures the caller may retry on.
+/// Returns `NotYet` when only older executions exist, the indexer hasn't yet built
+/// the trace, or referenced txs aren't resolvable yet; `Incomplete` when the current
+/// trace is truncated; and `Err` for transport / parse failures the caller may retry on.
 fn poll_send_results_by_trace(
     client: &TonApiClient,
     msg_hash_hex: &str,
+    execution_started_at: i64,
 ) -> anyhow::Result<TracePollOutcome> {
-    let traces = client.get_traces_by_msg_hash(msg_hash_hex, 1)?;
-    let Some(trace) = traces.into_iter().next() else {
+    let traces = client.get_traces_by_msg_hash(msg_hash_hex, 1, Some(execution_started_at))?;
+    // Match the v2 wait's inclusive, second-precision cutoff. Check the response
+    // before interpreting status so an older failure or truncated trace cannot
+    // stop this wait, even if an endpoint ignores the request's time filter.
+    let Some(trace) = traces
+        .into_iter()
+        .find(|trace| i64::from(trace.start_utime) >= execution_started_at)
+    else {
         return Ok(TracePollOutcome::NotYet);
     };
     if trace.is_incomplete {

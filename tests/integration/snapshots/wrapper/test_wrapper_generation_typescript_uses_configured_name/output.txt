@@ -1,1 +1,1 @@
-   Generated wrappers-ts/FriendlyWallet.gen.ts
+   Generated wrappers-ts/ConfiguredId.gen.ts

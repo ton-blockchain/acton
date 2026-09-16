@@ -411,7 +411,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 EnvironmentDriver::ActonSimulatedLocalnet { .. } => {
                     Err(EnvironmentRuntimeError::Conflict {
                         code: "environment_health_unavailable",
-                        message: "Health diagnostics are available for Full localnet environments"
+                        message: "Health diagnostics are available for Localnet environments"
                             .to_owned(),
                     })
                 }
@@ -449,7 +449,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
             let EnvironmentDriver::FullTonNetwork(driver) = &environment.driver else {
                 return Err(EnvironmentRuntimeError::Conflict {
                     code: "environment_activity_unavailable",
-                    message: "Activity generation is available for Full localnet environments"
+                    message: "Activity generation is available for Localnet environments"
                         .to_owned(),
                 });
             };
@@ -508,20 +508,20 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                         .map_err(|error| EnvironmentRuntimeError::Internal {
                             code: "config_update_failed",
                             message: format!(
-                                "Simulated localnet config update failed: {error}; reload the configuration before retrying"
+                                "Simulator config update failed: {error}; reload the configuration before retrying"
                             ),
                         })?;
                     let status = response.status();
                     let body: serde_json::Value = response.json().await.map_err(|error| {
                         EnvironmentRuntimeError::Internal {
                             code: "config_update_failed",
-                            message: format!("Invalid simulated localnet config response: {error}"),
+                            message: format!("Invalid simulator config response: {error}"),
                         }
                     })?;
                     if !status.is_success() {
                         let message = body["error"]
                             .as_str()
-                            .unwrap_or("Simulated localnet could not apply the configuration")
+                            .unwrap_or("Simulator could not apply the configuration")
                             .to_owned();
                         return Err(if status == reqwest::StatusCode::CONFLICT {
                             EnvironmentRuntimeError::Conflict {
@@ -545,8 +545,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                         .and_then(|seqno| u32::try_from(seqno).ok())
                         .ok_or_else(|| EnvironmentRuntimeError::Internal {
                             code: "config_update_failed",
-                            message: "Simulated localnet did not return the configuration block"
-                                .to_owned(),
+                            message: "Simulator did not return the configuration block".to_owned(),
                         })?;
                     environment.details.write().await.error = None;
 
@@ -581,9 +580,8 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 EnvironmentDriver::ActonSimulatedLocalnet { .. } => {
                     Err(EnvironmentRuntimeError::Conflict {
                         code: "environment_config_unavailable",
-                        message:
-                            "Configuration editing is available for Full localnet environments"
-                                .to_owned(),
+                        message: "Configuration editing is available for Localnet environments"
+                            .to_owned(),
                     })
                 }
             }
@@ -1120,7 +1118,7 @@ mod imported_contract_tests {
 fn snapshots_unavailable() -> EnvironmentRuntimeError {
     EnvironmentRuntimeError::Conflict {
         code: "environment_snapshots_unavailable",
-        message: "Snapshots are available only for full localnet environments".to_owned(),
+        message: "Snapshots are available only for localnet environments".to_owned(),
     }
 }
 
@@ -1506,7 +1504,7 @@ impl EnvironmentDriver {
             EnvironmentConfig::FullTonNetwork { .. } => {
                 let network = network.ok_or_else(|| EnvironmentRuntimeError::Internal {
                     code: "localnet_binding_missing",
-                    message: "Full localnet environment has no network reference".to_owned(),
+                    message: "Localnet environment has no network reference".to_owned(),
                 })?;
                 Ok(Self::FullTonNetwork(Box::new(FullLocalnet::new(
                     acton_executable,
@@ -1600,13 +1598,13 @@ fn spawn_localnet(
         mine_empty_blocks,
     } = config
     else {
-        unreachable!("localnet driver requires an Acton simulated localnet configuration");
+        unreachable!("localnet driver requires an Acton Simulator configuration");
     };
     let mut command = Command::new(acton_executable);
     command
         .arg("--project-root")
         .arg(workspace_root)
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("start")
         .arg("--port")
         .arg(port.to_string())
@@ -1650,7 +1648,7 @@ fn spawn_localnet(
 
     // Studio owns the managed environment lifecycle. Keep the child outside the
     // terminal's foreground process group so one Ctrl+C produces one Studio
-    // shutdown sequence instead of one message from every simulated localnet.
+    // shutdown sequence instead of one message from every simulator.
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
@@ -1953,7 +1951,10 @@ async fn run_project_artifact_coordinator(runtime: &Arc<LocalProcessRuntimeInner
 
         let fingerprint_is_stable =
             changed_at.is_some_and(|changed_at| changed_at.elapsed() >= PROJECT_ARTIFACT_DEBOUNCE);
+        // Standalone Studio still publishes stored artifacts, but cannot build
+        // project sources until an Acton manifest appears in the workspace.
         if fingerprint_is_stable
+            && runtime.workspace_root.join("Acton.toml").is_file()
             && !state.is_current_fingerprint(&fingerprint)
             && failed_build_fingerprint.as_ref() != Some(&fingerprint)
             && has_artifact_publication_target(runtime).await

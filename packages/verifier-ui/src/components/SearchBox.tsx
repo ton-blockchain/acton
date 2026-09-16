@@ -2,6 +2,7 @@ import {SearchInput, shortenMiddle} from "@acton/ui"
 import {History} from "lucide-react"
 import {useCallback, useEffect, useState} from "react"
 import type {FC} from "react"
+import {useNavigate} from "react-router"
 
 import {lookupPath, parseLookupTarget} from "../lib/target"
 
@@ -26,6 +27,7 @@ export const SearchBox: FC<SearchBoxProps> = ({
   initialValue = "",
   variant = "hero",
 }) => {
+  const navigate = useNavigate()
   const [value, setValue] = useState(initialValue)
   const [history, setHistory] = useState<readonly string[]>([])
   const [isInvalid, setIsInvalid] = useState(false)
@@ -76,10 +78,10 @@ export const SearchBox: FC<SearchBoxProps> = ({
       setIsInvalid(false)
       addToHistory(target.displayValue)
       setShowHistoryDropdown(false)
-      globalThis.location.assign(target.path)
+      void navigate(target.path)
       return true
     },
-    [addToHistory],
+    [addToHistory, navigate],
   )
 
   return (

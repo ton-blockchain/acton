@@ -64,7 +64,7 @@ These mutants were not caught by your tests!
 Consider adding more test cases to improve mutation coverage.
 ```
 
-One mutation survived: removing `assert (!storage.hasVoted) throw Errors.AlreadyVoted` from Voter (rule `remove_assert`). The earlier test suite never sends a duplicate vote, so deleting the duplicate-vote check goes unnoticed. Add a test that exercises that path:
+The earlier duplicate-vote tests should already catch removal of `assert (!storage.hasVoted) throw Errors.AlreadyVoted` (rule `remove_assert`) through Poll's final vote count. If this mutation survives in your suite, check those tests. Add a direct assertion on Voter's exit code to make the failure more specific:
 
 ```tolk title="tests/poll.test.tolk"
 get fun `test voter exits with AlreadyVoted on duplicate`() {

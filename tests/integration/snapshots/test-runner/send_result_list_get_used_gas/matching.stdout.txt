@@ -1,0 +1,17 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling receiver
+    Finished in [TIME]
+   Compiling worker
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/transaction_helpers.test.tolk (1 test)
+  ✓ send result list get used gas [TIME]
+    └─ Test output:
+       gas search predicate
+
+ ✓ 1 passed in 1 file

@@ -37,8 +37,8 @@ Step 3 (step_over):
       init = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-    res: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -55,8 +55,8 @@ Step 4 (step_over):
       init = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-    res: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -73,8 +73,8 @@ Step 5 (step_over):
       init = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-    res: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -91,10 +91,10 @@ Step 6 (step_over):
       init = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-    res: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    resetRes: BigArray<SendResult>
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    resetRes: BigArray<SendResult> = 1 items
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell
 
@@ -111,9 +111,9 @@ Step 7 (step_over):
       init = <optimized out>
     deployer: Treasury = (last seen)
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-    res: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
-    resetRes: BigArray<SendResult> = (last seen)
-      arr: [array<array<SendResult>>, int] = 2 items
+    res: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
+    resetRes: BigArray<SendResult> = 1 items (last seen)
+      0: SendResult
   Registers:
     c4 (storage): cell = empty cell

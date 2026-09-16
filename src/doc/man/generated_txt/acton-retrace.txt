@@ -18,6 +18,11 @@ DESCRIPTION
        source maps. When --debug is added, the prepared replay is exposed as a
        local Debug Adapter Protocol (DAP) server for editor integration.
 
+       Available since Acton 1.2.
+
+       Retrace also supports tick-tock transactions and restores the previous
+       masterchain block context used by the original execution.
+
 OPTIONS
    Retrace Options
        hash
@@ -28,6 +33,11 @@ OPTIONS
 
            Without this flag, Acton tries mainnet first and then falls back to
            testnet.
+
+           Available since Acton 1.2.
+
+           localnet and custom:<name> use TON Center endpoints configured in
+           Acton.toml.
 
        --verbose
            Show full cell hex in outgoing actions instead of only hashes.
@@ -72,7 +82,8 @@ OPTIONS
 NETWORK AND API BEHAVIOR
        o  Without --net, Acton tries mainnet and then testnet
 
-       o  localnet and custom:<name> are not supported by the retrace backend
+       o  localnet and custom:<name> use the TON Center endpoints configured in
+          Acton.toml (available since Acton 1.2)
 
 TON CENTER API KEYS
        Built-in mainnet/testnet requests read TONCENTER_MAINNET_API_KEY or

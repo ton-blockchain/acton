@@ -85,7 +85,7 @@ get fun `test gas: transfer with forward amount requires second forward fee`() {
     val minWithoutForward = calcMinimalTransferAmount(0, fwdFee) + MIN_EDGE_DELTA;
     val minMissingSecondFee = minWithoutForward + DEFAULT_FORWARD_TON_AMOUNT;
     val minWithForward = calcMinimalTransferAmount(DEFAULT_FORWARD_TON_AMOUNT, fwdFee) +
-    MIN_EDGE_DELTA;
+        MIN_EDGE_DELTA;
 
     expect(minWithForward).toEqual(minWithoutForward + DEFAULT_FORWARD_TON_AMOUNT + fwdFee);
 
@@ -130,7 +130,7 @@ get fun `test gas: transfer forward fees should follow config`() {
 
     val fwdFeeBefore = estimateBodyForwardFee(body);
     val minimalBefore = calcMinimalTransferAmount(DEFAULT_FORWARD_TON_AMOUNT, fwdFeeBefore) +
-    MIN_EDGE_DELTA;
+        MIN_EDGE_DELTA;
 
     var config = testing.getConfig();
     var msgPrices = config.getMsgForwardPrices(BASECHAIN);
@@ -141,7 +141,7 @@ get fun `test gas: transfer forward fees should follow config`() {
 
     val fwdFeeAfter = estimateBodyForwardFee(body);
     var minimalAfter = calcMinimalTransferAmount(DEFAULT_FORWARD_TON_AMOUNT, fwdFeeAfter) +
-    MIN_EDGE_DELTA;
+        MIN_EDGE_DELTA;
 
     expect(fwdFeeBefore).toBeLess(fwdFeeAfter);
     expect(minimalBefore).toBeLess(minimalAfter);
@@ -213,7 +213,7 @@ get fun `test gas: transfer gas fee should follow config`() {
 
     val fwdFee = estimateBodyForwardFee(body);
     val minimalBefore = calcMinimalTransferAmount(DEFAULT_FORWARD_TON_AMOUNT, fwdFee) +
-    MIN_EDGE_DELTA;
+        MIN_EDGE_DELTA;
 
     var config = testing.getConfig();
     var gasPrices = config.getGasPrices(BASECHAIN);
@@ -224,7 +224,7 @@ get fun `test gas: transfer gas fee should follow config`() {
     expect(testing.setConfig(config)).toEqual(true);
 
     val minimalAfter = calcMinimalTransferAmount(DEFAULT_FORWARD_TON_AMOUNT, fwdFee) +
-    MIN_EDGE_DELTA;
+        MIN_EDGE_DELTA;
     expect(minimalBefore).toBeLess(minimalAfter);
 
     val enough = createMessage({
@@ -268,7 +268,7 @@ get fun `test gas: transfer storage fee should follow config`() {
 
     val fwdFee = estimateBodyForwardFee(body);
     val minimalBefore = calcMinimalTransferAmount(DEFAULT_FORWARD_TON_AMOUNT, fwdFee) +
-    MIN_EDGE_DELTA;
+        MIN_EDGE_DELTA;
 
     var config = testing.getConfig();
     var storagePrices = config.getStoragePrices();
@@ -280,7 +280,7 @@ get fun `test gas: transfer storage fee should follow config`() {
     expect(testing.setConfig(config)).toEqual(true);
 
     val minimalAfter = calcMinimalTransferAmount(DEFAULT_FORWARD_TON_AMOUNT, fwdFee) +
-    MIN_EDGE_DELTA;
+        MIN_EDGE_DELTA;
     expect(minimalBefore).toBeLess(minimalAfter);
 
     val enough = createMessage({

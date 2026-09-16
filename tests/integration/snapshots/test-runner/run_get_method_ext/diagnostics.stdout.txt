@@ -1,0 +1,45 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling getter
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/get_method_meta.test.tolk (3 tests)
+  ✗ unwrap reports the original getter failure [TIME]
+    └─ Cannot execute get method fail (118408)
+      ├─ exit_code=123
+      ├─ at contracts/getter[LINE]
+      ├─ Backtrace:
+      │     fail   at contracts/getter[LINE]
+      ├─ Called from:
+      │     GetMethodResult<Calculation>.unwrap               at ../lib/emulation/network[LINE]
+      │     read__savedValue<Calculation>                     at tests/get_method_meta.test[LINE]
+      │     test unwrap reports the original getter failure   at tests/get_method_meta.test[LINE]
+      ├─ Description: GetterError.Failed
+      └─ Phase: Compute phase
+  ✗ mismatch reports the failed getter and expected code [TIME]
+    └─ Get method fail (118408): Expected [EXIT_STATUS] 124, got 123
+      ├─ exit_code=123
+      ├─ at contracts/getter[LINE]
+      ├─ Backtrace:
+      │     fail   at contracts/getter[LINE]
+      ├─ Called from:
+      │     Expectation<GetMethodResult<int>>.toHaveExitCode            at ../lib/emulation/network[LINE]
+      │     test mismatch reports the failed getter and expected code   at tests/get_method_meta.test[LINE]
+      ├─ Description: GetterError.Failed
+      └─ Phase: Compute phase
+  ✗ mismatch reports a successful getter [TIME]
+    └─ Get method calculate (70519): Expected [EXIT_STATUS] 123, got 0
+      ├─ exit_code=0
+      ├─ Called from:
+      │     Expectation<GetMethodResult<Calculation>>.toHaveExitCode   at ../lib/emulation/network[LINE]
+      │     test mismatch reports a successful getter                  at tests/get_method_meta.test[LINE]
+      ├─ Description: Standard successful execution [EXIT_STATUS]
+      └─ Phase: Compute and action phases
+
+ ✗ 3 failed in 1 file
+
+Some tests failed.

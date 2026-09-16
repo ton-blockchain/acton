@@ -12,7 +12,7 @@ interface VerifierAbiItem {
   readonly abi?: unknown
 }
 
-const VERIFIER_URL = "https://verifier-staging.ton.org"
+const VERIFIER_URL = "https://verifier.ton.org"
 const VERIFIER_SOURCE_URL = `${VERIFIER_URL}/api/v1/verification/source`
 const VERIFIER_ABI_URL = `${VERIFIER_URL}/api/v1/abi`
 const DEFAULT_REQUEST_TIMEOUT_MS = 5000

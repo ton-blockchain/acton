@@ -50,9 +50,9 @@ fun calcMinimalTransferAmount(forwardTonAmount: int, fwdFee: int): int {
         : jettonWalletGasConsumption;
 
     return forwardTonAmount + fwdCount * fwdFee + forwardInitStateOverhead() +
-    calculateGasFee(MY_WORKCHAIN, sendTransferGasConsumption) +
-    calculateGasFee(MY_WORKCHAIN, receiveTransferGasConsumption) +
-    calculateJettonWalletMinStorageFee();
+        calculateGasFee(MY_WORKCHAIN, sendTransferGasConsumption) +
+        calculateGasFee(MY_WORKCHAIN, receiveTransferGasConsumption) +
+        calculateJettonWalletMinStorageFee();
 }
 
 fun checkAmountIsEnoughToTransfer(msgValue: int, forwardTonAmount: int, fwdFee: int) {
@@ -71,8 +71,8 @@ fun calcMinimalBurnAmount(): coins {
         MESSAGE_SIZE_BURN_NOTIFICATION_BITS,
         MESSAGE_SIZE_BURN_NOTIFICATION_CELLS,
     ) +
-    calculateGasFee(MY_WORKCHAIN, sendBurnGasConsumption) +
-    calculateGasFee(MY_WORKCHAIN, GAS_CONSUMPTION_BURN_NOTIFICATION);
+        calculateGasFee(MY_WORKCHAIN, sendBurnGasConsumption) +
+        calculateGasFee(MY_WORKCHAIN, GAS_CONSUMPTION_BURN_NOTIFICATION);
 }
 
 fun checkAmountIsEnoughToBurn(msgValue: int) {

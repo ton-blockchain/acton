@@ -139,7 +139,9 @@ mod tests {
         let task = tokio::spawn(async move { axum::serve(listener, server.router()).await });
         let studio_url = format!("http://{address}");
 
-        tokio::time::timeout(Duration::from_secs(2), async {
+        // Client initialization and task scheduling can take seconds during a
+        // full workspace run; the production probe keeps its short request timeout.
+        tokio::time::timeout(Duration::from_secs(30), async {
             loop {
                 let matching_url = studio_url.clone();
                 if tokio::task::spawn_blocking(move || {
@@ -166,5 +168,6 @@ mod tests {
         );
 
         task.abort();
+        let _ = task.await;
     }
 }

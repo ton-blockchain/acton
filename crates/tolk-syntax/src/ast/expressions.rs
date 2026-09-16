@@ -1046,27 +1046,21 @@ impl<'tree> MatchArm<'tree> {
 
     #[must_use]
     pub fn body(&self) -> Option<MatchArmBody<'tree>> {
-        if let Some(block) = self.0.field("block") {
-            return Some(MatchArmBody::Block(block));
-        }
-        if let Some(ret) = self.0.field("return") {
-            return Some(MatchArmBody::Return(ret));
-        }
-        if let Some(throw) = self.0.field("throw") {
-            return Some(MatchArmBody::Throw(throw));
-        }
-        if let Some(expr) = self.0.field("expr") {
-            return Some(MatchArmBody::Expr(expr));
-        }
-        None
+        ["block", "return", "throw", "statement", "expr"]
+            .into_iter()
+            .find_map(|field| self.0.field(field))
     }
 }
 
+/// An arm can evaluate an expression or execute a statement without an enclosing block.
+/// Consumers must visit statement bodies so their control flow and references are retained.
 #[derive(Clone, Copy, Debug)]
 pub enum MatchArmBody<'tree> {
     Block(Block<'tree>),
     Return(crate::ast::statements::Return<'tree>),
     Throw(crate::ast::statements::Throw<'tree>),
+    /// Control-flow statements other than the block, return and throw forms above.
+    Statement(crate::ast::statements::Stmt<'tree>),
     Expr(Expr<'tree>),
 }
 
@@ -1076,6 +1070,9 @@ impl<'t> From<Node<'t>> for MatchArmBody<'t> {
             b"block_statement" => MatchArmBody::Block(Block(node)),
             b"return_statement" => MatchArmBody::Return(crate::ast::statements::Return(node)),
             b"throw_statement" => MatchArmBody::Throw(crate::ast::statements::Throw(node)),
+            _ if node.kind().ends_with("_statement") => {
+                MatchArmBody::Statement(crate::ast::statements::Stmt::from(node))
+            }
             _ => MatchArmBody::Expr(Expr::from(node)),
         }
     }

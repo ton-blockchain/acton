@@ -234,6 +234,7 @@ where
     let temp_arena = &typed_arena::Arena::new();
     Best {
         pos: 0,
+        pending_indent: 0,
         bcmds: vec![(0, Mode::Break, doc)],
         fcmds: vec![],
         annotation_levels: vec![],
@@ -253,14 +254,6 @@ enum Mode {
 
 type Cmd<'d, 'a, T, A> = (usize, Mode, &'d Doc<'a, T, A>);
 
-fn write_newline<W>(ind: usize, out: &mut W) -> Result<(), W::Error>
-where
-    W: ?Sized + Render,
-{
-    out.write_str_all("\n")?;
-    write_spaces(ind, out)
-}
-
 fn write_spaces<W>(spaces: usize, out: &mut W) -> Result<(), W::Error>
 where
     W: ?Sized + Render,
@@ -279,6 +272,7 @@ where
     T: DocPtr<'a, A> + 'a,
 {
     pos: usize,
+    pending_indent: usize,
     bcmds: Vec<Cmd<'d, 'a, T, A>>,
     fcmds: Vec<&'d Doc<'a, T, A>>,
     annotation_levels: Vec<usize>,
@@ -290,6 +284,19 @@ impl<'d, 'a, T, A> Best<'d, 'a, T, A>
 where
     T: DocPtr<'a, A> + 'a,
 {
+    fn write_text<W>(&mut self, text: &str, out: &mut W) -> Result<(), W::Error>
+    where
+        W: ?Sized + Render,
+    {
+        if !text.is_empty() {
+            // Delay generated indentation until there is content on the line. Blank lines
+            // stay empty without trimming whitespace that belongs to a source literal.
+            write_spaces(std::mem::take(&mut self.pending_indent), out)?;
+            out.write_str_all(text)?;
+        }
+        Ok(())
+    }
+
     fn fitting(&mut self, next: &'d Doc<'a, T, A>, mut pos: usize, ind: usize) -> bool {
         let mut bidx = self.bcmds.len();
         self.fcmds.clear(); // clear from previous calls from best
@@ -424,48 +431,49 @@ where
                         continue;
                     }
                     Doc::Hardline => {
+                        out.write_str_all("\n")?;
                         // The next document may have different indentation so we should use it if
                         // we can
                         if let Some(next) = self.bcmds.pop() {
-                            write_newline(next.0, out)?;
+                            self.pending_indent = next.0;
                             self.pos = next.0;
                             cmd = next;
                             continue;
                         } else {
-                            write_newline(ind, out)?;
+                            self.pending_indent = ind;
                             self.pos = ind;
                         }
                     }
                     Doc::RenderLen(len, ref doc) => match **doc {
                         Doc::OwnedText(ref s) => {
-                            out.write_str_all(s)?;
+                            self.write_text(s, out)?;
                             self.pos += len;
                             fits &= self.pos <= self.width;
                         }
                         Doc::BorrowedText(s) => {
-                            out.write_str_all(s)?;
+                            self.write_text(s, out)?;
                             self.pos += len;
                             fits &= self.pos <= self.width;
                         }
                         Doc::SmallText(ref s) => {
-                            out.write_str_all(s)?;
+                            self.write_text(s, out)?;
                             self.pos += len;
                             fits &= self.pos <= self.width;
                         }
                         _ => unreachable!(),
                     },
                     Doc::OwnedText(ref s) => {
-                        out.write_str_all(s)?;
+                        self.write_text(s, out)?;
                         self.pos += s.len();
                         fits &= self.pos <= self.width;
                     }
                     Doc::BorrowedText(s) => {
-                        out.write_str_all(s)?;
+                        self.write_text(s, out)?;
                         self.pos += s.len();
                         fits &= self.pos <= self.width;
                     }
                     Doc::SmallText(ref s) => {
-                        out.write_str_all(s)?;
+                        self.write_text(s, out)?;
                         self.pos += s.len();
                         fits &= self.pos <= self.width;
                     }
@@ -477,6 +485,7 @@ where
                     }
                     Doc::Union(ref l, ref r) => {
                         let pos = self.pos;
+                        let pending_indent = self.pending_indent;
                         let annotation_levels = self.annotation_levels.len();
                         let bcmds = self.bcmds.len();
 
@@ -488,6 +497,7 @@ where
                             Ok(true) => buffer.render(out)?,
                             Ok(false) | Err(()) => {
                                 self.pos = pos;
+                                self.pending_indent = pending_indent;
                                 self.bcmds.truncate(bcmds);
                                 self.annotation_levels.truncate(annotation_levels);
                                 cmd.2 = r;

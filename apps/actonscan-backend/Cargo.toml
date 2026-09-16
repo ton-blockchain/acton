@@ -47,6 +47,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 ton-indexer-core = { path = "../../crates/ton-indexer-core" }
 ton-indexer-liteserver = { path = "../../crates/ton-indexer-liteserver" }
+tvm-ffi = { path = "../../crates/tvm-ffi" }
 tower-http = { workspace = true, features = ["compression-br", "compression-gzip", "cors"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

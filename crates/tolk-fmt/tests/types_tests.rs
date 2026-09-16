@@ -70,6 +70,57 @@ fn test_parenthesized_type() {
 }
 
 #[test]
+fn test_parenthesized_union_preserves_line_comments() {
+    for width in [40, 80, 100] {
+        check_with_width(
+            r"
+                type Allowed = (
+                    int // number
+                    | slice // payload
+                    | null // empty
+                );
+            ",
+            expect![[r"
+                type Allowed = (
+                    int // number
+                    | slice // payload
+                    | null // empty
+                )"]],
+            width,
+        );
+    }
+}
+
+#[test]
+fn test_parenthesized_type_preserves_last_line_comment() {
+    check(
+        r"
+            type Amount = (int // amount
+            );
+        ",
+        expect![[r"
+            type Amount = (
+                int // amount
+            )"]],
+    );
+}
+
+#[test]
+fn test_parenthesized_union_with_only_a_final_comment() {
+    check(
+        r"
+            type Allowed = (int | slice // payload
+            );
+        ",
+        expect![[r"
+            type Allowed = (
+                int
+                | slice // payload
+            )"]],
+    );
+}
+
+#[test]
 fn test_tensor_type() {
     check(
         "const x: (int, slice) = 0;",
@@ -196,4 +247,49 @@ fn test_nested_complex_types() {
 #[test]
 fn test_null_literal_type() {
     check("const x: null = null;", expect!["const x: null = null"]);
+}
+
+#[test]
+fn test_empty_tuple_types() {
+    check(
+        r"type Empty = []
+type Nested = [[], Cell<[]>?]
+get fun f(): Empty { return []; }",
+        expect![[r"
+type Empty = []
+
+type Nested = [[], Cell<[]>?]
+
+get fun f(): Empty {
+    return [];
+}"]],
+    );
+}
+
+#[test]
+fn test_nested_empty_tuple_type_and_literal() {
+    check(
+        "get fun f(): [[]] { return [[]]; }",
+        expect![[r"
+            get fun f(): [[]] {
+                return [[]];
+            }"]],
+    );
+}
+
+#[test]
+fn test_single_union_variant_in_parentheses() {
+    check(
+        r"type Single = (| int)
+type Optional = (| int)?
+get fun f(): Single { return 1; }",
+        expect![[r"
+type Single = (int)
+
+type Optional = (int)?
+
+get fun f(): Single {
+    return 1;
+}"]],
+    );
 }

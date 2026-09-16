@@ -144,10 +144,10 @@ const TOLK_GRAMMAR = {
             optional(
                 seq(
                     $.enum_member_declaration,
-                    repeat(seq(optional(","), $.enum_member_declaration)),
+                    repeat(seq(optional(choice(",", ";")), $.enum_member_declaration)),
                 ),
             ),
-            optional(","),
+            optional(choice(",", ";")),
             "}",
         ),
     enum_member_declaration: $ =>
@@ -596,6 +596,19 @@ const TOLK_GRAMMAR = {
                     field("block", $.block_statement),
                     field("return", $.return_statement),
                     field("throw", $.throw_statement),
+                    field(
+                        "statement",
+                        choice(
+                            $.if_statement,
+                            $.while_statement,
+                            $.repeat_statement,
+                            $.do_while_statement,
+                            $.try_catch_statement,
+                            $.assert_statement,
+                            $.break_statement,
+                            $.continue_statement,
+                        ),
+                    ),
                     field("expr", $._expression),
                 ),
             ),
@@ -669,8 +682,11 @@ const TOLK_GRAMMAR = {
             103,
             choice(seq("(", ")"), seq("(", commaSep2($._type_hint), optional(","), ")")),
         ),
-    tuple_type: $ => prec(103, seq("[", commaSep1($._type_hint), optional(","), "]")),
-    parenthesized_type: $ => prec(103, seq("(", field("inner", $._type_hint), ")")),
+    // Like tensors, tuple types share syntax with literals. Keep both parses until
+    // the context distinguishes a type such as `[[]]` from a nested tuple value.
+    tuple_type: $ =>
+        prec.dynamic(103, seq("[", optional(seq(commaSep1($._type_hint), optional(","))), "]")),
+    parenthesized_type: $ => prec(103, seq("(", optional("|"), field("inner", $._type_hint), ")")),
 
     fun_callable_type: $ =>
         prec.right(
@@ -698,7 +714,13 @@ const TOLK_GRAMMAR = {
     string_literal: $ =>
         token(
             choice(
-                seq('"""', repeat(choice(/[^"]/, /"[^"]/, /""[^"]/)), '"""'),
+                // Escapes consume the following character, including a quote that would
+                // otherwise be mistaken for the start of the closing delimiter.
+                seq(
+                    '"""',
+                    repeat(seq(optional(choice('"', '""')), choice(/[^"\\]/, /\\[\s\S]/))),
+                    '"""',
+                ),
                 seq('"', repeat(choice(/[^"\\\n]/, /\\./)), '"'),
             ),
         ),
@@ -724,6 +746,7 @@ export default grammar({
         [$.type_instantiatedTs, $._type_hint],
         [$._expression, $.type_instantiatedTs],
         [$.tensor_type, $.tensor_expression],
+        [$.tuple_type, $.typed_tuple],
         [$.union_type],
         [$.block_statement, $.object_literal_body],
     ],

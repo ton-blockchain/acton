@@ -144,7 +144,7 @@ fn positive_compiler_fixtures_match_language_server_semantics() -> anyhow::Resul
     );
     if std::env::var_os("TOLK_CORPUS_FIXTURE").is_none() {
         expect![
-            "vendored_fixtures=645 checked_fixtures=105 type_expectations=838 symbol_usages=31480"
+            "vendored_fixtures=645 checked_fixtures=105 type_expectations=1042 symbol_usages=37394"
         ]
         .assert_eq(&summary);
     }

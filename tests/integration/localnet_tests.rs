@@ -1,4 +1,4 @@
-use crate::common::{assertion, strip_ansi};
+use crate::common::{ActonCommandExt, assertion, strip_ansi};
 use crate::support::TestOutputExt;
 use crate::support::localnet::{
     assert_v3_bad_request, block_header_gen_utime, is_success_response, latest_masterchain_seqno,
@@ -12,9 +12,9 @@ use crate::support::toncenter::{
     append_localnet_with_base_url as append_localnet_network, build_internal_message_boc,
     extract_canonical_addr_marker, format_captured_requests, jetton_v1_action_project,
     mocked_config_boc64, mocked_global_version_cell, nft_v1_action_project,
-    run_localnet_action_project, spawn_toncenter_v2_mock_with_capture, test_std_addr,
-    toncenter_v2_block_header_ok_response, toncenter_v2_config_all_ok_response,
-    with_nft_v1_action_fixtures,
+    run_localnet_action_project, spawn_toncenter_mock_with_capture,
+    spawn_toncenter_v2_mock_with_capture, test_std_addr, toncenter_v2_block_header_ok_response,
+    toncenter_v2_config_all_ok_response, with_nft_v1_action_fixtures,
 };
 use acton::wallets;
 use base64::Engine;
@@ -22,7 +22,6 @@ use reqwest::blocking::Client;
 use serde_json::{Value, json};
 use std::fmt::Write as _;
 use std::fs;
-use std::io::{ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::thread;
@@ -513,6 +512,55 @@ fun main() {
 "#;
 
 #[test]
+fn localnet_start_rejects_invalid_database_before_starting_server() {
+    let project = ProjectBuilder::new("localnet-invalid-database").build();
+    fs::write(
+        project.path().join("invalid.sqlite"),
+        "not a SQLite database",
+    )
+    .expect("failed to write invalid database");
+
+    for (no_mining, occupied_port) in [(false, false), (true, false), (false, true)] {
+        let Some((listener, port)) = reserve_localnet_port() else {
+            return;
+        };
+        // Also check an occupied port: the database error must take precedence
+        // over HTTP binding, with no startup wallets to detect a failed worker.
+        let _listener = occupied_port.then_some(listener);
+        let mut command = snapbox::cmd::Command::acton_ui()
+            .current_dir(project.path())
+            .env("HOME", project.path())
+            .env("USERPROFILE", project.path())
+            .env("NO_COLOR", "1")
+            .args([
+                "simulator",
+                "start",
+                "--port",
+                &port,
+                "--accounts",
+                "",
+                "--db-path",
+                "invalid.sqlite",
+            ])
+            .timeout(Duration::from_secs(15));
+        if no_mining {
+            command = command.arg("--no-mining");
+        }
+
+        let output = command.assert().code(1);
+        let output = output.get_output();
+        let snapshot = json!({
+            "stdout": strip_ansi(&String::from_utf8_lossy(&output.stdout)),
+            "stderr": strip_ansi(&String::from_utf8_lossy(&output.stderr)),
+        });
+        assertion().normalize_paths(false).eq(
+            pretty_json_for_snapshot(&snapshot, project.path()),
+            snapbox::file!("snapshots/localnet/test_localnet_start_invalid_database.json"),
+        );
+    }
+}
+
+#[test]
 fn localnet_start_port_conflict_is_reported_with_hint() {
     let project = ProjectBuilder::new("localnet-port-conflict").build();
     let Some((_listener, port)) = reserve_localnet_port() else {
@@ -521,7 +569,7 @@ fn localnet_start_port_conflict_is_reported_with_hint() {
 
     let output = project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("start")
         .arg("--port")
         .arg(&port)
@@ -532,7 +580,7 @@ fn localnet_start_port_conflict_is_reported_with_hint() {
 
     output
         .assert_not_contains("Starting Localnet server")
-        .assert_stderr_contains("Failed to start Acton simulated localnet on 127.0.0.1:")
+        .assert_stderr_contains("Failed to start Acton Simulator on 127.0.0.1:")
         .assert_stderr_contains("Set another port with [localnet].port in Acton.toml")
         .assert_stderr_contains("Or stop the process currently listening on that port")
         .assert_stderr_snapshot_matches(
@@ -785,7 +833,7 @@ fn localnet_no_mining_mines_only_on_request() {
 
     project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("mine")
         .arg("2")
         .arg("--port")
@@ -880,7 +928,7 @@ fn localnet_manual_mining_time_controls_update_blocks_and_transactions() {
     let next_block_timestamp_arg = next_block_timestamp.to_string();
     project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("set-next-block-timestamp")
         .arg(&next_block_timestamp_arg)
         .arg("--port")
@@ -1794,7 +1842,7 @@ fn localnet_require_auth_protects_http_api() {
 
     let status_output = project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("status")
         .arg("--json")
         .arg("--port")
@@ -1808,7 +1856,7 @@ fn localnet_require_auth_protects_http_api() {
 
     project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("airdrop")
         .arg(V3_TRANSACTIONS_TEST_ACCOUNT_A)
         .arg("--amount")
@@ -2139,7 +2187,7 @@ fn localnet_status_json_reports_running_node_details() {
     let node = project.localnet().start();
     let output = project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("status")
         .arg("--json")
         .arg("--port")
@@ -2164,7 +2212,7 @@ fn localnet_status_human_reports_running_node_details() {
     let node = project.localnet().start();
     let output = project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("status")
         .arg("--port")
         .arg(&node.port().to_string())
@@ -2188,7 +2236,7 @@ fn localnet_status_json_reports_stopped_node() {
 
     let output = project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("status")
         .arg("--json")
         .arg("--port")
@@ -2208,43 +2256,20 @@ fn localnet_status_json_reports_stopped_node() {
 #[test]
 fn localnet_status_json_reports_stopped_for_non_localnet_http_server() {
     let project = ProjectBuilder::new("localnet-status-non-localnet-http").build();
-    let listener = TcpListener::bind("127.0.0.1:0").expect("failed to bind fake status server");
-    listener
-        .set_nonblocking(true)
-        .expect("failed to make fake status server non-blocking");
-    let port = listener
-        .local_addr()
-        .expect("failed to resolve fake status server address")
-        .port();
-    let server = thread::spawn(move || {
-        let deadline = Instant::now() + Duration::from_secs(5);
-        loop {
-            match listener.accept() {
-                Ok((mut stream, _)) => {
-                    let mut request = [0u8; 1024];
-                    let _ = stream.read(&mut request);
-                    let body = "<html>not an acton simulated-localnet</html>";
-                    let response = format!(
-                        "HTTP/1.1 200 OK\r\ncontent-type: text/html\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
-                        body.len(),
-                        body
-                    );
-                    stream
-                        .write_all(response.as_bytes())
-                        .expect("failed to write fake status response");
-                    return;
-                }
-                Err(err) if err.kind() == ErrorKind::WouldBlock && Instant::now() < deadline => {
-                    thread::sleep(Duration::from_millis(10));
-                }
-                Err(err) => panic!("failed to accept fake status request: {err}"),
-            }
-        }
-    });
+    // The shared HTTP fixture consumes the complete request before responding.
+    // Replying after an unchecked nonblocking read races the client's send.
+    let (url, server, _) = spawn_toncenter_mock_with_capture(vec![(
+        200,
+        "<html>not an acton simulator</html>".to_owned(),
+    )]);
+    let port = reqwest::Url::parse(&url)
+        .expect("valid fake status server URL")
+        .port()
+        .expect("fake status server port");
 
     let output = project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("status")
         .arg("--json")
         .arg("--port")

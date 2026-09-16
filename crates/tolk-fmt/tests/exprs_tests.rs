@@ -4,6 +4,16 @@ use crate::common::{check, check_with_width};
 use expect_test::expect;
 
 #[test]
+fn test_multiline_string_preserves_whitespace_only_lines() {
+    check(
+        "fun test() { val text = \"\"\"hello\n    \n\t \nworld\"\"\";\n\nreturn text; }",
+        expect![
+            "fun test() {\n    val text = \"\"\"hello\n    \n\t \nworld\"\"\";\n\n    return text;\n}"
+        ],
+    );
+}
+
+#[test]
 fn test_assignment() {
     check(
         "fun test() { x = 10; }",
@@ -60,12 +70,12 @@ fun foo() {
         expect![[r"
             fun foo() {
                 return 6 +
-                // comment 1
-                4 * 5 +
-                3 +
-                // comment 2
-                2 +
-                1;
+                    // comment 1
+                    4 * 5 +
+                    3 +
+                    // comment 2
+                    2 +
+                    1;
             }"]],
     );
 }
@@ -81,8 +91,8 @@ fun foo() {
         expect![[r"
             fun foo() {
                 return 1 +
-                // comment
-                2;
+                    // comment
+                    2;
             }"]],
     );
 }
@@ -99,10 +109,10 @@ fun foo() {
         expect![[r"
             fun foo() {
                 return 1 +
-                // comment 1
-                2 * 3 +
-                // comment 2
-                4;
+                    // comment 1
+                    2 * 3 +
+                    // comment 2
+                    4;
             }"]],
     );
 }
@@ -119,7 +129,7 @@ fun foo() {
         expect![[r"
             fun foo() {
                 return 1 + 2 // comment
-                + 3;
+                    + 3;
             }"]],
     );
 }
@@ -137,15 +147,36 @@ fn test_null_coalescing_operator() {
 }
 
 #[test]
+fn test_binary_operator_continuations_are_indented() {
+    check_with_width(
+        r"
+            fun test() {
+                val result = firstLongCondition && secondLongCondition && thirdLongCondition;
+                val sum = firstLongOperand + secondLongOperand + thirdLongOperand;
+            }
+        ",
+        expect![[r"
+            fun test() {
+                val result = firstLongCondition &&
+                    secondLongCondition &&
+                    thirdLongCondition;
+                val sum = firstLongOperand +
+                    secondLongOperand +
+                    thirdLongOperand;
+            }"]],
+        40,
+    );
+}
+
+#[test]
 fn test_binary_operator_breaking() {
-    // TODO:
     check_with_width(
         "fun test() { x = a + b + c + d; }",
         expect![[r"
-                fun test() {
-                    x = a + b + c +
+            fun test() {
+                x = a + b + c +
                     d;
-                }"]],
+            }"]],
         20,
     );
 }
@@ -160,6 +191,33 @@ fn test_unary_operator() {
                     y = !b;
                     z = ~c;
                 }"]],
+    );
+}
+
+#[test]
+fn test_unary_signs_do_not_form_increment_or_decrement_tokens() {
+    check(
+        r"
+            fun test(x: int) {
+                val negative = - -x;
+                val positive = + +x;
+                val repeated = - - -x;
+                val literal = + +42;
+                val mixed = - +x;
+                val parenthesized = -(-x);
+                val logical = ! !true;
+            }
+        ",
+        expect![[r"
+            fun test(x: int) {
+                val negative = - -x;
+                val positive = + +x;
+                val repeated = - - -x;
+                val literal = + +42;
+                val mixed = -+x;
+                val parenthesized = -(-x);
+                val logical = !!true;
+            }"]],
     );
 }
 
@@ -213,7 +271,7 @@ fn test_dot_access_breaking() {
 }
 
 #[test]
-fn test_dot_access_for_struct_litral() {
+fn test_dot_access_for_struct_literal() {
     check_with_width(
         "fun test() { Foo { loooooooooong }.toCell() }",
         expect![[r"
@@ -223,6 +281,102 @@ fn test_dot_access_for_struct_litral() {
                     }.toCell();
                 }"]],
         20,
+    );
+}
+
+#[test]
+fn test_struct_literal_chain_fits_on_one_line() {
+    check(
+        "fun test() { Foo{}\n.foo\n.bar; }",
+        expect![[r"
+            fun test() {
+                Foo {}.foo.bar;
+            }"]],
+    );
+}
+
+#[test]
+fn test_struct_literal_chain_after_multiline_literal() {
+    check(
+        r"
+            fun test() {
+                Foo { first: 1, second: 2 }.foo.bar;
+                if (ready) {
+                    val result = Foo { first: 1, second: 2 }.foo().bar();
+                }
+            }
+        ",
+        expect![[r"
+            fun test() {
+                Foo {
+                    first: 1,
+                    second: 2,
+                }
+                .foo
+                .bar;
+                if (ready) {
+                    val result = Foo {
+                        first: 1,
+                        second: 2,
+                    }
+                    .foo()
+                    .bar();
+                }
+            }"]],
+    );
+}
+
+#[test]
+fn test_struct_literal_chain_breaks_by_width() {
+    check_with_width(
+        "fun test() { Foo {}.withFirstValue().withSecondValue(); }",
+        expect![[r"
+            fun test() {
+                Foo {}
+                .withFirstValue()
+                .withSecondValue();
+            }"]],
+        30,
+    );
+}
+
+#[test]
+fn test_struct_literal_chain_with_generics() {
+    check(
+        "fun test() { Foo<int> { first: 1, second: 2 }.convert<int>().toCell(); }",
+        expect![[r"
+            fun test() {
+                Foo<int> {
+                    first: 1,
+                    second: 2,
+                }
+                .convert<int>()
+                .toCell();
+            }"]],
+    );
+}
+
+#[test]
+fn test_struct_literal_chain_with_comments() {
+    check(
+        r"
+            fun test() {
+                Foo { first: 1, second: 2 }
+                    // First step
+                    .foo() // Keep the result
+                    .bar();
+            }
+        ",
+        expect![[r"
+            fun test() {
+                Foo {
+                    first: 1,
+                    second: 2,
+                }
+                // First step
+                .foo() // Keep the result
+                .bar();
+            }"]],
     );
 }
 
@@ -1431,6 +1585,33 @@ fn test_match_expression_nested() {
 }
 
 #[test]
+fn test_lambda_parameter_defaults_are_preserved() {
+    check(
+        r#"
+            fun test() {
+                val compute = fun(x: int = 123): int { return x; };
+                val describe = fun(enabled: bool = true, label: string = "default", amount: int = 1 + 2) {
+                    return (enabled, label, amount);
+                };
+            }
+        "#,
+        expect![[r#"
+            fun test() {
+                val compute = fun(x: int = 123): int {
+                    return x;
+                };
+                val describe = fun(
+                    enabled: bool = true,
+                    label: string = "default",
+                    amount: int = 1 + 2,
+                ) {
+                    return (enabled, label, amount);
+                };
+            }"#]],
+    );
+}
+
+#[test]
 fn test_lambda_simple() {
     check(
         "fun test() { x = fun(a: int, b: int): int { return a + b; }; }",
@@ -2129,11 +2310,11 @@ fn test_complex_expression_combination_with_breaking() {
                     INIT_ORDER_BIT_OVERHEAD + orderBits + signersBits,
                     INIT_ORDER_CELL_OVERHEAD + orderCells + signersCells,
                 ) +
-                calculateForwardFee(
-                    BASECHAIN,
-                    EXECUTE_ORDER_BIT_OVERHEAD + orderBits,
-                    EXECUTE_ORDER_CELL_OVERHEAD + orderCells,
-                );
+                    calculateForwardFee(
+                        BASECHAIN,
+                        EXECUTE_ORDER_BIT_OVERHEAD + orderBits,
+                        EXECUTE_ORDER_CELL_OVERHEAD + orderCells,
+                    );
             }"]],
         80,
     );
@@ -2353,7 +2534,7 @@ fn test_complex_expression_combination_with_breaking() {
         expect![[r"
             fun main() {
                 val minWithForward = calcMinimalTransferAmount(DEFAULT_FORWARD_TON_AMOUNT, fwdFee) +
-                MIN_EDGE_DELTA;
+                    MIN_EDGE_DELTA;
             }"]],
         100,
     );
@@ -2412,5 +2593,128 @@ fn test_match_in_expressions() {
                         },
                     );
                 }"]],
+    );
+}
+
+#[test]
+fn test_triple_quoted_string_escapes() {
+    check(
+        r#"get fun f(): string { return """a\""""; }
+get fun g(): string { return """a\"""b"""; }
+get fun h(): string { return """a"\"b"""; }
+get fun i(): string { return """a""\"b"""; }"#,
+        expect![[r#"
+get fun f(): string {
+    return """a\"""";
+}
+
+get fun g(): string {
+    return """a\"""b""";
+}
+
+get fun h(): string {
+    return """a"\"b""";
+}
+
+get fun i(): string {
+    return """a""\"b""";
+}"#]],
+    );
+}
+
+#[test]
+fn test_match_assert_comma_form() {
+    check(
+        r"get fun f(x: int): int {
+match (x) {
+0 => assert(x == 0, 123),
+else => assert(x > 0, 123),
+}
+return x;
+}",
+        expect![[r"
+            get fun f(x: int): int {
+                match (x) {
+                    0 => assert(x == 0, 123),
+                    else => assert(x > 0, 123),
+                }
+                return x;
+            }"]],
+    );
+}
+
+#[test]
+fn test_match_statement_bodies() {
+    check(
+        r"get fun f(x: int): int {
+var result = 0;
+match (x) {
+1 => assert (x < 2) throw 123,
+2 => while (x > 0) { result += x; x -= 1; }
+3 => do { result += x; x -= 1; } while (x > 0)
+4 => if (x == 4) { result = 5; } else { throw 123; }
+5 => repeat (x) { result += 1; }
+6 => try { throw 1; } catch (code) { result = code; }
+else => return 0
+}
+return result;
+}",
+        expect![[r"
+get fun f(x: int): int {
+    var result = 0;
+    match (x) {
+        1 => assert (x < 2) throw 123,
+        2 => while (x > 0) {
+            result += x;
+            x -= 1;
+        }
+        3 => do {
+            result += x;
+            x -= 1;
+        } while (x > 0),
+        4 => if (x == 4) {
+            result = 5;
+        } else {
+            throw 123;
+        }
+        5 => repeat (x) {
+            result += 1;
+        }
+        6 => try {
+            throw 1;
+        } catch (code) {
+            result = code;
+        }
+        else => return 0,
+    }
+    return result;
+}"]],
+    );
+}
+
+#[test]
+fn test_match_loop_control_statements() {
+    check(
+        r"get fun f(x: int): int {
+while (x > 0) {
+x -= 1;
+match (x) {
+0 => break,
+else => continue,
+}
+}
+return x;
+}",
+        expect![[r"
+            get fun f(x: int): int {
+                while (x > 0) {
+                    x -= 1;
+                    match (x) {
+                        0 => break,
+                        else => continue,
+                    }
+                }
+                return x;
+            }"]],
     );
 }

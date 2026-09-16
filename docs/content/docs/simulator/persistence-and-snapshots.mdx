@@ -1,0 +1,96 @@
+---
+title: "Persistence and Snapshots"
+description: "Keep local chain state across runs and save persistent JSON snapshots for repeatable scenarios"
+---
+
+<AvailabilityBadge since="Acton 1.2" />
+
+SQLite keeps committed chain state across runs. Snapshots save explicit restore
+points as JSON files, including volatile state such as pending messages and virtual time.
+
+## Persistent SQLite State
+
+Use a database file when you want state continuity across runs:
+
+```bash
+acton simulator start --db-path .acton/localnet.db
+```
+
+To make persistence the project default, configure the same path in
+`Acton.toml`:
+
+```acton-toml title="Acton.toml"
+[localnet]
+db-path = ".acton/localnet.db"
+```
+
+Configured relative paths resolve from the project root. `--db-path` overrides
+the configured value for a single run; a relative CLI path resolves from the
+current working directory.
+
+SQLite preserves committed blocks, transactions, messages, account history,
+latest account state and blockchain config, CAS data, compiler ABIs, and
+verified sources. Account keys include the workchain, so basechain and
+masterchain addresses cannot collide.
+
+Queued but unmined messages, pending time overrides, address aliases, and
+derived token/NFT caches belong to the running process. Create a snapshot of the running node when those runtime details must be carried over exactly.
+
+## Saved snapshots
+
+Create a snapshot, then use its returned ID to restore or export it:
+
+```bash
+acton simulator snapshot create before-upgrade
+acton simulator snapshot list --json
+acton simulator snapshot restore <SNAPSHOT_ID>
+acton simulator snapshot export <SNAPSHOT_ID> --out snapshots/before-upgrade.json
+acton simulator snapshot import snapshots/before-upgrade.json --name imported
+acton simulator snapshot delete <SNAPSHOT_ID>
+```
+
+Each snapshot is an immutable JSON file. Saving or restoring runs in the same queue
+as mining and other state changes, so the process stays running.
+
+Import validates the file and saves it under a new ID. It does not change the running
+state. Export downloads the selected saved file. Pass `--force` to replace an existing
+output file. Failed writes cannot truncate an existing export or publish a partial snapshot.
+
+With a database, snapshots live in a sibling directory: `localnet.sqlite` uses
+`localnet.snapshots/`. Without a database, the default is
+`.acton/simulator/<port>/snapshots/` under the project root. Use
+`--snapshots-dir <path>` at startup to choose another location.
+
+Snapshots survive node restarts. Use the same directory on the next run to access them.
+The snapshot format is intended for the same Acton version and fork network that
+produced it. Imports validate history, CAS hashes, config, accounts, transactions,
+messages, and queue references before publishing a file.
+
+## Snapshot contents
+
+A snapshot stores enough local node state to resume the same local chain
+view later. The state document includes:
+
+- global chain state such as head seqno, logical time, queue policy, and config hash
+- latest account state cache
+- block history and account deltas by seqno
+- transaction and message history indexes
+- address aliases managed through `/acton_getAddressName` and `/acton_setAddressName`
+- cached token and NFT metadata
+- registered compiler ABIs from `/acton_registerCompilerAbis`
+- CAS entries for serialized cells and message/code payloads
+- pending internal/external message pools
+
+This is broader than just account balances or contract storage. A restored
+snapshot can also bring back explorer-oriented metadata and local admin state.
+
+## Studio
+
+Open **Snapshots** in a Simulator environment to create, restore, delete, import, or
+download snapshots. The page uses the same workflow as Localnet. Simulator
+snapshots use JSON files and do not stop a running environment.
+
+Listing, importing, downloading, and deleting also work while the environment is
+stopped. Creation from a stopped environment saves its persisted SQLite state;
+volatile data is available only when capturing a running node. Restoring a stopped
+environment starts it so the restored state is ready to use.

@@ -33,15 +33,19 @@ if (decoded != null) {
 
 ## `boc`
 
+<AvailabilityBadge since="Acton 1.2" />
+
 ```tolk
 struct boc
 ```
 
 Namespace for raw Bag of Cells encoding and decoding.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/boc.tolk#L25" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/boc.tolk#L27" />
 
 ## `BocEncodeOptions`
+
+<AvailabilityBadge since="Acton 1.2" />
 
 ```tolk
 struct BocEncodeOptions {
@@ -52,9 +56,11 @@ struct BocEncodeOptions {
 
 Options controlling raw BoC encoding.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/boc.tolk#L28" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/boc.tolk#L32" />
 
 ## `boc.encode`
+
+<AvailabilityBadge since="Acton 1.2" />
 
 ```tolk
 fun boc.encode<T>(value: T, options: BocEncodeOptions = {}): slice
@@ -68,9 +74,11 @@ has one root, no index, and no checksum. Set `options.crc32` to append CRC32C.
 When `value` is a `slice`, only its remaining bits and references are encoded. Bits or
 references already loaded from the slice are not included.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/boc.tolk#L40" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/boc.tolk#L46" />
 
 ## `boc.decode`
+
+<AvailabilityBadge since="Acton 1.2" />
 
 ```tolk
 fun boc.decode(data: slice): cell?
@@ -81,5 +89,5 @@ Decodes raw BoC bytes into a single root cell.
 Returns `null` when `data` is not a valid snake byte slice, is not a valid BoC, has an
 invalid CRC32C checksum, or contains a number of roots other than one.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/boc.tolk#L48" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/boc.tolk#L56" />
 

@@ -49,6 +49,9 @@ Create and install a project-local Git hook with `acton check` and `acton fmt --
 
 Possible values: `pre-push`, `pre-commit`
 
+Available since Acton 1.2.
+
+Hook selection and the `pre-push` default are new in 1.2.
 `--hooks` creates `.githooks/pre-push`. Use `--hooks=pre-commit` to run checks
 before each commit. An explicit value must use `=`.
 

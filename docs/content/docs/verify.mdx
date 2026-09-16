@@ -4,6 +4,10 @@ description: "Verify Tolk contract source code with Acton on TON testnet"
 icon: "Lock"
 ---
 
+<AvailabilityBadge since="Acton 1.2" />
+
+The ticket-based verifier workflow described here is available from Acton 1.2.
+
 Source code verification publishes reproducible local Tolk sources for a compiled code hash. Acton compiles the contract, requests a verification ticket, sends the required TON testnet payment, and uploads the source bundle to the TON verifier.
 
 ## Before verification
@@ -14,9 +18,10 @@ Prepare these inputs before running `acton verify`:
 - a `.tolk` contract that is defined in `Acton.toml`
 - enough testnet GRAM for the verifier payment and network fees
 
-Only Tolk contracts can be verified. Arbitrary `.boc` contracts are not supported by the verifier flow.
+The `acton verify` command accepts Tolk contracts. The verifier service also accepts
+FunC and Tact through its own interface and supports mainnet payments; the Acton CLI uses testnet. Arbitrary `.boc` contracts are not supported by the verifier flow.
 
-When `--address` is set, verification fails if the current local sources do not compile to the same bytecode as the deployed contract. Run verification from the same source revision and compiler configuration used for deployment.
+For a new verification, `--address` checks that the local sources compile to the same bytecode as the deployed contract. Already verified code succeeds before this address check. Run verification from the same source revision and compiler configuration used for deployment.
 
 ## Verify source code
 
@@ -32,7 +37,7 @@ On success, Acton prints a verifier link for the contract:
 
 ```acton-cli noCopy title="terminal"
 ✓ Contract verification completed!
-View at: https://verifier-staging.ton.org/0123abcd...
+View at: https://verifier.ton.org/0123abcd...
 ```
 
 To compare the compiled code with an active testnet contract before payment, pass its address:
@@ -41,8 +46,10 @@ To compare the compiled code with an active testnet contract before payment, pas
 acton verify Counter --address EQDt7LL... --wallet deployer
 ```
 
-Acton first sends the compiled code hash to `/api/v1/take_ticket`. If that code
-hash is verified, Acton stops successfully and does not request wallet access.
+Acton first checks `/api/v1/verification/status` for the compiled code hash.
+If verification is queued or compiling, Acton waits for it. If that code hash
+is verified, Acton stops successfully and does not request wallet access.
+Otherwise, Acton requests a payment ticket from `/api/v1/take_ticket`.
 
 For new code, the backend returns a testnet address, a minimum amount, and a
 comment. The comment has this form:
@@ -123,12 +130,7 @@ Common causes include:
 - changed generated or imported source files
 - verifying the wrong contract name or address
 
-For backend diagnostics, rerun the command with `ACTON_VERIFY_DEBUG=1`:
-
-```acton-cli
-ACTON_VERIFY_DEBUG=1 \
-acton verify Counter --address EQDt7LL... --dry-run
-```
+Backend errors include the HTTP status, request URL, and response body when available.
 
 To test a specific verifier backend, set `ACTON_VERIFY_BACKEND`:
 

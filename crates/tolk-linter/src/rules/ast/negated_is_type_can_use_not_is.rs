@@ -28,7 +28,7 @@ use tolk_syntax::ast::expressions::{Expr, IsType, Unary};
 /// }
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct NegatedIsTypeCanUseNotIs;
 
 impl Violation for NegatedIsTypeCanUseNotIs {

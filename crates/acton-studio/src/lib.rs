@@ -77,7 +77,7 @@ pub use test_run::{
     TestRunOutput, TestRunRecord, TestRunSource, TestRunStats, TestRunStatus, TestRunStreamEvent,
     TestRunSummary, is_valid_test_run_id, load_studio_daemon_descriptor, load_test_runs,
     new_test_run_id, persist_studio_daemon_descriptor, persist_test_run,
-    remove_studio_daemon_descriptor, studio_daemon_descriptor_path,
+    remove_studio_daemon_descriptor, studio_daemon_descriptor_path, test_artifact_dir,
     test_contract_artifact_file_name, test_history_dir, test_output_paths, test_trace_dir,
 };
 pub use test_runtime::{TestRunRuntime, TestRunRuntimeError, TestRunRuntimeFuture};
@@ -1107,7 +1107,7 @@ async fn restart_environment(
     path = "/api/v1/environments/{environment_id}/health",
     params(("environment_id" = String, Path, description = "Environment ID")),
     responses(
-        (status = 200, description = "Live Full localnet health", body = acton_localnet::NetworkHealth),
+        (status = 200, description = "Live Localnet health", body = acton_localnet::NetworkHealth),
         (status = 404, description = "Environment not found", body = StudioApiErrorBody),
         (status = 409, description = "Health diagnostics are unavailable", body = StudioApiErrorBody),
         (status = 500, description = "Failed to inspect environment health", body = StudioApiErrorBody)
@@ -1139,7 +1139,7 @@ struct EnvironmentStartupQuery {
         ("tail" = Option<usize>, Query, description = "Maximum startup log lines to return")
     ),
     responses(
-        (status = 200, description = "Live Full localnet startup progress and log tail", body = EnvironmentStartupState),
+        (status = 200, description = "Live Localnet startup progress and log tail", body = EnvironmentStartupState),
         (status = 404, description = "Environment not found", body = StudioApiErrorBody),
         (status = 409, description = "Startup diagnostics are unavailable", body = StudioApiErrorBody),
         (status = 500, description = "Failed to inspect environment startup", body = StudioApiErrorBody)

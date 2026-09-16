@@ -29,7 +29,7 @@ npm run dev
 ```
 
 <Callout>
-    The `counter` template ships with `CounterActions` and `CounterValue` components already wired to the generated `wrappers-ts/Counter.gen.ts` wrapper.
+    The `counter` template ships with a frontend in `app/src/App.tsx` and helpers in `app/src/lib/counter.ts`, already wired to the generated `wrappers-ts/Counter.gen.ts` wrapper.
 </Callout>
 
 ## Add a frontend to an existing project
@@ -55,7 +55,7 @@ This produces `wrappers-ts/Counter.gen.ts`. The generated file provides:
 - `Counter.fromStorage(init)` — derives the contract address from initial storage
 - `Counter.fromAddress(addr)` — opens an existing contract by address
 - `Counter.createCellOfIncreaseCounter(params)` — encodes an `IncreaseCounter` message body
-- `counter.getCurrentCounter()` — calls the `getCurrentCounter` get method and returns a typed value
+- `counter.getCurrentCounter()` — calls the `currentCounter` get method and returns a typed value
 
 <Callout title="Regenerate after ABI changes">
     Run `acton wrapper Counter --ts` after any change to storage, incoming messages, or get methods. Do not edit `*.gen.ts` files by hand.

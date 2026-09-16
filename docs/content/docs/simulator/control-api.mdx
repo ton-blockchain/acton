@@ -1,0 +1,322 @@
+---
+title: Simulator Control API
+description: >-
+  Acton-only control routes for local state, wallets, address names, compiler
+  ABI metadata, simulated network conditions, and raw local message injection.
+
+
+  These routes are intended for local development tooling and should not be
+  exposed publicly. When Simulator is started with --require-auth, these routes
+  require the Simulator API token. Rate limiting applies only to /api routes,
+  and response delay applies only to TON Center-compatible API routes; control
+  routes remain available when --rate-limit or --response-delay-ms is enabled.
+full: true
+sidebarTitle: Control API
+_openapi:
+  toc:
+    - depth: 2
+      title: Fund an account
+      url: '#fund-an-account'
+    - depth: 2
+      title: Mint jettons to an account
+      url: '#mint-jettons-to-an-account'
+    - depth: 2
+      title: Get address names
+      url: '#get-address-names'
+    - depth: 2
+      title: Set an address name
+      url: '#set-an-address-name'
+    - depth: 2
+      title: Get compiler ABI metadata
+      url: '#get-compiler-abi-metadata'
+    - depth: 2
+      title: List registered compiler ABI metadata
+      url: '#list-registered-compiler-abi-metadata'
+    - depth: 2
+      title: Delete registered compiler ABI metadata
+      url: '#delete-registered-compiler-abi-metadata'
+    - depth: 2
+      title: Get verified contract source
+      url: '#get-verified-contract-source'
+    - depth: 2
+      title: Get registered contract source
+      url: '#get-registered-contract-source'
+    - depth: 2
+      title: List registered contract sources
+      url: '#list-registered-contract-sources'
+    - depth: 2
+      title: Delete registered contract source
+      url: '#delete-registered-contract-source'
+    - depth: 2
+      title: Register compiler ABI metadata
+      url: '#register-compiler-abi-metadata'
+    - depth: 2
+      title: Register contract sources
+      url: '#register-contract-sources'
+    - depth: 2
+      title: Create snapshot
+      url: '#create-snapshot'
+    - depth: 2
+      title: List snapshots
+      url: '#list-snapshots'
+    - depth: 2
+      title: Restore snapshot
+      url: '#restore-snapshot'
+    - depth: 2
+      title: Delete snapshot
+      url: '#delete-snapshot'
+    - depth: 2
+      title: Download snapshot
+      url: '#download-snapshot'
+    - depth: 2
+      title: Import snapshot
+      url: '#import-snapshot'
+    - depth: 2
+      title: Replace blockchain config
+      url: '#replace-blockchain-config'
+    - depth: 2
+      title: Update a blockchain config parameter
+      url: '#update-a-blockchain-config-parameter'
+    - depth: 2
+      title: Set a ShardAccount
+      url: '#set-a-shardaccount'
+    - depth: 2
+      title: Change account state
+      url: '#change-account-state'
+    - depth: 2
+      title: Send a raw internal message
+      url: '#send-a-raw-internal-message'
+    - depth: 2
+      title: List startup accounts
+      url: '#list-startup-accounts'
+    - depth: 2
+      title: Mine Simulator blocks
+      url: '#mine-simulator-blocks'
+    - depth: 2
+      title: Increase virtual time
+      url: '#increase-virtual-time'
+    - depth: 2
+      title: Set virtual time
+      url: '#set-virtual-time'
+    - depth: 2
+      title: Set next block timestamp
+      url: '#set-next-block-timestamp'
+    - depth: 2
+      title: Set empty-block mining mode
+      url: '#set-empty-block-mining-mode'
+    - depth: 2
+      title: Set simulated network conditions
+      url: '#set-simulated-network-conditions'
+    - depth: 2
+      title: Get node status
+      url: '#get-node-status'
+  structuredData:
+    headings:
+      - content: Fund an account
+        id: fund-an-account
+      - content: Mint jettons to an account
+        id: mint-jettons-to-an-account
+      - content: Get address names
+        id: get-address-names
+      - content: Set an address name
+        id: set-an-address-name
+      - content: Get compiler ABI metadata
+        id: get-compiler-abi-metadata
+      - content: List registered compiler ABI metadata
+        id: list-registered-compiler-abi-metadata
+      - content: Delete registered compiler ABI metadata
+        id: delete-registered-compiler-abi-metadata
+      - content: Get verified contract source
+        id: get-verified-contract-source
+      - content: Get registered contract source
+        id: get-registered-contract-source
+      - content: List registered contract sources
+        id: list-registered-contract-sources
+      - content: Delete registered contract source
+        id: delete-registered-contract-source
+      - content: Register compiler ABI metadata
+        id: register-compiler-abi-metadata
+      - content: Register contract sources
+        id: register-contract-sources
+      - content: Create snapshot
+        id: create-snapshot
+      - content: List snapshots
+        id: list-snapshots
+      - content: Restore snapshot
+        id: restore-snapshot
+      - content: Delete snapshot
+        id: delete-snapshot
+      - content: Download snapshot
+        id: download-snapshot
+      - content: Import snapshot
+        id: import-snapshot
+      - content: Replace blockchain config
+        id: replace-blockchain-config
+      - content: Update a blockchain config parameter
+        id: update-a-blockchain-config-parameter
+      - content: Set a ShardAccount
+        id: set-a-shardaccount
+      - content: Change account state
+        id: change-account-state
+      - content: Send a raw internal message
+        id: send-a-raw-internal-message
+      - content: List startup accounts
+        id: list-startup-accounts
+      - content: Mine Simulator blocks
+        id: mine-simulator-blocks
+      - content: Increase virtual time
+        id: increase-virtual-time
+      - content: Set virtual time
+        id: set-virtual-time
+      - content: Set next block timestamp
+        id: set-next-block-timestamp
+      - content: Set empty-block mining mode
+        id: set-empty-block-mining-mode
+      - content: Set simulated network conditions
+        id: set-simulated-network-conditions
+      - content: Get node status
+        id: get-node-status
+    contents:
+      - content: >-
+          Queues a local faucet transfer to credit an address. The transfer is
+          included on the next automatic or manually mined block.
+        heading: fund-an-account
+      - content: >-
+          Finds the jetton master in Simulator state, verifies that it is
+          mintable and has an admin, converts the display amount using the
+          decimals from jetton metadata, preflights the legacy 0x15 and current
+          0x642b7d07 mint layouts, and queues the uniquely accepted message for
+          the next block.
+        heading: mint-jettons-to-an-account
+      - content: >-
+          Returns local names for the requested addresses. Missing names are
+          returned as null.
+        heading: get-address-names
+      - content: Sets or updates the local name for an address.
+        heading: set-an-address-name
+      - content: >-
+          Returns extended contract ABI metadata for the requested code hashes.
+          Missing ABI entries are returned as null.
+        heading: get-compiler-abi-metadata
+      - content: >-
+          Returns compiler ABI metadata registered directly in the Simulator
+          node.
+        heading: list-registered-compiler-abi-metadata
+      - content: >-
+          Deletes a locally registered compiler ABI entry by code hash or one of
+          its code hash aliases.
+        heading: delete-registered-compiler-abi-metadata
+      - content: >-
+          Proxies TON verifier source lookup by address or code hash and returns
+          the verified source bundle when the contract is confirmed.
+        heading: get-verified-contract-source
+      - content: >-
+          Returns the source bundle registered directly in the Simulator node
+          for an address or code hash.
+        heading: get-registered-contract-source
+      - content: >-
+          Returns source bundles registered directly in the Simulator node, one
+          per code hash.
+        heading: list-registered-contract-sources
+      - content: Deletes a locally registered source bundle by code hash.
+        heading: delete-registered-contract-source
+      - content: >-
+          Registers one or more extended compiler ABI payloads for later
+          explorer and API lookups by code hash.
+        heading: register-compiler-abi-metadata
+      - content: >-
+          Registers one or more source artifacts for later explorer source-code
+          and retrace lookups by code hash.
+        heading: register-contract-sources
+      - content: >-
+          Saves the current state as a persistent JSON snapshot without stopping
+          the node. The returned ID identifies the saved file.
+        heading: create-snapshot
+      - content: >-
+          Lists saved JSON snapshots, including snapshots from earlier node
+          runs.
+        heading: list-snapshots
+      - content: >-
+          Restores state in the node mutation queue without restarting the
+          process or deleting any saved snapshots.
+        heading: restore-snapshot
+      - content: Downloads the selected saved JSON file without capturing new state.
+        heading: download-snapshot
+      - content: >-
+          Validates and saves a JSON snapshot under a new ID without changing
+          the running state. An optional name overrides the name in the file.
+        heading: import-snapshot
+      - content: >-
+          Validates and replaces the full blockchain config dictionary from a
+          base64-encoded BOC, then commits the change in a config-only block.
+        heading: replace-blockchain-config
+      - content: >-
+          Checks the parameter's expected representation hash and commits its
+          replacement in a new block, even with automatic mining disabled. A
+          null expectedHash adds a missing parameter. Other parameters and
+          historical configs are preserved. Parameter 0 cannot be changed.
+        heading: update-a-blockchain-config-parameter
+      - content: >-
+          Replaces the selected account state with a base64-encoded ShardAccount
+          BOC.
+        heading: set-a-shardaccount
+      - content: >-
+          Changes the selected local account state to nonexist, uninit, or
+          frozen. When state is frozen with source=current, set mine=false to
+          queue the synthetic freeze transaction for the next mined block
+          instead of committing a block immediately.
+        heading: change-account-state
+      - content: >-
+          Injects a base64-encoded internal message BOC into the local internal
+          queue. TON Center-compatible message endpoints accept external-in
+          messages only.
+        heading: send-a-raw-internal-message
+      - content: >-
+          Returns public account descriptors selected when the Simulator server
+          started.
+        heading: list-startup-accounts
+      - content: >-
+          Attempts to mine the requested number of Simulator blocks. Empty
+          blocks are skipped when skip_empty_blocks is true. When the request
+          body is omitted or blocks is not provided, one mining attempt is made.
+        heading: mine-simulator-blocks
+      - content: >-
+          Adds seconds to the Simulator virtual clock. Future blocks use this
+          adjusted time until it is changed again.
+        heading: increase-virtual-time
+      - content: >-
+          Sets the Simulator virtual clock to a Unix timestamp. The timestamp
+          must not be lower than the latest mined block time.
+        heading: set-virtual-time
+      - content: >-
+          Sets a one-shot Unix timestamp for the next mined block. The timestamp
+          is consumed by the next automatic or manually mined block and must not
+          be lower than the latest mined block time.
+        heading: set-next-block-timestamp
+      - content: >-
+          Controls whether automatic and manual mining skip blocks with no
+          pending messages. Set skip_empty_blocks to false to produce empty
+          blocks. This does not enable or disable automatic mining.
+        heading: set-empty-block-mining-mode
+      - content: >-
+          Updates simulated network conditions while the Simulator server is
+          running and returns the updated values. Set response_delay_ms to 0 to
+          disable response delay. Current values are also available from
+          /acton_nodeInfo.
+        heading: set-simulated-network-conditions
+      - content: >-
+          Returns uptime, latest block seqno, local or remote state-source
+          information, virtual time, mining settings, rate limit, and current
+          simulated network conditions.
+        heading: get-node-status
+---
+
+<AvailabilityBadge since="Acton 1.2" />
+
+{/* @generated by `bun run generated-source`. Do not edit directly. */}
+
+Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.
+
+These routes are intended for local development tooling and should not be exposed publicly. When Simulator is started with --require-auth, these routes require the Simulator API token. Rate limiting applies only to /api routes, and response delay applies only to TON Center-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled.
+
+<APIPage document={"./public/openapi/acton-simulator-control.openapi.json"} webhooks={[]} operations={[{"path":"/acton_fundAccount","method":"post"},{"path":"/acton_fundJetton","method":"post"},{"path":"/acton_getAddressName","method":"get"},{"path":"/acton_setAddressName","method":"post"},{"path":"/acton_getCompilerAbi","method":"get"},{"path":"/acton_listCompilerAbis","method":"get"},{"path":"/acton_deleteCompilerAbi","method":"post"},{"path":"/acton_getVerifiedSource","method":"get"},{"path":"/acton_getRegisteredVerifiedSource","method":"get"},{"path":"/acton_listVerifiedSources","method":"get"},{"path":"/acton_deleteVerifiedSource","method":"post"},{"path":"/acton_registerCompilerAbis","method":"post"},{"path":"/acton_registerVerifiedSources","method":"post"},{"path":"/acton_createSnapshot","method":"post"},{"path":"/acton_listSnapshots","method":"get"},{"path":"/acton_restoreSnapshot","method":"post"},{"path":"/acton_deleteSnapshot","method":"post"},{"path":"/acton_exportSnapshot","method":"get"},{"path":"/acton_importSnapshot","method":"post"},{"path":"/acton_setConfig","method":"post"},{"path":"/acton_setConfigParam","method":"post"},{"path":"/acton_setShardAccount","method":"post"},{"path":"/acton_changeAccountState","method":"post"},{"path":"/acton_sendInternalMessage","method":"post"},{"path":"/acton_getStartupAccounts","method":"get"},{"path":"/acton_mine","method":"post"},{"path":"/acton_increaseTime","method":"post"},{"path":"/acton_setTime","method":"post"},{"path":"/acton_setNextBlockTimestamp","method":"post"},{"path":"/acton_setMiningMode","method":"post"},{"path":"/acton_setNetworkConditions","method":"post"},{"path":"/acton_nodeInfo","method":"get"}]} showTitle />

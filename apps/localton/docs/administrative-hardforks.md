@@ -1,7 +1,7 @@
 # Change account state with administrative hardforks
 
 Use **Admin actions** in Acton Studio to prepare account states for contract tests
-on a full localnet. You can set a balance, replace contract code or data, freeze
+on a localnet. You can set a balance, replace contract code or data, freeze
 an account, or delete it.
 
 Each operation creates a **real hardfork** of your local blockchain. All managed
@@ -14,7 +14,7 @@ has no transaction for this change.
 
 ## Before you apply an edit
 
-- Start your full localnet and all its nodes. Every node must be available and
+- Start your localnet and all its nodes. Every node must be available and
   synchronized before the operation starts
 - Use a Localton image with support for administrative hardforks and account
   indexing after a hardfork. Studio checks image support before it pauses the network
@@ -30,7 +30,7 @@ environment with a compatible image.
 
 ## Apply an account change
 
-- Open your full localnet in Studio, then open **Admin actions**
+- Open your localnet in Studio, then open **Admin actions**
 - Select an **Action** from the table below
 - Enter the **Account address**, or select a wallet or known contract from the suggestions
 - Enter the balance or BoC required for the action
@@ -98,7 +98,7 @@ The error and environment logs provide details for diagnosis.
 
 ## Scope and limits
 
-- Administrative hardforks support managed full localnets with masterchain
+- Administrative hardforks support managed localnets with masterchain
   accounts and one unsplit workchain-0 shard. Split and merged histories are not supported
 - All validators must belong to the managed environment. External validators
   cannot participate in the coordinated pause and state change

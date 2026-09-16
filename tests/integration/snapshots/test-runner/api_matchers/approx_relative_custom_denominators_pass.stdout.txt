@@ -1,0 +1,15 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/approx.test.tolk (6 tests)
+  ✓ parts per million boundary [TIME]
+  ✓ eighteen decimal precision [TIME]
+  ✓ custom precision floors delta [TIME]
+  ✓ denominator below one hundred [TIME]
+  ✓ equal values at custom precision [TIME]
+  ✓ wide intermediate multiplication [TIME]
+
+ ✓ 6 passed in 1 file

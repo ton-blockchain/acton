@@ -30,6 +30,7 @@ interface RunningActonUi {
 
 interface StartActonTestUiOptions {
   readonly coverage?: boolean
+  readonly verbose?: boolean
   readonly filter?: string
   readonly gasProfile?: boolean
   readonly gasProfileIncludeTests?: boolean
@@ -37,13 +38,17 @@ interface StartActonTestUiOptions {
 
 interface TestFixtures {
   readonly actonUi: RunningActonUi
+  readonly loggedActonUi: RunningActonUi
   readonly fanoutGraphUi: RunningActonUi
+  readonly loggedFanoutGraphUi: RunningActonUi
   readonly profiledActonUi: RunningActonUi
 }
 
 interface WorkerFixtures {
   readonly startedActonUi: RunningActonUi
+  readonly startedLoggedActonUi: RunningActonUi
   readonly startedFanoutGraphUi: RunningActonUi
+  readonly startedLoggedFanoutGraphUi: RunningActonUi
   readonly startedProfiledActonUi: RunningActonUi
 }
 
@@ -529,6 +534,10 @@ const startActonTestUi = async (options: StartActonTestUiOptions = {}): Promise<
       testArgs.push("--coverage")
     }
 
+    if (options.verbose) {
+      testArgs.push("--verbose")
+    }
+
     if (options.gasProfile === true) {
       testArgs.push("--gas-profile", ".acton/test-ui-gas.cpuprofile")
 
@@ -568,7 +577,9 @@ const startActonTestUi = async (options: StartActonTestUiOptions = {}): Promise<
   }
 }
 
-const startFanoutGraphTestUi = async (): Promise<RunningActonUi> => {
+const startFanoutGraphTestUi = async (
+  options: Pick<StartActonTestUiOptions, "filter" | "verbose"> = {},
+): Promise<RunningActonUi> => {
   const fixture = await createFixtureProject("fanout-graph")
   let child: ChildProcess | undefined
 
@@ -581,7 +592,17 @@ const startFanoutGraphTestUi = async (): Promise<RunningActonUi> => {
     await addFanoutGraphFixture(fixture)
 
     const output = new ProcessOutput()
-    const testArgs = ["test", "--ui", "--ui-port", "0", "--filter", fanoutGraphFilter]
+    const testArgs = [
+      "test",
+      "--ui",
+      "--ui-port",
+      "0",
+      "--filter",
+      options.filter ?? fanoutGraphFilter,
+    ]
+    if (options.verbose) {
+      testArgs.push("--verbose")
+    }
 
     child = spawn(actonBinary, testArgs, {
       cwd: fixture.projectDir,
@@ -628,10 +649,43 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     {scope: "worker", timeout: startupTimeoutMs + shutdownTimeoutMs},
   ],
 
+  startedLoggedActonUi: [
+    // biome-ignore lint/correctness/noEmptyPattern: Playwright requires an object destructuring pattern.
+    async ({}, use) => {
+      const running = await startActonTestUi({
+        coverage: false,
+        filter: "owner can send jettons",
+        verbose: true,
+      })
+      try {
+        await use(running)
+      } finally {
+        await running.stop()
+      }
+    },
+    {scope: "worker", timeout: startupTimeoutMs + shutdownTimeoutMs},
+  ],
+
   startedFanoutGraphUi: [
     // biome-ignore lint/correctness/noEmptyPattern: Playwright requires an object destructuring pattern.
     async ({}, use) => {
       const running = await startFanoutGraphTestUi()
+      try {
+        await use(running)
+      } finally {
+        await running.stop()
+      }
+    },
+    {scope: "worker", timeout: startupTimeoutMs + shutdownTimeoutMs},
+  ],
+
+  startedLoggedFanoutGraphUi: [
+    // biome-ignore lint/correctness/noEmptyPattern: Playwright requires an object destructuring pattern.
+    async ({}, use) => {
+      const running = await startFanoutGraphTestUi({
+        filter: "chain graph has twenty transactions",
+        verbose: true,
+      })
       try {
         await use(running)
       } finally {
@@ -663,8 +717,16 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     await use(startedActonUi)
   },
 
+  loggedActonUi: async ({startedLoggedActonUi}, use) => {
+    await use(startedLoggedActonUi)
+  },
+
   fanoutGraphUi: async ({startedFanoutGraphUi}, use) => {
     await use(startedFanoutGraphUi)
+  },
+
+  loggedFanoutGraphUi: async ({startedLoggedFanoutGraphUi}, use) => {
+    await use(startedLoggedFanoutGraphUi)
   },
 
   profiledActonUi: async ({startedProfiledActonUi}, use) => {

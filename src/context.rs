@@ -101,8 +101,12 @@ pub struct AssertDecimalFailure {
     pub location: Option<SourceLocation>,
 }
 
+/// Diagnostic context retained for one getter execution, including deferred assertions.
+/// VM logs and ABI belong to that invocation; an assertion can add its own explanation.
 #[derive(Debug, Clone)]
 pub struct GetMethodAssertFailure {
+    /// An assertion-specific explanation, or None for a failed getter unwrap.
+    pub message: Option<String>,
     pub get_method_presentation: String,
     pub vm_exit_code: i32,
     pub suggested_name: Option<String>,
@@ -262,6 +266,9 @@ impl AssertFailure {
 #[derive(Debug, Clone)]
 pub struct BuildCache {
     pub built: FxHashMap<PathBuf, CompilationResult>,
+    /// Named contracts whose generated dependencies are current for this run.
+    /// Explicit-path builds do not prepare manifest dependencies.
+    pub(crate) prepared_contracts: FxHashSet<String>,
 }
 
 impl Default for BuildCache {
@@ -275,6 +282,7 @@ impl BuildCache {
     pub fn new() -> Self {
         Self {
             built: FxHashMap::default(),
+            prepared_contracts: FxHashSet::default(),
         }
     }
 
@@ -532,6 +540,7 @@ impl Emulations {
 pub struct EmulationsState {
     pub results: FxHashMap<String, Emulations>,
     next_failed_message_id: u64,
+    get_method_diagnostics: Vec<GetMethodAssertFailure>,
 }
 
 impl Default for EmulationsState {
@@ -546,6 +555,7 @@ impl EmulationsState {
         Self {
             results: FxHashMap::default(),
             next_failed_message_id: 1,
+            get_method_diagnostics: Vec::new(),
         }
     }
 
@@ -629,6 +639,20 @@ impl EmulationsState {
             })
             .get_methods
             .push(get_method);
+    }
+
+    /// Retains invocation diagnostics until the emulation state is dropped.
+    /// Handles remain stable across subsequent getters and state clones used by test setup.
+    pub fn save_get_method_diagnostic(&mut self, diagnostic: GetMethodAssertFailure) -> usize {
+        let diagnostic_id = self.get_method_diagnostics.len();
+        self.get_method_diagnostics.push(diagnostic);
+        diagnostic_id
+    }
+
+    /// Retrieves the original getter context for a deferred unwrap or exit-code assertion.
+    #[must_use]
+    pub fn get_method_diagnostic(&self, diagnostic_id: usize) -> Option<&GetMethodAssertFailure> {
+        self.get_method_diagnostics.get(diagnostic_id)
     }
 
     pub fn save_trace_name(&mut self, env_name: &str, lt: u64, trace_name: String) {

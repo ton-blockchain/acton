@@ -48,6 +48,7 @@ fn render_docs_page(spec: &CommandManualSpec, source_path: &Path, body: &str) ->
     let body = rewrite_docs_links(body);
     let body = strip_leading_h1(&body);
     let body = strip_leading_section(body, "NAME");
+    let body = super::render_availability_badges(body);
     let generated_notice = generated_notice_from_path(source_path);
     format!(
         "---\ntitle: {:?}\ndescription: {:?}\n---\n\n{generated_notice}{body}",
@@ -322,7 +323,7 @@ mod tests {
         let rendered = render_docs_page(
             spec,
             Path::new("src/doc/man/acton-new.md"),
-            "# acton-new(1)\n\n## NAME\n\nacton-new --- Create a new Acton project\n\n## DESCRIPTION\n\nBody.\n",
+            "# acton-new(1)\n\n## NAME\n\nacton-new --- Create a new Acton project\n\n## DESCRIPTION\n\nAvailable since Acton 1.2.\n\n```text\nAvailable since Acton 1.2.\n```\n\nBody.\n",
         );
         assert!(rendered.contains("title: \"acton new\""));
         assert!(rendered.contains("description: \"Reference manual for the acton new command\""));
@@ -331,7 +332,7 @@ mod tests {
         ));
         assert!(!rendered.contains("# acton-new(1)"));
         assert!(!rendered.contains("## NAME\n"));
-        assert!(rendered.ends_with("## DESCRIPTION\n\nBody.\n"));
+        assert!(rendered.ends_with("## DESCRIPTION\n\n<AvailabilityBadge since=\"Acton 1.2\" />\n\n```text\nAvailable since Acton 1.2.\n```\n\nBody.\n"));
     }
 
     #[test]

@@ -3,6 +3,144 @@ use crate::support::project::ProjectBuilder;
 use acton_config::color::ColorMode;
 
 #[test]
+fn test_println_big_array() {
+    let project = ProjectBuilder::new("println-big-array")
+        .script_file(
+            "main",
+            r#"
+            import "../../lib/io"
+            import "../../lib/types/big_array"
+
+            struct Point {
+                x: int
+                y: int
+            }
+
+            struct Collection {
+                values: BigArray<int>?
+                next: int
+            }
+
+            type Numbers = BigArray<int>
+
+            fun main() {
+                println(BigArray<int>.createEmpty());
+                val numbers: Numbers = BigArray<int>.createFromArray([1, 2, 3]);
+                println(numbers);
+                println("values={}", numbers);
+                println(Collection { values: numbers, next: 42 });
+                println(Collection { values: null, next: 43 });
+                println([numbers, BigArray<int>.createEmpty()]);
+                println(BigArray<Point>.createFromArray([
+                    Point { x: 1, y: 2 }, Point { x: 3, y: 4 }
+                ]));
+                println(BigArray<(int, bool)>.createFromArray([(1, true), (2, false)]));
+                println(BigArray<array<int>>.createFromArray([[1, 2], [], [3]]));
+                println(BigArray<BigArray<int>>.createFromArray([
+                    numbers, BigArray<int>.createEmpty()
+                ]));
+            }
+            "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/main.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/println/test_println_big_array.stdout.txt");
+}
+
+#[test]
+fn test_println_big_array_chunk_boundaries() {
+    let project = ProjectBuilder::new("println-big-array-chunk-boundaries")
+        .test_file(
+            "big_array",
+            r#"
+            import "../../lib/io"
+            import "../../lib/fmt"
+            import "../../lib/testing/expect"
+            import "../../lib/types/big_array"
+
+            get fun `test big array chunk boundaries`() {
+                var values = BigArray<int>.createEmpty();
+                var expected = "";
+                repeat (511) {
+                    val index = values.size();
+                    if (index > 0) {
+                        expected = format("{}, {}", expected, index);
+                    } else {
+                        expected = format("{}", index);
+                    }
+                    values.push(index);
+                    if (values.size() == 255 || values.size() == 256 ||
+                        values.size() == 510 || values.size() == 511) {
+                        expect(format("{}", values)).toEqual(format("BigArray<int> [{}]", expected));
+                    }
+                }
+                repeat (256) {
+                    values.pop();
+                }
+                values.push(999);
+                println(values);
+                repeat (256) {
+                    values.pop();
+                }
+                println(values);
+            }
+            "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/println/test_println_big_array_chunk_boundaries.stdout.txt",
+        );
+}
+
+#[test]
+fn test_println_single_tuple_field_and_unrelated_big_array() {
+    let project = ProjectBuilder::new("println-single-tuple-field")
+        .script_file(
+            "main",
+            r#"
+            import "../../lib/io"
+
+            struct Box<T> {
+                value: T
+            }
+
+            struct BigArray<T> {
+                items: array<T>
+            }
+
+            fun main() {
+                println(Box<[int, bool]> { value: [1, true] });
+                println(Box { value: array<int> [1, 2, 3] });
+                println(Box { value: array<int> [] });
+                println(Box { value: Box<[int, bool]> { value: [2, false] } });
+                println(BigArray<int> { items: [4, 5] });
+            }
+            "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/main.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/println/test_println_single_tuple_field_and_unrelated_big_array.stdout.txt",
+        );
+}
+
+#[test]
 fn test_println_formatting() {
     let project = ProjectBuilder::new("println-formatting")
         .script_file(

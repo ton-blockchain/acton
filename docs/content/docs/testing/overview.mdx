@@ -6,6 +6,19 @@ description: "Learn how to write and run tests for Tolk smart contracts"
 
 This section contains guides and reference documentation for the Acton test runner.
 
+## Run selected paths and inspect results in Studio
+
+<AvailabilityBadge since="Acton 1.2" />
+
+Pass multiple files or directories to one test run. Overlapping selections run once:
+
+```bash
+acton test tests/unit tests/integration/wallet.test.tolk
+```
+
+Use `--no-capture` for live test output. Start `acton studio` to retain test history
+and inspect results in the [Studio workspace](/docs/studio/tests).
+
 <Cards>
   <Card href="/docs/testing/generating-wrappers" title="Generating wrappers">
     Generate wrappers for Tolk smart contracts

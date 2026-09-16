@@ -1,0 +1,72 @@
+[
+  {
+    "case": "legacy",
+    "message": {
+      "body_preserved": true,
+      "bounced": true,
+      "opcode": 305419896
+    },
+    "sent": true,
+    "transaction": {
+      "body_preserved": true,
+      "bounced": true,
+      "opcode": 305419896
+    }
+  },
+  {
+    "case": "rich",
+    "message": {
+      "body_preserved": true,
+      "bounced": true,
+      "opcode": 305419896
+    },
+    "sent": true,
+    "transaction": {
+      "body_preserved": true,
+      "bounced": true,
+      "opcode": 305419896
+    }
+  },
+  {
+    "case": "unmarked",
+    "message": {
+      "body_preserved": true,
+      "bounced": false,
+      "opcode": 4294967294
+    },
+    "sent": true,
+    "transaction": {
+      "body_preserved": true,
+      "bounced": false,
+      "opcode": 4294967294
+    }
+  },
+  {
+    "case": "missing_ref",
+    "message": {
+      "body_preserved": true,
+      "bounced": true,
+      "opcode": null
+    },
+    "sent": true,
+    "transaction": {
+      "body_preserved": true,
+      "bounced": true,
+      "opcode": null
+    }
+  },
+  {
+    "case": "short_ref",
+    "message": {
+      "body_preserved": true,
+      "bounced": true,
+      "opcode": null
+    },
+    "sent": true,
+    "transaction": {
+      "body_preserved": true,
+      "bounced": true,
+      "opcode": null
+    }
+  }
+]

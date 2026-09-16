@@ -13,6 +13,7 @@ x
   Backtrace:
     currentCounterFail   at contracts/simple[LINE]
   Called from:
+    GetMethodResult<int>.unwrap              at ../lib/emulation/network[LINE]
     net.runGetMethod<int>                    at ../lib/emulation/network[LINE]
     test get method failure with backtrace   at tests/test.test[LINE]
   Description: Dictionary error

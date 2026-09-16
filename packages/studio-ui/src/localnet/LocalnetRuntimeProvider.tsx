@@ -64,8 +64,8 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
   const apiV3BaseUrl = environment?.endpoints.apiV3 ?? `${rpcBaseUrl}/api/v3`
   const controlBaseUrl = environment?.endpoints.control ?? rpcBaseUrl
   const controlEnabled = supports(environment, "controlApi")
-  // Full localnet control uses a service token owned by the Studio server.
-  // Only simulated localnet can require a browser-supplied bearer token.
+  // Localnet control uses a service token owned by the Studio server.
+  // Only simulator can require a browser-supplied bearer token.
   const browserApiTokenEnabled = environment?.config.kind === "actonSimulatedLocalnet"
   const toncenterApiCompatible = environment?.network.supportsActions ?? !controlEnabled
   const contractsEnabled = supports(environment, "contracts")

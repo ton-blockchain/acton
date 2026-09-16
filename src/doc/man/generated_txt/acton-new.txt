@@ -76,8 +76,11 @@ OPTIONS
 
            Possible values: pre-push, pre-commit
 
-           --hooks creates .githooks/pre-push. Use --hooks=pre-commit to run
-           checks before each commit. An explicit value must use =.
+           Available since Acton 1.2.
+
+           Hook selection and the pre-push default are new in 1.2. --hooks
+           creates .githooks/pre-push. Use --hooks=pre-commit to run checks
+           before each commit. An explicit value must use =.
 
            If git is available and --hooks is not provided, interactive mode
            offers the choices pre-push, pre-commit, and no hooks after you opt

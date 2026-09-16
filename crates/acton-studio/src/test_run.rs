@@ -339,6 +339,13 @@ pub fn test_trace_dir(project_root: &Path, run_id: &str) -> PathBuf {
     project_root.join(TEST_TRACES_RELATIVE_PATH).join(run_id)
 }
 
+/// Stores viewer artifacts independently of CLI export paths and trace collection.
+/// The caller must supply a validated run ID so each saved run owns its artifacts.
+#[must_use]
+pub fn test_artifact_dir(project_root: &Path, run_id: &str) -> PathBuf {
+    project_root.join(".studio/tests/artifacts").join(run_id)
+}
+
 #[must_use]
 pub fn test_output_paths(project_root: &Path, run_id: &str) -> (PathBuf, PathBuf) {
     let output_dir = project_root.join(TEST_OUTPUT_RELATIVE_PATH);

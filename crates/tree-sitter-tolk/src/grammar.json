@@ -818,8 +818,17 @@
                         "type": "CHOICE",
                         "members": [
                           {
-                            "type": "STRING",
-                            "value": ","
+                            "type": "CHOICE",
+                            "members": [
+                              {
+                                "type": "STRING",
+                                "value": ","
+                              },
+                              {
+                                "type": "STRING",
+                                "value": ";"
+                              }
+                            ]
                           },
                           {
                             "type": "BLANK"
@@ -844,8 +853,17 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "STRING",
-              "value": ","
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": ","
+                },
+                {
+                  "type": "STRING",
+                  "value": ";"
+                }
+              ]
             },
             {
               "type": "BLANK"
@@ -3639,6 +3657,47 @@
               },
               {
                 "type": "FIELD",
+                "name": "statement",
+                "content": {
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "SYMBOL",
+                      "name": "if_statement"
+                    },
+                    {
+                      "type": "SYMBOL",
+                      "name": "while_statement"
+                    },
+                    {
+                      "type": "SYMBOL",
+                      "name": "repeat_statement"
+                    },
+                    {
+                      "type": "SYMBOL",
+                      "name": "do_while_statement"
+                    },
+                    {
+                      "type": "SYMBOL",
+                      "name": "try_catch_statement"
+                    },
+                    {
+                      "type": "SYMBOL",
+                      "name": "assert_statement"
+                    },
+                    {
+                      "type": "SYMBOL",
+                      "name": "break_statement"
+                    },
+                    {
+                      "type": "SYMBOL",
+                      "name": "continue_statement"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "FIELD",
                 "name": "expr",
                 "content": {
                   "type": "SYMBOL",
@@ -4201,7 +4260,7 @@
       }
     },
     "tuple_type": {
-      "type": "PREC",
+      "type": "PREC_DYNAMIC",
       "value": 103,
       "content": {
         "type": "SEQ",
@@ -4211,36 +4270,49 @@
             "value": "["
           },
           {
-            "type": "SEQ",
-            "members": [
-              {
-                "type": "SYMBOL",
-                "name": "_type_hint"
-              },
-              {
-                "type": "REPEAT",
-                "content": {
-                  "type": "SEQ",
-                  "members": [
-                    {
-                      "type": "STRING",
-                      "value": ","
-                    },
-                    {
-                      "type": "SYMBOL",
-                      "name": "_type_hint"
-                    }
-                  ]
-                }
-              }
-            ]
-          },
-          {
             "type": "CHOICE",
             "members": [
               {
-                "type": "STRING",
-                "value": ","
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "SYMBOL",
+                        "name": "_type_hint"
+                      },
+                      {
+                        "type": "REPEAT",
+                        "content": {
+                          "type": "SEQ",
+                          "members": [
+                            {
+                              "type": "STRING",
+                              "value": ","
+                            },
+                            {
+                              "type": "SYMBOL",
+                              "name": "_type_hint"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "CHOICE",
+                    "members": [
+                      {
+                        "type": "STRING",
+                        "value": ","
+                      },
+                      {
+                        "type": "BLANK"
+                      }
+                    ]
+                  }
+                ]
               },
               {
                 "type": "BLANK"
@@ -4263,6 +4335,18 @@
           {
             "type": "STRING",
             "value": "("
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "|"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
           },
           {
             "type": "FIELD",
@@ -4435,19 +4519,41 @@
               {
                 "type": "REPEAT",
                 "content": {
-                  "type": "CHOICE",
+                  "type": "SEQ",
                   "members": [
                     {
-                      "type": "PATTERN",
-                      "value": "[^\"]"
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "CHOICE",
+                          "members": [
+                            {
+                              "type": "STRING",
+                              "value": "\""
+                            },
+                            {
+                              "type": "STRING",
+                              "value": "\"\""
+                            }
+                          ]
+                        },
+                        {
+                          "type": "BLANK"
+                        }
+                      ]
                     },
                     {
-                      "type": "PATTERN",
-                      "value": "\"[^\"]"
-                    },
-                    {
-                      "type": "PATTERN",
-                      "value": "\"\"[^\"]"
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "PATTERN",
+                          "value": "[^\"\\\\]"
+                        },
+                        {
+                          "type": "PATTERN",
+                          "value": "\\\\[\\s\\S]"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -4601,6 +4707,10 @@
     [
       "tensor_type",
       "tensor_expression"
+    ],
+    [
+      "tuple_type",
+      "typed_tuple"
     ],
     [
       "union_type"

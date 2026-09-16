@@ -39,7 +39,7 @@ use tolk_syntax::{VarDeclLhs, match_parents};
 /// - Autofix is available for simple `var x = ...` declarations.
 ///   Destructuring declarations still warn but may not have a fix.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct MutableVariableCanBeImmutable;
 
 impl Violation for MutableVariableCanBeImmutable {

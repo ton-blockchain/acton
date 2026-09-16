@@ -2,7 +2,7 @@
    Compiling contracts
    Compiling First Wallet
     Finished in [TIME]
-   Compiling second_id
+   Compiling First Wallet
     Finished in [TIME]
    Compiling third_id
     Finished in [TIME]

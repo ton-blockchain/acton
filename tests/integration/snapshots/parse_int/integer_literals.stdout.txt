@@ -1,0 +1,17 @@
+  Installing standard library [ACTON_VERSION]
+publicKey=3e4918f7faa48afcb4569138b3cc291b4e76e59aba9c72d2fef1e8d586c5cf3e
+0: parseInt=0, promptInt=0
+42: parseInt=42, promptInt=42
++42: parseInt=42, promptInt=42
+-42: parseInt=-42, promptInt=-42
+ 42 : parseInt=42, promptInt=42
+1_000: parseInt=1000, promptInt=1000
+0xff: parseInt=255, promptInt=255
+0xAbCd: parseInt=43981, promptInt=43981
++0xff: parseInt=255, promptInt=255
+-0xff: parseInt=-255, promptInt=-255
+  -0xFF  : parseInt=-255, promptInt=-255
+0xFF_FF: parseInt=65535, promptInt=65535
+0b101010: parseInt=42, promptInt=42
+-0b101010: parseInt=-42, promptInt=-42
+0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff: parseInt=115792089237316195423570985008687907853269984665640564039457584007913129639935, promptInt=115792089237316195423570985008687907853269984665640564039457584007913129639935

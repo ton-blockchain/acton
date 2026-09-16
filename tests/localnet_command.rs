@@ -39,6 +39,7 @@ mod studio;
 
 // Independent temporary projects share the host port space. Serialize fixtures
 // until their mock APIs are gone; each scenario can still run several services.
+// Nextest uses separate processes, coordinated by the localnet-serial test group.
 static FIXTURE_PORTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 struct Service {
@@ -186,7 +187,7 @@ fn acton(root: &Path, args: &[&str]) -> std::process::Command {
     command
         .arg("--project-root")
         .arg(root)
-        .arg("full-localnet")
+        .arg("localnet")
         .args(args)
         .env(
             "PATH",
@@ -277,7 +278,7 @@ async fn cli_and_http_share_lifecycle_snapshots_and_persisted_state() {
     let human = Command::new(env!("CARGO_BIN_EXE_acton"))
         .arg("--project-root")
         .arg(service.root.path())
-        .args(["full-localnet", "--state-dir"])
+        .args(["localnet", "--state-dir"])
         .arg(service.state())
         .args(["status", "integration"])
         .env("NO_COLOR", "1")
@@ -300,7 +301,7 @@ async fn cli_and_http_share_lifecycle_snapshots_and_persisted_state() {
         .replace(&network.endpoints.observability, "<dashboard>");
     expect![[r#"
 
-        Full localnet "integration"
+        Localnet "integration"
           Status:    running
           Network:   <network-id>
           State:     /var/lib/localton (inside Docker)

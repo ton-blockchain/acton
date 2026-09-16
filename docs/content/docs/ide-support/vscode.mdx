@@ -34,6 +34,15 @@ The extension is compatible with:
   Your browser does not support the video tag.
 </LandingVideo>
 
+## Native language server
+
+<AvailabilityBadge since="Acton 1.2" />
+
+The extension uses `acton ls` for native Tolk, Fift, TASM, TL-B, and `Acton.toml`
+language tooling. The current extension requires VS Code 1.91 or a compatible editor.
+See the [command reference](/docs/commands/ls) and
+[protocol extensions](/docs/ide-support/language-server-protocol) for custom integrations.
+
 ## Recommended TOML extension
 
 We recommend installing [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml)
@@ -134,7 +143,7 @@ block explorer.
 
 ### Linting
 
-The extension runs `acton check` for Tolk files and reports diagnostics directly in the editor.
+The language server runs the Acton linter for Tolk files and reports diagnostics directly in the editor.
 Available fixes can be applied from the Problems panel or the inline quick-fix menu.
 
 ![](imgs/vscode/check.png)

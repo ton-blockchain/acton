@@ -744,6 +744,19 @@ export function studioTestRunArtifactsUrl(runId: string) {
   return `/api/v1/test-runs/${encodeURIComponent(runId)}/artifacts`
 }
 
+export interface TestArtifactConfig {
+  readonly project_root: string
+  readonly coverage_available: boolean
+  readonly gas_profile_available: boolean
+}
+
+export function fetchStudioTestArtifactConfig(
+  runId: string,
+  signal?: AbortSignal,
+): Promise<TestArtifactConfig> {
+  return requestJson<TestArtifactConfig>(`${studioTestRunArtifactsUrl(runId)}/config`, {signal})
+}
+
 export function subscribeToStudioTestRuns(
   onEvent: (event: TestRunStreamEvent) => void,
   onError?: () => void,

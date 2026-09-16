@@ -49,7 +49,7 @@ use tolk_ty::{InferenceResult, TyData};
 /// }
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct EnumCastMissingSafetyComment;
 
 impl Violation for EnumCastMissingSafetyComment {

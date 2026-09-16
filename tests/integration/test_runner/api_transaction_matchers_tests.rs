@@ -624,6 +624,10 @@ fn bounced_opcode_scalar_path_supports_new_fffffffe_prefix() {
         r#"
             {TEST_IMPORTS}
 
+            fun isBounced(value: bool): bool {{ return value; }}
+            fun isOriginalOpcode(value: int): bool {{ return value == 0x12345678; }}
+            fun isRichBounceTag(value: int): bool {{ return value == 0xFFFFFFFE; }}
+
             get fun `test bounced opcode scalar path supports fffffffe prefix`() {{
                 val init = ContractState {{
                     code: build("simple"),
@@ -640,7 +644,11 @@ fn bounced_opcode_scalar_path_supports_new_fffffffe_prefix() {
 
                 val bouncedBody = beginCell()
                     .storeUint(0xFFFFFFFE, 32)
-                    .storeUint(0x12345678, 32)
+                    .storeRef(beginCell().storeUint(0x12345678, 32).endCell())
+                    .storeRef(beginCell().storeCoins(0).storeBool(false).storeUint(0, 96).endCell())
+                    .storeUint(0, 8)
+                    .storeInt(-14, 32)
+                    .storeBool(false)
                     .endCell();
 
                 val txs = net.send(sender.address, createMessage({{
@@ -662,6 +670,12 @@ fn bounced_opcode_scalar_path_supports_new_fffffffe_prefix() {
                     bounced: true,
                     opcode: 0xFFFFFFFE,
                 }});
+                expect(txs).toHaveTx({{
+                    bounced: isBounced,
+                    opcode: isOriginalOpcode,
+                }});
+                expect(txs).toHaveTx({{ opcode: 0xFFFFFFFE }});
+                expect(txs).toHaveTx({{ opcode: isRichBounceTag }});
             }}
         "#,
     );

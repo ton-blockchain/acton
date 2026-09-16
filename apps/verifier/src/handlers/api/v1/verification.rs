@@ -8,6 +8,7 @@ use serde_json::Value;
 use utoipa::ToSchema;
 
 use crate::{
+    compilation_queue::CompilationStatus,
     error::ApiError,
     registry::{
         AbiContractsRequest, LastVerifiedRequest, VerificationStatisticsHistoryReceipt,
@@ -39,6 +40,7 @@ const MAX_PAGE_LIMIT: usize = 100;
         (status = 200, description = "Verification status for the resolved code hash", body = VerificationStatusResponse),
         (status = 400, description = "Invalid or missing verification target", body = crate::error::ErrorResponse),
         (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
+        (status = 409, description = "The address exists on both TON networks", body = crate::error::ErrorResponse),
         (status = 502, description = "Blockchain or registry lookup failure", body = crate::error::ErrorResponse)
     ),
     tag = "verification"
@@ -57,10 +59,12 @@ pub async fn status_handler(
             code_hash: resolved_target.code_hash.clone(),
         })
         .await?;
+    let compilation_status = state.compilation_status(&resolved_target.code_hash);
 
     Ok(Json(VerificationStatusResponse::new(
         resolved_target.code_hash,
         &status,
+        compilation_status,
     )))
 }
 
@@ -75,6 +79,7 @@ pub async fn status_handler(
         (status = 200, description = "Verified source bundle for the resolved code hash", body = VerificationSourceResponse),
         (status = 400, description = "Invalid or missing verification target", body = crate::error::ErrorResponse),
         (status = 404, description = "Current code hash or verified source bundle was not found", body = crate::error::ErrorResponse),
+        (status = 409, description = "The address exists on both TON networks", body = crate::error::ErrorResponse),
         (status = 502, description = "Blockchain, registry, or source lookup failure", body = crate::error::ErrorResponse)
     ),
     tag = "verification"
@@ -259,13 +264,41 @@ fn page_limit(limit: Option<usize>) -> usize {
 pub(super) struct VerificationStatusResponse {
     code_hash: String,
     verified: bool,
+    status: VerificationStatus,
 }
 
 impl VerificationStatusResponse {
-    const fn new(code_hash: String, status: &VerificationStatusReceipt) -> Self {
+    fn new(
+        code_hash: String,
+        status: &VerificationStatusReceipt,
+        compilation_status: Option<CompilationStatus>,
+    ) -> Self {
         Self {
             code_hash,
             verified: status.verified,
+            status: if status.verified {
+                VerificationStatus::Verified
+            } else {
+                compilation_status.map_or(VerificationStatus::Unverified, VerificationStatus::from)
+            },
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum VerificationStatus {
+    Unverified,
+    Queued,
+    Compiling,
+    Verified,
+}
+
+impl From<CompilationStatus> for VerificationStatus {
+    fn from(status: CompilationStatus) -> Self {
+        match status {
+            CompilationStatus::Queued => Self::Queued,
+            CompilationStatus::Compiling => Self::Compiling,
         }
     }
 }

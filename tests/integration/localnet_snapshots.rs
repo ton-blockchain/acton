@@ -253,7 +253,7 @@ fn localnet_snapshot_cli_manages_and_transfers_snapshots() {
     let run = |args: &[&str]| {
         project
             .acton()
-            .args(["simulated-localnet", "snapshot", "--json", "--port", &port])
+            .args(["simulator", "snapshot", "--json", "--port", &port])
             .args(args)
             .run()
             .success()
@@ -266,7 +266,7 @@ fn localnet_snapshot_cli_manages_and_transfers_snapshots() {
 
     let duplicate_export = project
         .acton()
-        .args(["simulated-localnet", "snapshot", "--port", &port])
+        .args(["simulator", "snapshot", "--port", &port])
         .args(["export", id, "--out", &snapshot_path_arg])
         .run()
         .failure();

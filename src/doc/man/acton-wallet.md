@@ -288,6 +288,13 @@ secure store.
 - otherwise Acton prompts on a TTY; in non-interactive contexts, provide the
   wallet name explicitly
 
+Available since Acton 1.2.
+
+Wallet V5 derives its address from the selected network's `global-id`.
+Custom networks default to `-3`, matching testnet and localnet. For a custom
+endpoint that uses mainnet wallet addresses, set
+`networks.<name>.global-id = -239` in `Acton.toml`.
+
 ## New And Import Workflow
 
 `wallet new` and `wallet import` share the same storage choices and most of the
@@ -421,6 +428,6 @@ wallets, the keyring ID usually matches the wallet name.
 
 ## See Also
 
-- `acton help full-localnet`
+- `acton help localnet`
 - [Wallet command guide](https://ton-blockchain.github.io/acton/docs/commands/wallet)
 - [Wallet management guide](https://ton-blockchain.github.io/acton/docs/wallets)

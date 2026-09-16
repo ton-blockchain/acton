@@ -111,3 +111,50 @@ fn confirm_default_true_is_used_in_non_interactive_mode() {
             "integration/snapshots/test-runner/prompts_return_deterministic_fallbacks_in_non_interactive_runner/confirm_default_true_is_used_in_non_interactive_mode.stdout.txt",
         );
 }
+
+#[cfg(unix)]
+#[test]
+fn prompt_int_accepts_hex_input_and_interactive_default() {
+    use expectrl::Eof;
+    use std::time::Duration;
+
+    let project = ProjectBuilder::new("stdlib-prompt-int-hex")
+        .script_file(
+            "hex_prompt",
+            r#"
+import "../../lib/prompts"
+import "../../lib/fmt"
+import "../../lib/fs"
+
+fun main() {
+    val publicKey = promptInt("DEX owner public key", "", "0x...") as uint256;
+    val defaultKey = promptInt("Default public key", format("0x{:x}", publicKey)) as uint256;
+    assert (fs.writeString("public-keys.txt", format("entered={:x}\ndefault={:x}\n", publicKey, defaultKey))) throw 100;
+}
+"#,
+        )
+        .build();
+
+    let mut session = project
+        .acton()
+        .script("scripts/hex_prompt.tolk")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(10)));
+
+    session.expect("DEX owner public key");
+    session.send_line("0xgg", "failed to send invalid hex integer");
+    session.expect("Enter a valid integer");
+    session
+        .send(
+            "\x7f\x7f\x7f\x7f0x3e4918f7faa48afcb4569138b3cc291b4e76e59aba9c72d2fef1e8d586c5cf3e\n",
+        )
+        .expect("failed to correct hex integer");
+
+    session.expect("Default public key");
+    session.send_line("", "failed to accept hex default");
+    session.expect(Eof);
+    session.assert_file_snapshot_matches(
+        "public-keys.txt",
+        "integration/snapshots/parse_int/interactive_public_keys.txt",
+    );
+}

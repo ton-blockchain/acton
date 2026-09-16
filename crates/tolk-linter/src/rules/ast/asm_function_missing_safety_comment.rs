@@ -26,7 +26,7 @@ use tolk_syntax::{FuncBody, FunctionLike, HasName, TopLevel};
 /// fun lowLevelLoad(x: slice): int asm "32 LDI";
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct AsmFunctionMissingSafetyComment;
 
 impl Violation for AsmFunctionMissingSafetyComment {

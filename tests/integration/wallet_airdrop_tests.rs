@@ -970,23 +970,23 @@ fn test_wallet_airdrop_localnet_uses_configured_studio_environment_gateway() {
         .run()
         .success();
 
-    let environment_rpc_path = "/api/v1/environments/full-localnet-1/rpc";
+    let environment_rpc_path = "/api/v1/environments/localnet-1/rpc";
     let (port, faucet_handle, captured_requests) = spawn_localnet_faucet_mock(vec![
         FaucetMockResponse {
             method: "GET",
-            path: "/api/v1/environments/full-localnet-1/rpc/api/v2/getAddressInformation*",
+            path: "/api/v1/environments/localnet-1/rpc/api/v2/getAddressInformation*",
             status: 200,
             body: r#"{"ok":true,"result":{"balance":"0"}}"#,
         },
         FaucetMockResponse {
             method: "POST",
-            path: "/api/v1/environments/full-localnet-1/rpc/acton_fundAccount",
+            path: "/api/v1/environments/localnet-1/rpc/acton_fundAccount",
             status: 200,
             body: r#"{"ok":true,"result":{"hash":"accepted"}}"#,
         },
         FaucetMockResponse {
             method: "GET",
-            path: "/api/v1/environments/full-localnet-1/rpc/api/v2/getAddressInformation*",
+            path: "/api/v1/environments/localnet-1/rpc/api/v2/getAddressInformation*",
             status: 200,
             body: r#"{"ok":true,"result":{"balance":"100000000000"}}"#,
         },

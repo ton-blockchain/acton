@@ -123,8 +123,8 @@ fun scripts.wallet(name: string): ActonWallet {
     return ActonWallet { address: testing.treasury(name).address };
 }
 
-/// Returns current account state for address or null if no information available or
-/// contract is not deployed.
+/// Returns current account state, including uninitialized accounts.
+/// Returns `null` if no account state is available.
 ///
 /// The account state includes balance, storage information, and other account data.
 /// See [TlbAccountInfo] type for more information.
@@ -144,7 +144,7 @@ fun scripts.fetchAccountState(addr: address): TlbAccountInfo? {
 
 /// Returns storage fee for address for specified amount of seconds.
 ///
-/// Returns `null` if the contract with given address is not deployed.
+/// Returns `null` if no account state is available. Uses basechain storage prices.
 ///
 /// Example:
 /// ```tolk
@@ -159,7 +159,7 @@ fun scripts.fetchAccountStorageFee(addr: address, seconds: int): coins? {
 
 /// Get the balance of an address.
 ///
-/// Returns 0 if the address is not deployed.
+/// Returns 0 if no account state is available.
 ///
 /// Example:
 /// ```tolk
@@ -187,7 +187,7 @@ fun scripts.fetchShardAccount(addr: address): TlbShardAccount? {
 
 /// Retrieves the current blockchain configuration.
 ///
-/// Returns a map of all blockchain configuration parameters indexed from 0-90.
+/// Returns a map of all blockchain configuration parameters indexed by signed 32-bit integers.
 /// The configuration includes gas prices, storage costs, validator settings, and other
 /// network parameters. Use specialized getter functions like [BlockchainConfigMap.getGasPrices],
 /// [BlockchainConfigMap.getStoragePrices], or [BlockchainConfigMap.getGlobalVersion]

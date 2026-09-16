@@ -76,19 +76,19 @@ fn build_model(
         .get_contract(contract_id)
         .ok_or_else(|| anyhow!(error_fmt::contract_not_found(config, contract_id)))?;
 
-    let contract_name = to_pascal_case(contract_config.display_name(contract_id));
-    // This name becomes both a language identifier and a filename. Reject invalid display
-    // names before compilation or writing, including names containing path separators.
+    let contract_name = to_pascal_case(contract_id);
+    // The contract ID determines both the language identifier and the filename.
+    // Reject invalid names before compilation or writing any output.
     if !contract_name.starts_with(|ch: char| ch.is_ascii_alphabetic())
         || !contract_name.chars().all(|ch| ch.is_ascii_alphanumeric())
     {
         anyhow::bail!(
             "Cannot generate wrapper for {}: {} is not a valid wrapper type name\n\n\
-             Set {} in {} to a name starting with a letter\n\
+             Set the {} in {} to a name starting with a letter\n\
              Use ASCII letters and digits, with spaces, underscores, or hyphens between words",
             contract_id.yellow(),
             contract_name.yellow(),
-            "display-name".yellow(),
+            "contract ID".yellow(),
             "Acton.toml".yellow(),
         );
     }
@@ -337,12 +337,12 @@ pub fn wrapper_cmd(
         {
             anyhow::bail!(
                 "Contracts {} and {} have conflicting wrapper name {}\n\n\
-                 Set distinct {} values in {}\n\
+                 Set distinct {} in {}\n\
                  Wrapper names must differ after PascalCase conversion, ignoring case",
                 previous_id.yellow(),
                 model.contract_id.yellow(),
                 model.contract_name.yellow(),
-                "display-name".yellow(),
+                "contract IDs".yellow(),
                 "Acton.toml".yellow(),
             );
         }

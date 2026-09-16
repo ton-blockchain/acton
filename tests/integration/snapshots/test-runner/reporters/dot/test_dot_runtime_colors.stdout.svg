@@ -1,4 +1,4 @@
-<svg width="740px" height="506px" xmlns="http://www.w3.org/2000/svg">
+<svg width="740px" height="524px" xmlns="http://www.w3.org/2000/svg">
   <style>
     .fg { fill: #AAAAAA }
     .bg { fill: #000000 }
@@ -52,29 +52,31 @@
 </tspan>
     <tspan x="10px" y="280px"><tspan>  Called from:</tspan>
 </tspan>
-    <tspan x="10px" y="298px"><tspan>    </tspan><tspan class="fg-green">net.runGetMethod&lt;int&gt;             </tspan><tspan> at </tspan><tspan class="dimmed">../lib/emulation/network[LINE]</tspan>
+    <tspan x="10px" y="298px"><tspan>    </tspan><tspan class="fg-green">GetMethodResult&lt;int&gt;.unwrap       </tspan><tspan> at </tspan><tspan class="dimmed">../lib/emulation/network[LINE]</tspan>
 </tspan>
-    <tspan x="10px" y="316px"><tspan>    </tspan><tspan class="fg-green">test dot colored runtime details  </tspan><tspan> at </tspan><tspan class="dimmed">tests/test.test[LINE]</tspan>
+    <tspan x="10px" y="316px"><tspan>    </tspan><tspan class="fg-green">net.runGetMethod&lt;int&gt;             </tspan><tspan> at </tspan><tspan class="dimmed">../lib/emulation/network[LINE]</tspan>
 </tspan>
-    <tspan x="10px" y="334px"><tspan>  Description: Dictionary error</tspan>
+    <tspan x="10px" y="334px"><tspan>    </tspan><tspan class="fg-green">test dot colored runtime details  </tspan><tspan> at </tspan><tspan class="dimmed">tests/test.test[LINE]</tspan>
 </tspan>
-    <tspan x="10px" y="352px"><tspan>  Phase: Compute phase</tspan>
+    <tspan x="10px" y="352px"><tspan>  Description: Dictionary error</tspan>
 </tspan>
-    <tspan x="10px" y="370px">
+    <tspan x="10px" y="370px"><tspan>  Phase: Compute phase</tspan>
 </tspan>
-    <tspan x="10px" y="388px"><tspan>stderr | [ROOT]/tests/test.test.tolk &gt; test dot colored runtime details</tspan>
+    <tspan x="10px" y="388px">
 </tspan>
-    <tspan x="10px" y="406px"><tspan class="fg-bright-red">colored stderr line</tspan>
+    <tspan x="10px" y="406px"><tspan>stderr | [ROOT]/tests/test.test.tolk &gt; test dot colored runtime details</tspan>
 </tspan>
-    <tspan x="10px" y="424px">
+    <tspan x="10px" y="424px"><tspan class="fg-bright-red">colored stderr line</tspan>
 </tspan>
-    <tspan x="10px" y="442px"><tspan> </tspan><tspan class="fg-red bold">✗</tspan><tspan> </tspan><tspan class="fg-red bold">1</tspan><tspan> </tspan><tspan class="fg-red bold">failed</tspan><tspan> </tspan><tspan class="dimmed">in</tspan><tspan> </tspan><tspan class="fg-green">1</tspan><tspan> </tspan><tspan class="fg-green dimmed">file</tspan>
+    <tspan x="10px" y="442px">
 </tspan>
-    <tspan x="10px" y="460px">
+    <tspan x="10px" y="460px"><tspan> </tspan><tspan class="fg-red bold">✗</tspan><tspan> </tspan><tspan class="fg-red bold">1</tspan><tspan> </tspan><tspan class="fg-red bold">failed</tspan><tspan> </tspan><tspan class="dimmed">in</tspan><tspan> </tspan><tspan class="fg-green">1</tspan><tspan> </tspan><tspan class="fg-green dimmed">file</tspan>
 </tspan>
-    <tspan x="10px" y="478px"><tspan class="fg-red">Some tests failed.</tspan>
+    <tspan x="10px" y="478px">
 </tspan>
-    <tspan x="10px" y="496px">
+    <tspan x="10px" y="496px"><tspan class="fg-red">Some tests failed.</tspan>
+</tspan>
+    <tspan x="10px" y="514px">
 </tspan>
   </text>
 

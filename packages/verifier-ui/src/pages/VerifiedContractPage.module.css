@@ -53,6 +53,67 @@
   border-color: color-mix(in srgb, var(--acton-color-status-failed) 35%, transparent);
 }
 
+.networkOptions {
+  display: grid;
+  gap: 10px;
+  max-width: 760px;
+  margin-top: 20px;
+}
+
+.networkOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: var(--acton-radius-control);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text);
+  text-decoration: none;
+  transition:
+    background-color var(--acton-duration-fast) var(--acton-ease-standard),
+    border-color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.networkOption:hover {
+  border-color: var(--acton-color-border-strong);
+  background: var(--acton-color-surface-hover);
+}
+
+.networkOption:focus-visible {
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.networkOption > svg {
+  flex: 0 0 auto;
+  color: var(--acton-color-accent);
+}
+
+.networkOptionContent {
+  min-width: 0;
+}
+
+.networkOptionContent strong,
+.networkOptionContent code {
+  display: block;
+}
+
+.networkOptionContent strong {
+  font-size: var(--acton-font-size-sm);
+  text-transform: capitalize;
+}
+
+.networkOptionContent code {
+  margin-top: 5px;
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  overflow-wrap: anywhere;
+}
+
 .externalLink {
   min-width: 0;
   width: fit-content;

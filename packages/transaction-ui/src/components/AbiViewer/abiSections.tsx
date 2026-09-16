@@ -3,6 +3,8 @@ import type {ContractABI, SymTable} from "@ton/tolk-abi-to-typescript"
 import {
   formatAbiTyDeclaration,
   formatDeclarationTolk,
+  formatDeclarationName,
+  formatType,
   getAbiTyDeclaration,
   getAbiThrownErrors,
   type AbiDeclaration,
@@ -87,7 +89,7 @@ function AbiMessageRow({
   readonly showSymbolAnchors: boolean
 }) {
   const declaration = getAbiTyDeclaration(symbols, message.body_ty_idx)
-  const messageName = declaration?.name ?? `type-${message.body_ty_idx}`
+  const messageName = formatType(symbols, message.body_ty_idx)
   const messageId = abiSymbolAnchorId("message", `${groupTitle}-${messageName}`)
 
   return (
@@ -177,7 +179,9 @@ export function AbiDeclarationsSection({
                 className={styles.declaration}
               >
                 <summary>
-                  <span className={styles.declarationName}>{declaration.name}</span>
+                  <span className={styles.declarationName}>
+                    {formatDeclarationName(declaration, symbols)}
+                  </span>
                   <sup
                     className={`${styles.declarationKind} ${declarationKindClass(declaration.kind)}`}
                   >

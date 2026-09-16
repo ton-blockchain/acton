@@ -6,9 +6,9 @@ let environments: StudioEnvironment[]
 
 test.beforeEach(async ({page}) => {
   environments = [
-    simulatedEnvironment("environment-1", "Simulated localnet 1"),
-    simulatedEnvironment("environment-2", "Simulated localnet 3"),
-    simulatedEnvironment("environment-3", "Full localnet 1"),
+    simulatedEnvironment("environment-1", "Simulator 1"),
+    simulatedEnvironment("environment-2", "Simulator 3"),
+    simulatedEnvironment("environment-3", "Localnet 1"),
   ]
 
   await page.route("**/api/v1/**", async route => {
@@ -29,10 +29,10 @@ test("suggests an unused environment name and releases deleted names", async ({p
   await page.goto("/virtual-environments")
   await page.getByRole("button", {name: "Create environment"}).click()
 
-  await expect(page.getByLabel("Name")).toHaveValue("Simulated localnet 2")
+  await expect(page.getByLabel("Name")).toHaveValue("Simulator 2")
 
   await page.getByLabel("Environment type").selectOption("fullTonNetwork")
-  await expect(page.getByLabel("Name")).toHaveValue("Full localnet 2")
+  await expect(page.getByLabel("Name")).toHaveValue("Localnet 2")
 
   await page.getByLabel("Name").fill("Custom environment")
   await page.getByLabel("Environment type").selectOption("actonSimulatedLocalnet")
@@ -43,7 +43,7 @@ test("suggests an unused environment name and releases deleted names", async ({p
   await page.reload()
   await page.getByRole("button", {name: "Create environment"}).click()
 
-  await expect(page.getByLabel("Name")).toHaveValue("Simulated localnet 1")
+  await expect(page.getByLabel("Name")).toHaveValue("Simulator 1")
 })
 
 function simulatedEnvironment(id: string, name: string): StudioEnvironment {

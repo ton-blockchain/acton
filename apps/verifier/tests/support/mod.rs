@@ -476,6 +476,7 @@ fn recording_payment_verifier() -> (
 impl PaymentVerifier for MockPaymentVerifier {
     fn quote(&self, code_hash: &str) -> PaymentQuote {
         PaymentQuote {
+            network: verifier::config::TonNetwork::Testnet,
             payment_address: "0:1111111111111111111111111111111111111111111111111111111111111111"
                 .to_owned(),
             amount_nano: "10000000".to_owned(),

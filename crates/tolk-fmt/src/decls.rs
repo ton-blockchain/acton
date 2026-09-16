@@ -91,9 +91,13 @@ fn build_import_items<'tree>(
 
 #[must_use]
 pub fn print_source_file<'a>(ctx: &Context<'_>, file: &SourceFile) -> Option<RcDoc<'a>> {
-    if ctx.options.range.is_some() {
+    if ctx.options.range.is_some()
+        || file
+            .top_levels()
+            .all(|decl| matches!(decl, TopLevel::Unmapped(node) if node.0.kind() == "comment"))
+    {
         // Full-file formatting intentionally hoists the version/import sections and sorts imports.
-        // Range formatting is used by editors and must keep unrelated top-level nodes untouched.
+        // Range formatting and comment-only files need the path that preserves source order.
         return print_source_file_preserving_order(ctx, file);
     }
 
@@ -208,9 +212,10 @@ pub fn print_source_file<'a>(ctx: &Context<'_>, file: &SourceFile) -> Option<RcD
         } else {
             comments::print_leading_comments(ctx, &mut docs, comments);
 
-            let Some(doc) = print_decl(ctx, &top_level) else {
-                continue;
-            };
+            // The parser accepts unfinished declarations while editing. Keep their
+            // source when a printer cannot handle them, so formatting cannot erase code.
+            let doc = print_decl(ctx, &top_level)
+                .unwrap_or_else(|| common::print_original_node_text_inline(ctx, &node));
             docs.push(doc);
 
             comments::print_inline_comments(ctx, &mut docs, comments);
@@ -282,9 +287,8 @@ fn print_source_file_preserving_order<'a>(
         } else {
             comments::print_leading_comments(ctx, &mut docs, comments);
 
-            let Some(doc) = print_decl(ctx, top_level) else {
-                continue;
-            };
+            let doc = print_decl(ctx, top_level)
+                .unwrap_or_else(|| common::print_original_node_text_inline(ctx, &node));
             docs.push(doc);
 
             comments::print_inline_comments(ctx, &mut docs, comments);
@@ -304,6 +308,8 @@ fn print_source_file_preserving_order<'a>(
     Some(RcDoc::concat(docs))
 }
 
+/// An incomplete declaration may lack a required component. Callers must preserve
+/// the original node when printing returns `None`, including during range formatting.
 #[must_use]
 pub fn print_decl<'a>(ctx: &Context<'_>, decl: &TopLevel) -> Option<RcDoc<'a>> {
     match decl {
@@ -359,7 +365,7 @@ pub fn print_contract_body<'a>(ctx: &Context<'_>, body: &ContractBody) -> Option
         &fields,
         print_contract_field_declaration,
         |f| f.0,
-        |_| collect_lonely_body_comments(body.0),
+        |_| common::collect_lonely_comments(body.0),
         common::ListOptions::curly_bracket_body(),
     )
 }
@@ -496,7 +502,7 @@ pub fn print_struct_body<'a>(ctx: &Context<'_>, body: &StructBody) -> Option<RcD
         &fields,
         print_struct_field_declaration,
         |f| f.0,
-        |_| collect_lonely_body_comments(body.0),
+        |_| common::collect_lonely_comments(body.0),
         common::ListOptions::curly_bracket_body(),
     )
 }
@@ -561,16 +567,9 @@ pub fn print_enum_body<'a>(ctx: &Context<'_>, body: &EnumBody) -> Option<RcDoc<'
         &members,
         print_enum_member_declaration,
         |m| m.0,
-        |_| collect_lonely_body_comments(body.0),
+        |_| common::collect_lonely_comments(body.0),
         common::ListOptions::curly_bracket_body(),
     )
-}
-
-fn collect_lonely_body_comments(body: Node) -> Vec<Node> {
-    let mut cursor = body.walk();
-    body.named_children(&mut cursor)
-        .filter(|node| node.kind() == "comment")
-        .collect()
 }
 
 #[must_use]
@@ -606,6 +605,7 @@ pub fn print_function<'a>(ctx: &Context<'_>, func: &Func) -> Option<RcDoc<'a>> {
     parts.push(print_parameter_list_with_options(
         ctx,
         &parameters,
+        func.0.child_by_field_name("parameters"),
         function_parameter_list_options(ctx, func.0.child_by_field_name("parameters")),
     )?);
 
@@ -652,6 +652,7 @@ pub fn print_method_declaration<'a>(ctx: &Context<'_>, m: &Method) -> Option<RcD
     parts.push(print_parameter_list_with_options(
         ctx,
         &parameters,
+        m.0.child_by_field_name("parameters"),
         function_parameter_list_options(ctx, m.0.child_by_field_name("parameters")),
     )?);
 
@@ -686,6 +687,7 @@ pub fn print_get_method_declaration<'a>(ctx: &Context, g: &GetMethod) -> Option<
     parts.push(print_parameter_list_with_options(
         ctx,
         &parameters,
+        g.0.child_by_field_name("parameters"),
         function_parameter_list_options(ctx, g.0.child_by_field_name("parameters")),
     )?);
 
@@ -831,7 +833,7 @@ impl ParameterTrait for LambdaParameter<'_> {
     where
         Self: 't,
     {
-        None
+        self.default()
     }
 }
 
@@ -862,16 +864,21 @@ where
     Some(RcDoc::concat(parts))
 }
 
-pub fn print_parameter_list<'a, 'tree, P>(ctx: &Context<'tree>, params: &[P]) -> Option<RcDoc<'a>>
+pub fn print_parameter_list<'a, 'tree, P>(
+    ctx: &Context<'tree>,
+    params: &[P],
+    parameter_list: Option<Node<'tree>>,
+) -> Option<RcDoc<'a>>
 where
     P: ParameterTrait + 'tree,
 {
-    print_parameter_list_with_options(ctx, params, common::ListOptions::default())
+    print_parameter_list_with_options(ctx, params, parameter_list, common::ListOptions::default())
 }
 
 pub fn print_parameter_list_with_options<'a, 'tree, P>(
     ctx: &Context<'tree>,
     params: &[P],
+    parameter_list: Option<Node<'tree>>,
     options: common::ListOptions<'a>,
 ) -> Option<RcDoc<'a>>
 where
@@ -882,7 +889,7 @@ where
         params,
         print_parameter_declaration,
         P::syntax,
-        |_| vec![],
+        |_| parameter_list.map_or_else(Vec::new, common::collect_lonely_comments),
         options,
     )
 }
@@ -942,7 +949,7 @@ pub fn print_annotation_arguments<'a>(ctx: &Context<'_>, a: &AnnotationArgs) -> 
         return common::print_list(
             ctx,
             &[typ],
-            types::print_type,
+            types::print_type_naked,
             Type::syntax,
             |_| vec![],
             common::ListOptions::default(),
@@ -958,9 +965,9 @@ pub fn print_annotation_arguments<'a>(ctx: &Context<'_>, a: &AnnotationArgs) -> 
     common::print_list(
         ctx,
         &arguments,
-        exprs::print_expression,
+        exprs::print_expression_naked,
         Expr::syntax,
-        |_| vec![],
+        |_| common::collect_lonely_comments(a.0),
         common::ListOptions {
             never_break_if_items_lt,
             ..Default::default()
@@ -975,7 +982,7 @@ pub fn print_type_parameters<'a>(ctx: &Context<'_>, tp: &TypeParameters) -> Opti
         &parameters,
         print_type_parameter,
         |p| p.0,
-        |_| vec![],
+        |_| common::collect_lonely_comments(tp.0),
         common::ListOptions::triangle_bracket_list(),
     )
 }
@@ -1001,6 +1008,8 @@ fn print_function_body<'a>(ctx: &Context<'_>, body: &FuncBody) -> Option<RcDoc<'
     }
 }
 
+/// Preserves instruction literals and their comments. A line comment must end
+/// before the next literal, even when the whole body would fit on one line.
 #[must_use]
 pub fn print_asm_body<'a>(ctx: &Context<'_>, asm: &AsmBody) -> Option<RcDoc<'a>> {
     let mut parts = vec![RcDoc::text("asm")];
@@ -1060,7 +1069,11 @@ pub fn print_asm_body<'a>(ctx: &Context<'_>, asm: &AsmBody) -> Option<RcDoc<'a>>
 
         let is_last = i == instructions.len() - 1;
         if !is_last {
-            inst_docs.push(RcDoc::line());
+            inst_docs.push(if comments::has_inline_line_comments_on_node(ctx, *node) {
+                RcDoc::hardline()
+            } else {
+                RcDoc::line()
+            });
         }
 
         if let Some(c) = comments

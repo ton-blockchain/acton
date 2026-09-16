@@ -6,9 +6,12 @@ use tokio_util::task::TaskTracker;
 use tracing::instrument::WithSubscriber;
 
 use crate::{
-    blockchain::{BlockchainClient, ToncenterClient},
-    compilers::{CompilerService, NodeCompilerService},
-    config::{Config, DEFAULT_MAX_REQUEST_BYTES},
+    blockchain::{BlockchainClient, MultiNetworkToncenterClient},
+    compilation_queue::{CompilationQueue, CompilationStatus},
+    compilers::{
+        CompileOutput, CompileRequest, CompilerError, CompilerService, NodeCompilerService,
+    },
+    config::{Config, DEFAULT_MAX_CONCURRENT_COMPILATIONS, DEFAULT_MAX_REQUEST_BYTES},
     payment::{OnchainPaymentVerifier, PaymentError, PaymentVerifier},
     registry::{SourceVerificationRegistry, VerificationRegistry},
     registry_index::{SqliteVerificationIndex, VerificationIndexError},
@@ -19,10 +22,12 @@ use crate::{
 #[derive(Clone)]
 pub struct AppState {
     api_key: Option<String>,
+    read_only: bool,
     compiler_service: Arc<dyn CompilerService>,
     verification_registry: Arc<dyn VerificationRegistry>,
     verification_service: VerificationService,
     payment_verifier: Arc<dyn PaymentVerifier>,
+    compilation_queue: CompilationQueue,
     max_request_bytes: usize,
     background_tasks: TaskTracker,
 }
@@ -44,12 +49,14 @@ impl AppState {
         let payment_verifier = Arc::new(OnchainPaymentVerifier::from_config(config)?);
 
         Ok(Self::new(
-            Arc::new(ToncenterClient::from_config(config)),
+            Arc::new(MultiNetworkToncenterClient::from_config(config)),
             Arc::new(NodeCompilerService::from_config(config)),
             verification_registry,
             payment_verifier,
         )
         .with_api_key(config.api_key())
+        .with_read_only(config.read_only())
+        .with_max_concurrent_compilations(config.max_concurrent_compilations())
         .with_max_request_bytes(config.max_request_bytes()))
     }
 
@@ -62,10 +69,12 @@ impl AppState {
     ) -> Self {
         Self {
             api_key: None,
+            read_only: false,
             compiler_service,
             verification_registry,
             verification_service: VerificationService::new(blockchain_client),
             payment_verifier,
+            compilation_queue: CompilationQueue::new(Some(DEFAULT_MAX_CONCURRENT_COMPILATIONS)),
             max_request_bytes: DEFAULT_MAX_REQUEST_BYTES,
             background_tasks: TaskTracker::new(),
         }
@@ -78,8 +87,23 @@ impl AppState {
     }
 
     #[must_use]
+    pub const fn with_read_only(mut self, read_only: bool) -> Self {
+        self.read_only = read_only;
+        self
+    }
+
+    #[must_use]
     pub const fn with_max_request_bytes(mut self, max_request_bytes: usize) -> Self {
         self.max_request_bytes = max_request_bytes;
+        self
+    }
+
+    #[must_use]
+    pub fn with_max_concurrent_compilations(
+        mut self,
+        max_concurrent_compilations: Option<usize>,
+    ) -> Self {
+        self.compilation_queue = CompilationQueue::new(max_concurrent_compilations);
         self
     }
 
@@ -97,8 +121,22 @@ impl AppState {
     }
 
     #[must_use]
-    pub fn compiler_service(&self) -> &dyn CompilerService {
-        self.compiler_service.as_ref()
+    pub const fn read_only(&self) -> bool {
+        self.read_only
+    }
+
+    pub(crate) async fn compile(
+        &self,
+        code_hash: &str,
+        request: CompileRequest,
+    ) -> Result<CompileOutput, CompilerError> {
+        let _permit = self.compilation_queue.acquire(code_hash).await?;
+        self.compiler_service.compile(request).await
+    }
+
+    #[must_use]
+    pub(crate) fn compilation_status(&self, code_hash: &str) -> Option<CompilationStatus> {
+        self.compilation_queue.status(code_hash)
     }
 
     #[must_use]
@@ -126,7 +164,7 @@ impl AppState {
         Ok(())
     }
 
-    /// Rebuilds payment replay state from TON testnet history.
+    /// Rebuilds payment replay state from TON history.
     ///
     /// # Errors
     ///

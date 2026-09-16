@@ -1,0 +1,32 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling getter
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/get_method_meta.test.tolk (1 test)
+  ✓ failed get method returns metadata [TIME]
+    └─ Test output:
+       false
+       GetMethodMeta {
+           gasUsed: 670,
+           exitCode: 123,
+       }
+       false
+       GetMethodMeta {
+           gasUsed: 470,
+           exitCode: 11,
+       }
+       Calculation {
+           value: 6,
+           positive: true,
+       }
+       GetMethodMeta {
+           gasUsed: 1114,
+           exitCode: 0,
+       }
+
+ ✓ 1 passed in 1 file

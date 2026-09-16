@@ -37,6 +37,8 @@ const CODE_HASH_ONE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 const CODE_HASH_ONE_BASE64: &str = "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=";
 const CODE_HASH_TWO: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const CODE_HASH_THREE: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+const PAYMENT_TX_HASH_TWO: &str =
+    "b17d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394c";
 const API_KEY: &str = "migration-api-key";
 const ORIGINAL_VERIFIED_AT: &str = "1678647600000";
 const COMPILE_PARAMS_TOLK: &str = r#"{"compiler_version":"1.4.1"}"#;
@@ -209,7 +211,7 @@ async fn healthz_reports_payment_history_recovery() {
 }
 
 #[tokio::test]
-async fn take_ticket_returns_a_testnet_payment_bound_to_the_code_hash() {
+async fn take_ticket_returns_a_payment_bound_to_the_code_hash() {
     let response = post_take_ticket(app_state(&[], CODE_HASH_ONE), CODE_HASH_ONE_BASE64).await;
 
     assert_eq!(response.status(), StatusCode::OK);
@@ -218,10 +220,26 @@ async fn take_ticket_returns_a_testnet_payment_bound_to_the_code_hash() {
         json!({
             "status": "payment_required",
             "code_hash": CODE_HASH_ONE,
+            "network": "testnet",
             "payment_address": "0:1111111111111111111111111111111111111111111111111111111111111111",
             "amount_nano": "10000000",
             "comment": format!("acton-verify:v1:{CODE_HASH_ONE}")
         })
+    );
+}
+
+#[tokio::test]
+async fn take_ticket_rejects_new_contracts_in_read_only_mode() {
+    let response = post_take_ticket(
+        app_state(&[], CODE_HASH_ONE).with_read_only(true),
+        CODE_HASH_ONE,
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({"error": "verifier_read_only: verification of new contracts is disabled"})
     );
 }
 
@@ -266,6 +284,21 @@ async fn verify_requires_a_payment_for_unverified_code() {
     assert_eq!(
         response_json::<Value>(response).await,
         json!({"error": "missing required field: tx_hash"})
+    );
+}
+
+#[tokio::test]
+async fn verify_rejects_new_contracts_in_read_only_mode_before_payment() {
+    let response = post_verify(
+        payment_error_app_state(CODE_HASH_ONE, PaymentError::AlreadyUsed).with_read_only(true),
+        valid_verify_parts(),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({"error": "verifier_read_only: verification of new contracts is disabled"})
     );
 }
 
@@ -362,7 +395,7 @@ async fn verify_maps_payment_failures_to_stable_http_contracts() {
         (
             PaymentError::TransactionNotFound,
             StatusCode::PAYMENT_REQUIRED,
-            "payment_not_found: transaction was not found on TON testnet".to_owned(),
+            "payment_not_found: transaction was not found on the configured TON network".to_owned(),
         ),
         (
             PaymentError::InvalidTransaction,
@@ -437,6 +470,35 @@ async fn take_ticket_skips_payment_for_already_verified_code() {
 }
 
 #[tokio::test]
+async fn read_only_mode_keeps_already_verified_contracts_available() {
+    let state = app_state(&[], CODE_HASH_ONE);
+    let verify_response = post_verify(state.clone(), valid_verify_parts()).await;
+    assert_eq!(verify_response.status(), StatusCode::OK);
+
+    let read_only_state = state.with_read_only(true);
+    let response = post_take_ticket(read_only_state.clone(), CODE_HASH_ONE).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response_json::<Value>(response).await["status"],
+        "already_verified"
+    );
+
+    let response = post_verify(read_only_state.clone(), valid_verify_parts()).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response_json::<Value>(response).await["verification_result"],
+        "already_verified"
+    );
+
+    let response = get(
+        read_only_state,
+        &format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
 async fn robots_txt_disallows_crawling() {
     let response = get(app_state(&[], CODE_HASH_ONE), "/robots.txt").await;
 
@@ -501,7 +563,10 @@ async fn openapi_json_documents_verifier_api() {
         ]
     );
     assert_eq!(response_statuses(abi), ["200", "400", "404", "502"]);
-    assert_eq!(response_statuses(source), ["200", "400", "404", "502"]);
+    assert_eq!(
+        response_statuses(source),
+        ["200", "400", "404", "409", "502"]
+    );
 }
 
 #[tokio::test]
@@ -840,6 +905,7 @@ async fn verification_status_reports_unverified_code_hash_without_stored_bundle(
     let body = response_json::<VerificationStatusResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert!(!body.verified);
+    assert_eq!(body.status, "unverified");
 }
 
 #[tokio::test]
@@ -869,6 +935,7 @@ async fn verification_status_reports_verified_after_successful_verify() {
     let body = response_json::<VerificationStatusResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert!(body.verified);
+    assert_eq!(body.status, "verified");
 }
 
 #[tokio::test]
@@ -898,6 +965,7 @@ async fn verification_status_resolves_code_hash_from_address() {
     let body = response_json::<VerificationStatusResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert!(body.verified);
+    assert_eq!(body.status, "verified");
 }
 
 #[tokio::test]
@@ -913,6 +981,85 @@ async fn verification_status_reports_unverified_contract() {
     let body = response_json::<VerificationStatusResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert!(!body.verified);
+    assert_eq!(body.status, "unverified");
+}
+
+#[tokio::test]
+async fn verification_status_reports_compiler_queue_progress() {
+    let fixture = blocking_verification_app_state(CODE_HASH_ONE);
+    let state = fixture.state.with_api_key(Some(API_KEY));
+    let first_request = tokio::spawn(post_verify_with_api_key(
+        state.clone(),
+        valid_verify_parts(),
+        API_KEY,
+    ));
+
+    tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        fixture.compiler_started.notified(),
+    )
+    .await
+    .expect("first compiler should start");
+
+    let second_request = tokio::spawn(post_verify_with_api_key(
+        state.clone(),
+        vec![
+            text_part("code_hash", CODE_HASH_TWO),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+        API_KEY,
+    ));
+
+    let queued = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        loop {
+            let response = get(
+                state.clone(),
+                &format!("/api/v1/verification/status?code_hash={CODE_HASH_TWO}"),
+            )
+            .await;
+            let body = response_json::<VerificationStatusResponse>(response).await;
+            if body.status == "queued" {
+                break body;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("second verification should enter the compiler queue");
+    assert!(!queued.verified);
+
+    fixture.release_compiler.notify_one();
+    let first_response = first_request.await.expect("first request should finish");
+    assert_eq!(first_response.status(), StatusCode::OK);
+
+    tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        fixture.compiler_started.notified(),
+    )
+    .await
+    .expect("second compiler should start after the slot is released");
+    let response = get(
+        state.clone(),
+        &format!("/api/v1/verification/status?code_hash={CODE_HASH_TWO}"),
+    )
+    .await;
+    let compiling = response_json::<VerificationStatusResponse>(response).await;
+    assert_eq!(compiling.status, "compiling");
+
+    fixture.release_compiler.notify_one();
+    let second_response = second_request.await.expect("second request should finish");
+    assert_eq!(second_response.status(), StatusCode::OK);
+
+    let response = get(
+        state,
+        &format!("/api/v1/verification/status?code_hash={CODE_HASH_TWO}"),
+    )
+    .await;
+    let completed = response_json::<VerificationStatusResponse>(response).await;
+    assert_eq!(completed.status, "unverified");
 }
 
 #[tokio::test]
@@ -1999,6 +2146,34 @@ async fn verification_finishes_after_the_request_task_is_cancelled() {
 }
 
 #[tokio::test]
+async fn an_outstanding_payment_is_consumed_when_the_code_hash_is_already_verified() {
+    let (state, outcomes) = recording_payment_app_state(CODE_HASH_ONE);
+
+    let first_response = post_verify(state.clone(), valid_verify_parts()).await;
+    assert_eq!(first_response.status(), StatusCode::OK);
+
+    let mut second_parts = valid_verify_parts();
+    second_parts.push(text_part("tx_hash", PAYMENT_TX_HASH_TWO));
+    let second_response = post_verify_without_payment(state, second_parts).await;
+    assert_eq!(second_response.status(), StatusCode::OK);
+    assert_eq!(
+        response_json::<VerifyResponse>(second_response)
+            .await
+            .verification_result,
+        "already_verified"
+    );
+    assert_eq!(
+        *outcomes
+            .lock()
+            .expect("payment outcomes mutex should not be poisoned"),
+        [
+            PaymentAttemptOutcome::Consumed,
+            PaymentAttemptOutcome::Consumed
+        ]
+    );
+}
+
+#[tokio::test]
 async fn verify_returns_bad_request_when_compilation_fails() {
     let response = post_verify(
         failing_compiler_app_state(&[], "Tolk syntax error at main.tolk:1:5"),
@@ -2851,6 +3026,7 @@ struct VerifyResponse {
 struct VerificationStatusResponse {
     code_hash: String,
     verified: bool,
+    status: String,
 }
 
 #[derive(Debug, Deserialize)]

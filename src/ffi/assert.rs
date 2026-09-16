@@ -521,6 +521,32 @@ fn fail_external_send_not_accepted_impl(
     Ok(())
 }
 
+extension!(fail_get_method in (Context) with (expected_exit_code: Option<BigInt>, diagnostic_id: BigInt) using fail_get_method_impl);
+fn fail_get_method_impl(
+    ctx: &mut Context,
+    _stack: &mut Tuple,
+    expected_exit_code: Option<BigInt>,
+    diagnostic_id: BigInt,
+) -> anyhow::Result<()> {
+    let diagnostic_id = diagnostic_id
+        .to_usize()
+        .context("Invalid get-method diagnostic handle")?;
+    let mut failure = ctx
+        .chain
+        .emulations
+        .get_method_diagnostic(diagnostic_id)
+        .context("Get-method execution diagnostics are unavailable")?
+        .clone();
+    failure.message = expected_exit_code.map(|expected| {
+        format!(
+            "Expected exit code {expected}, got {}",
+            failure.vm_exit_code
+        )
+    });
+    *ctx.asserts.assert_failure = Some(AssertFailure::GetMethod(failure));
+    Ok(())
+}
+
 fn tuple_item(tuple: &Tuple, index: usize) -> TupleItem {
     tuple.0.get(index).cloned().unwrap_or(TupleItem::Null)
 }
@@ -747,5 +773,6 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         107 => assume_reject : 2,
         108 => fail_to_find_external_message : 5,
         109 => fail_external_send_not_accepted : 3,
+        110 => fail_get_method : 2,
     });
 }

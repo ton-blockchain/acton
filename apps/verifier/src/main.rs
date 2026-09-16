@@ -14,10 +14,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!(
         %addr,
-        network = %config.network(),
-        toncenter_base_url = %config.toncenter_base_url(),
+        payment_primary_network = %config.payment_primary_network(),
+        read_only = config.read_only(),
+        toncenter_mainnet_base_url = %config.toncenter_mainnet_base_url(),
+        toncenter_testnet_base_url = %config.toncenter_testnet_base_url(),
         "starting verifier backend"
     );
+
+    if config.read_only() {
+        tracing::warn!(
+            "verifier read-only mode is enabled; new contract verifications will be rejected"
+        );
+    }
 
     let state = AppState::from_config(&config)?;
     let published_payment_transaction_hashes = if config.source_repository_path().is_some() {

@@ -28,7 +28,7 @@ use tolk_resolver::file_index::{FileId, Span};
 /// import "@stdlib/gas-payments";
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct ActonImportInContract;
 
 impl Violation for ActonImportInContract {

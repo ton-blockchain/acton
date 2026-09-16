@@ -322,11 +322,13 @@ fn extract_message_opcode(message: &v3::Message) -> u32 {
     let Ok(body) = Boc::decode_base64(body_boc64) else {
         return 0;
     };
-    let mut parser = body.as_slice_allow_exotic();
-    if message.bounced.unwrap_or(false) {
-        parser.load_u32().unwrap_or(0);
-    }
-    parser.load_u32().unwrap_or(0)
+    body.as_slice()
+        .ok()
+        .and_then(|body| {
+            tvm_ffi::message::original_message_body(body, message.bounced.unwrap_or(false))
+        })
+        .and_then(|mut body| body.load_u32().ok())
+        .unwrap_or(0)
 }
 
 fn format_message_value(message: &v3::Message) -> String {

@@ -1,0 +1,445 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`ABI rendering of compiled Tolk types specializes storage fields, including nested references to the same generic 1`] = `
+"storage_ty_idx:
+struct Storage<uint32> {
+    value: uint32
+    history: Cell<Storage<uint32>>?
+    status: Status
+    enabled: bool
+    counter: uint64
+}
+
+storage_at_deployment_ty_idx:
+struct Storage<address> {
+    value: address
+    history: Cell<Storage<address>>?
+    status: Status
+    enabled: bool
+    counter: uint64
+}"
+`;
+
+exports[`ABI rendering of compiled Tolk types renders concrete messages, generic aliases, union tags and wide prefixes 1`] = `
+"incoming_messages:
+struct GenericMessage<uint32> {
+    value: uint32
+}
+
+struct GenericMessage<address> {
+    value: address
+}
+
+incoming_external:
+struct (0b001) Message<address> {
+    /// The message payload
+    value: address
+}
+
+outgoing_messages:
+type Wrapped<address> = Message<address>
+
+emitted_events:
+struct (0b001) Message<bool> {
+    /// The message payload
+    value: bool
+}
+
+struct (0x123456789abc) WidePrefix {
+    value: uint8
+}"
+`;
+
+exports[`ABI rendering of compiled Tolk types preserves template parameters, enum encoding, defaults and client serialization metadata 1`] = `
+"Storage<T>:
+struct Storage<T> {
+    value: T
+    history: Cell<Storage<T>>?
+    status: Status
+    enabled: bool
+    counter: uint64
+}
+
+Message<T>:
+struct (0b001) Message<T> {
+    /// The message payload
+    value: T
+}
+
+Empty<T>:
+struct Empty<T> {}
+
+GenericMessage<T>:
+struct GenericMessage<T> {
+    value: T
+}
+
+Pair<L, R>:
+struct Pair<L, R> {
+    left: L
+    right: R
+}
+
+Either<L, R>:
+type Either<L, R> = L | R
+
+WidePrefix:
+struct (0x123456789abc) WidePrefix {
+    value: uint8
+}
+
+Wrapped<T>:
+type Wrapped<T> = Message<T>
+
+Status:
+enum Status: uint8 {
+    /// Ready to receive messages
+    Ready = 0
+    Busy = 7
+}
+
+Meta:
+struct Meta {
+    value: uint8
+}
+
+\`odd-name\`:
+struct \`odd-name\` {
+    \`field-name\`: uint16
+}
+
+\`type\`:
+struct \`type\` {
+    \`fun\`: uint8
+}
+
+\`odd-alias\`<T>:
+type \`odd-alias\`<T> = (T, \`odd-name\`)
+
+WirePayload:
+type WirePayload = RemainingBitsAndRefs
+
+ClientMessage:
+struct ClientMessage {
+    @abi.clientType(Cell<Message<uint32>>)
+    payload: WirePayload
+}
+
+CustomInt:
+// Custom serialization: packToBuilder, unpackFromSlice
+type CustomInt = int32
+
+Defaults:
+struct Defaults {
+    count: int = 0
+    large: uint64 = 18446744073709551615
+    enabled: bool = false
+    text: string = "hello\\n\\"world\\""
+    bits: slice = "ABCD".hexToSlice()
+    owner: address = address("0:0000000000000000000000000000000000000000000000000000000000000000")
+    pair: (int, bool) = (1, true)
+    tupleValue: [int, bool] = ([2, false] as [int, bool])
+    meta: Meta = Meta { value: (7 as uint8) }
+    message: Message<uint32> = Message<uint32> { value: (1 as uint32) }
+    wrapped: Wrapped<uint32> = Message<uint32> { value: (2 as uint32) }
+    nested: (Message<uint32>, Meta) = (Message<uint32> { value: (3 as uint32) }, Meta { value: (4 as uint8) })
+    boxed: [Message<uint32>] = ([Message<uint32> { value: (5 as uint32) }] as [Message<uint32>])
+    items: array<Message<uint32>> = ([Message<uint32> { value: (6 as uint32) }] as array<Message<uint32>>)
+    state: Status = (7 as Status)
+    optional: int? = null
+    custom: CustomInt = (42 as CustomInt)
+}"
+`;
+
+exports[`ABI rendering of compiled Tolk types renders getter signatures and concrete type definitions consistently 1`] = `
+"get fun get_storage(limit: int = 10): Storage<uint32>
+
+limit:
+int
+
+result:
+struct Storage<uint32> {
+    value: uint32
+    history: Cell<Storage<uint32>>?
+    status: Status
+    enabled: bool
+    counter: uint64
+}
+
+get fun get_wrapped(): Wrapped<address>
+
+result:
+type Wrapped<address> = Message<address>
+
+get fun get_empty(): Empty<bool>
+
+result:
+struct Empty<bool> {}
+
+get fun get_defaults(value: Defaults = Defaults { count: 0, large: (18446744073709551615 as uint64), enabled: (false as bool), text: ("hello\\n\\"world\\"" as string), bits: ("ABCD".hexToSlice() as slice), owner: address("0:0000000000000000000000000000000000000000000000000000000000000000"), pair: ((1, true) as (int, bool)), tupleValue: ([2, false] as [int, bool]), meta: (Meta { value: (7 as uint8) } as Meta), message: (Message<uint32> { value: (1 as uint32) } as Message<uint32>), wrapped: (Message<uint32> { value: (2 as uint32) } as Wrapped<uint32>), nested: ((Message<uint32> { value: (3 as uint32) }, Meta { value: (4 as uint8) }) as (Message<uint32>, Meta)), boxed: ([Message<uint32> { value: (5 as uint32) }] as [Message<uint32>]), items: ([Message<uint32> { value: (6 as uint32) }] as array<Message<uint32>>), state: (7 as Status), optional: ((null as null) as int?), custom: (42 as CustomInt) }): Defaults
+
+value:
+struct Defaults {
+    count: int = 0
+    large: uint64 = 18446744073709551615
+    enabled: bool = false
+    text: string = "hello\\n\\"world\\""
+    bits: slice = "ABCD".hexToSlice()
+    owner: address = address("0:0000000000000000000000000000000000000000000000000000000000000000")
+    pair: (int, bool) = (1, true)
+    tupleValue: [int, bool] = ([2, false] as [int, bool])
+    meta: Meta = Meta { value: (7 as uint8) }
+    message: Message<uint32> = Message<uint32> { value: (1 as uint32) }
+    wrapped: Wrapped<uint32> = Message<uint32> { value: (2 as uint32) }
+    nested: (Message<uint32>, Meta) = (Message<uint32> { value: (3 as uint32) }, Meta { value: (4 as uint8) })
+    boxed: [Message<uint32>] = ([Message<uint32> { value: (5 as uint32) }] as [Message<uint32>])
+    items: array<Message<uint32>> = ([Message<uint32> { value: (6 as uint32) }] as array<Message<uint32>>)
+    state: Status = (7 as Status)
+    optional: int? = null
+    custom: CustomInt = (42 as CustomInt)
+}
+
+result:
+struct Defaults {
+    count: int = 0
+    large: uint64 = 18446744073709551615
+    enabled: bool = false
+    text: string = "hello\\n\\"world\\""
+    bits: slice = "ABCD".hexToSlice()
+    owner: address = address("0:0000000000000000000000000000000000000000000000000000000000000000")
+    pair: (int, bool) = (1, true)
+    tupleValue: [int, bool] = ([2, false] as [int, bool])
+    meta: Meta = Meta { value: (7 as uint8) }
+    message: Message<uint32> = Message<uint32> { value: (1 as uint32) }
+    wrapped: Wrapped<uint32> = Message<uint32> { value: (2 as uint32) }
+    nested: (Message<uint32>, Meta) = (Message<uint32> { value: (3 as uint32) }, Meta { value: (4 as uint8) })
+    boxed: [Message<uint32>] = ([Message<uint32> { value: (5 as uint32) }] as [Message<uint32>])
+    items: array<Message<uint32>> = ([Message<uint32> { value: (6 as uint32) }] as array<Message<uint32>>)
+    state: Status = (7 as Status)
+    optional: int? = null
+    custom: CustomInt = (42 as CustomInt)
+}
+
+get fun get_client_message(value: ClientMessage): ClientMessage
+
+value:
+struct ClientMessage {
+    @abi.clientType(Cell<Message<uint32>>)
+    payload: WirePayload
+}
+
+result:
+struct ClientMessage {
+    @abi.clientType(Cell<Message<uint32>>)
+    payload: WirePayload
+}
+
+get fun get_odd(value: \`odd-alias\`<uint32>): \`odd-alias\`<uint32>
+
+value:
+type \`odd-alias\`<uint32> = (uint32, \`odd-name\`)
+
+result:
+type \`odd-alias\`<uint32> = (uint32, \`odd-name\`)
+
+get fun \`return\`(\`val\`: \`type\`): \`type\`
+
+val:
+struct \`type\` {
+    \`fun\`: uint8
+}
+
+result:
+struct \`type\` {
+    \`fun\`: uint8
+}
+
+get fun get_pair(value: Pair<uint32, Wrapped<address>>): Pair<uint32, Wrapped<address>>
+
+value:
+struct Pair<uint32, Wrapped<address>> {
+    left: uint32
+    right: Wrapped<address>
+}
+
+result:
+struct Pair<uint32, Wrapped<address>> {
+    left: uint32
+    right: Wrapped<address>
+}
+
+get fun get_either(value: Either<uint32, address>): Either<uint32, address>
+
+value:
+type Either<uint32, address> = uint32 | address
+
+result:
+type Either<uint32, address> = uint32 | address
+
+get fun get_union(value: Message<uint32> | WidePrefix): Message<uint32> | WidePrefix
+
+value:
+    struct (0b001) Message<uint32> {
+        /// The message payload
+        value: uint32
+    } /* 0b001 */
+|     struct (0x123456789abc) WidePrefix {
+        value: uint8
+    } /* 0x123456789abc */
+
+result:
+    struct (0b001) Message<uint32> {
+        /// The message payload
+        value: uint32
+    } /* 0b001 */
+|     struct (0x123456789abc) WidePrefix {
+        value: uint8
+    } /* 0x123456789abc */
+
+get fun get_optional(value: Storage<uint32>?): Storage<uint32>?
+
+value:
+Storage<uint32>?
+
+struct Storage<uint32> {
+    value: uint32
+    history: Cell<Storage<uint32>>?
+    status: Status
+    enabled: bool
+    counter: uint64
+}
+
+result:
+Storage<uint32>?
+
+struct Storage<uint32> {
+    value: uint32
+    history: Cell<Storage<uint32>>?
+    status: Status
+    enabled: bool
+    counter: uint64
+}
+
+get fun get_types(maybe: uint8 | address | null, cells: Cell<Message<uint32>>, items: array<\`odd-name\`>, linked: lisp_list<uint16>, mapping: map<uint32, Cell<Storage<address>>>, tupleValue: [int, (address, bool)], remainder: RemainingBitsAndRefs, any: any_address, bits: bits13, vi: varint16, vu: varuint32): (uint8 | address | null, Cell<Message<uint32>>, array<\`odd-name\`>, lisp_list<uint16>, map<uint32, Cell<Storage<address>>>, [int, (address, bool)], RemainingBitsAndRefs, any_address, bits13, varint16, varuint32)
+
+maybe:
+    uint8 /* 0b10 */
+|     address /* 0b11 */
+|     null /* 0b0 */
+
+cells:
+Cell<Message<uint32>>
+
+items:
+array<\`odd-name\`>
+
+linked:
+lisp_list<uint16>
+
+mapping:
+map<uint32, Cell<Storage<address>>>
+
+tupleValue:
+[int, (address, bool)]
+
+remainder:
+RemainingBitsAndRefs
+
+any:
+any_address
+
+bits:
+bits13
+
+vi:
+varint16
+
+vu:
+varuint32
+
+result:
+(uint8 | address | null, Cell<Message<uint32>>, array<\`odd-name\`>, lisp_list<uint16>, map<uint32, Cell<Storage<address>>>, [int, (address, bool)], RemainingBitsAndRefs, any_address, bits13, varint16, varuint32)"
+`;
+
+exports[`ABI rendering of compiled Tolk types preserves compound Tolk syntax and escaped identifiers at every nesting level 1`] = `
+"void
+int
+slice
+cell
+builder
+bool
+coins
+address
+int32
+uint32
+int64
+uint64
+GenericMessage<uint32>
+T
+GenericMessage<T>
+GenericMessage<address>
+Message<address>
+Message<T>
+Wrapped<address>
+Wrapped<T>
+Message<bool>
+WidePrefix
+uint8
+Storage<uint32>
+Cell<Storage<uint32>>
+Cell<Storage<uint32>>?
+Status
+Storage<T>
+Cell<Storage<T>>
+Cell<Storage<T>>?
+Storage<address>
+Cell<Storage<address>>
+Cell<Storage<address>>?
+Empty<bool>
+Empty<T>
+Defaults
+string
+(int, bool)
+[int, bool]
+Meta
+Message<uint32>
+Wrapped<uint32>
+(Message<uint32>, Meta)
+[Message<uint32>]
+array<Message<uint32>>
+int?
+CustomInt
+null
+ClientMessage
+WirePayload
+RemainingBitsAndRefs
+Cell<Message<uint32>>
+\`odd-alias\`<uint32>
+\`odd-name\`
+uint16
+(uint32, \`odd-name\`)
+\`odd-alias\`<T>
+(T, \`odd-name\`)
+\`type\`
+Pair<uint32, Wrapped<address>>
+L
+R
+Pair<L, R>
+Either<uint32, address>
+uint32 | address
+Either<L, R>
+L | R
+Message<uint32> | WidePrefix
+Storage<uint32>?
+uint8 | address | null
+array<\`odd-name\`>
+lisp_list<uint16>
+map<uint32, Cell<Storage<address>>>
+(address, bool)
+[int, (address, bool)]
+any_address
+bits13
+varint16
+varuint32
+(uint8 | address | null, Cell<Message<uint32>>, array<\`odd-name\`>, lisp_list<uint16>, map<uint32, Cell<Storage<address>>>, [int, (address, bool)], RemainingBitsAndRefs, any_address, bits13, varint16, varuint32)"
+`;

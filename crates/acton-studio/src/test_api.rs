@@ -14,7 +14,8 @@ use utoipa::{OpenApi, ToSchema};
 
 use crate::{
     StartTestRunRequest, StudioApiErrorBody, StudioState, StudioTestExecutionLogs,
-    StudioTestReport, TestRunEventEnvelope, TestRunRuntimeError, test_contract_artifact_file_name,
+    StudioTestReport, TestRunEventEnvelope, TestRunRuntimeError, test_artifact_dir,
+    test_contract_artifact_file_name,
 };
 
 pub(super) fn openapi() -> utoipa::openapi::OpenApi {
@@ -94,11 +95,11 @@ pub(super) fn router() -> Router<StudioState> {
         )
         .route(
             "/test-runs/{run_id}/artifacts/coverage.lcov",
-            get(no_optional_artifact),
+            get(coverage_artifact),
         )
         .route(
             "/test-runs/{run_id}/artifacts/gas-profile",
-            get(no_optional_artifact),
+            get(gas_profile_artifact),
         )
         .route(
             "/test-runs/{run_id}/artifacts/config",
@@ -507,10 +508,15 @@ async fn get_test_artifact_config(
     if !project_root.ends_with(std::path::MAIN_SEPARATOR) {
         project_root.push(std::path::MAIN_SEPARATOR);
     }
+    let directory = test_artifact_dir(&run.project_root, &run.id);
     Ok(Json(TestArtifactConfig {
         project_root,
-        coverage_available: false,
-        gas_profile_available: false,
+        coverage_available: resolve_existing_path(&directory, Path::new("coverage.lcov"))
+            .await
+            .is_some(),
+        gas_profile_available: resolve_existing_path(&directory, Path::new("gas-profile.json"))
+            .await
+            .is_some(),
     }))
 }
 
@@ -537,29 +543,64 @@ async fn test_artifact_health(
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn no_optional_artifact() -> StatusCode {
-    StatusCode::NO_CONTENT
-}
-
 #[utoipa::path(
     get,
     path = "/api/v1/test-runs/{run_id}/artifacts/coverage.lcov",
     params(("run_id" = String, Path, description = "Test run ID")),
-    responses((status = 204, description = "Coverage data is not available")),
+    responses(
+        (status = 200, description = "Coverage report", body = String, content_type = "text/plain"),
+        (status = 204, description = "Coverage data is not available"),
+        (status = 404, description = "Test run not found", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read coverage", body = StudioApiErrorBody)
+    ),
     tag = "test artifacts"
 )]
-#[allow(dead_code, reason = "documentation-only OpenAPI path")]
-const fn coverage_artifact() {}
+async fn coverage_artifact(
+    State(state): State<StudioState>,
+    AxumPath(run_id): AxumPath<String>,
+) -> Result<Response, TestRunApiError> {
+    let run = state
+        .test_run_runtime
+        .get(&run_id)
+        .await
+        .map_err(TestRunApiError)?;
+    let directory = test_artifact_dir(&run.project_root, &run.id);
+    let Some(path) = resolve_existing_path(&directory, Path::new("coverage.lcov")).await else {
+        return Ok(StatusCode::NO_CONTENT.into_response());
+    };
+    let contents = tokio::fs::read_to_string(&path).await.map_err(|error| {
+        internal(
+            "test_artifact_read_failed",
+            format!("{}: {error}", path.display()),
+        )
+    })?;
+    Ok(contents.into_response())
+}
 
 #[utoipa::path(
     get,
     path = "/api/v1/test-runs/{run_id}/artifacts/gas-profile",
     params(("run_id" = String, Path, description = "Test run ID")),
-    responses((status = 204, description = "Gas profile data is not available")),
+    responses(
+        (status = 200, description = "Source-level gas profile for the run and individual tests", body = serde_json::Value),
+        (status = 204, description = "Gas profile data is not available"),
+        (status = 404, description = "Test run not found", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read gas profile", body = StudioApiErrorBody)
+    ),
     tag = "test artifacts"
 )]
-#[allow(dead_code, reason = "documentation-only OpenAPI path")]
-const fn gas_profile_artifact() {}
+async fn gas_profile_artifact(
+    State(state): State<StudioState>,
+    AxumPath(run_id): AxumPath<String>,
+) -> Result<Response, TestRunApiError> {
+    let run = state
+        .test_run_runtime
+        .get(&run_id)
+        .await
+        .map_err(TestRunApiError)?;
+    let directory = test_artifact_dir(&run.project_root, &run.id);
+    read_json_artifact(&directory, Path::new("gas-profile.json"), false).await
+}
 
 async fn read_json_artifact(
     root: &Path,

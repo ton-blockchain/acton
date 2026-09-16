@@ -1,9 +1,7 @@
-import {Code2, ExternalLink, X} from "lucide-react"
+import {Banner} from "@acton/ui"
+import {Code2, ExternalLink} from "lucide-react"
 import {useState} from "react"
-import {Tooltip} from "@acton/ui"
 import {useNetworkInfo} from "@acton/explorer-core/hooks/useNetworkInfo"
-
-import styles from "./DeveloperExplorerBanner.module.css"
 
 const DISMISSED_STORAGE_KEY = "actonExplorerDeveloperBannerDismissed"
 
@@ -33,41 +31,24 @@ export function DeveloperExplorerBanner() {
   }
 
   return (
-    <aside className={styles.banner} aria-label="Developer explorer notice">
-      <div className={styles.inner}>
-        <p className={styles.message}>
-          <Code2 className={styles.developerIcon} size={16} aria-hidden="true" />
-          <strong>
-            <span className={styles.desktopHeadline}>
-              Acton Explorer is made for smart-contract developers
-            </span>
-            <span className={styles.mobileHeadline}>Acton Explorer is made for developers</span>
-          </strong>
-          <span className={styles.separator} aria-hidden="true">
-            ·
-          </span>
-          <span className={styles.publicExplorerPrompt}>Looking for a public TON explorer?</span>
-          <a
-            className={styles.link}
-            href={network.id === "mainnet" ? "https://tonscan.org" : "https://testnet.tonscan.org"}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Visit Tonscan
-            <ExternalLink size={13} aria-hidden="true" />
-          </a>
-        </p>
-        <Tooltip content="Dismiss">
-          <button
-            type="button"
-            className={styles.closeButton}
-            aria-label="Dismiss developer explorer notice"
-            onClick={dismiss}
-          >
-            <X size={16} aria-hidden="true" />
-          </button>
-        </Tooltip>
-      </div>
-    </aside>
+    <Banner
+      aria-label="Developer explorer notice"
+      icon={<Code2 size={16} />}
+      title="Acton Explorer is made for smart-contract developers"
+      compactTitle="Acton Explorer is made for developers"
+      description="Looking for a public TON explorer?"
+      action={
+        <a
+          href={network.id === "mainnet" ? "https://tonscan.org" : "https://testnet.tonscan.org"}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Visit Tonscan
+          <ExternalLink size={13} aria-hidden="true" />
+        </a>
+      }
+      dismissLabel="Dismiss developer explorer notice"
+      onDismiss={dismiss}
+    />
   )
 }

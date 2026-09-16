@@ -500,7 +500,7 @@ Source-of-truth map:
 - linter rule metadata in `crates/tolk-linter/` and related macros ->
   `docs/content/docs/rules`
 
-This updates generated trees under:
+`acton docgen` updates generated trees under:
 
 - `docs/content/docs/commands`
 - `docs/content/docs/standard_library`
@@ -508,6 +508,11 @@ This updates generated trees under:
 - `docs/content/docs/rules`
 - `src/etc/man`
 - `src/doc/man/generated_txt`
+
+The Simulator Control API uses a separate generator:
+`docs/public/openapi/acton-simulator-control.openapi.json` ->
+`docs/content/docs/simulator/control-api.mdx` through `bun run generated-source`
+in `docs/`.
 
 `acton docgen --check` renders into a temporary output tree and fails if any
 tracked generated file is stale.
@@ -519,6 +524,23 @@ generated documentation changes is required. This includes:
 - `crates/tolk-compiler/assets/tolk-stdlib/`
 - linter rule metadata and mappings (for example `crates/tolk-linter/`,
   `crates/tolk-macros/`)
+
+Changes to man pages can change the `acton help` snapshots. After regeneration,
+run the help tests:
+
+```bash
+cargo nextest run --test integration_test -E 'test(test_acton_help_)'
+```
+
+Changes to `lib/` comments can shift source line numbers in debugger snapshots.
+Run the debugger tests that cover the changed modules. For example:
+
+```bash
+cargo nextest run --test integration_test -E 'test(test_real_counter_contract_step_in)'
+```
+
+Review each snapshot diff. For an intended change, rerun the affected test with
+`SNAPSHOTS=overwrite` and commit the updated snapshot.
 
 For docs-site-only pages under `docs/content/docs/` that are not generated,
 edit them directly and keep nearby `meta.json` in sync.
@@ -546,6 +568,8 @@ When to rerun schema generation:
 
 - any change to `ActonConfig` or related config structs
 - schema-shaping serde/schemars changes
+- changes to linter rule names, descriptions, or explanation comments in
+  `crates/tolk-linter/`, which the schema includes
 - docs or editor work that depends on new config fields
 
 Current consumers include:

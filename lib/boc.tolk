@@ -22,9 +22,13 @@
 import "ffi"
 
 /// Namespace for raw Bag of Cells encoding and decoding.
+///
+/// Available since Acton 1.2.
 struct boc
 
 /// Options controlling raw BoC encoding.
+///
+/// Available since Acton 1.2.
 struct BocEncodeOptions {
     /// Append a four-byte CRC32C checksum to the encoded BoC.
     crc32: bool = false
@@ -37,6 +41,8 @@ struct BocEncodeOptions {
 ///
 /// When `value` is a `slice`, only its remaining bits and references are encoded. Bits or
 /// references already loaded from the slice are not included.
+///
+/// Available since Acton 1.2.
 fun boc.encode<T>(value: T, options: BocEncodeOptions = {}): slice {
     return value.__bocEncode(options.crc32);
 }
@@ -45,6 +51,8 @@ fun boc.encode<T>(value: T, options: BocEncodeOptions = {}): slice {
 ///
 /// Returns `null` when `data` is not a valid snake byte slice, is not a valid BoC, has an
 /// invalid CRC32C checksum, or contains a number of roots other than one.
+///
+/// Available since Acton 1.2.
 fun boc.decode(data: slice): cell? {
     return ffi.bocDecode(data);
 }

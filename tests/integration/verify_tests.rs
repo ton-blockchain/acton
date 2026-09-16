@@ -1,9 +1,15 @@
+use crate::common::assertion;
 use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
 use crate::support::toncenter::{spawn_toncenter_v3_mock, toncenter_v3_account_states_ok_response};
-use crate::support::verifier::{VerifierMockResponse, spawn_verifier_mock};
+use crate::support::verifier::{
+    CapturedVerifierRequest, VerifierMockResponse, spawn_verifier_mock,
+};
+use std::io::{Read, Write};
+use std::net::TcpStream;
 use std::path::Path;
-use std::sync::{LazyLock, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
+use std::time::Duration;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 
@@ -70,6 +76,30 @@ fn payment_ticket_response() -> VerifierMockResponse {
     }
 }
 
+fn verification_status_response(status: &str) -> VerifierMockResponse {
+    VerifierMockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "code_hash": VERIFY_TEST_CODE_HASH,
+            "verified": status == "verified",
+            "status": status,
+        })
+        .to_string(),
+        headers: vec![],
+    }
+}
+
+fn spawn_unverified_verifier_mock(
+    mut responses: Vec<VerifierMockResponse>,
+) -> (
+    String,
+    std::thread::JoinHandle<()>,
+    Arc<Mutex<Vec<CapturedVerifierRequest>>>,
+) {
+    responses.insert(0, verification_status_response("unverified"));
+    spawn_verifier_mock(responses)
+}
+
 fn verifier_error_response(status: u16, error: &str) -> VerifierMockResponse {
     VerifierMockResponse {
         status,
@@ -96,7 +126,7 @@ fn successful_verification_response() -> VerifierMockResponse {
 fn assert_verifier_payment_error(project_name: &str, status: u16, error: &str, snapshot: &str) {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project(project_name);
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![
+    let (mock_url, mock_handle, captured) = spawn_unverified_verifier_mock(vec![
         payment_ticket_response(),
         verifier_error_response(status, error),
     ]);
@@ -116,7 +146,11 @@ fn assert_verifier_payment_error(project_name: &str, status: u16, error: &str, s
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 2, "expected ticket and verify requests");
+    assert_eq!(
+        captured.len(),
+        3,
+        "expected status, ticket, and verify requests"
+    );
     drop(captured);
 }
 
@@ -323,7 +357,7 @@ version = "0.1.0"
 fn test_verify_verifier_sends_api_payload_and_reports_success() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-verifier-success");
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![
+    let (mock_url, mock_handle, captured) = spawn_unverified_verifier_mock(vec![
         payment_ticket_response(),
         successful_verification_response(),
     ]);
@@ -347,17 +381,26 @@ fn test_verify_verifier_sends_api_payload_and_reports_success() {
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 2, "expected ticket and verify requests");
-    assert_eq!(captured[0].method, "POST");
-    assert_eq!(captured[0].path, "/api/v1/take_ticket");
+    assert_eq!(
+        captured.len(),
+        3,
+        "expected status, ticket, and verify requests"
+    );
+    assert_eq!(captured[0].method, "GET");
+    assert_eq!(
+        captured[0].path,
+        format!("/api/v1/verification/status?code_hash={VERIFY_TEST_CODE_HASH}")
+    );
     assert_eq!(captured[1].method, "POST");
-    assert_eq!(captured[1].path, "/api/v1/verify");
-    let ticket_body = String::from_utf8_lossy(&captured[0].body);
+    assert_eq!(captured[1].path, "/api/v1/take_ticket");
+    assert_eq!(captured[2].method, "POST");
+    assert_eq!(captured[2].path, "/api/v1/verify");
+    let ticket_body = String::from_utf8_lossy(&captured[1].body);
     assert!(
         ticket_body.contains(VERIFY_TEST_CODE_HASH),
         "ticket request must include target code hash, got: {ticket_body}"
     );
-    let body = String::from_utf8_lossy(&captured[1].body);
+    let body = String::from_utf8_lossy(&captured[2].body);
     assert!(
         body.contains("name=\"code_hash\"") && body.contains(VERIFY_TEST_CODE_HASH),
         "multipart request must include target code hash, got: {body}"
@@ -395,17 +438,18 @@ fn test_verify_verifier_sends_api_payload_and_reports_success() {
 fn test_verify_verifier_stops_when_code_is_already_verified() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-verifier-already-verified");
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
-        status: 200,
-        body: serde_json::json!({
-            "status": "already_verified",
-            "code_hash": VERIFY_TEST_CODE_HASH,
-            "source_bundle_hash": VERIFY_TEST_SOURCE_BUNDLE_HASH,
-            "storage_revision": "0123456789abcdef"
-        })
-        .to_string(),
-        headers: vec![],
-    }]);
+    let (mock_url, mock_handle, captured) =
+        spawn_unverified_verifier_mock(vec![VerifierMockResponse {
+            status: 200,
+            body: serde_json::json!({
+                "status": "already_verified",
+                "code_hash": VERIFY_TEST_CODE_HASH,
+                "source_bundle_hash": VERIFY_TEST_SOURCE_BUNDLE_HASH,
+                "storage_revision": "0123456789abcdef"
+            })
+            .to_string(),
+            headers: vec![],
+        }]);
 
     let output = project
         .acton()
@@ -427,8 +471,83 @@ fn test_verify_verifier_stops_when_code_is_already_verified() {
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 1, "expected only the ticket request");
-    assert_eq!(captured[0].path, "/api/v1/take_ticket");
+    assert_eq!(captured.len(), 2, "expected status and ticket requests");
+    assert_eq!(captured[0].method, "GET");
+    assert_eq!(
+        captured[0].path,
+        format!("/api/v1/verification/status?code_hash={VERIFY_TEST_CODE_HASH}")
+    );
+    assert_eq!(captured[1].path, "/api/v1/take_ticket");
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_verifier_stops_when_status_is_verified() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-verifier-status-verified");
+    let (mock_url, mock_handle, captured) =
+        spawn_verifier_mock(vec![verification_status_response("verified")]);
+
+    let output = project
+        .acton()
+        .env("ACTON_VERIFY_BACKEND", &mock_url)
+        .verify()
+        .verify_contract("simple")
+        .run()
+        .success();
+
+    assert!(
+        output
+            .get_stdout()
+            .contains("Contract was already verified")
+    );
+
+    mock_handle.join().expect("mock verifier must finish");
+    let captured = captured
+        .lock()
+        .expect("captured verifier requests mutex poisoned");
+    assert_eq!(captured.len(), 1, "expected only the status request");
+    assert_eq!(captured[0].method, "GET");
+    assert_eq!(
+        captured[0].path,
+        format!("/api/v1/verification/status?code_hash={VERIFY_TEST_CODE_HASH}")
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_verifier_waits_for_an_existing_verification() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-verifier-existing-queue");
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![
+        verification_status_response("queued"),
+        verification_status_response("compiling"),
+        verification_status_response("verified"),
+    ]);
+
+    let output = project
+        .acton()
+        .env("ACTON_VERIFY_BACKEND", &mock_url)
+        .verify()
+        .verify_contract("simple")
+        .run()
+        .success();
+
+    let stdout = output.get_stdout();
+    assert!(stdout.contains("Verification is queued"));
+    assert!(stdout.contains("Verification is compiling"));
+    assert!(stdout.contains("Contract was already verified"));
+
+    mock_handle.join().expect("mock verifier must finish");
+    let captured = captured
+        .lock()
+        .expect("captured verifier requests mutex poisoned");
+    assert_eq!(captured.len(), 3, "expected three status requests");
+    assert!(captured.iter().all(|request| {
+        request.method == "GET"
+            && request.path
+                == format!("/api/v1/verification/status?code_hash={VERIFY_TEST_CODE_HASH}")
+    }));
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -436,7 +555,8 @@ fn test_verify_verifier_stops_when_code_is_already_verified() {
 fn test_verify_verifier_dry_run_formats_payment_without_sending_it() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-verifier-dry-run");
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![payment_ticket_response()]);
+    let (mock_url, mock_handle, captured) =
+        spawn_unverified_verifier_mock(vec![payment_ticket_response()]);
 
     let output = project
         .acton()
@@ -455,8 +575,8 @@ fn test_verify_verifier_dry_run_formats_payment_without_sending_it() {
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 1, "expected only the ticket request");
-    assert_eq!(captured[0].path, "/api/v1/take_ticket");
+    assert_eq!(captured.len(), 2, "expected status and ticket requests");
+    assert_eq!(captured[1].path, "/api/v1/take_ticket");
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -464,7 +584,8 @@ fn test_verify_verifier_dry_run_formats_payment_without_sending_it() {
 fn test_verify_verifier_rejects_a_ticket_for_another_code_hash() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-verifier-ticket-code-hash-mismatch");
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
+    let (mock_url, mock_handle, captured) =
+        spawn_unverified_verifier_mock(vec![VerifierMockResponse {
         status: 200,
         body: serde_json::json!({
             "status": "payment_required",
@@ -475,7 +596,7 @@ fn test_verify_verifier_rejects_a_ticket_for_another_code_hash() {
         })
         .to_string(),
         headers: vec![],
-    }]);
+        }]);
 
     project
         .acton()
@@ -492,8 +613,8 @@ fn test_verify_verifier_rejects_a_ticket_for_another_code_hash() {
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 1, "expected only the ticket request");
-    assert_eq!(captured[0].path, "/api/v1/take_ticket");
+    assert_eq!(captured.len(), 2, "expected status and ticket requests");
+    assert_eq!(captured[1].path, "/api/v1/take_ticket");
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -501,7 +622,8 @@ fn test_verify_verifier_rejects_a_ticket_for_another_code_hash() {
 fn test_verify_verifier_rejects_a_ticket_with_a_wrong_payment_comment() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-verifier-ticket-comment-mismatch");
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
+    let (mock_url, mock_handle, captured) =
+        spawn_unverified_verifier_mock(vec![VerifierMockResponse {
         status: 200,
         body: serde_json::json!({
             "status": "payment_required",
@@ -512,7 +634,7 @@ fn test_verify_verifier_rejects_a_ticket_with_a_wrong_payment_comment() {
         })
         .to_string(),
         headers: vec![],
-    }]);
+        }]);
 
     project
         .acton()
@@ -529,8 +651,8 @@ fn test_verify_verifier_rejects_a_ticket_with_a_wrong_payment_comment() {
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 1, "expected only the ticket request");
-    assert_eq!(captured[0].path, "/api/v1/take_ticket");
+    assert_eq!(captured.len(), 2, "expected status and ticket requests");
+    assert_eq!(captured[1].path, "/api/v1/take_ticket");
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -538,7 +660,8 @@ fn test_verify_verifier_rejects_a_ticket_with_a_wrong_payment_comment() {
 fn test_verify_verifier_rejects_a_non_basechain_payment_address() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-verifier-ticket-payment-address");
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
+    let (mock_url, mock_handle, captured) =
+        spawn_unverified_verifier_mock(vec![VerifierMockResponse {
         status: 200,
         body: serde_json::json!({
             "status": "payment_required",
@@ -549,7 +672,7 @@ fn test_verify_verifier_rejects_a_non_basechain_payment_address() {
         })
         .to_string(),
         headers: vec![],
-    }]);
+        }]);
 
     project
         .acton()
@@ -566,8 +689,8 @@ fn test_verify_verifier_rejects_a_non_basechain_payment_address() {
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 1, "expected only the ticket request");
-    assert_eq!(captured[0].path, "/api/v1/take_ticket");
+    assert_eq!(captured.len(), 2, "expected status and ticket requests");
+    assert_eq!(captured[1].path, "/api/v1/take_ticket");
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -582,7 +705,7 @@ fn test_verify_verifier_address_option_validates_deployed_code_hash() {
             Some(&contract_code_boc),
             "active",
         )]);
-    let (mock_url, mock_handle, _captured) = spawn_verifier_mock(vec![
+    let (mock_url, mock_handle, _captured) = spawn_unverified_verifier_mock(vec![
         payment_ticket_response(),
         VerifierMockResponse {
             status: 200,
@@ -645,7 +768,8 @@ fn test_verify_verifier_address_option_rejects_mismatched_deployed_code_hash() {
             Some(&wrong_code_boc),
             "active",
         )]);
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![payment_ticket_response()]);
+    let (mock_url, mock_handle, captured) =
+        spawn_unverified_verifier_mock(vec![payment_ticket_response()]);
 
     let output = project
         .acton()
@@ -669,8 +793,8 @@ fn test_verify_verifier_address_option_rejects_mismatched_deployed_code_hash() {
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 1, "expected only the ticket request");
-    assert_eq!(captured[0].path, "/api/v1/take_ticket");
+    assert_eq!(captured.len(), 2, "expected status and ticket requests");
+    assert_eq!(captured[1].path, "/api/v1/take_ticket");
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -678,7 +802,7 @@ fn test_verify_verifier_address_option_rejects_mismatched_deployed_code_hash() {
 fn test_verify_verifier_reports_mismatch() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-verifier-mismatch");
-    let (mock_url, mock_handle, _captured) = spawn_verifier_mock(vec![
+    let (mock_url, mock_handle, _captured) = spawn_unverified_verifier_mock(vec![
         payment_ticket_response(),
         VerifierMockResponse {
             status: 200,
@@ -719,7 +843,7 @@ fn test_verify_verifier_reports_mismatch() {
 fn test_verify_verifier_reports_http_error_body() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-verifier-http-error");
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![
+    let (mock_url, mock_handle, captured) = spawn_unverified_verifier_mock(vec![
         payment_ticket_response(),
         VerifierMockResponse {
             status: 400,
@@ -750,9 +874,13 @@ fn test_verify_verifier_reports_http_error_body() {
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 2, "expected ticket and verify requests");
-    assert_eq!(captured[0].path, "/api/v1/take_ticket");
-    assert_eq!(captured[1].path, "/api/v1/verify");
+    assert_eq!(
+        captured.len(),
+        3,
+        "expected status, ticket, and verify requests"
+    );
+    assert_eq!(captured[1].path, "/api/v1/take_ticket");
+    assert_eq!(captured[2].path, "/api/v1/verify");
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -760,7 +888,8 @@ fn test_verify_verifier_reports_http_error_body() {
 fn test_verify_verifier_rejects_an_invalid_payment_transaction_hash() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-verifier-invalid-payment-hash");
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![payment_ticket_response()]);
+    let (mock_url, mock_handle, captured) =
+        spawn_unverified_verifier_mock(vec![payment_ticket_response()]);
 
     project
         .acton()
@@ -779,8 +908,8 @@ fn test_verify_verifier_rejects_an_invalid_payment_transaction_hash() {
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 1, "expected only the ticket request");
-    assert_eq!(captured[0].path, "/api/v1/take_ticket");
+    assert_eq!(captured.len(), 2, "expected status and ticket requests");
+    assert_eq!(captured[1].path, "/api/v1/take_ticket");
 }
 
 #[test]
@@ -848,7 +977,7 @@ fn test_verify_verifier_reports_used_payment() {
 fn test_verify_verifier_retries_payment_in_progress_then_succeeds() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-verifier-payment-in-progress-retry");
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![
+    let (mock_url, mock_handle, captured) = spawn_unverified_verifier_mock(vec![
         payment_ticket_response(),
         verifier_error_response(
             409,
@@ -875,7 +1004,11 @@ fn test_verify_verifier_retries_payment_in_progress_then_succeeds() {
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 3, "expected ticket and two verify requests");
+    assert_eq!(
+        captured.len(),
+        4,
+        "expected status, ticket, and two verify requests"
+    );
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -883,7 +1016,7 @@ fn test_verify_verifier_retries_payment_in_progress_then_succeeds() {
 fn test_verify_verifier_retries_a_retryable_storage_error_then_succeeds() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-verifier-storage-retry");
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![
+    let (mock_url, mock_handle, captured) = spawn_unverified_verifier_mock(vec![
         payment_ticket_response(),
         verifier_error_response(
             502,
@@ -910,7 +1043,11 @@ fn test_verify_verifier_retries_a_retryable_storage_error_then_succeeds() {
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 3, "expected ticket and two verify requests");
+    assert_eq!(
+        captured.len(),
+        4,
+        "expected status, ticket, and two verify requests"
+    );
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -924,7 +1061,7 @@ fn test_verify_verifier_reports_payment_in_progress_after_bounded_retries() {
     );
     let mut responses = vec![payment_ticket_response()];
     responses.extend(vec![in_progress; 8]);
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(responses);
+    let (mock_url, mock_handle, captured) = spawn_unverified_verifier_mock(responses);
 
     project
         .acton()
@@ -945,8 +1082,8 @@ fn test_verify_verifier_reports_payment_in_progress_after_bounded_retries() {
         .expect("captured verifier requests mutex poisoned");
     assert_eq!(
         captured.len(),
-        9,
-        "expected ticket and eight verify requests"
+        10,
+        "expected status, ticket, and eight verify requests"
     );
 }
 
@@ -955,7 +1092,7 @@ fn test_verify_verifier_reports_payment_in_progress_after_bounded_retries() {
 fn test_verify_verifier_does_not_retry_a_generic_server_error() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-verifier-generic-server-error");
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![
+    let (mock_url, mock_handle, captured) = spawn_unverified_verifier_mock(vec![
         payment_ticket_response(),
         verifier_error_response(502, "internal verifier error"),
     ]);
@@ -977,7 +1114,61 @@ fn test_verify_verifier_does_not_retry_a_generic_server_error() {
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 2, "expected ticket and one verify request");
+    assert_eq!(
+        captured.len(),
+        3,
+        "expected status, ticket, and one verify request"
+    );
+}
+
+#[test]
+fn test_verify_mock_reads_a_fragmented_request_body() {
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
+        status: 200,
+        body: "{}".to_owned(),
+        headers: vec![],
+    }]);
+    let mut stream = TcpStream::connect(mock_url.trim_start_matches("http://"))
+        .expect("must connect to verifier mock");
+    stream
+        .set_nodelay(true)
+        .expect("must disable Nagle buffering");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .expect("must bound response reads");
+
+    // Leave the body incomplete long enough for the mock to start reading it.
+    // An accepted non-blocking socket would fail immediately with WouldBlock.
+    stream
+        .write_all(b"POST /api/v1/verify HTTP/1.1\r\nContent-Length: 13\r\n\r\nsource ")
+        .expect("must send headers and the first body fragment");
+    std::thread::sleep(Duration::from_millis(100));
+    stream
+        .write_all(b"bundle")
+        .expect("must send the remaining body fragment");
+
+    let mut response = String::new();
+    stream
+        .read_to_string(&mut response)
+        .expect("must read verifier response");
+    mock_handle.join().expect("mock verifier must finish");
+
+    let captured = captured.lock().expect("captured requests mutex poisoned");
+    let request = captured.first().expect("mock must capture the request");
+    let outcome = format!(
+        "Response:\n{}\nCaptured requests: {}\n{} {}\n{}\n",
+        response.replace("\r\n", "\n"),
+        captured.len(),
+        request.method,
+        request.path,
+        String::from_utf8_lossy(&request.body),
+    );
+    drop(captured);
+
+    assertion().eq(
+        outcome,
+        snapbox::file!["snapshots/verify/test_verify_mock_reads_a_fragmented_request_body.txt"],
+    );
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -985,14 +1176,15 @@ fn test_verify_verifier_does_not_retry_a_generic_server_error() {
 fn test_verify_verifier_reports_payment_recovery() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-verifier-payment-recovery");
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
-        status: 503,
-        body: serde_json::json!({
-            "error": "payment_recovery_in_progress: payment history is still being recovered"
-        })
-        .to_string(),
-        headers: vec![],
-    }]);
+    let (mock_url, mock_handle, captured) =
+        spawn_unverified_verifier_mock(vec![VerifierMockResponse {
+            status: 503,
+            body: serde_json::json!({
+                "error": "payment_recovery_in_progress: payment history is still being recovered"
+            })
+            .to_string(),
+            headers: vec![],
+        }]);
 
     project
         .acton()
@@ -1011,7 +1203,7 @@ fn test_verify_verifier_reports_payment_recovery() {
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 1, "expected only the ticket request");
+    assert_eq!(captured.len(), 2, "expected status and ticket requests");
 }
 
 #[test]
@@ -1056,7 +1248,7 @@ fn test_verify_rejects_inconsistent_success_responses() {
         body[field] = value;
         response.body = body.to_string();
         let (mock_url, mock_handle, _) =
-            spawn_verifier_mock(vec![payment_ticket_response(), response]);
+            spawn_unverified_verifier_mock(vec![payment_ticket_response(), response]);
         project
             .acton()
             .env("ACTON_VERIFY_BACKEND", &mock_url)
@@ -1087,7 +1279,8 @@ fn test_verify_rejects_unsupported_source_paths_before_payment() {
         .unwrap()
         .replace("contracts/simple.tolk", "contracts/my contract.tolk");
     std::fs::write(config_path, config).unwrap();
-    let (mock_url, mock_handle, _) = spawn_verifier_mock(vec![payment_ticket_response()]);
+    let (mock_url, mock_handle, _) =
+        spawn_unverified_verifier_mock(vec![payment_ticket_response()]);
     project
         .acton()
         .env("ACTON_VERIFY_BACKEND", &mock_url)

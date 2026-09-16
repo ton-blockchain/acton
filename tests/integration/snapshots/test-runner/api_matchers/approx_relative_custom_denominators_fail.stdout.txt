@@ -1,0 +1,29 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/approx.test.tolk (6 tests)
+  ✗ parts per million above boundary [TIME]
+    └─ Error: 1000000 !~= 1000002 (max delta: 1/1000000, real delta: 2/1000000)
+      └─ at tests/approx.test[LINE]
+  ✗ eighteen decimal precision above boundary [TIME]
+    └─ Error: 1000000000000000000 !~= 1000000000000000002 (max delta: 1/1000000000000000000, real delta: 2/1000000000000000000)
+      └─ at tests/approx.test[LINE]
+  ✗ negative actual above boundary [TIME]
+    └─ Error: -1000000 !~= -1000002 (max delta: 1/1000000, real delta: 2/1000000)
+      └─ at tests/approx.test[LINE]
+  ✗ zero actual with custom precision [TIME]
+    └─ Error: 0 !~= 1 (max delta: 1/1000000, real delta: inf)
+      └─ at tests/approx.test[LINE]
+  ✗ zero delta with custom precision [TIME]
+    └─ Error: 1000000 !~= 1000001 (max delta: 0/1000000, real delta: 1/1000000)
+      └─ at tests/approx.test[LINE]
+  ✗ denominator below one hundred above boundary [TIME]
+    └─ Error: 100 !~= 200 (max delta: 1/2, real delta: 2/2)
+      └─ at tests/approx.test[LINE]
+
+ ✗ 6 failed in 1 file
+
+Some tests failed.

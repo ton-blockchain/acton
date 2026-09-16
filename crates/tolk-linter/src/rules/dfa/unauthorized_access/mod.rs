@@ -46,7 +46,7 @@ pub mod analysis;
 /// }
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.1")]
+#[violation_metadata(preview_since = "v1.0.0")]
 pub struct UnauthorizedAccess;
 
 impl Violation for UnauthorizedAccess {

@@ -74,13 +74,25 @@ export interface VerificationStatisticsHistoryItem {
   readonly version: string
 }
 
+export interface CodeHashMatch {
+  readonly network: "mainnet" | "testnet"
+  readonly code_hash: string
+}
+
+interface ErrorResponse {
+  readonly error?: string
+  readonly matches?: readonly CodeHashMatch[]
+}
+
 export class ApiRequestError extends Error {
   readonly status: number
+  readonly matches: readonly CodeHashMatch[]
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, matches: readonly CodeHashMatch[] = []) {
     super(message)
     this.name = "ApiRequestError"
     this.status = status
+    this.matches = matches
   }
 }
 
@@ -109,13 +121,12 @@ export function createVerifierApi({
       },
     })
 
-    const body = (await response.json().catch(() => undefined)) as
-      | ({error?: string} & T)
-      | undefined
+    const body = (await response.json().catch(() => ({}))) as ErrorResponse & T
     if (!response.ok) {
       throw new ApiRequestError(
         response.status,
-        body?.error || `Request failed: ${response.status}`,
+        body.error ?? `Request failed: ${response.status}`,
+        body.matches ?? [],
       )
     }
 

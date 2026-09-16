@@ -1,4 +1,4 @@
-use crate::comments::has_inline_line_comment_in_subtree;
+use crate::comments::{has_inline_line_comment_in_subtree, has_inline_line_comments_on_node};
 use crate::pretty::RcDoc;
 use crate::{Context, comments, common, stmts, types};
 use tolk_syntax::{
@@ -14,18 +14,6 @@ pub fn print_expression<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<RcDoc<'a>>
     let node = expr.syntax();
     if !common::should_format_node(ctx, &node) {
         return Some(common::print_original_node_text_inline(ctx, &node));
-    }
-
-    // TODO: other literals as well
-    if let Expr::NumberLit(lit) = expr {
-        let kind = lit.0.parent()?.kind();
-        if kind == "tensor_expression"
-            || kind == "tuple_expression"
-            || kind == "typed_tuple"
-            || kind == "annotation_arguments"
-        {
-            return print_expression_naked(ctx, expr);
-        }
     }
 
     let comments = ctx.comments.get(&node);
@@ -87,20 +75,6 @@ fn has_leading_comments_on_node(ctx: &Context<'_>, node: Node<'_>) -> bool {
                 comment.kind,
                 comments::CommentKind::Leading | comments::CommentKind::LeadingWithEmptyLine
             )
-        })
-    })
-}
-
-fn has_inline_line_comments_on_node(ctx: &Context<'_>, node: Node<'_>) -> bool {
-    ctx.comments.get(&node).is_some_and(|comments| {
-        comments.iter().any(|comment| {
-            comment.kind == comments::CommentKind::Inline
-                && comment.nodes.iter().any(|comment_node| {
-                    comment_node
-                        .utf8_text(ctx.code.as_ref().as_ref())
-                        .ok()
-                        .is_some_and(|text| text.trim_start().starts_with("//"))
-                })
         })
     })
 }
@@ -319,10 +293,10 @@ fn print_method_chain_expression<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<R
 
     let mut tail = Vec::with_capacity(chain.links.len() * 3);
     let mut previous_has_inline_line_comments = false;
-    for (index, link) in chain.links.into_iter().enumerate() {
+    for link in chain.links {
         let separator = if previous_has_inline_line_comments || link.has_leading_comments {
             RcDoc::hardline()
-        } else if index == 0 && (chain.base_is_object_lit || keep_single_link_attached) {
+        } else if keep_single_link_attached {
             RcDoc::nil()
         } else {
             RcDoc::line_()
@@ -334,7 +308,8 @@ fn print_method_chain_expression<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<R
         tail.push(link.doc);
     }
 
-    let tail_doc = if keep_single_link_attached {
+    // Struct literal chains align with the closing brace, which already marks the base's end.
+    let tail_doc = if keep_single_link_attached || chain.base_is_object_lit {
         RcDoc::concat(tail)
     } else {
         RcDoc::concat(tail).nest(4)
@@ -343,7 +318,8 @@ fn print_method_chain_expression<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<R
     Some(RcDoc::group(RcDoc::concat([chain.base, tail_doc])))
 }
 
-fn print_expression_naked<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<RcDoc<'a>> {
+/// Prints an expression whose outer comments are owned by its enclosing list or wrapper.
+pub(crate) fn print_expression_naked<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<RcDoc<'a>> {
     match expr {
         Expr::VarDeclLhs(node) => print_var_declaration_lhs(ctx, node),
         Expr::Assign(assignment) => print_assignment(ctx, assignment),
@@ -490,6 +466,8 @@ pub fn print_ternary_operator<'a>(ctx: &Context<'_>, ternary: &Ternary) -> Optio
     ))
 }
 
+/// Control-flow headers already indent their root expression. Other expressions need
+/// a continuation indent; parentheses and call arguments start a separate expression.
 #[must_use]
 pub fn print_binary_operator<'a>(ctx: &Context<'_>, binary: &Bin) -> Option<RcDoc<'a>> {
     let left = binary.left()?;
@@ -498,31 +476,66 @@ pub fn print_binary_operator<'a>(ctx: &Context<'_>, binary: &Bin) -> Option<RcDo
     let left_doc = print_expression(ctx, &left)?;
     let right_doc = print_expression(ctx, &right)?;
 
+    let mut root = binary.0;
+    while let Some(parent) = root
+        .parent()
+        .filter(|parent| parent.kind() == "binary_operator")
+    {
+        root = parent;
+    }
+
+    let header_owns_indent = root.parent().is_some_and(|parent| match parent.kind() {
+        "if_statement" | "while_statement" | "do_while_statement" | "repeat_statement"
+        | "match_expression" => true,
+        "assert_statement" => {
+            parent.child_by_field_name("condition") == Some(root)
+                && stmts::assert_uses_throw_syntax(&tolk_syntax::Assert(parent))
+        }
+        _ => false,
+    });
+    let continuation_indent = if header_owns_indent { 0 } else { 4 };
+
     if has_inline_line_comment_in_subtree(ctx, left.syntax()) {
         return Some(RcDoc::group(RcDoc::concat([
             left_doc,
-            RcDoc::hardline(),
-            RcDoc::text(op),
-            RcDoc::space(),
-            RcDoc::group(right_doc),
+            RcDoc::concat([
+                RcDoc::hardline(),
+                RcDoc::text(op),
+                RcDoc::space(),
+                RcDoc::group(right_doc),
+            ])
+            .nest(continuation_indent),
         ])));
     }
 
     Some(RcDoc::group(RcDoc::concat([
         left_doc,
-        RcDoc::text(" "),
-        RcDoc::text(op),
-        RcDoc::line(),
-        RcDoc::group(right_doc),
+        RcDoc::concat([
+            RcDoc::space(),
+            RcDoc::text(op),
+            RcDoc::line(),
+            RcDoc::group(right_doc),
+        ])
+        .nest(continuation_indent),
     ])))
 }
 
+/// Keeps adjacent signs separate so the compiler cannot read them as `++` or `--`.
 #[must_use]
 pub fn print_unary_operator<'a>(ctx: &Context<'_>, unary: &Unary) -> Option<RcDoc<'a>> {
     let op = unary.operator_name(ctx.code.as_ref().as_ref()).to_string();
     let arg = unary.argument()?;
     let arg_doc = print_expression(ctx, &arg)?;
-    Some(RcDoc::concat([RcDoc::text(op), arg_doc]))
+    let separator = if matches!(&arg, Expr::Unary(inner)
+        if matches!(op.as_str(), "+" | "-")
+            && inner.operator_name(ctx.code.as_ref().as_ref()) == op)
+    {
+        RcDoc::space()
+    } else {
+        RcDoc::nil()
+    };
+
+    Some(RcDoc::concat([RcDoc::text(op), separator, arg_doc]))
 }
 
 #[must_use]
@@ -612,8 +625,9 @@ pub fn print_argument_list<'a>(
 ) -> Option<RcDoc<'a>> {
     // Respect only explicit top-level line breaks in `(...)`.
     // Newlines inside a single object/lambda argument should not force the whole call to break.
-    let has_top_level_newline = argument_list
-        .is_some_and(|argument_list| argument_list_has_top_level_newline(ctx, &argument_list));
+    let has_top_level_newline = argument_list.is_some_and(|list| {
+        common::list_has_top_level_newline(ctx, list.0, list.arguments().map(|arg| arg.0))
+    });
 
     // We want to output:
     // ```
@@ -662,30 +676,9 @@ pub fn print_argument_list<'a>(
         args,
         print_call_argument,
         |arg| arg.0,
-        |_| vec![],
+        |_| argument_list.map_or_else(Vec::new, |list| common::collect_lonely_comments(list.0)),
         list_options,
     )
-}
-
-fn argument_list_has_top_level_newline(
-    ctx: &Context<'_>,
-    argument_list: &ArgumentList<'_>,
-) -> bool {
-    let source = ctx.code.as_ref().as_bytes();
-    let node = argument_list.0;
-    let close_paren_start = node.end_byte().saturating_sub(1);
-    let mut previous_end = node.start_byte().saturating_add(1);
-
-    // Scan only the gaps between top-level argument nodes and the parens.
-    // This ignores newlines nested inside an argument expression itself.
-    for argument in argument_list.arguments() {
-        if source[previous_end..argument.0.start_byte()].contains(&b'\n') {
-            return true;
-        }
-        previous_end = argument.0.end_byte();
-    }
-
-    source[previous_end..close_paren_start].contains(&b'\n')
 }
 
 fn call_argument_contains_lambda(arg: &CallArgument) -> bool {
@@ -706,24 +699,22 @@ fn print_instantiation_types<'a>(
     let ts = instantiation.instantiation_ts()?;
     let types: Vec<_> = ts.types().collect();
 
-    if let [single_type] = types.as_slice()
-        && types::single_type_argument_should_stay_inline(single_type)
-    {
-        let single_type_doc = types::print_type(ctx, single_type)?;
-        return Some(RcDoc::concat([
-            RcDoc::text("<"),
-            single_type_doc,
-            RcDoc::text(">"),
-        ]));
-    }
-
     common::print_list(
         ctx,
         &types,
-        types::print_type,
+        types::print_type_naked,
         Type::syntax,
         |_| vec![],
-        common::ListOptions::triangle_bracket_list(),
+        common::ListOptions {
+            never_break_if_items_lt: if matches!(types.as_slice(), [single_type]
+                if types::single_type_argument_should_stay_inline(single_type))
+            {
+                2
+            } else {
+                0
+            },
+            ..common::ListOptions::triangle_bracket_list()
+        },
     )
 }
 
@@ -788,7 +779,7 @@ pub fn print_match_body<'a>(ctx: &Context<'_>, body: &MatchBody) -> Option<RcDoc
         &arms,
         print_match_arm,
         |arm| arm.0,
-        |_| vec![],
+        |_| common::collect_lonely_comments(body.0),
         common::ListOptions {
             brackets: (RcDoc::text("{"), RcDoc::text("}")),
             separator: RcDoc::nil(), // handled by print_match_arm itself
@@ -813,6 +804,16 @@ pub fn print_match_arm<'a>(ctx: &Context<'_>, arm: &MatchArm) -> Option<RcDoc<'a
         MatchArmBody::Block(b) => (stmts::print_block_statement(ctx, &b)?, true),
         MatchArmBody::Return(r) => (stmts::print_return_statement(ctx, &r)?, false),
         MatchArmBody::Throw(t) => (stmts::print_throw_statement(ctx, &t)?, false),
+        MatchArmBody::Statement(stmt) => (
+            stmts::print_statement(ctx, &stmt)?,
+            matches!(
+                stmt,
+                tolk_syntax::Stmt::If(_)
+                    | tolk_syntax::Stmt::While(_)
+                    | tolk_syntax::Stmt::Repeat(_)
+                    | tolk_syntax::Stmt::TryCatch(_)
+            ),
+        ),
         MatchArmBody::Expr(e) => (print_expression(ctx, &e)?, false),
     };
 
@@ -850,11 +851,12 @@ pub fn print_object_literal_body<'a>(
     has_type_name: bool,
 ) -> Option<RcDoc<'a>> {
     let node = obj.syntax();
+    let body = node.child_by_field_name("arguments")?;
     let args: Vec<_> = obj.arguments().collect();
 
     let (multiline_threshold, never_break_if_items_lt) =
         if is_single_typeless_object_call_argument(node, has_type_name) {
-            if node.start_position().row < node.end_position().row {
+            if common::list_has_top_level_newline(ctx, body, args.iter().map(|arg| arg.0)) {
                 (0, 0)
             } else {
                 (usize::MAX, args.len() + 1)
@@ -868,7 +870,7 @@ pub fn print_object_literal_body<'a>(
         &args,
         print_instance_argument,
         |arg| arg.0,
-        |_| vec![],
+        |_| common::collect_lonely_comments(body),
         common::ListOptions {
             brackets: (RcDoc::text("{"), RcDoc::text("}")),
             multiline_threshold,
@@ -935,18 +937,14 @@ pub fn print_instance_argument<'a>(ctx: &Context<'_>, arg: &InstanceArg) -> Opti
 #[must_use]
 pub fn print_tensor_expression<'a>(ctx: &Context<'_>, tensor: &Tensor) -> Option<RcDoc<'a>> {
     let elements: Vec<_> = tensor.elements().collect();
-    if elements.is_empty() {
-        return Some(RcDoc::text("()"));
-    }
-
-    print_tuple_tensor(ctx, &elements, "(", ")")
+    print_tuple_tensor(ctx, &elements, tensor.0, "(", ")")
 }
 
 #[must_use]
 pub fn print_typed_tuple<'a>(ctx: &Context<'_>, tuple: &Tuple) -> Option<RcDoc<'a>> {
     let tuple_type = tuple.typ();
     let elements: Vec<_> = tuple.elements().collect();
-    let tuple_doc = print_tuple_tensor(ctx, &elements, "[", "]")?;
+    let tuple_doc = print_tuple_tensor(ctx, &elements, tuple.0, "[", "]")?;
 
     let mut docs = vec![];
     if let Some(typ) = tuple_type {
@@ -960,15 +958,16 @@ pub fn print_typed_tuple<'a>(ctx: &Context<'_>, tuple: &Tuple) -> Option<RcDoc<'
 fn print_tuple_tensor<'a>(
     ctx: &Context,
     elements: &[Expr],
+    node: Node<'_>,
     open_quote: &'a str,
     close_quote: &'a str,
 ) -> Option<RcDoc<'a>> {
     common::print_list(
         ctx,
         elements,
-        print_expression,
+        print_expression_naked,
         Expr::syntax,
-        |_| vec![],
+        |_| common::collect_lonely_comments(node),
         common::ListOptions {
             brackets: (RcDoc::text(open_quote), RcDoc::text(close_quote)),
             ..Default::default()
@@ -979,7 +978,11 @@ fn print_tuple_tensor<'a>(
 #[must_use]
 pub fn print_lambda_expression<'a>(ctx: &Context<'_>, lambda: &Lambda) -> Option<RcDoc<'a>> {
     let params: Vec<_> = lambda.parameters().collect();
-    let params_doc = crate::decls::print_parameter_list(ctx, &params)?;
+    let params_doc = crate::decls::print_parameter_list(
+        ctx,
+        &params,
+        lambda.0.child_by_field_name("parameters"),
+    )?;
 
     let mut docs = vec![RcDoc::text("fun"), params_doc];
     if let Some(ret) = lambda.return_type() {

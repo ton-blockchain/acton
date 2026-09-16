@@ -151,7 +151,7 @@ async fn status_handler(
     Ok(Json(RuntimeState::load(&state.layout.runtime)?))
 }
 
-/// Get the persistent Full localnet settings
+/// Get the persistent Localnet settings
 ///
 /// The response includes network parameters, node settings, service settings, validation settings, and monitoring settings
 #[utoipa::path(

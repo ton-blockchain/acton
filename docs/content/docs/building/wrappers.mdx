@@ -23,6 +23,8 @@ acton wrapper --all
 
 When generating all wrappers, use `--output-dir` to choose a directory. `--output` is only for a single contract because it names one file.
 
+<AvailabilityBadge since="Acton 1.1" />
+
 Precompiled `.boc` contracts can also have wrappers when their contract section
 points `types` to a Tolk interface file:
 
@@ -59,7 +61,11 @@ The generated file provides:
 - `counter.{getMethodName}()` — one method per declared get method.
 
 In local emulation, `ExternalSendResult.isAccepted()` reports whether the
-contract accepted the external-in message. After a network broadcast, use
+contract accepted the external-in message.
+
+<AvailabilityBadge since="Acton 1.2" />
+
+After a network broadcast, use
 `waitForFirstTransaction()` or `waitForTrace()` instead: successful submission
 does not prove contract acceptance, so `isAccepted()` exits with an error.
 
@@ -68,6 +74,21 @@ Fine tune wrapper generation with the `contract { ... }` header in the contract 
 - `storage: ...` enables the typed `fromStorage()` initializer; without it, the initializer falls back to an untyped form.
 - `incomingMessages: ...` enables typed `send{MessageName}` helpers; without it, only the generic `sendAny()` internal-message helper is generated.
 - `incomingExternal: ...` enables `sendExternal{MessageName}` helpers and `sendAnyExternal()`.
+
+### Storage aliases and workchains
+
+<AvailabilityBadge since="Acton 1.2" />
+
+Tolk wrappers accept union aliases as storage types. Generated test stubs use the
+corresponding storage types and imports.
+
+`fromStorage(storage, toShard, workchain)` accepts an optional workchain after
+`toShard`, defaulting to `BASECHAIN`. For masterchain deployment, use
+`Counter.fromStorage(storage, null, MASTERCHAIN)`. Deployments preserve the selected
+workchain and shard settings.
+
+Wrapper names and default filenames use the PascalCase contract ID from `Acton.toml`,
+independent of the source filename and `display-name`.
 
 ### Use a wrapper in a Tolk test
 
@@ -162,6 +183,8 @@ test-output-dir = "tests"
 [wrappers.typescript]
 output-dir = "wrappers-ts"
 ```
+
+<AvailabilityBadge since="Acton 1.2" />
 
 Override any of these fields for one contract by nesting the same tables under
 its contract entry:

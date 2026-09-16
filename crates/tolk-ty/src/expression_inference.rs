@@ -2646,6 +2646,14 @@ impl<'t> TypeInferenceWalker<'_, '_> {
                             self.intrn().ty_void
                         };
                     }
+                    MatchArmBody::Statement(stmt) => {
+                        arm_flow = self.process_stmt(stmt, arm_flow);
+                        body_ty = if arm_flow.is_unreachable() {
+                            self.intrn().ty_never
+                        } else {
+                            self.intrn().ty_void
+                        };
+                    }
                     MatchArmBody::Expr(expr) => {
                         let flow_res = self.infer_expr(expr, arm_flow, false, hint);
                         arm_flow = flow_res.out_flow;

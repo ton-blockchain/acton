@@ -1,0 +1,26 @@
+  Installing standard library [ACTON_VERSION]
+BigArray<int> []
+BigArray<int> [1, 2, 3]
+values=BigArray<int> [1, 2, 3]
+Collection {
+    values: BigArray<int> [1, 2, 3],
+    next: 42,
+}
+Collection {
+    values: null,
+    next: 43,
+}
+[BigArray<int> [1, 2, 3], BigArray<int> []]
+BigArray<Point> [
+    Point {
+        x: 1,
+        y: 2,
+    },
+    Point {
+        x: 3,
+        y: 4,
+    },
+]
+BigArray<(int, bool)> [(1, true), (2, false)]
+BigArray<array<int>> [[1, 2], [], [3]]
+BigArray<BigArray<int>> [BigArray<int> [1, 2, 3], BigArray<int> []]

@@ -6,6 +6,8 @@ import "../ffi"
 import "../fmt"
 
 /// Root namespace for benchmark helpers.
+///
+/// Available since Acton 1.2.
 struct bench
 
 /// Aggregated gas statistics for a single TVM instruction mnemonic executed by
@@ -14,6 +16,8 @@ struct bench
 /// The profiler groups samples by instruction mnemonic. For example, all `LDI`
 /// executions are merged into one `BenchInstructionInfo` row with the total
 /// number of executions and min/max gas observed for that mnemonic.
+///
+/// Available since Acton 1.2.
 struct BenchInstructionInfo {
     /// Row id in the profile map.
     id: uint32
@@ -39,6 +43,8 @@ struct BenchInstructionInfo {
 /// println(bench.format(profile));
 /// println(profile.asmCode);
 /// ```
+///
+/// Available since Acton 1.2.
 struct BenchResult<Ret> {
     /// Benchmark name passed as the first argument to `bench.measure`.
     name: string
@@ -71,6 +77,8 @@ struct BenchResult<Ret> {
 ///     println(bench.format(profile));
 /// }
 /// ```
+///
+/// Available since Acton 1.2.
 fun bench.measure<Ret>(
     name: string,
     fn: () -> Ret,
@@ -120,6 +128,8 @@ fun bench.__baseline(): void {}
 /// });
 /// println(bench.format(profile));
 /// ```
+///
+/// Available since Acton 1.2.
 fun bench.format<Ret>(profile: BenchResult<Ret>): string {
     return ffi.benchFormat(profile.name, profile.gasUsed, profile.instructions);
 }
@@ -140,6 +150,8 @@ fun bench.format<Ret>(profile: BenchResult<Ret>): string {
 /// });
 /// println(bench.formatDiff(baseline, current));
 /// ```
+///
+/// Available since Acton 1.2.
 fun bench.formatDiff<BaselineRet, CurrentRet>(
     baseline: BenchResult<BaselineRet>,
     current: BenchResult<CurrentRet>,

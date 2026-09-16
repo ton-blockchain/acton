@@ -531,3 +531,138 @@ type OtherType<T, U> = tuple<T, U>;
             type OtherType<T, U> = tuple<T, U>"]],
     );
 }
+
+#[test]
+fn test_fmt_ignore_call_argument_separators() {
+    check(
+        r"fun add(x: int, y: int): int { return x+y; }
+get fun f(): int { return add(
+// fmt-ignore
+1  +  2, // keep this argument
+3); }",
+        expect![[r"
+fun add(x: int, y: int): int {
+    return x + y;
+}
+
+get fun f(): int {
+    return add(
+        // fmt-ignore
+        1  +  2, // keep this argument
+        3,
+    );
+}"]],
+    );
+}
+
+#[test]
+fn test_fmt_ignore_parameter_separators() {
+    check(
+        r"get fun f(
+// fmt-ignore
+x : int,
+y: int): int { return x+y; }",
+        expect![[r"
+get fun f(
+    // fmt-ignore
+    x : int,
+    y: int,
+): int {
+    return x + y;
+}"]],
+    );
+}
+
+#[test]
+fn test_fmt_ignore_tuple_separators() {
+    check(
+        r"get fun f(): [int,int] { return [
+// fmt-ignore
+1  +  2,
+// fmt-ignore
+3  +  4]; }",
+        expect![[r"
+get fun f(): [int, int] {
+    return [
+        // fmt-ignore
+        1  +  2,
+        // fmt-ignore
+        3  +  4,
+    ];
+}"]],
+    );
+}
+
+#[test]
+fn test_fmt_ignore_type_separators() {
+    check(
+        r"type Pair = [
+// fmt-ignore
+int,
+int]
+get fun f(): Pair { return [1,2]; }",
+        expect![[r"
+type Pair = [
+    // fmt-ignore
+    int,
+    int,
+]
+
+get fun f(): Pair {
+    return [1, 2];
+}"]],
+    );
+}
+
+#[test]
+fn test_fmt_ignore_generic_separators() {
+    check(
+        r"struct Pair<
+// fmt-ignore
+X,
+Y> { x:X y:Y }
+type IntPair = Pair<
+// fmt-ignore
+int,
+int>",
+        expect![[r"
+struct Pair<
+    // fmt-ignore
+    X,
+    Y,
+> {
+    x: X
+    y: Y
+}
+
+type IntPair = Pair<
+    // fmt-ignore
+    int,
+    int,
+>"]],
+    );
+}
+
+#[test]
+fn test_fmt_ignore_object_field_separators() {
+    check(
+        r"struct Pair { x:int y:int }
+get fun f(): Pair { return Pair {
+// fmt-ignore
+x: 1  +  2,
+y: 3}; }",
+        expect![[r"
+struct Pair {
+    x: int
+    y: int
+}
+
+get fun f(): Pair {
+    return Pair {
+        // fmt-ignore
+        x: 1  +  2,
+        y: 3,
+    };
+}"]],
+    );
+}

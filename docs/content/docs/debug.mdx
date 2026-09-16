@@ -328,8 +328,13 @@ Key tradeoffs:
 - `--debug` requires `--contract`
 - source-level retrace only works for a matching local `.tolk` contract
 - local code hash must match the retraced account code
-- retrace supports mainnet and testnet, not localnet/custom backends
+- retrace supports mainnet and testnet; Localnet and custom backends are also supported from Acton 1.2
 - the replay summary shows state-hash check status, but it is surfaced as output rather than a hard failure
+
+<AvailabilityBadge since="Acton 1.2" />
+
+Tick-tock replay and `--net localnet` / `--net custom:<name>` are available in 1.2.
+Local and custom targets use the TON Center endpoints from `Acton.toml`.
 
 See [`acton retrace`](/docs/commands/retrace).
 
@@ -379,6 +384,12 @@ Use them for:
 - test diagnostics
 - quick script progress output
 - printing transaction trees or matcher results
+
+<AvailabilityBadge since="Acton 1.2" />
+
+Pass `acton test --no-capture` to stream `println(...)` and `eprintln(...)`
+while retaining their output for reporters and Test UI. This flag does not
+stream VM debug logs and cannot be combined with `--mutate`.
 
 ### Use `debug.print*` inside contract code
 

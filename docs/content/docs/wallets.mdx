@@ -60,7 +60,7 @@ Acton merges wallet definitions from `global.wallets.toml` first and then from l
 
 New wallets start with zero balance. To request testnet GRAM, use the faucet provided by Acton. It works by performing a small cryptographic computation locally on device and confirming it with the remote endpoint.
 
-Acton Faucet is limited to 2 requests of 2 testnet GRAM per hour for a single IP, device, and wallet.
+The faucet service determines the grant amount and claim limits. Limits can depend on the destination, device, IP address, and GitHub identity tier.
 
 <Callout>
   To avoid local computational work and solve captcha instead, use the [Testgiver TON bot in Telegram](https://t.me/testgiver_ton_bot).
@@ -141,6 +141,10 @@ To use a wallet from an external wallet service such as Tonkeeper, pass `--tonco
 acton script deploy.tolk --net testnet --tonconnect
 ```
 
+<AvailabilityBadge since="Acton 1.2" />
+
+Acton prints a native TON Connect QR code and a `tc://` link. The local browser bridge and `--tonconnect-port` option are no longer used.
+
 ## Choose local or global storage
 
 Use local wallets for project-specific work and global wallets for identities shared across projects.
@@ -207,6 +211,10 @@ address-testnet = "0QD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8ZLd"
 ```
 
 `acton wallet new` and `acton wallet import` populate `expected.address-testnet` automatically. Add `address-mainnet` manually when the same wallet is meant to be used on mainnet.
+
+<AvailabilityBadge since="Acton 1.2" />
+
+Wallet V5 derives its address from the network's `global-id`. Custom networks default to `-3`, matching testnet and localnet. For a custom endpoint that uses mainnet wallet addresses, set `global-id = -239` in its [network configuration](/docs/acton-toml#networks).
 
 ## Keep wallet data out of version control
 

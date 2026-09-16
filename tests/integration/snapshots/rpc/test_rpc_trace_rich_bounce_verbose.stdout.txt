@@ -1,0 +1,60 @@
+N/A -> kQAzMz..MzMw8H A
+└── (!) IncreaseCounter 0.1 GRAM -> counter B                                   gas=123
+    increaseBy: 5
+    ├── empty 0.000000001 GRAM -> kQAzMz..MzMw8H A                              gas=123
+    └── ReturnExcessesBack 0.000000002 GRAM -> counter B                        gas=123
+        queryId: 7
+
+  Query Hash:        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  Trace ID:          aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  Time:              2023-11-14 22:13:20 UTC — 2023-11-14 22:13:22 UTC
+  Block:             10000 — 10002
+  Trace Complete:    true
+  Total Txs:         3
+  Total Messages:    3
+
+  tx[1]:
+    hash: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    lt: 100
+    account: [WALLET_ADDRESS_BASE]
+    parent_lt: null
+    child_lts: [101, 102]
+    from: [WALLET_ADDRESS_BASE]
+    to: [WALLET_ADDRESS_BASE]
+    value: 0.1 GRAM
+    opcode: 0x7e8764ef (IncreaseCounter)
+    bounced: true
+    branch: bounce
+    success: true
+    exit_code: 0
+    action_result_code: 0
+  tx[2]:
+    hash: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    lt: 101
+    account: [WALLET_ADDRESS_BASE]
+    parent_lt: 100
+    child_lts: []
+    from: [WALLET_ADDRESS_BASE]
+    to: [WALLET_ADDRESS_BASE]
+    value: 0.000000001 GRAM
+    opcode: 0x00000000 (empty)
+    bounced: false
+    branch: message
+    success: true
+    exit_code: 0
+    action_result_code: 0
+  tx[3]:
+    hash: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+    lt: 102
+    account: [WALLET_ADDRESS_BASE]
+    parent_lt: 100
+    child_lts: []
+    from: [WALLET_ADDRESS_BASE]
+    to: [WALLET_ADDRESS_BASE]
+    value: 0.000000002 GRAM
+    opcode: 0xd53276db (ReturnExcessesBack)
+    bounced: false
+    branch: message
+    success: true
+    exit_code: 0
+    action_result_code: 0

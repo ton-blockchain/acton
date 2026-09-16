@@ -123,7 +123,7 @@ pub(crate) async fn load_environments(
             .map(str::to_owned);
         let config = if stored.config["kind"] == "fullTonNetwork" {
             let id = network_id.as_deref().ok_or_else(|| {
-                invalid_metadata("Full localnet environment is missing networkId".to_owned())
+                invalid_metadata("Localnet environment is missing networkId".to_owned())
             })?;
             let location = crate::localnet::find_network(workspace_root, id).await?;
             let imports = serde_json::from_value(stored.config["importedAccounts"].clone())

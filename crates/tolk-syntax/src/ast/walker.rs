@@ -919,6 +919,7 @@ pub trait Walker<'tree> {
                 MatchArmBody::Block(ref block) => self.walk_block(block),
                 MatchArmBody::Return(ref ret) => self.walk_return(ret),
                 MatchArmBody::Throw(ref throw) => self.walk_throw(throw),
+                MatchArmBody::Statement(ref stmt) => self.visit_stmt(stmt),
                 MatchArmBody::Expr(ref expr) => self.visit_expr(expr),
             };
         }

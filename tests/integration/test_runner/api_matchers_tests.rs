@@ -77,6 +77,85 @@ get fun `test approx rel small threshold fail`() {
 }
 "#;
 
+const APPROX_REL_CUSTOM_PASS_TESTS: &str = r#"
+import "../../lib/testing/expect"
+
+get fun `test parts per million boundary`() {
+    expect(1_000_000).toBeApproxEqRel(1_000_001, 1, 1_000_000);
+    expect(1_000_000).toBeApproxEqRel(999_999, 1, 1_000_000);
+}
+
+get fun `test eighteen decimal precision`() {
+    val actual = 1_000_000_000_000_000_000;
+    expect(actual).toBeApproxEqRel(actual + 1, 1, actual);
+    expect(-actual).toBeApproxEqRel(-actual - 1, 1, actual);
+}
+
+get fun `test custom precision floors delta`() {
+    expect(1000).toBeApproxEqRel(1099, 9, 100);
+    expect(10_000_000).toBeApproxEqRel(10_000_019, 1, 1_000_000);
+    expect(10_000_000).toBeApproxEqRel(10_000_009, 0, 1_000_000);
+}
+
+get fun `test denominator below one hundred`() {
+    expect(100).toBeApproxEqRel(150, 1, 2);
+    expect(100).toBeApproxEqRel(200, 1, 1);
+}
+
+get fun `test equal values at custom precision`() {
+    expect(0).toBeApproxEqRel(0, 0, 1_000_000);
+    expect(42).toBeApproxEqRel(42, 0, 1_000_000);
+    expect(-42).toBeApproxEqRel(-42, 0, 1_000_000);
+}
+
+get fun `test wide intermediate multiplication`() {
+    val actual = 1 << 240;
+    val difference = 1 << 200;
+    expect(actual).toBeApproxEqRel(actual + difference, 1 << 60, 1 << 100);
+}
+"#;
+
+const APPROX_REL_CUSTOM_FAIL_TESTS: &str = r#"
+import "../../lib/testing/expect"
+
+get fun `test parts per million above boundary`() {
+    expect(1_000_000).toBeApproxEqRel(1_000_002, 1, 1_000_000);
+}
+
+get fun `test eighteen decimal precision above boundary`() {
+    val actual = 1_000_000_000_000_000_000;
+    expect(actual).toBeApproxEqRel(actual + 2, 1, actual);
+}
+
+get fun `test negative actual above boundary`() {
+    expect(-1_000_000).toBeApproxEqRel(-1_000_002, 1, 1_000_000);
+}
+
+get fun `test zero actual with custom precision`() {
+    expect(0).toBeApproxEqRel(1, 1, 1_000_000);
+}
+
+get fun `test zero delta with custom precision`() {
+    expect(1_000_000).toBeApproxEqRel(1_000_001, 0, 1_000_000);
+}
+
+get fun `test denominator below one hundred above boundary`() {
+    expect(100).toBeApproxEqRel(200, 1, 2);
+}
+"#;
+
+const APPROX_REL_INVALID_DENOMINATOR_TESTS: &str = r#"
+import "../../lib/testing/expect"
+
+get fun `test zero denominator even for equal zeros`() {
+    expect(0).toBeApproxEqRel(0, 0, 0);
+}
+
+get fun `test negative denominator even for equal values`() {
+    expect(100).toBeApproxEqRel(100, 10, -100);
+}
+"#;
+
 #[test]
 fn comparison_matchers_pass() {
     ProjectBuilder::new("lib-api-comparison-pass")
@@ -134,5 +213,50 @@ fn approx_matchers_fail() {
         .assert_failed(3)
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/api_matchers/approx_matchers_fail.stdout.txt",
+        );
+}
+
+#[test]
+fn approx_relative_custom_denominators_pass() {
+    ProjectBuilder::new("lib-api-approx-rel-custom-pass")
+        .test_file("approx", APPROX_REL_CUSTOM_PASS_TESTS)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(6)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_matchers/approx_relative_custom_denominators_pass.stdout.txt",
+        );
+}
+
+#[test]
+fn approx_relative_custom_denominators_fail() {
+    ProjectBuilder::new("lib-api-approx-rel-custom-fail")
+        .test_file("approx", APPROX_REL_CUSTOM_FAIL_TESTS)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(6)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_matchers/approx_relative_custom_denominators_fail.stdout.txt",
+        );
+}
+
+#[test]
+fn approx_relative_rejects_invalid_denominators() {
+    ProjectBuilder::new("lib-api-approx-rel-invalid-denominator")
+        .test_file("approx", APPROX_REL_INVALID_DENOMINATOR_TESTS)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(2)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_matchers/approx_relative_rejects_invalid_denominators.stdout.txt",
         );
 }

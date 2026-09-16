@@ -11,8 +11,9 @@
   ✗ foo [TIME]
     └─ exit_code=679
       ├─ at ../lib/emulation/network[LINE]
-      │     net.runGetMethod<int>   at ../lib/emulation/network[LINE]
-      │     test foo                at tests/test.test[LINE]
+      │     net.runGetMethodExt<int>   at ../lib/emulation/network[LINE]
+      │     net.runGetMethod<int>      at ../lib/emulation/network[LINE]
+      │     test foo                   at tests/test.test[LINE]
       ├─ custom THROW
       └─ Cannot run method of contract without code
 

@@ -148,7 +148,7 @@ async fn studio_reports_docker_recovery_and_restarts_the_same_environment_after_
         ..
     } = created.config
     else {
-        panic!("full localnet")
+        panic!("localnet")
     };
     let v2 = api_listener(api_v2_port).await;
     let v3 = api_listener(api_v3_port).await;

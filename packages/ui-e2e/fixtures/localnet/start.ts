@@ -9,7 +9,7 @@ const executable = process.env.ACTON_E2E_BIN ?? path.resolve("target/debug/acton
 const directory = await mkdtemp("/tmp/acton-ui-snapshots-")
 const node = spawn(
   executable,
-  ["simulated-localnet", "start", "--port", port, "--no-mining", "--snapshots-dir", directory],
+  ["simulator", "start", "--port", port, "--no-mining", "--snapshots-dir", directory],
   {stdio: "inherit"},
 )
 const exited = new Promise<number>((resolve, reject) => {

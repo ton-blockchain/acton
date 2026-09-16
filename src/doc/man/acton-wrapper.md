@@ -18,12 +18,15 @@ Generate a wrapper for the contract identified by `_contract-name_` from
 Use `--all` to generate wrappers for every contract defined in `Acton.toml`
 without picking a single one.
 
-The wrapper type and default file name use the contract's `display-name` from
-`Acton.toml`. If it is absent or empty, they use the contract ID instead.
-Acton converts this name to PascalCase, treating spaces, underscores, and hyphens
-as word separators. The source file name does not affect the wrapper name.
-For example, `display-name = "First Wallet"` produces `FirstWallet.gen.tolk`
-with a `FirstWallet` structure, or `FirstWallet.gen.ts` with a `FirstWallet` class.
+Available since Acton 1.2.
+
+The wrapper type and default file name use the contract ID from `Acton.toml`.
+Acton converts the ID to PascalCase, treating spaces, underscores, and hyphens
+as word separators. Neither `display-name` nor the source file name affects
+the generated names.
+For example, `[contracts.first_wallet]` with `display-name = "Friendly Wallet"`
+produces `FirstWallet.gen.tolk` with a `FirstWallet` structure, or
+`FirstWallet.gen.ts` with a `FirstWallet` class.
 The resulting name must start with an ASCII letter and contain only ASCII letters
 and digits. Acton reports an error if the name is invalid.
 
@@ -128,9 +131,11 @@ Wrapper generation depends on the contract ABI exposed by the Tolk compiler.
 
 - `storage: ...` enables typed storage helpers such as `fromStorage`
 - `incomingMessages: ...` enables `send{Message}` helpers
+- `incomingExternal: ...` enables `sendExternal{Message}` and `sendAnyExternal` helpers
 - declared get methods are emitted as wrapper methods
 
-If `incomingMessages` is missing, message-sending helpers are not generated. If
+If `incomingMessages` is missing, only the generic `sendAny` internal-message
+helper is generated. If
 `storage` is missing, storage helpers fall back to an untyped initializer.
 
 ## TypeScript Generation
@@ -156,6 +161,8 @@ test-output-dir = "tests"
 output-dir = "wrappers-ts"
 ```
 
+Available since Acton 1.2.
+
 Each contract can override the same settings without changing the defaults for
 other contracts:
 
@@ -174,6 +181,8 @@ wrapper command defaults. An omitted per-contract field inherits the
 project-wide value. An explicit per-contract `generate-test = false` overrides
 a project-wide `true`. With `--all`, Acton resolves these settings separately
 for every contract.
+
+Available since Acton 1.1.
 
 For a precompiled `.boc` contract, configure `types` next to `src` so wrapper
 generation can read ABI from the Tolk interface file:

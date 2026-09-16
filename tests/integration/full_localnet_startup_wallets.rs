@@ -212,7 +212,7 @@ async fn full_localnet_startup_wallets_persist_and_reject_collisions() -> Result
             "Invalid genesis ShardAccount: invalid BOC",
             "Startup wallet 'wallet_v4' duplicates address 0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
             "Wallets are not found in Acton.toml: missing",
-            "Startup wallet 'alias' must be in workchain 0 for Full localnet"
+            "Startup wallet 'alias' must be in workchain 0 for Localnet"
           ],
           "imports": 0,
           "names": [
@@ -234,7 +234,7 @@ async fn full_localnet_startup_wallets_persist_and_reject_collisions() -> Result
 #[tokio::test]
 async fn full_localnet_cli_startup_wallets_use_project_defaults_and_explicit_selection()
 -> Result<()> {
-    let project = ProjectBuilder::new("full-localnet-wallets").build();
+    let project = ProjectBuilder::new("localnet-wallets").build();
     std::fs::write(
         project.path().join("wallets.toml"),
         TON_CONNECT_WALLETS_CONFIG,
@@ -245,9 +245,9 @@ async fn full_localnet_cli_startup_wallets_use_project_defaults_and_explicit_sel
     std::fs::write(path, config)?;
 
     for args in [
-        vec!["full-localnet", "create", "default"],
+        vec!["localnet", "create", "default"],
         vec![
-            "full-localnet",
+            "localnet",
             "create",
             "explicit",
             "--accounts",
@@ -267,19 +267,13 @@ async fn full_localnet_cli_startup_wallets_use_project_defaults_and_explicit_sel
     project
         .acton()
         .current_dir(project.path())
-        .args(["full-localnet", "list", "--json"])
+        .args(["localnet", "list", "--json"])
         .run()
         .success();
     project
         .acton()
         .current_dir(project.path())
-        .args([
-            "full-localnet",
-            "start",
-            "default",
-            "--accounts",
-            "wallet_v1",
-        ])
+        .args(["localnet", "start", "default", "--accounts", "wallet_v1"])
         .run()
         .failure()
         .assert_stderr_contains("Genesis options apply only to new networks");

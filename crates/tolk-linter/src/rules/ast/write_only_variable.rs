@@ -36,7 +36,7 @@ use tolk_resolver::resolve_index::LocalDefKind;
 /// - This rule only reports variables with writes and no reads.
 ///   Operations that imply reads (for example `+=`) do not match this rule.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct WriteOnlyVariable;
 
 impl Violation for WriteOnlyVariable {

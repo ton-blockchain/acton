@@ -69,26 +69,25 @@ fn check_with_width_and_options(
 }
 
 fn check_code(code: &str, expect: Expect, width: usize, check_trees: bool, options: FormatOptions) {
-    // unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
-    let res = format_source(code, FormatOptions { width, ..options }).unwrap();
+    let options = FormatOptions { width, ..options };
+    let res = format_source(code, options).unwrap();
 
-    equal_format_code(expect, &res);
+    equal_format_code(&expect, &res);
     equal_trees(code, &res, check_trees);
+
+    let repeated = format_source(&res, options).expect("formatted source must remain valid Tolk");
+    assert_eq!(res, repeated, "formatting must be stable after one pass");
 }
 
-fn equal_format_code(expect: Expect, code: &str) {
-    let res = code
-        .lines()
-        .map(|l| if l.trim().is_empty() { "" } else { l })
-        .collect::<Vec<_>>()
-        .join("\n");
+fn equal_format_code(expect: &Expect, code: &str) {
+    let res = code.lines().collect::<Vec<_>>().join("\n");
 
     expect.assert_eq(&res);
 }
 
 fn equal_trees(old_code: &str, new_code: &str, check_trees: bool) {
-    let old_tree = parse_tolk_code(old_code).unwrap_or_else(|_| "<error>".to_owned());
-    let new_tree = parse_tolk_code(new_code).unwrap_or_else(|_| "<error>".to_owned());
+    let old_tree = parse_tolk_code(old_code).expect("test input must be valid Tolk");
+    let new_tree = parse_tolk_code(new_code).expect("formatted source must be valid Tolk");
 
     if check_trees {
         assert_eq!(old_tree, new_tree);
@@ -97,7 +96,7 @@ fn equal_trees(old_code: &str, new_code: &str, check_trees: bool) {
     }
 }
 
-fn parse_tolk_code(source: &str) -> anyhow::Result<String> {
+fn parse_tolk_code(source: &str) -> anyhow::Result<(String, Vec<String>)> {
     let source_file = tolk_syntax::parse(source)?;
     let root_node = source_file.root_node();
     if root_node.has_error() {
@@ -105,5 +104,21 @@ fn parse_tolk_code(source: &str) -> anyhow::Result<String> {
     }
 
     let root_sexp = root_node.to_sexp().replace(" (empty_statement)", "");
-    Ok(root_sexp)
+    // CST shapes omit literal values. Compare their text too so formatting cannot
+    // change a string or number while keeping the same syntax-tree shape.
+    let mut literals = vec![];
+    let mut nodes = vec![root_node];
+    while let Some(node) = nodes.pop() {
+        if matches!(
+            node.kind(),
+            "string_literal" | "number_literal" | "boolean_literal" | "null_literal"
+        ) {
+            literals.push(source[node.byte_range()].to_owned());
+        } else {
+            nodes.extend(node.children(&mut node.walk()));
+        }
+    }
+    // Import sorting changes the order of path literals, but must preserve their contents.
+    literals.sort();
+    Ok((root_sexp, literals))
 }

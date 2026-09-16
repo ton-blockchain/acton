@@ -46,8 +46,14 @@ acton build [OPTIONS] [CONTRACT]
 | `--out-dir <DIR>`     | Directory to save build artifacts. Defaults to `build/`                                                                                                      |
 | `--gen-dir <DIR>`     | Directory to save generated dependency files (`<dependency>.code.tolk`). Defaults to `gen/`                                                                  |
 | `--output-abi <DIR>`  | Directory to save contract ABI JSON files (`<contract>.json`). Defaults to `build/abi/`                                                                      |
+| `--output-boc <DIR>` | Export `<contract-name>.boc` for compiled and precompiled contracts |
+| `--output-sources <DIR>` | Export `<contract>.source.json` with source, ABI, compiler, and debug metadata for `.tolk` contracts |
 | `--output-fift <DIR>` | Directory to save compiled Fift files (`<contract>.fif`) for `.tolk` sources. Precompiled `.boc` entries are skipped. If omitted, no Fift files are written. |
 | `--info`              | Print compiled contract code and code hash after a successful build.                                                                                         |
+
+<AvailabilityBadge since="Acton 1.2" />
+
+`--output-boc` and `--output-sources` are available from Acton 1.2.
 
 ### Examples
 
@@ -91,7 +97,9 @@ Use `[build]` to configure default outputs for `acton build`:
 out-dir = "build"
 gen-dir = "gen"
 output-abi = "build/abi"
+output-boc = "build/boc"
 output-fift = "build/fift"
+output-sources = "build/sources"
 ```
 
 `out-dir` controls where JSON artifacts are written (`<out-dir>/<contract>.json`).
@@ -99,6 +107,10 @@ output-fift = "build/fift"
 `output-abi` controls where compiler ABI JSON files are written (`<output-abi>/<contract>.json`).
 When `output-fift` is set, Acton writes one file per compiled `.tolk` contract: `<output-fift>/<contract-name>.fif`.
 Contracts with `src = "*.boc"` are not recompiled, so no `.fif` file is produced for them.
+
+`output-boc` also exports precompiled contracts and preserves each contract's `output` path.
+`output-sources` exports source bundles for Explorer import; precompiled contracts do not produce source bundles.
+Both settings are available from Acton 1.2.
 
 CLI flags have priority over config values. Example:
 
@@ -140,6 +152,8 @@ Override rules:
 - TypeScript wrapper path: `--output` -> `--output-dir` -> `[contracts.<name>.wrappers.typescript].output-dir` -> `[wrappers.typescript].output-dir` -> wrapper command built-in default.
 - Test stub path: `--test-output` -> `--test-output-dir` -> `[contracts.<name>.wrappers.tolk].test-output-dir` -> `[wrappers.tolk].test-output-dir` -> wrapper command built-in default.
 - `[contracts.<name>.wrappers.tolk].generate-test` overrides `[wrappers.tolk].generate-test`. Both only affect non-TypeScript runs. `acton wrapper --ts` still rejects test-stub options.
+
+<AvailabilityBadge since="Acton 1.2" />
 
 The same fields are available below each contract's `wrappers` table. Missing
 per-contract fields inherit their project-level values. `acton wrapper --all`
@@ -183,7 +197,9 @@ The `[contracts.ID]` in `Acton.toml` is used:
 - To generate the function name (e.g., `Counter` → `counterCompiledCode()`)
 - In console messages and web UI, unless overridden by optional `display-name` in `Acton.toml`
 
-Generated wrapper filenames are based on the source file stem normalized to PascalCase. With the conventional `src = "contracts/Counter.tolk"`, that produces `wrappers/Counter.gen.tolk` and `wrappers-ts/Counter.gen.ts`.
+<AvailabilityBadge since="Acton 1.2" />
+
+Generated wrapper filenames and type names use the contract ID converted to PascalCase. For `[contracts.my_counter]`, that produces `wrappers/MyCounter.gen.tolk` and `wrappers-ts/MyCounter.gen.ts` with the type `MyCounter`, regardless of `src` or `display-name`.
 
 Contract IDs should use PascalCase, e.g., `JettonWallet`, `NftCollection`.
 
@@ -322,10 +338,16 @@ When using `.boc` files:
 - `--output-fift` only applies to compiled `.tolk` contracts. BoC contracts are
   already compiled, so Acton does not produce Fift for them.
 
+<AvailabilityBadge since="Acton 1.1" />
+
+The `types` interface and its ABI and wrapper support are available from Acton 1.1.
+
 This is useful for referencing third-party contracts.
 
 For the user-facing workflow, including interface files and wrapper generation,
 see [Precompiled BoC contracts](/docs/building/precompiled-boc).
+
+<AvailabilityBadge since="Acton 1.1" />
 
 This build mode is separate from TON network precompiled contracts configured
 through Param 45. During local emulation and tests, Acton honors Param 45

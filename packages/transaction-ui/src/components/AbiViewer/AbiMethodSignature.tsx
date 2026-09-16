@@ -3,6 +3,7 @@ import type {ABIGetMethod, SymTable} from "@ton/tolk-abi-to-typescript"
 
 import {
   formatAbiTyDeclaration,
+  formatAbiDefault,
   formatGetMethodSignature,
   formatTolkIdentifier,
   formatType,
@@ -24,11 +25,16 @@ export function AbiMethodSignature({
       <span className={styles.signatureName}>{formatTolkIdentifier(method.name)}</span>
       <span className={styles.signaturePunctuation}>(</span>
       {method.parameters.map((parameter, index) => (
-        <span key={`${parameter.name}:${index}`}>
+        <span key={`${parameter.name}:${index}`} title={parameter.description}>
           {index > 0 && <span className={styles.signaturePunctuation}>, </span>}
           <span className={styles.signatureParameter}>{formatTolkIdentifier(parameter.name)}</span>
           <span className={styles.signaturePunctuation}>: </span>
           <AbiTypeToken symbols={symbols} tyIdx={parameter.ty_idx} />
+          {parameter.default_value !== undefined && (
+            <span className={styles.signaturePunctuation}>
+              {formatAbiDefault(parameter.default_value, symbols, parameter.ty_idx)}
+            </span>
+          )}
         </span>
       ))}
       <span className={styles.signaturePunctuation}>): </span>

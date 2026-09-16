@@ -1,5 +1,8 @@
 //! Durable asynchronous operations shared by HTTP and command-line clients.
 
+#[cfg(test)]
+mod tests;
+
 use super::{Entry, Runtime};
 use crate::{Error, Operation, OperationStatus, OperationStep, Status, storage};
 use serde_json::Value;
@@ -79,9 +82,30 @@ impl Runtime {
         }
 
         let entry = self.entry().await?;
-        let guard = Arc::clone(&entry.mutation)
-            .try_lock_owned()
-            .map_err(|_| Error::busy())?;
+        let guard = match Arc::clone(&entry.mutation).try_lock_owned() {
+            Ok(guard) => guard,
+            Err(_) => {
+                if entry
+                    .record
+                    .read()
+                    .await
+                    .operation
+                    .as_ref()
+                    .is_some_and(|operation| operation.status == OperationStatus::Running)
+                    || entry
+                        .admin_operation
+                        .read()
+                        .await
+                        .as_ref()
+                        .is_some_and(crate::AdminOperation::is_active)
+                {
+                    return Err(Error::busy());
+                }
+                // Completed operations may still be saving history; idle reconciliation
+                // also takes this lock. Admission keeps another mutation from overtaking us.
+                Arc::clone(&entry.mutation).lock_owned().await
+            }
+        };
         if let Action::ConfigureOverlays(config) = &action {
             let network = entry.record.read().await;
             super::overlays::validate_update(&network, config)?;
@@ -227,16 +251,8 @@ impl Context {
             }
         }
 
-        storage::write_json(
-            &self
-                .runtime
-                .inner
-                .root
-                .join("operations")
-                .join(format!("{}.json", self.operation.id)),
-            &self.operation,
-        )
-        .await?;
+        // A client may retry as soon as it reads terminal operation progress.
+        // Its admission check must already see the completed network operation.
         {
             let mut record = self.entry.record.write().await;
             record.operation = Some(self.operation.clone());
@@ -248,6 +264,16 @@ impl Context {
             }
         }
         Runtime::save(&self.entry).await?;
+        storage::write_json(
+            &self
+                .runtime
+                .inner
+                .root
+                .join("operations")
+                .join(format!("{}.json", self.operation.id)),
+            &self.operation,
+        )
+        .await?;
         log::info!(
             "operation={} target={} phase={} duration_ms={} outcome={:?} progress={:?}",
             self.operation.kind,

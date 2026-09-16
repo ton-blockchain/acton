@@ -2098,6 +2098,104 @@ get fun `test formatter println bounced and compute skipped`() {
 }
 
 #[test]
+fn formatter_println_renders_rich_bounced_payloads() {
+    let output = bounce_formatter_project(
+        "formatter-println-rich-bounced-payloads",
+        r#"
+get fun `test formatter println rich bounced payloads`() {
+    val (sender, echoAddress) = deployFmBounceHarness();
+    val originalInfo = beginCell().storeCoins(0).storeBool(false).storeUint(0, 96).endCell();
+    var originalBodies: array<cell> = [
+        FmBouncePing { queryId: 501 }.toCell(),
+        // The string reference must be read from the original payload, not the envelope.
+        beginCell().storeUint(0, 32).storeString("rich bounce comment").endCell(),
+        // Unknown opcodes must also come from the original body.
+        beginCell().storeUint(0x12345678, 32).endCell(),
+    ];
+    repeat (originalBodies.size()) {
+        val originalBody = originalBodies.pop();
+        val rich = beginCell()
+            .storeUint(0xFFFFFFFE, 32)
+            .storeRef(originalBody)
+            .storeRef(originalInfo)
+            .storeUint(0, 8)
+            .storeInt(-14, 32)
+            .storeBool(true)
+            .storeUint(123, 32)
+            .storeUint(456, 32)
+            .endCell();
+        val bounced = net.send(sender.address, createMessage({
+            bounce: false,
+            value: grams("0.2"),
+            dest: echoAddress,
+            body: rich,
+        }).bounced());
+        println(bounced);
+    }
+}
+"#,
+    )
+    .build()
+    .acton()
+    .test()
+    .show_bodies()
+    .arg("--snapshot")
+    .arg("rich-profile.json")
+    .run()
+    .success();
+    output.assert_passed(1);
+
+    // Equal-gas rows inherit HashMap iteration order; keep every value but normalize order.
+    let stdout = output.get_normalized_stdout();
+    let mut lines = stdout.lines().collect::<Vec<_>>();
+    let start = lines
+        .iter()
+        .position(|line| line.starts_with(" Opcode "))
+        .unwrap()
+        + 2;
+    let end = start
+        + lines[start..]
+            .iter()
+            .position(|line| line.is_empty())
+            .unwrap();
+    lines[start..end].sort_unstable();
+    crate::common::assertion().eq(
+        format!("{}\n", lines.join("\n")),
+        snapbox::file!("../snapshots/formatter/formatter_println_rich_bounced_payloads.stdout.txt"),
+    );
+}
+
+#[test]
+fn formatter_println_handles_malformed_rich_bounces() {
+    run_success_case(
+        bounce_formatter_project(
+            "formatter-println-malformed-rich-bounces",
+            r#"
+get fun `test formatter println malformed rich bounces`() {
+    val (sender, echoAddress) = deployFmBounceHarness();
+    var bodies = [
+        // Inline diagnostics are not the opcode when original_body is missing.
+        beginCell().storeUint(0xFFFFFFFE, 32).storeUint(0xF4000001, 32).endCell(),
+        beginCell().storeUint(0xFFFFFFFE, 32).storeRef(createEmptyCell()).endCell(),
+        beginCell().storeUint(0xFFFFFFFE, 32).storeRef(beginCell().storeUint(7, 3).endCell()).endCell(),
+    ];
+    repeat (bodies.size()) {
+        val bounced = net.send(sender.address, createMessage({
+            bounce: false,
+            value: grams("0.2"),
+            dest: echoAddress,
+            body: bodies.pop(),
+        }).bounced());
+        println(bounced);
+    }
+}
+"#,
+        ),
+        "integration/snapshots/formatter/formatter_println_malformed_rich_bounces.stdout.txt",
+    );
+}
+
+#[test]
 fn formatter_multi_root_println_renders_independent_internal_chains() {
     run_success_case(
         linear_formatter_project(

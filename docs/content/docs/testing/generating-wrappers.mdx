@@ -17,6 +17,12 @@ acton wrapper Counter
 
 This will generate a Tolk wrapper file, e.g., `wrappers/Counter.gen.tolk`.
 
+<AvailabilityBadge since="Acton 1.2" />
+
+Wrapper type names and default filenames use the PascalCase contract ID from
+`Acton.toml`, independent of the source filename and `display-name`.
+Regenerate wrappers after upgrading and update imports if those names differ.
+
 ## Bootstrap tests with `--test`
 
 New contract tests repeat the same boilerplate: imports, deploy, and basic checks. Pass `--test` to emit a runnable test stub file in addition to the wrapper:
@@ -166,6 +172,12 @@ get fun `test example`() {
 }
 ```
 
+<AvailabilityBadge since="Acton 1.2" />
+
+`fromStorage()` accepts an optional workchain after `toShard`. For example,
+`Counter.fromStorage({ counter: 0 }, null, MASTERCHAIN)` creates a masterchain
+address. The default is `BASECHAIN`, and `deploy()` preserves the selected workchain.
+
 ### Send messages
 
 For every message type listed in `contract { incomingMessages: ... }`, the wrapper generates a corresponding `send{MessageName}` method.
@@ -241,6 +253,8 @@ With this configuration:
 - `acton wrapper Counter` writes `tests/counter-wrappers/Counter.gen.tolk` without a test stub because the contract overrides those two Tolk fields
 - `acton wrapper Counter --ts` writes `app/src/wrappers/counter/Counter.gen.ts`
 - contracts without nested wrapper settings continue to use `tests/generated-wrappers`, `tests/generated-tests`, and `wrappers-ts`
+
+<AvailabilityBadge since="Acton 1.2" />
 
 Per-contract settings use the same fields as the project defaults and inherit
 any fields they omit. CLI path and test flags override both levels.

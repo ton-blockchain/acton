@@ -110,6 +110,14 @@ Examples:
 fail-fast = true
 ```
 
+### Studio reporting
+
+<AvailabilityBadge since="Acton 1.2" />
+
+Test runs report to [Studio](/docs/studio/tests) when it is running for the same
+project. Set `[test].studio-reporting = false` or pass `--no-studio-reporting`
+to disable reporting. Reporting failures do not change test results.
+
 ### Reporter options
 
 | Configuration | CLI Flag      | Type  | Description                          |
@@ -156,6 +164,11 @@ reporter = ["console", "teamcity"]
 | `debug-port`  | `--debug-port`    | Integer | Debug server port                             |
 | `backtrace`   | `--backtrace`     | String  | Enable stack traces ("full")                  |
 | `-`           | `--verbose`       | Count   | Enable level-1 executor debug logs (CLI only) |
+
+<AvailabilityBadge since="Acton 1.2" />
+
+`--no-capture` streams `println` and `eprintln` output while retaining it for
+reporters. It does not stream executor logs and cannot be combined with `--mutate`.
 
 `--verbose` is currently binary in practice: default level `0`, and level `1` when `--verbose` is passed once. Higher user-selected levels are not supported yet.
 
@@ -229,6 +242,11 @@ seed = 42
 
 `fail-on-diff` is applied when running baseline comparison mode with
 `--baseline-snapshot <FILE>`.
+
+<AvailabilityBadge since="Acton 1.2" />
+
+`gas-profile`, `gas-profile-format`, and `gas-profile-include-tests` are available from Acton 1.2.
+
 Gas profile options apply when `gas-profile` or `--gas-profile <FILE>` is set.
 Combine `--gas-profile <FILE>` with `--ui` to browse the profile as a
 flamegraph in Test UI. Add `--gas-profile-include-tests` when the expensive
@@ -312,6 +330,11 @@ ui-port = 23456
 |:--------------------|:----------------------|:----------|:-------------------------------------------------------------------------------------------------------------------------|
 | `fork-net`          | `--fork-net`          | `string`  | Network name to fork state from (`mainnet`, `testnet`, or `custom:<name>` for a custom network defined in `[networks]`). |
 | `fork-block-number` | `--fork-block-number` | `integer` | Specific block number to fork from.                                                                                      |
+
+<AvailabilityBadge since="Acton 1.2" />
+
+`--no-fork-cache` disables persistent account and library cache reads and writes.
+It does not disable the masterchain snapshot cache. See [fork caching](/docs/testing/fork-testing#cache-scope-and-refresh-behavior).
 
 The fork uses state and network configuration from the same masterchain block.
 When `fork-block-number` is set, it also uses that block's Unix time; otherwise,

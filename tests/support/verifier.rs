@@ -70,6 +70,11 @@ pub(crate) fn spawn_verifier_mock(
                 }
             };
 
+            // macOS inherits the listener's non-blocking mode on accepted
+            // sockets. HTTP headers and multipart bodies can arrive separately.
+            stream
+                .set_nonblocking(false)
+                .expect("failed to set verifier mock stream blocking");
             stream
                 .set_read_timeout(Some(Duration::from_secs(2)))
                 .expect("failed to set verifier mock read timeout");

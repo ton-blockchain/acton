@@ -1,0 +1,41 @@
+warning[S009]: prefer `grams()` over `ton()`
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |     val before = ton("0.1");
+  |                  ^^^ use the standard-library function `grams`
+
+help: replace `ton` with `grams`
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |     val before = ton("0.1");
+  |                  ^^^ grams
+
+warning[S009]: prefer `grams()` over `ton()`
+  --> [ROOT]/contracts/main[LINE]
+  |
+6 |         val shadowed = ton("0.2");
+  |                        ^^^ use the standard-library function `grams`
+
+warning[S009]: prefer `grams()` over `ton()`
+  --> [ROOT]/contracts/main[LINE]
+  |
+8 |     val after = ton("0.3");
+  |                 ^^^ use the standard-library function `grams`
+
+help: replace `ton` with `grams`
+  --> [ROOT]/contracts/main[LINE]
+  |
+8 |     val after = ton("0.3");
+  |                 ^^^ grams
+
+warning[S009]: prefer `grams()` over `ton()`
+   --> [ROOT]/contracts/main[LINE]
+   |
+10 |     return ton("0.4");
+   |            ^^^ use the standard-library function `grams`
+
+
+2 issues can be fixed automatically, rerun with --fix flag.
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain S009

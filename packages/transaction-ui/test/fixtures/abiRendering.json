@@ -1,0 +1,1520 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "AbiRendering",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GenericMessage",
+      "type_args_ty_idx": [
+        9
+      ]
+    },
+    {
+      "kind": "genericT",
+      "name_t": "T"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GenericMessage",
+      "type_args_ty_idx": [
+        13
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GenericMessage",
+      "type_args_ty_idx": [
+        7
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Message",
+      "type_args_ty_idx": [
+        7
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Message",
+      "type_args_ty_idx": [
+        13
+      ]
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Wrapped",
+      "type_args_ty_idx": [
+        7
+      ]
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Wrapped",
+      "type_args_ty_idx": [
+        13
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Message",
+      "type_args_ty_idx": [
+        5
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WidePrefix"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage",
+      "type_args_ty_idx": [
+        9
+      ]
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 23
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 24
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "Status"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage",
+      "type_args_ty_idx": [
+        13
+      ]
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 27
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 28
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage",
+      "type_args_ty_idx": [
+        7
+      ]
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 30
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 31
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Empty",
+      "type_args_ty_idx": [
+        5
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Empty",
+      "type_args_ty_idx": [
+        13
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Defaults"
+    },
+    {
+      "kind": "string"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        5
+      ]
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        1,
+        5
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Meta"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Message",
+      "type_args_ty_idx": [
+        9
+      ]
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Wrapped",
+      "type_args_ty_idx": [
+        9
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        40,
+        39
+      ]
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        40
+      ]
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 40
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 1
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "CustomInt"
+    },
+    {
+      "kind": "nullLiteral"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClientMessage"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "WirePayload"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 40
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "odd-alias",
+      "type_args_ty_idx": [
+        9
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "odd-name"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        9,
+        53
+      ]
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "odd-alias",
+      "type_args_ty_idx": [
+        13
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        13,
+        53
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "type"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Pair",
+      "type_args_ty_idx": [
+        9,
+        18
+      ]
+    },
+    {
+      "kind": "genericT",
+      "name_t": "L"
+    },
+    {
+      "kind": "genericT",
+      "name_t": "R"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Pair",
+      "type_args_ty_idx": [
+        60,
+        61
+      ]
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Either",
+      "type_args_ty_idx": [
+        9,
+        7
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 9,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 47,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 7,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 8,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Either",
+      "type_args_ty_idx": [
+        60,
+        61
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 60,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": null,
+          "stack_width": null
+        },
+        {
+          "variant_ty_idx": 61,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": null,
+          "stack_width": null
+        }
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 40,
+          "prefix_num": 1,
+          "prefix_len": 3,
+          "is_prefix_implicit": null,
+          "stack_type_id": 133,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 21,
+          "prefix_num": 20015998343868,
+          "prefix_len": 48,
+          "is_prefix_implicit": null,
+          "stack_type_id": 132,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 23,
+      "stack_type_id": 134,
+      "stack_width": 6
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 22,
+          "prefix_num": 2,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 43,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 7,
+          "prefix_num": 3,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 8,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 47,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 0,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 53
+    },
+    {
+      "kind": "lispListOf",
+      "inner_ty_idx": 54
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 9,
+      "value_ty_idx": 31
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        7,
+        5
+      ]
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        1,
+        73
+      ]
+    },
+    {
+      "kind": "addressAny"
+    },
+    {
+      "kind": "bitsN",
+      "n": 13
+    },
+    {
+      "kind": "varintN",
+      "n": 16
+    },
+    {
+      "kind": "varuintN",
+      "n": 32
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        69,
+        51,
+        70,
+        71,
+        72,
+        74,
+        50,
+        75,
+        76,
+        77,
+        78
+      ]
+    }
+  ],
+  "struct_instantiations": [
+    {
+      "ty_idx": 12,
+      "struct_name": "GenericMessage<uint32>",
+      "monomorphic_fields_ty_idx": [
+        9
+      ]
+    },
+    {
+      "ty_idx": 15,
+      "struct_name": "GenericMessage<address>",
+      "monomorphic_fields_ty_idx": [
+        7
+      ]
+    },
+    {
+      "ty_idx": 16,
+      "struct_name": "Message<address>",
+      "monomorphic_fields_ty_idx": [
+        7
+      ]
+    },
+    {
+      "ty_idx": 20,
+      "struct_name": "Message<bool>",
+      "monomorphic_fields_ty_idx": [
+        5
+      ]
+    },
+    {
+      "ty_idx": 23,
+      "struct_name": "Storage<uint32>",
+      "monomorphic_fields_ty_idx": [
+        9,
+        25,
+        26,
+        5,
+        11
+      ]
+    },
+    {
+      "ty_idx": 30,
+      "struct_name": "Storage<address>",
+      "monomorphic_fields_ty_idx": [
+        7,
+        32,
+        26,
+        5,
+        11
+      ]
+    },
+    {
+      "ty_idx": 33,
+      "struct_name": "Empty<bool>",
+      "monomorphic_fields_ty_idx": []
+    },
+    {
+      "ty_idx": 40,
+      "struct_name": "Message<uint32>",
+      "monomorphic_fields_ty_idx": [
+        9
+      ]
+    },
+    {
+      "ty_idx": 59,
+      "struct_name": "Pair<uint32, Wrapped<address>>",
+      "monomorphic_fields_ty_idx": [
+        9,
+        18
+      ]
+    }
+  ],
+  "alias_instantiations": [
+    {
+      "ty_idx": 18,
+      "alias_name": "Wrapped<address>",
+      "monomorphic_target_ty_idx": 16
+    },
+    {
+      "ty_idx": 41,
+      "alias_name": "Wrapped<uint32>",
+      "monomorphic_target_ty_idx": 40
+    },
+    {
+      "ty_idx": 52,
+      "alias_name": "odd-alias<uint32>",
+      "monomorphic_target_ty_idx": 55
+    },
+    {
+      "ty_idx": 63,
+      "alias_name": "Either<uint32, address>",
+      "monomorphic_target_ty_idx": 64
+    }
+  ],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "Storage",
+      "ty_idx": 27,
+      "type_params": [
+        "T"
+      ],
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 13
+        },
+        {
+          "name": "history",
+          "ty_idx": 29
+        },
+        {
+          "name": "status",
+          "ty_idx": 26
+        },
+        {
+          "name": "enabled",
+          "ty_idx": 5
+        },
+        {
+          "name": "counter",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Message",
+      "ty_idx": 17,
+      "type_params": [
+        "T"
+      ],
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 3
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 13,
+          "description": "The message payload"
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Empty",
+      "ty_idx": 34,
+      "type_params": [
+        "T"
+      ],
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "GenericMessage",
+      "ty_idx": 14,
+      "type_params": [
+        "T"
+      ],
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Pair",
+      "ty_idx": 62,
+      "type_params": [
+        "L",
+        "R"
+      ],
+      "fields": [
+        {
+          "name": "left",
+          "ty_idx": 60
+        },
+        {
+          "name": "right",
+          "ty_idx": 61
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "Either",
+      "ty_idx": 65,
+      "target_ty_idx": 66,
+      "type_params": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WidePrefix",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 20015998343868,
+        "prefix_len": 48
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "Wrapped",
+      "ty_idx": 19,
+      "target_ty_idx": 17,
+      "type_params": [
+        "T"
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "Status",
+      "ty_idx": 26,
+      "encoded_as_ty_idx": 22,
+      "members": [
+        {
+          "name": "Ready",
+          "value": "0",
+          "description": "Ready to receive messages"
+        },
+        {
+          "name": "Busy",
+          "value": "7"
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Meta",
+      "ty_idx": 39,
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "odd-name",
+      "ty_idx": 53,
+      "fields": [
+        {
+          "name": "field-name",
+          "ty_idx": 54
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "type",
+      "ty_idx": 58,
+      "fields": [
+        {
+          "name": "fun",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "odd-alias",
+      "ty_idx": 56,
+      "target_ty_idx": 57,
+      "type_params": [
+        "T"
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "WirePayload",
+      "ty_idx": 49,
+      "target_ty_idx": 50
+    },
+    {
+      "kind": "struct",
+      "name": "ClientMessage",
+      "ty_idx": 48,
+      "fields": [
+        {
+          "name": "payload",
+          "ty_idx": 49,
+          "client_ty_idx": 51
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "CustomInt",
+      "ty_idx": 46,
+      "target_ty_idx": 8,
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    },
+    {
+      "kind": "struct",
+      "name": "Defaults",
+      "ty_idx": 35,
+      "fields": [
+        {
+          "name": "count",
+          "ty_idx": 1,
+          "default_value": {
+            "kind": "int",
+            "v": "0"
+          }
+        },
+        {
+          "name": "large",
+          "ty_idx": 11,
+          "default_value": {
+            "kind": "int",
+            "v": "18446744073709551615"
+          }
+        },
+        {
+          "name": "enabled",
+          "ty_idx": 5,
+          "default_value": {
+            "kind": "bool",
+            "v": false
+          }
+        },
+        {
+          "name": "text",
+          "ty_idx": 36,
+          "default_value": {
+            "kind": "string",
+            "str": "hello\n\"world\""
+          }
+        },
+        {
+          "name": "bits",
+          "ty_idx": 2,
+          "default_value": {
+            "kind": "slice",
+            "hex": "ABCD"
+          }
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7,
+          "default_value": {
+            "kind": "address",
+            "addr": "0:0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        },
+        {
+          "name": "pair",
+          "ty_idx": 37,
+          "default_value": {
+            "kind": "tensor",
+            "items": [
+              {
+                "kind": "int",
+                "v": "1"
+              },
+              {
+                "kind": "bool",
+                "v": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "tupleValue",
+          "ty_idx": 38,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "shapedTuple",
+              "items": [
+                {
+                  "kind": "int",
+                  "v": "2"
+                },
+                {
+                  "kind": "bool",
+                  "v": false
+                }
+              ]
+            },
+            "cast_to_ty_idx": 38
+          }
+        },
+        {
+          "name": "meta",
+          "ty_idx": 39,
+          "default_value": {
+            "kind": "object",
+            "struct_name": "Meta",
+            "fields": [
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "int",
+                  "v": "7"
+                },
+                "cast_to_ty_idx": 22
+              }
+            ]
+          }
+        },
+        {
+          "name": "message",
+          "ty_idx": 40,
+          "default_value": {
+            "kind": "object",
+            "struct_name": "Message<uint32>",
+            "fields": [
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "int",
+                  "v": "1"
+                },
+                "cast_to_ty_idx": 9
+              }
+            ]
+          }
+        },
+        {
+          "name": "wrapped",
+          "ty_idx": 41,
+          "default_value": {
+            "kind": "object",
+            "struct_name": "Message<uint32>",
+            "fields": [
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "int",
+                  "v": "2"
+                },
+                "cast_to_ty_idx": 9
+              }
+            ]
+          }
+        },
+        {
+          "name": "nested",
+          "ty_idx": 42,
+          "default_value": {
+            "kind": "tensor",
+            "items": [
+              {
+                "kind": "object",
+                "struct_name": "Message<uint32>",
+                "fields": [
+                  {
+                    "kind": "castTo",
+                    "inner": {
+                      "kind": "int",
+                      "v": "3"
+                    },
+                    "cast_to_ty_idx": 9
+                  }
+                ]
+              },
+              {
+                "kind": "object",
+                "struct_name": "Meta",
+                "fields": [
+                  {
+                    "kind": "castTo",
+                    "inner": {
+                      "kind": "int",
+                      "v": "4"
+                    },
+                    "cast_to_ty_idx": 22
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "boxed",
+          "ty_idx": 43,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "shapedTuple",
+              "items": [
+                {
+                  "kind": "object",
+                  "struct_name": "Message<uint32>",
+                  "fields": [
+                    {
+                      "kind": "castTo",
+                      "inner": {
+                        "kind": "int",
+                        "v": "5"
+                      },
+                      "cast_to_ty_idx": 9
+                    }
+                  ]
+                }
+              ]
+            },
+            "cast_to_ty_idx": 43
+          }
+        },
+        {
+          "name": "items",
+          "ty_idx": 44,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "shapedTuple",
+              "items": [
+                {
+                  "kind": "object",
+                  "struct_name": "Message<uint32>",
+                  "fields": [
+                    {
+                      "kind": "castTo",
+                      "inner": {
+                        "kind": "int",
+                        "v": "6"
+                      },
+                      "cast_to_ty_idx": 9
+                    }
+                  ]
+                }
+              ]
+            },
+            "cast_to_ty_idx": 44
+          }
+        },
+        {
+          "name": "state",
+          "ty_idx": 26,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "int",
+              "v": "7"
+            },
+            "cast_to_ty_idx": 26
+          }
+        },
+        {
+          "name": "optional",
+          "ty_idx": 45,
+          "default_value": {
+            "kind": "null"
+          }
+        },
+        {
+          "name": "custom",
+          "ty_idx": 46,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "int",
+              "v": "42"
+            },
+            "cast_to_ty_idx": 46
+          }
+        }
+      ]
+    }
+  ],
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 15
+    }
+  ],
+  "incoming_external": [
+    {
+      "body_ty_idx": 16
+    }
+  ],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 18
+    }
+  ],
+  "emitted_events": [
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 23,
+    "storage_at_deployment_ty_idx": 30
+  },
+  "get_methods": [
+    {
+      "tvm_method_id": 108004,
+      "name": "get_storage",
+      "parameters": [
+        {
+          "name": "limit",
+          "ty_idx": 1,
+          "default_value": {
+            "kind": "int",
+            "v": "10"
+          }
+        }
+      ],
+      "return_ty_idx": 23
+    },
+    {
+      "tvm_method_id": 117011,
+      "name": "get_wrapped",
+      "parameters": [],
+      "return_ty_idx": 18
+    },
+    {
+      "tvm_method_id": 120140,
+      "name": "get_empty",
+      "parameters": [],
+      "return_ty_idx": 33
+    },
+    {
+      "tvm_method_id": 100738,
+      "name": "get_defaults",
+      "parameters": [
+        {
+          "name": "value",
+          "ty_idx": 35,
+          "default_value": {
+            "kind": "object",
+            "struct_name": "Defaults",
+            "fields": [
+              {
+                "kind": "int",
+                "v": "0"
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "int",
+                  "v": "18446744073709551615"
+                },
+                "cast_to_ty_idx": 11
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "bool",
+                  "v": false
+                },
+                "cast_to_ty_idx": 5
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "string",
+                  "str": "hello\n\"world\""
+                },
+                "cast_to_ty_idx": 36
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "slice",
+                  "hex": "ABCD"
+                },
+                "cast_to_ty_idx": 2
+              },
+              {
+                "kind": "address",
+                "addr": "0:0000000000000000000000000000000000000000000000000000000000000000"
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "tensor",
+                  "items": [
+                    {
+                      "kind": "int",
+                      "v": "1"
+                    },
+                    {
+                      "kind": "bool",
+                      "v": true
+                    }
+                  ]
+                },
+                "cast_to_ty_idx": 37
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "shapedTuple",
+                  "items": [
+                    {
+                      "kind": "int",
+                      "v": "2"
+                    },
+                    {
+                      "kind": "bool",
+                      "v": false
+                    }
+                  ]
+                },
+                "cast_to_ty_idx": 38
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "object",
+                  "struct_name": "Meta",
+                  "fields": [
+                    {
+                      "kind": "castTo",
+                      "inner": {
+                        "kind": "int",
+                        "v": "7"
+                      },
+                      "cast_to_ty_idx": 22
+                    }
+                  ]
+                },
+                "cast_to_ty_idx": 39
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "object",
+                  "struct_name": "Message<uint32>",
+                  "fields": [
+                    {
+                      "kind": "castTo",
+                      "inner": {
+                        "kind": "int",
+                        "v": "1"
+                      },
+                      "cast_to_ty_idx": 9
+                    }
+                  ]
+                },
+                "cast_to_ty_idx": 40
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "object",
+                  "struct_name": "Message<uint32>",
+                  "fields": [
+                    {
+                      "kind": "castTo",
+                      "inner": {
+                        "kind": "int",
+                        "v": "2"
+                      },
+                      "cast_to_ty_idx": 9
+                    }
+                  ]
+                },
+                "cast_to_ty_idx": 41
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "tensor",
+                  "items": [
+                    {
+                      "kind": "object",
+                      "struct_name": "Message<uint32>",
+                      "fields": [
+                        {
+                          "kind": "castTo",
+                          "inner": {
+                            "kind": "int",
+                            "v": "3"
+                          },
+                          "cast_to_ty_idx": 9
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "object",
+                      "struct_name": "Meta",
+                      "fields": [
+                        {
+                          "kind": "castTo",
+                          "inner": {
+                            "kind": "int",
+                            "v": "4"
+                          },
+                          "cast_to_ty_idx": 22
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "cast_to_ty_idx": 42
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "shapedTuple",
+                  "items": [
+                    {
+                      "kind": "object",
+                      "struct_name": "Message<uint32>",
+                      "fields": [
+                        {
+                          "kind": "castTo",
+                          "inner": {
+                            "kind": "int",
+                            "v": "5"
+                          },
+                          "cast_to_ty_idx": 9
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "cast_to_ty_idx": 43
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "shapedTuple",
+                  "items": [
+                    {
+                      "kind": "object",
+                      "struct_name": "Message<uint32>",
+                      "fields": [
+                        {
+                          "kind": "castTo",
+                          "inner": {
+                            "kind": "int",
+                            "v": "6"
+                          },
+                          "cast_to_ty_idx": 9
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "cast_to_ty_idx": 44
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "int",
+                  "v": "7"
+                },
+                "cast_to_ty_idx": 26
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "castTo",
+                  "inner": {
+                    "kind": "null"
+                  },
+                  "cast_to_ty_idx": 47
+                },
+                "cast_to_ty_idx": 45
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "int",
+                  "v": "42"
+                },
+                "cast_to_ty_idx": 46
+              }
+            ]
+          }
+        }
+      ],
+      "return_ty_idx": 35
+    },
+    {
+      "tvm_method_id": 69420,
+      "name": "get_client_message",
+      "parameters": [
+        {
+          "name": "value",
+          "ty_idx": 48
+        }
+      ],
+      "return_ty_idx": 48
+    },
+    {
+      "tvm_method_id": 122756,
+      "name": "get_odd",
+      "parameters": [
+        {
+          "name": "value",
+          "ty_idx": 52
+        }
+      ],
+      "return_ty_idx": 52
+    },
+    {
+      "tvm_method_id": 109688,
+      "name": "return",
+      "parameters": [
+        {
+          "name": "val",
+          "ty_idx": 58
+        }
+      ],
+      "return_ty_idx": 58
+    },
+    {
+      "tvm_method_id": 111266,
+      "name": "get_pair",
+      "parameters": [
+        {
+          "name": "value",
+          "ty_idx": 59
+        }
+      ],
+      "return_ty_idx": 59
+    },
+    {
+      "tvm_method_id": 113382,
+      "name": "get_either",
+      "parameters": [
+        {
+          "name": "value",
+          "ty_idx": 63
+        }
+      ],
+      "return_ty_idx": 63
+    },
+    {
+      "tvm_method_id": 76391,
+      "name": "get_union",
+      "parameters": [
+        {
+          "name": "value",
+          "ty_idx": 67
+        }
+      ],
+      "return_ty_idx": 67
+    },
+    {
+      "tvm_method_id": 98348,
+      "name": "get_optional",
+      "parameters": [
+        {
+          "name": "value",
+          "ty_idx": 68
+        }
+      ],
+      "return_ty_idx": 68
+    },
+    {
+      "tvm_method_id": 80665,
+      "name": "get_types",
+      "parameters": [
+        {
+          "name": "maybe",
+          "ty_idx": 69
+        },
+        {
+          "name": "cells",
+          "ty_idx": 51
+        },
+        {
+          "name": "items",
+          "ty_idx": 70
+        },
+        {
+          "name": "linked",
+          "ty_idx": 71
+        },
+        {
+          "name": "mapping",
+          "ty_idx": 72
+        },
+        {
+          "name": "tupleValue",
+          "ty_idx": 74
+        },
+        {
+          "name": "remainder",
+          "ty_idx": 50
+        },
+        {
+          "name": "any",
+          "ty_idx": 75
+        },
+        {
+          "name": "bits",
+          "ty_idx": 76
+        },
+        {
+          "name": "vi",
+          "ty_idx": 77
+        },
+        {
+          "name": "vu",
+          "ty_idx": 78
+        }
+      ],
+      "return_ty_idx": 79
+    }
+  ],
+  "thrown_errors": [],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}

@@ -30,7 +30,6 @@ struct Inner {
     studio_url: String,
     runs: RwLock<BTreeMap<String, TestRunRecord>>,
     sequences: Mutex<HashMap<String, u64>>,
-    persistence: Mutex<()>,
     cancellations: Mutex<HashMap<String, watch::Sender<bool>>>,
     events: broadcast::Sender<TestRunStreamEvent>,
 }
@@ -62,7 +61,6 @@ impl LocalProcessTestRunRuntime {
                 studio_url: studio_url.into(),
                 runs: RwLock::new(runs),
                 sequences: Mutex::new(HashMap::new()),
-                persistence: Mutex::new(()),
                 cancellations: Mutex::new(HashMap::new()),
                 events,
             }),
@@ -90,7 +88,6 @@ impl LocalProcessTestRunRuntime {
     }
 
     async fn persist(&self, run: TestRunRecord) -> Result<(), TestRunRuntimeError> {
-        let _persistence = self.inner.persistence.lock().await;
         let project_root = self.inner.project_root.clone();
         let persisted_run = run.clone();
         tokio::task::spawn_blocking(move || persist_test_run(&project_root, &persisted_run))
@@ -125,37 +122,42 @@ impl LocalProcessTestRunRuntime {
         };
         let _ = stdout_task.await;
         let _ = stderr_task.await;
-        self.inner.cancellations.lock().await.remove(&run_id);
         self.refresh_history().await.ok();
 
         let mut runs = self.inner.runs.write().await;
         let Some(run) = runs.get_mut(&run_id) else {
             return;
         };
-        run.finished_at.get_or_insert_with(Utc::now);
-        match status {
-            Ok(status) => {
-                run.exit_code = status.code();
-                if cancelled {
-                    run.status = TestRunStatus::Cancelled;
-                    run.error = Some("Test run was cancelled".to_owned());
-                } else if !status.success() {
-                    run.status = TestRunStatus::Failed;
-                    if run.error.is_none() && run.reports.is_empty() {
-                        run.error = Some("acton test exited before producing a report".to_owned());
+        // A final reporter result describes the completed tests. Killing a process
+        // that is still flushing its output must not replace that result.
+        if !run.status.is_finished() {
+            run.finished_at = Some(Utc::now());
+            match status {
+                Ok(status) => {
+                    run.exit_code = status.code();
+                    if cancelled {
+                        run.status = TestRunStatus::Cancelled;
+                        run.error = Some("Test run was cancelled".to_owned());
+                    } else if !status.success() {
+                        run.status = TestRunStatus::Failed;
+                        if run.error.is_none() && run.reports.is_empty() {
+                            run.error =
+                                Some("acton test exited before producing a report".to_owned());
+                        }
+                    } else {
+                        run.status = TestRunStatus::Passed;
                     }
-                } else if !run.status.is_finished() {
-                    run.status = TestRunStatus::Passed;
                 }
-            }
-            Err(error) => {
-                run.status = TestRunStatus::Failed;
-                run.error = Some(format!("Failed to wait for acton test: {error}"));
+                Err(error) => {
+                    run.status = TestRunStatus::Failed;
+                    run.error = Some(format!("Failed to wait for acton test: {error}"));
+                }
             }
         }
         let finished = run.clone();
-        drop(runs);
         self.persist(finished).await.ok();
+        drop(runs);
+        self.inner.cancellations.lock().await.remove(&run_id);
     }
 
     async fn read_run_output(&self, run_id: &str) -> Result<TestRunOutput, TestRunRuntimeError> {
@@ -250,6 +252,8 @@ impl TestRunRuntime for LocalProcessTestRunRuntime {
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .kill_on_drop(true);
+            // Keep early reporter events behind the initial history write.
+            let mut runs = self.inner.runs.write().await;
             let mut child = command
                 .spawn()
                 .map_err(|error| internal("test_process_start_failed", error.to_string()))?;
@@ -267,12 +271,9 @@ impl TestRunRuntime for LocalProcessTestRunRuntime {
                 command_display,
                 trace_dir,
             );
-            self.inner
-                .runs
-                .write()
-                .await
-                .insert(run_id.clone(), run.clone());
+            runs.insert(run_id.clone(), run.clone());
             self.persist(run.clone()).await?;
+            drop(runs);
 
             let stdout_task = tokio::spawn(capture_output(
                 stdout,
@@ -420,6 +421,11 @@ impl TestRunRuntime for LocalProcessTestRunRuntime {
                     run_id: envelope.run_id.clone(),
                 }
             })?;
+            // Publish a completed result only after it is durable. Readers may
+            // stop Studio as soon as they observe a terminal status.
+            if run.status.is_finished() {
+                self.persist(run.clone()).await?;
+            }
             drop(runs);
             self.inner
                 .events
@@ -427,9 +433,7 @@ impl TestRunRuntime for LocalProcessTestRunRuntime {
                     event: Box::new(envelope.clone()),
                 })
                 .ok();
-            if run.status.is_finished() {
-                self.persist(run.clone()).await?;
-            } else if changed {
+            if changed && !run.status.is_finished() {
                 self.inner
                     .events
                     .send(TestRunStreamEvent::RunChanged { run: run.summary() })
@@ -450,11 +454,15 @@ impl TestRunRuntime for LocalProcessTestRunRuntime {
 
     fn shutdown(&self) -> TestRunRuntimeFuture<'_, ()> {
         Box::pin(async move {
-            let cancellations = self.inner.cancellations.lock().await;
+            let cancellations = self.inner.cancellations.lock().await.clone();
             for cancel in cancellations.values() {
                 cancel.send(true).ok();
             }
-            drop(cancellations);
+            // Receivers live until their monitors have drained output and saved
+            // the final history, including runs cancelled during shutdown.
+            for cancel in cancellations.values() {
+                cancel.closed().await;
+            }
             Ok(())
         })
     }

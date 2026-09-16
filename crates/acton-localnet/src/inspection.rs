@@ -62,6 +62,9 @@ pub async fn status(root: &Path) -> Result<Network, Error> {
     let observed = async {
         match DockerNetwork::load(root, &network).await? {
             Some(driver) => driver.status(&network.nodes).await,
+            // Prerequisite failures leave no deployment to inspect. Preserve the
+            // saved failure after service shutdown, as the live runtime does.
+            None if network.status == Status::Failed => Ok(Status::Failed),
             None => Ok(Status::Stopped),
         }
     }

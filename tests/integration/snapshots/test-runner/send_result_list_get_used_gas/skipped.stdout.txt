@@ -1,0 +1,13 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/skipped.test.tolk (1 test)
+  ✗ send result list get used gas skipped [TIME]
+    └─ Error: Cannot get used gas for transaction with skipped compute phase
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

@@ -36,9 +36,9 @@ const apiReferences: Record<
     specUrl: "/openapi/ton-api-v3.openapi.json",
   },
   control: {
-    title: "Simulated localnet control API",
-    slug: "acton-simulated-localnet-control-api",
-    specUrl: "/openapi/acton-simulated-localnet-control.openapi.json",
+    title: "Simulator control API",
+    slug: "acton-simulator-control-api",
+    specUrl: "/openapi/acton-simulator-control.openapi.json",
   },
   admin: {
     title: "Localton Admin API",
@@ -83,7 +83,7 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
       servers: [
         {
           url: serverUrl,
-          description: "Simulated localnet",
+          description: "Simulator",
         },
       ],
       agent: {

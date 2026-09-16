@@ -1,0 +1,55 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling fm_bounce_echo
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/formatter_bounce.test.tolk (1 test)
+  ✓ formatter println rich bounced payloads [TIME]
+    └─ Test output:
+       N/A -> sender A
+       └── (!) 0x12345678 0.2 GRAM -> fm_bounce_echo B                                 gas=271
+       
+       N/A -> sender A
+       └── (!) text comment 0.2 GRAM -> fm_bounce_echo B                               gas=271
+           text: "rich bounce comment"
+       
+       N/A -> sender A
+       └── (!) FmBouncePing 0.2 GRAM -> fm_bounce_echo B                               gas=271
+           queryId: 501
+
+ ✓ 1 passed in 1 file
+
+ GAS USAGE
+
+────────────────────────────────────────────
+ Opcode         Min Gas   Max Gas   Avg Gas 
+────────────────────────────────────────────
+ 0x00000000         271       271       271 
+ 0x12345678         271       271       271 
+ FmBouncePing       271       271       271 
+
+
+ CHAIN GAS & FEES SUMMARY
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Test                                           Traces   Tx   Gas Used   Gas Fee            Forward Fee        Total Fee        
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ test formatter println rich bounced payloads        5    5       1473   0.000098206 GRAM   0.000361829 GRAM   0.000098206 GRAM 
+
+
+ CHAIN GAS & FEES · test formatter println rich bounced payloads
+
+────────────────────────────────────────────────────────────────────────────────────────
+ Trace     Tx Count   Gas Used   Gas Fee            Forward Fee        Total Fee        
+────────────────────────────────────────────────────────────────────────────────────────
+ Trace 1          1        309   0.000020601 GRAM   0.000089157 GRAM   0.000020601 GRAM 
+ Trace 2          1        351   0.000023401 GRAM    0.00008089 GRAM   0.000023401 GRAM 
+ Trace 3          1        271   0.000018068 GRAM   0.000059246 GRAM   0.000018068 GRAM 
+ Trace 4          1        271   0.000018068 GRAM   0.000070446 GRAM   0.000018068 GRAM 
+ Trace 5          1        271   0.000018068 GRAM    0.00006209 GRAM   0.000018068 GRAM 
+
+Gas snapshot saved to rich-profile.json

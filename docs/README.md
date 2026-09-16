@@ -68,6 +68,21 @@ update the nearby `meta.json` so navigation stays correct. For richer content,
 reuse the shared MDX components and docs UI instead of embedding one-off markup
 directly into pages.
 
+Use `<AvailabilityBadge since="Acton 1.2" />` for a new page or section introduced
+in Acton 1.2. Keep existing 1.1 markers; do not add markers for earlier releases.
+For an existing API with a new option, place the badge next to that option and
+state which behavior it covers.
+
+Generated references use `Available since Acton 1.2.` in their source:
+
+- Add `/// Available since Acton 1.2.` to new public functions and types in `lib/`.
+- Put the version note first in a linter rule's doc comment and update its lifecycle version.
+- Use `v1.0.0` for linter rules released before Acton 1.0; preserve their stable or preview status.
+- Add a standalone version paragraph to the relevant command or option in `src/doc/man/`.
+
+`acton docgen` renders these notes as badges on the site and keeps plain text in
+terminal and manpage output. Update generated pages through their source files.
+
 Some docs trees are generated and should not be edited by hand. Their
 source-of-truth inputs live outside `docs/`:
 

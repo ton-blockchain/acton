@@ -9,7 +9,7 @@ This guide covers the full Acton workflow: creating a counter contract from a te
 ## Prerequisites
 
 - [Acton](/docs/installation) {{ acton_version }} or later installed.
-- [Node.js](https://nodejs.org/en/download/) 22 or later LTS: required for the TypeScript app scaffold added by `--app`.
+- [Node.js](https://nodejs.org/en/download/) 22.12 or later LTS: required for the TypeScript app scaffold added by `--app`.
 
 To enable Acton support in the IDE, install either of:
 
@@ -50,9 +50,12 @@ Created Acton.toml with project configuration
 ```
 
 <Callout type="idea">
-  Pass `--hooks` to install pre-push checks, `--hooks=pre-commit` for checks before each commit, or
-  `--agents` to add coding-agent guidance. See [`acton new`](/docs/commands/new) for all options.
+  Pass `--agents` to add coding-agent guidance. See [`acton new`](/docs/commands/new) for all options.
   When run without arguments, `acton new` prompts interactively.
+
+  <AvailabilityBadge since="Acton 1.2" />
+
+  Pass `--hooks` to install pre-push checks or `--hooks=pre-commit` for checks before each commit.
 </Callout>
 
 Navigate to the project folder:
@@ -509,7 +512,7 @@ Acton blocks the selected test until a client attaches. Add the following to `.v
 
 ```json title=".vscode/launch.json"
 {
- "version": "{{ acton_version }}",
+ "version": "0.2.0",
  "configurations": [
    {
      "type": "tolk",
@@ -717,31 +720,43 @@ acton script contracts/scripts/deploy.tolk --net testnet --verbose --show-bodies
 
 ## Verify the contract
 
-Use [`acton verify`](/docs/commands/verify) to check that the deployed bytecode matches the local sources. It compiles local sources, uploads them to the verifier backend, collects the required signatures, and submits the verification transaction.
+<AvailabilityBadge since="Acton 1.2" />
+
+Use [`acton verify`](/docs/commands/verify) to publish Tolk sources that reproduce the contract's compiled code hash. Address checks and verification payments use TON testnet.
+
+Use the same source revision and compiler settings as deployment. First, prepare verification and inspect the payment details:
 
 ```bash
-acton verify Counter --net testnet --address <CONTRACT_ADDRESS>
+acton verify Counter --address <CONTRACT_ADDRESS> --dry-run
 ```
 
-Replace `<CONTRACT_ADDRESS>` with the address from the [deployment step](#run-scripts).
+Replace `<CONTRACT_ADDRESS>` with the testnet address from the [deployment step](#run-scripts).
 
-Verification requires a [funded wallet](#set-up-a-wallet). If there is more than one wallet, choose the target wallet when prompted. If there is a single wallet, it will be selected automatically.
+Acton compiles the contract and requests a verification ticket. If the code hash is already verified, Acton prints its verifier link and exits without payment.
 
-Use `--dry-run` to compile and upload sources without consuming funds to send the verification message:
+For new code, Acton compares the deployed code hash with the local result and stops on a mismatch. It then prepares the sources and displays the ticket's payment amount, recipient address, and comment.
+
+`--dry-run` does not send a payment or upload sources. It does not confirm that the verifier can compile the source bundle.
+
+To complete verification, use the [funded wallet](#set-up-a-wallet) created earlier:
 
 ```bash
-acton verify Counter --net testnet --address <CONTRACT_ADDRESS> --dry-run
+acton verify Counter --address <CONTRACT_ADDRESS> --wallet deployer
 ```
 
-Pass `--tonconnect` to approve the final verification transaction through a TON Connect wallet instead of a wallet from `wallets.toml`:
+Review the amount and recipient, then approve the payment when prompted. The ticket sets the amount. Keep enough testnet GRAM in the wallet for this payment and network fees.
+
+Acton sends the payment, waits for the recipient transaction to finalize, and uploads the sources with that transaction's hash. On success, it prints a verifier link for the code hash.
+
+To approve the payment through a TON Connect testnet wallet, use `--tonconnect`:
 
 ```bash
-acton verify Counter --address EQDt7LL... --net mainnet --tonconnect
+acton verify Counter --address <CONTRACT_ADDRESS> --tonconnect
 ```
 
-Acton prints a native TON Connect QR code and a `tc://` link.
+Acton prints a QR code and a `tc://` link. Connect the wallet and approve the payment in the wallet app.
 
-See the [verification guide](/docs/verify) for more.
+See the [verification guide](/docs/verify) for compiler options and payment retries.
 
 ## Manage on-chain libraries
 
@@ -753,10 +768,10 @@ See the [verification guide](/docs/verify) for more.
 
 The counter template does not need on-chain libraries, but larger contracts often use them to keep reusable code in a single masterchain account and reference it from many deployments. When a contract dependency in `Acton.toml` uses `kind = "library_ref"`, publish that dependency first with [`acton library`](/docs/commands/library), then build and deploy the contracts that reference it.
 
-Publish a configured contract as a library:
+On a network that permits library publication, publish a configured contract as a library:
 
-```bash
-acton library publish <CONTRACT_NAME> --duration 365d --wallet deployer --net testnet --local
+```acton-cli
+acton library publish <CONTRACT_NAME> --duration 365d --wallet deployer --net <NETWORK> --local
 ```
 
 Acton compiles the contract, estimates the storage payment for the requested duration, sends the funding transaction, and saves the resulting metadata to `libraries.toml`.
@@ -797,9 +812,11 @@ acton rpc info <CONTRACT_ADDRESS> --net testnet
 If automatic ABI matching is unavailable, pass compiler ABI JSON or a Tolk
 interface explicitly:
 
+<AvailabilityBadge since="Acton 1.2" />
+
 ```bash
-acton rpc info <CONTRACT_ADDRESS> --abi build/abi/counter.json --net testnet
-acton rpc call <CONTRACT_ADDRESS> currentCounter --abi contracts/Counter.types.tolk --net testnet
+acton rpc info <CONTRACT_ADDRESS> --abi build/abi/Counter.json --net testnet
+acton rpc call <CONTRACT_ADDRESS> currentCounter --abi build/abi/Counter.json --net testnet
 ```
 
 Fetch the latest masterchain block sequence number with `rpc block-number`:

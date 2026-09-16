@@ -463,7 +463,7 @@ fn resolve_airdrop_target(
 ///
 /// Studio exposes every environment through one `/rpc` prefix, so removing the
 /// terminal `/api/v2` selects that environment's control API for both simulated
-/// and Full localnets. Direct simulated-localnet URLs follow the same layout.
+/// and Localnets. Direct simulator URLs follow the same layout.
 fn localnet_airdrop_urls(config: &ActonConfig) -> anyhow::Result<(reqwest::Url, reqwest::Url)> {
     let networks = config.custom_networks();
     let api_v2 = networks
@@ -636,7 +636,7 @@ fn perform_localnet_airdrop(
         .build()
         .context("Failed to build HTTP client")?;
     let amount_nanograms = (amount_grams * 1_000_000_000.0) as u128;
-    let auth_token = commands::simulated_localnet::resolve_localnet_auth_token(None);
+    let auth_token = commands::simulator::resolve_localnet_auth_token(None);
     let initial_balance =
         fetch_localnet_account_balance(&client, api_v2_url, &address, auth_token.as_deref());
     let request = client.post(faucet_url.clone()).json(&serde_json::json!({

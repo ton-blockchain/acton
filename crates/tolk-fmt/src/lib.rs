@@ -83,11 +83,5 @@ pub fn format_source(source: &str, options: FormatOptions) -> Result<String, For
         .map_err(FormatError::Render)?;
 
     let res = String::from_utf8(out).map_err(FormatError::InvalidUtf8)?;
-
-    // TODO: for some reason there are lines with whitespace only, trim manually for now
-    Ok(res
-        .lines()
-        .map(|l| if l.trim().is_empty() { "" } else { l })
-        .collect::<Vec<_>>()
-        .join("\n"))
+    Ok(res.strip_suffix('\n').unwrap_or(&res).to_owned())
 }

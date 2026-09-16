@@ -160,6 +160,10 @@ impl Fixture {
         if kind == "legacy" {
             source = source.replace("saveBlocks(blockInfo());", "var info = blockInfo(); assert(info.size() == 2, 77); info.push([] as tuple); saveBlocks(info);");
         }
+        if kind.starts_with("bounce_") {
+            "fun onInternalMessage(_: InMessage) {}\nfun onBouncedMessage(_: InMessageBounced) {}"
+                .clone_into(&mut source);
+        }
         let mut config = tycho_types::models::BlockchainConfigParams::from_raw(Boc::decode_base64(
             DEFAULT_CONFIG,
         )?);
@@ -221,9 +225,36 @@ impl Fixture {
                     .collect()
             }),
         );
-        let body = CellBuilder::build_from(CellBuilder::build_from(0xf82du16)?)?;
+        let body = if kind.starts_with("bounce_") {
+            let mut body = CellBuilder::new();
+            body.store_u32(if kind == "bounce_legacy" {
+                0xffff_ffff
+            } else {
+                0xffff_fffe
+            })?;
+            if kind == "bounce_legacy" || kind == "bounce_missing" {
+                // With a missing rich ref, inline diagnostics must not become an opcode.
+                body.store_u32(0x1234_5678)?;
+            } else {
+                body.store_reference(if kind == "bounce_empty" {
+                    Cell::empty_cell()
+                } else {
+                    CellBuilder::build_from(0x1234_5678u32)?
+                })?;
+                let mut original_info = CellBuilder::new();
+                original_info.store_zeros(101)?;
+                body.store_reference(original_info.build()?)?;
+                body.store_u8(0)?;
+                body.store_u32((-14_i32) as u32)?;
+                body.store_bit_zero()?;
+            }
+            body.build()?
+        } else {
+            CellBuilder::build_from(CellBuilder::build_from(0xf82du16)?)?
+        };
         let message = Boc::encode_base64(CellBuilder::build_from(OwnedMessage {
             info: MsgInfo::Int(IntMsgInfo {
+                bounced: kind.starts_with("bounce_") && kind != "bounce_unmarked",
                 src: StdAddr::new(workchain, HashBytes([0x44; 32])).into(),
                 dst: address.clone().into(),
                 value: CurrencyCollection::new(1_000_000_000),
@@ -428,7 +459,11 @@ async fn replay(fixture: Fixture, corrupt: bool) -> anyhow::Result<(String, Vec<
     .await;
     server.abort();
     let outcome = match result.context("Retrace fixture timed out")? {
-        Ok(result) => format!("state_matches={}", result.state_update_hash_ok),
+        Ok(result) => format!(
+            "state_matches={} opcode={:?}",
+            result.state_update_hash_ok,
+            result.in_msg.opcode.map(|opcode| format!("0x{opcode:08x}"))
+        ),
         Err(error) => format!("{error:#}"),
     };
     let paths = requests
@@ -443,6 +478,30 @@ async fn replay(fixture: Fixture, corrupt: bool) -> anyhow::Result<(String, Vec<
         .cloned()
         .collect();
     Ok((outcome, paths))
+}
+
+#[tokio::test]
+async fn replays_bounced_messages_with_original_opcodes() -> anyhow::Result<()> {
+    let mut results = String::new();
+    for kind in [
+        "bounce_legacy",
+        "bounce_rich",
+        "bounce_unmarked",
+        "bounce_missing",
+        "bounce_empty",
+    ] {
+        let (outcome, _) = replay(Fixture::new(2345, 2300, kind)?, false).await?;
+        writeln!(results, "{kind}: {outcome}")?;
+    }
+    expect![[r#"
+        bounce_legacy: state_matches=true opcode=Some("0x12345678")
+        bounce_rich: state_matches=true opcode=Some("0x12345678")
+        bounce_unmarked: state_matches=true opcode=Some("0xfffffffe")
+        bounce_missing: state_matches=true opcode=None
+        bounce_empty: state_matches=true opcode=None
+    "#]]
+    .assert_eq(&results);
+    Ok(())
 }
 
 #[tokio::test]
@@ -481,30 +540,30 @@ async fn replays_previous_and_target_transactions_with_block_history() -> anyhow
         }
     }
     expect![[r"
-        full anchor=2345: state_matches=true
+        full anchor=2345: state_matches=true opcode=None
           getBlockHeader: [2345]
           lookupBlock: [2300, 2344, 2343, 2342, 2341, 2340, 2339, 2338, 2337, 2336, 2335, 2334, 2333, 2332, 2331, 2330, 2200, 2100, 2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 900, 800]
-        recent anchor=2345: state_matches=true
+        recent anchor=2345: state_matches=true opcode=None
           getBlockHeader: [2345]
           lookupBlock: [2300, 2344, 2343, 2342, 2341, 2340, 2339, 2338, 2337, 2336, 2335, 2334, 2333, 2332, 2331, 2330]
-        dynamic anchor=2345: state_matches=true
+        dynamic anchor=2345: state_matches=true opcode=None
           getBlockHeader: [2345]
           lookupBlock: [2300, 2344, 2343, 2342, 2341, 2340, 2339, 2338, 2337, 2336, 2335, 2334, 2333, 2332, 2331, 2330, 2200, 2100, 2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 900, 800]
-        recent_dynamic anchor=2345: state_matches=true
+        recent_dynamic anchor=2345: state_matches=true opcode=None
           getBlockHeader: [2345, 2345]
           lookupBlock: [2300, 2344, 2343, 2342, 2341, 2340, 2339, 2338, 2337, 2336, 2335, 2334, 2333, 2332, 2331, 2330, 2300, 2344, 2343, 2342, 2341, 2340, 2339, 2338, 2337, 2336, 2335, 2334, 2333, 2332, 2331, 2330, 2200, 2100, 2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 900, 800]
-        hundreds anchor=2345: state_matches=true
+        hundreds anchor=2345: state_matches=true opcode=None
           getBlockHeader: [2345]
           lookupBlock: [2300, 2344, 2343, 2342, 2341, 2340, 2339, 2338, 2337, 2336, 2335, 2334, 2333, 2332, 2331, 2330, 2200, 2100, 2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 900, 800]
-        tick anchor=200: state_matches=true
+        tick anchor=200: state_matches=true opcode=None
           getBlockHeader: [200]
           getMasterchainInfo: [0]
           lookupBlock: [199, 198, 197, 196, 195, 194, 193, 192, 191, 190, 189, 188, 187, 186, 185, 100]
-        full anchor=5: state_matches=true
+        full anchor=5: state_matches=true opcode=None
           getBlockHeader: [5]
           getMasterchainInfo: [0]
           lookupBlock: [4, 3, 2, 1]
-        unused anchor=2345: state_matches=true
+        unused anchor=2345: state_matches=true opcode=None
     "]].assert_eq(&results);
     Ok(())
 }
@@ -519,7 +578,7 @@ async fn rejects_invalid_block_hashes_before_replay() -> anyhow::Result<()> {
 #[tokio::test]
 async fn replays_predecessor_with_its_own_masterchain_reference() -> anyhow::Result<()> {
     let (outcome, _) = replay(Fixture::new(2345, 2300, "separate_blocks")?, false).await?;
-    expect!["state_matches=true"].assert_eq(&outcome);
+    expect!["state_matches=true opcode=None"].assert_eq(&outcome);
     Ok(())
 }
 
@@ -528,7 +587,7 @@ async fn preserves_pre_tvm9_c7_tuple_layout() -> anyhow::Result<()> {
     let (outcome, paths) = replay(Fixture::new(2345, 2300, "legacy")?, false).await?;
     expect![[r#"
         (
-            "state_matches=true",
+            "state_matches=true opcode=None",
             17,
         )
     "#]]

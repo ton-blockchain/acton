@@ -3,6 +3,8 @@ title: "Troubleshooting"
 description: "Resolve Studio startup, test reporting, environment, Docker, indexer, endpoint, and authentication problems"
 ---
 
+<AvailabilityBadge since="Acton 1.2" />
+
 Start diagnosis by identifying the failing layer: Studio server, test reporter, managed runtime,
 Docker services, public network provider, or the application using an endpoint.
 
@@ -57,13 +59,13 @@ have failed before the runner emitted individual results.
 Open the environment row. The state page distinguishes loading, starting, stopping, stopped, and
 failed states.
 
-For a Simulated localnet, common causes are:
+For a Simulator, common causes are:
 
 - requested runtime port is already occupied
 - fork provider or API key is unavailable
 - invalid project wallet or startup configuration
 
-For a Full localnet, confirm that Docker is running and has enough memory and disk space. The startup
+For a Localnet, confirm that Docker is running and has enough memory and disk space. The startup
 panel reports four readiness stages:
 
 - **Docker Compose:** containers are being created and started
@@ -71,7 +73,7 @@ panel reports four readiness stages:
 - **API:** V2 and V3 services are reachable
 - **Indexer:** indexed data is ready for Explorer and application reads
 
-Initial image download and database initialization make the first Full localnet start slower than
+Initial image download and database initialization make the first Localnet start slower than
 later starts. Additional validators also increase startup time.
 
 When startup fails, Studio shows copyable **Docker output** on the environment page. Read the final
@@ -80,7 +82,7 @@ remain available, so an unrecoverable environment can be deleted without startin
 
 ## Explorer data is missing or stale
 
-For Full localnet, wait for both API and Indexer readiness. The TON node can be ready before actions,
+For Localnet, wait for both API and Indexer readiness. The TON node can be ready before actions,
 tokens, NFTs, and imported accounts are indexed.
 
 Then:
@@ -91,8 +93,8 @@ Then:
    the Explorer request succeeded
 4. verify that the address belongs to the selected environment
 
-An imported Full localnet account is registered in Contracts immediately. Source-network history is
-not imported; indexed activity begins with messages processed by the Full localnet.
+An imported Localnet account is registered in Contracts immediately. Source-network history is
+not imported; indexed activity begins with messages processed by the Localnet.
 
 ## A contract is absent from Contracts
 
@@ -127,10 +129,10 @@ methods and is separate from wallet signing.
 
 Studio hides tools unsupported by the selected environment. Examples:
 
-- Full snapshots appear only for Full localnet.
-- Mining controls appear only for Simulated localnet.
-- Faucets do not appear for Testnet or Mainnet.
-- Admin and Config API reference pages appear only for Full localnet.
+- Snapshots appear for Simulator and Localnet.
+- Mining controls appear only for Simulator.
+- Testnet has its own faucet; Mainnet has none.
+- Admin and Config API reference pages appear only for Localnet.
 - Environment settings appear only for managed local environments.
 
 Return to Studio navigation and select an environment with the capability required by the task.
@@ -141,7 +143,7 @@ Prefer lifecycle and deletion controls in Studio over editing `.studio/` manuall
 contains environment metadata, test history, contract registry data, traces, and managed runtime
 descriptors that must remain consistent.
 
-Deleting a Full localnet also deletes its snapshots. Keep the environment when its state or snapshots
+Deleting a Localnet also deletes its snapshots. Keep the environment when its state or snapshots
 may still be needed. Deleting an environment or an individual snapshot is permanent.
 
 ## Collect information for a bug report
@@ -154,6 +156,6 @@ Include:
 - selected environment type and status
 - copied error or Docker output
 - relevant API Calls request and response
-- whether the problem reproduces in Simulated localnet, Full localnet, Testnet, or Mainnet
+- whether the problem reproduces in Simulator, Localnet, Testnet, or Mainnet
 
 Do not include wallet mnemonics, API keys, environment API tokens, or other secrets.

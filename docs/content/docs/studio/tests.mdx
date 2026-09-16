@@ -3,6 +3,8 @@ title: "Tests"
 description: "Run Acton tests from Studio, collect CLI test history, and inspect failures, traces, logs, and output"
 ---
 
+<AvailabilityBadge since="Acton 1.2" />
+
 The **Tests** area keeps a project-wide history of test runs. Runs started from Studio and runs
 reported by `acton test` use the same result format, so you can move between the browser and terminal
 without maintaining separate test workflows.
@@ -126,6 +128,22 @@ those streams in its terminal.
 The embedded details view uses the same trace and result model as [Test UI](/docs/testing/test-ui/overview).
 See the [Test UI reference](/docs/testing/test-ui/reference) for a deeper description of transaction
 panels and trace controls.
+
+## Coverage and gas profiles
+
+Run the CLI with the artifacts you want to inspect:
+
+```bash
+acton test --coverage
+acton test --gas-profile build/gas.cpuprofile --gas-profile-include-tests
+```
+
+Studio saves coverage and gas profiles with the run. Open **Coverage** for annotated
+source files or **Profile** for flamegraphs and instruction costs. These artifacts
+remain available after Studio restarts.
+
+Transaction log links open **Logs** at the selected transaction and expand its
+VM or executor log.
 
 ## Recommended workflow
 

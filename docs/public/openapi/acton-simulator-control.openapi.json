@@ -1,0 +1,2165 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Simulator control API",
+    "version": "1.0.0",
+    "description": "Control endpoints for Acton's fast local TON development environment, which provides TON-compatible blocks and APIs for local tooling. The environment is Acton's custom simplified implementation, not a real TON network or validator cluster. When Simulator is started with --require-auth, pass the printed token as Authorization: Bearer <token> or X-API-Key: <token>."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:5411",
+      "description": "Default Simulator server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Localnet Control",
+      "description": "Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.\n\nThese routes are intended for local development tooling and should not be exposed publicly. When Simulator is started with --require-auth, these routes require the Simulator API token. Rate limiting applies only to /api routes, and response delay applies only to TON Center-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled."
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    },
+    {
+      "APIKeyHeader": []
+    }
+  ],
+  "paths": {
+    "/acton_fundAccount": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "fundAccount",
+        "summary": "Fund an account",
+        "description": "Queues a local faucet transfer to credit an address. The transfer is included on the next automatic or manually mined block.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundAccountRequest"
+              },
+              "example": {
+                "address": "0:2222222222222222222222222222222222222222222222222222222222222222",
+                "amount": 1000000000
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FundAccountResponse"
+          }
+        }
+      }
+    },
+    "/acton_fundJetton": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "fundJetton",
+        "summary": "Mint jettons to an account",
+        "description": "Finds the jetton master in Simulator state, verifies that it is mintable and has an admin, converts the display amount using the decimals from jetton metadata, preflights the legacy 0x15 and current 0x642b7d07 mint layouts, and queues the uniquely accepted message for the next block.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundJettonRequest"
+              },
+              "example": {
+                "address": "0:2222222222222222222222222222222222222222222222222222222222222222",
+                "jetton_master": "0:3333333333333333333333333333333333333333333333333333333333333333",
+                "amount": "12.5"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SendInternalMessageResponse"
+          }
+        }
+      }
+    },
+    "/acton_getAddressName": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "getAddressName",
+        "summary": "Get address names",
+        "description": "Returns local names for the requested addresses. Missing names are returned as null.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AddressQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/AddressNamesResponse"
+          }
+        }
+      }
+    },
+    "/acton_setAddressName": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setAddressName",
+        "summary": "Set an address name",
+        "description": "Sets or updates the local name for an address.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAddressNameRequest"
+              },
+              "example": {
+                "address": "0:2222222222222222222222222222222222222222222222222222222222222222",
+                "name": "deployer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_getCompilerAbi": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "getCompilerAbi",
+        "summary": "Get compiler ABI metadata",
+        "description": "Returns extended contract ABI metadata for the requested code hashes. Missing ABI entries are returned as null.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CodeHashQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/CompilerAbisResponse"
+          }
+        }
+      }
+    },
+    "/acton_listCompilerAbis": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "listCompilerAbis",
+        "summary": "List registered compiler ABI metadata",
+        "description": "Returns compiler ABI metadata registered directly in the Simulator node.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RegisteredCompilerAbisResponse"
+          }
+        }
+      }
+    },
+    "/acton_deleteCompilerAbi": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "deleteCompilerAbi",
+        "summary": "Delete registered compiler ABI metadata",
+        "description": "Deletes a locally registered compiler ABI entry by code hash or one of its code hash aliases.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeHashRequest"
+              },
+              "example": {
+                "code_hash": "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8="
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_getVerifiedSource": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "getVerifiedSource",
+        "summary": "Get verified contract source",
+        "description": "Proxies TON verifier source lookup by address or code hash and returns the verified source bundle when the contract is confirmed.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          },
+          {
+            "name": "code_hash",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/VerifiedSourceResponse"
+          }
+        }
+      }
+    },
+    "/acton_getRegisteredVerifiedSource": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "getRegisteredVerifiedSource",
+        "summary": "Get registered contract source",
+        "description": "Returns the source bundle registered directly in the Simulator node for an address or code hash.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          },
+          {
+            "name": "code_hash",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/VerifiedSourceResponse"
+          }
+        }
+      }
+    },
+    "/acton_listVerifiedSources": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "listVerifiedSources",
+        "summary": "List registered contract sources",
+        "description": "Returns source bundles registered directly in the Simulator node, one per code hash.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RegisteredVerifiedSourcesResponse"
+          }
+        }
+      }
+    },
+    "/acton_deleteVerifiedSource": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "deleteVerifiedSource",
+        "summary": "Delete registered contract source",
+        "description": "Deletes a locally registered source bundle by code hash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeHashRequest"
+              },
+              "example": {
+                "code_hash": "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8="
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_registerCompilerAbis": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "registerCompilerAbis",
+        "summary": "Register compiler ABI metadata",
+        "description": "Registers one or more extended compiler ABI payloads for later explorer and API lookups by code hash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterCompilerAbisRequest"
+              },
+              "example": {
+                "entries": [
+                  {
+                    "abi": {
+                      "compiler_abi": {
+                        "contract_name": "Wallet",
+                        "get_methods": [],
+                        "incoming_messages": []
+                      },
+                      "display_name": "Wallet",
+                      "code_hashes": ["f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8="],
+                      "links": []
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_registerVerifiedSources": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "registerVerifiedSources",
+        "summary": "Register contract sources",
+        "description": "Registers one or more source artifacts for later explorer source-code and retrace lookups by code hash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterVerifiedSourcesRequest"
+              },
+              "example": {
+                "entries": [
+                  {
+                    "code_hash": "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8=",
+                    "source": {
+                      "code_hash": "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8=",
+                      "verified": true,
+                      "bundle": null
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_createSnapshot": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "createSnapshot",
+        "summary": "Create snapshot",
+        "description": "Saves the current state as a persistent JSON snapshot without stopping the node. The returned ID identifies the saved file.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSnapshotRequest"
+              },
+              "example": {
+                "name": "before-upgrade"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SnapshotResponse"
+          }
+        }
+      }
+    },
+    "/acton_listSnapshots": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "listSnapshots",
+        "summary": "List snapshots",
+        "description": "Lists saved JSON snapshots, including snapshots from earlier node runs.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SnapshotListResponse"
+          }
+        }
+      }
+    },
+    "/acton_restoreSnapshot": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "restoreSnapshot",
+        "summary": "Restore snapshot",
+        "description": "Restores state in the node mutation queue without restarting the process or deleting any saved snapshots.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnapshotRequest"
+              },
+              "example": {
+                "id": "f25d4568-af6a-4f5f-a857-ebcf90648a9f"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SnapshotResponse"
+          }
+        }
+      }
+    },
+    "/acton_deleteSnapshot": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "deleteSnapshot",
+        "summary": "Delete snapshot",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnapshotRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_exportSnapshot": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "exportSnapshot",
+        "summary": "Download snapshot",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot state file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateFile"
+                }
+              }
+            }
+          }
+        },
+        "description": "Downloads the selected saved JSON file without capturing new state."
+      }
+    },
+    "/acton_importSnapshot": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "importSnapshot",
+        "summary": "Import snapshot",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StateFile"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SnapshotResponse"
+          }
+        },
+        "description": "Validates and saves a JSON snapshot under a new ID without changing the running state. An optional name overrides the name in the file."
+      }
+    },
+    "/acton_setConfig": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setConfig",
+        "summary": "Replace blockchain config",
+        "description": "Validates and replaces the full blockchain config dictionary from a base64-encoded BOC, then commits the change in a config-only block.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetConfigRequest"
+              },
+              "example": {
+                "config": "te6ccgEC..."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SetConfigResponse"
+          }
+        }
+      }
+    },
+    "/acton_setConfigParam": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setConfigParam",
+        "summary": "Update a blockchain config parameter",
+        "description": "Checks the parameter's expected representation hash and commits its replacement in a new block, even with automatic mining disabled. A null expectedHash adds a missing parameter. Other parameters and historical configs are preserved. Parameter 0 cannot be changed.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetConfigParamRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SetConfigResponse"
+          },
+          "409": {
+            "description": "The parameter changed since it was loaded"
+          },
+          "422": {
+            "description": "Invalid, unchanged or immutable parameter"
+          }
+        }
+      }
+    },
+    "/acton_setShardAccount": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setShardAccount",
+        "summary": "Set a ShardAccount",
+        "description": "Replaces the selected account state with a base64-encoded ShardAccount BOC.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetShardAccountRequest"
+              },
+              "example": {
+                "address": "0:2222222222222222222222222222222222222222222222222222222222222222",
+                "shard_account": "te6ccgEBAQEA..."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_changeAccountState": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "changeAccountState",
+        "summary": "Change account state",
+        "description": "Changes the selected local account state to nonexist, uninit, or frozen. When state is frozen with source=current, set mine=false to queue the synthetic freeze transaction for the next mined block instead of committing a block immediately.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeAccountStateRequest"
+              },
+              "example": {
+                "address": "0:2222222222222222222222222222222222222222222222222222222222222222",
+                "mine": false,
+                "state": {
+                  "type": "frozen",
+                  "source": "current"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_sendInternalMessage": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "sendInternalMessage",
+        "summary": "Send a raw internal message",
+        "description": "Injects a base64-encoded internal message BOC into the local internal queue. TON Center-compatible message endpoints accept external-in messages only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendBocRequest"
+              },
+              "example": {
+                "boc": "te6ccgEBAQEA..."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SendInternalMessageResponse"
+          }
+        }
+      }
+    },
+    "/acton_getStartupAccounts": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "getStartupAccounts",
+        "summary": "List startup accounts",
+        "description": "Returns public account descriptors selected when the Simulator server started.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/StartupAccountsResponse"
+          }
+        }
+      }
+    },
+    "/acton_mine": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "mineBlocks",
+        "summary": "Mine Simulator blocks",
+        "description": "Attempts to mine the requested number of Simulator blocks. Empty blocks are skipped when skip_empty_blocks is true. When the request body is omitted or blocks is not provided, one mining attempt is made.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MineBlocksRequest"
+              },
+              "example": {
+                "blocks": 3
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MineBlocksResponse"
+          }
+        }
+      }
+    },
+    "/acton_increaseTime": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "increaseTime",
+        "summary": "Increase virtual time",
+        "description": "Adds seconds to the Simulator virtual clock. Future blocks use this adjusted time until it is changed again.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncreaseTimeRequest"
+              },
+              "example": {
+                "seconds": 3600
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/TimeControlResponse"
+          }
+        }
+      }
+    },
+    "/acton_setTime": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setTime",
+        "summary": "Set virtual time",
+        "description": "Sets the Simulator virtual clock to a Unix timestamp. The timestamp must not be lower than the latest mined block time.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetTimeRequest"
+              },
+              "example": {
+                "timestamp": 1710000000
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/TimeControlResponse"
+          }
+        }
+      }
+    },
+    "/acton_setNextBlockTimestamp": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setNextBlockTimestamp",
+        "summary": "Set next block timestamp",
+        "description": "Sets a one-shot Unix timestamp for the next mined block. The timestamp is consumed by the next automatic or manually mined block and must not be lower than the latest mined block time.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetNextBlockTimestampRequest"
+              },
+              "example": {
+                "timestamp": 1710000600
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/TimeControlResponse"
+          }
+        }
+      }
+    },
+    "/acton_setMiningMode": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setMiningMode",
+        "summary": "Set empty-block mining mode",
+        "description": "Controls whether automatic and manual mining skip blocks with no pending messages. Set skip_empty_blocks to false to produce empty blocks. This does not enable or disable automatic mining.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MiningMode"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MiningModeResponse"
+          }
+        }
+      }
+    },
+    "/acton_setNetworkConditions": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setNetworkConditions",
+        "summary": "Set simulated network conditions",
+        "description": "Updates simulated network conditions while the Simulator server is running and returns the updated values. Set response_delay_ms to 0 to disable response delay. Current values are also available from /acton_nodeInfo.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetNetworkConditionsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NetworkConditionsResponse"
+          }
+        }
+      }
+    },
+    "/acton_nodeInfo": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "nodeInfo",
+        "summary": "Get node status",
+        "description": "Returns uptime, latest block seqno, local or remote state-source information, virtual time, mining settings, rate limit, and current simulated network conditions.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NodeInfoResponse"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Simulator API token printed by `acton simulator start --require-auth`."
+      },
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "Alternative Simulator API token header for TON Center-compatible clients."
+      }
+    },
+    "parameters": {
+      "AddressQuery": {
+        "name": "address",
+        "in": "query",
+        "required": true,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/components/schemas/Address"
+          }
+        }
+      },
+      "CodeHashQuery": {
+        "name": "code_hash",
+        "in": "query",
+        "required": true,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/components/schemas/Hash"
+          }
+        }
+      }
+    },
+    "responses": {
+      "NullResponse": {
+        "description": "Successful wrapped response with null result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "nullable": true
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "StringOrNullResponse": {
+        "description": "Successful wrapped response with a string or null result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "AddressNamesResponse": {
+        "description": "Successful wrapped response with address names keyed by requested address.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "nullable": true
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "JsonOrNullResponse": {
+        "description": "Successful wrapped response with JSON metadata or null result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "nullable": true
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "CompilerAbisResponse": {
+        "description": "Successful wrapped response with extended contract ABI metadata keyed by requested code hash.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/ExtendedContractABI"
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "RegisteredCompilerAbisResponse": {
+        "description": "Successful wrapped response with registered compiler ABI metadata.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RegisteredCompilerAbi"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "VerifiedSourceResponse": {
+        "description": "Successful wrapped response with the source bundle returned by the TON verifier.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/VerificationSource"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "RegisteredVerifiedSourcesResponse": {
+        "description": "Successful wrapped response with registered sources, one bundle per code hash.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RegisteredVerifiedSource"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "FundAccountResponse": {
+        "description": "Successful faucet response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/FundAccountResultWrapper"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "SendInternalMessageResponse": {
+        "description": "Successful internal message injection response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/SendMessageResult"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "StartupAccountsResponse": {
+        "description": "Successful startup accounts response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StartupAccount"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "MineBlocksResponse": {
+        "description": "Successful manual mining response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/MineBlocksResult"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "SetConfigResponse": {
+        "description": "Successful blockchain config replacement response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/SetConfigResult"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "SnapshotResponse": {
+        "description": "Successful snapshot response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/SnapshotResult"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "SnapshotListResponse": {
+        "description": "Successful snapshot list response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SnapshotResult"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "MiningModeResponse": {
+        "description": "Successful mining mode update response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/MiningMode"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "NetworkConditionsResponse": {
+        "description": "Successful simulated network conditions response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/NetworkConditions"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "TimeControlResponse": {
+        "description": "Successful virtual time update response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/LocalnetTimeInfo"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "NodeInfoResponse": {
+        "description": "Successful node status response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/NodeInfo"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Address": {
+        "type": "string",
+        "description": "TON address in raw or user-friendly format."
+      },
+      "Hash": {
+        "type": "string",
+        "description": "Hash in hex or base64 format."
+      },
+      "Base64Boc": {
+        "type": "string",
+        "description": "Base64-encoded TON BOC."
+      },
+      "LocalnetBlockId": {
+        "type": "object",
+        "required": ["workchain", "shard", "seqno", "root_hash", "file_hash"],
+        "properties": {
+          "workchain": {
+            "type": "integer"
+          },
+          "shard": {
+            "type": "integer"
+          },
+          "seqno": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "root_hash": {
+            "type": "string"
+          },
+          "file_hash": {
+            "type": "string"
+          }
+        }
+      },
+      "SuccessEnvelope": {
+        "type": "object",
+        "required": ["ok", "result", "@extra"],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "result": {},
+          "@extra": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": ["ok", "error", "code", "@extra"],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [false]
+          },
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "integer"
+          },
+          "@extra": {
+            "type": "string"
+          }
+        }
+      },
+      "FundAccountRequest": {
+        "type": "object",
+        "required": ["address", "amount"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Amount in nanograms."
+          }
+        }
+      },
+      "FundJettonRequest": {
+        "type": "object",
+        "required": ["address", "jetton_master", "amount"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "jetton_master": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^[0-9]+(?:\\.[0-9]*)?$",
+            "description": "Positive display-unit amount. The server reads decimals from the jetton master metadata and defaults to 9 when the metadata value is missing or invalid."
+          }
+        }
+      },
+      "FundAccountResultWrapper": {
+        "type": "object",
+        "required": ["ok", "result"],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "result": {
+            "$ref": "#/components/schemas/FundAccountResult"
+          }
+        }
+      },
+      "FundAccountResult": {
+        "type": "object",
+        "required": ["tx_hash", "block_seqno"],
+        "properties": {
+          "tx_hash": {
+            "type": "string"
+          },
+          "block_seqno": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "SetAddressNameRequest": {
+        "type": "object",
+        "required": ["address", "name"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CompilerAbiRegistration": {
+        "type": "object",
+        "required": ["abi"],
+        "properties": {
+          "abi": {
+            "$ref": "#/components/schemas/ExtendedContractABI"
+          }
+        }
+      },
+      "CodeHashRequest": {
+        "type": "object",
+        "required": ["code_hash"],
+        "properties": {
+          "code_hash": {
+            "$ref": "#/components/schemas/Hash"
+          }
+        }
+      },
+      "ContractAbiLink": {
+        "type": "object",
+        "required": ["kind", "title", "url", "scope"],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "scope": {
+            "type": "string"
+          }
+        }
+      },
+      "ExtendedContractABI": {
+        "type": "object",
+        "required": ["compiler_abi", "code_hashes", "links"],
+        "properties": {
+          "compiler_abi": {},
+          "display_name": {
+            "type": "string"
+          },
+          "code_hashes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Hash"
+            }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContractAbiLink"
+            }
+          }
+        }
+      },
+      "RegisteredCompilerAbi": {
+        "type": "object",
+        "required": ["codeHash", "abi", "savedAt"],
+        "properties": {
+          "codeHash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "abi": {
+            "$ref": "#/components/schemas/ExtendedContractABI"
+          },
+          "savedAt": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "VerificationSource": {
+        "type": "object",
+        "required": ["code_hash", "verified", "bundle"],
+        "properties": {
+          "code_hash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "bundle": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SourceBundle"
+              }
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "VerifiedSourceRegistration": {
+        "type": "object",
+        "required": ["code_hash", "source"],
+        "properties": {
+          "code_hash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "source": {
+            "$ref": "#/components/schemas/VerificationSource"
+          }
+        }
+      },
+      "RegisteredVerifiedSource": {
+        "type": "object",
+        "required": ["codeHash", "source", "savedAt"],
+        "properties": {
+          "codeHash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "source": {
+            "$ref": "#/components/schemas/VerificationSource"
+          },
+          "savedAt": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "OnchainVerification": {
+        "type": "object",
+        "required": ["master_address", "verification_record_address"],
+        "properties": {
+          "master_address": {
+            "type": "string"
+          },
+          "verification_record_address": {
+            "type": "string"
+          }
+        }
+      },
+      "SourceBundle": {
+        "type": "object",
+        "required": [
+          "source_bundle_hash",
+          "verified_at",
+          "storage_revision",
+          "entrypoint",
+          "compiler",
+          "files"
+        ],
+        "properties": {
+          "source_bundle_hash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "verified_at": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "storage_revision": {
+            "type": "string"
+          },
+          "entrypoint": {
+            "type": "string"
+          },
+          "compiler": {
+            "$ref": "#/components/schemas/SourceCompiler"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceFile"
+            }
+          }
+        }
+      },
+      "SourceCompiler": {
+        "type": "object",
+        "required": ["language", "version", "params"],
+        "properties": {
+          "language": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "params": {}
+        }
+      },
+      "SourceFile": {
+        "type": "object",
+        "required": [
+          "path",
+          "content_hash",
+          "include_in_command",
+          "is_stdlib",
+          "has_include_directives",
+          "content"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "content_hash": {
+            "type": "string"
+          },
+          "include_in_command": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "is_stdlib": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "has_include_directives": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      },
+      "RegisterCompilerAbisRequest": {
+        "type": "object",
+        "required": ["entries"],
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompilerAbiRegistration"
+            }
+          }
+        }
+      },
+      "RegisterVerifiedSourcesRequest": {
+        "type": "object",
+        "required": ["entries"],
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerifiedSourceRegistration"
+            }
+          }
+        }
+      },
+      "StateFile": {
+        "type": "object",
+        "required": ["format_version", "id", "created_at", "state"],
+        "properties": {
+          "format_version": {
+            "type": "integer",
+            "enum": [1]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "integer"
+          },
+          "fork_network": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Complete serialized node snapshot"
+          }
+        }
+      },
+      "SetShardAccountRequest": {
+        "type": "object",
+        "required": ["address", "shard_account"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "shard_account": {
+            "$ref": "#/components/schemas/Base64Boc"
+          }
+        }
+      },
+      "SetConfigRequest": {
+        "type": "object",
+        "required": ["config"],
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/Base64Boc"
+          }
+        }
+      },
+      "SetConfigParamRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["index", "boc"],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Signed configuration parameter ID, excluding 0"
+          },
+          "boc": {
+            "$ref": "#/components/schemas/Base64Boc"
+          },
+          "expectedHash": {
+            "type": "string",
+            "nullable": true,
+            "description": "Lowercase hexadecimal representation hash of the current parameter, or null to add a missing parameter"
+          }
+        }
+      },
+      "SetConfigResult": {
+        "type": "object",
+        "required": ["config_hash", "block_seqno"],
+        "properties": {
+          "config_hash": {
+            "type": "string",
+            "description": "Representation hash of the committed config dictionary root."
+          },
+          "block_seqno": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Masterchain block seqno that committed the config."
+          }
+        }
+      },
+      "ChangeAccountStateRequest": {
+        "type": "object",
+        "required": ["address", "state"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ChangeAccountStatePayload"
+          },
+          "mine": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether to commit the state change immediately. Defaults to true. false is supported only for frozen source=current and queues the synthetic freeze transaction for the next automatic or manual block."
+          }
+        }
+      },
+      "ChangeAccountStatePayload": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ChangeAccountStateNonexist"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeAccountStateUninit"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeAccountStateFrozenFromCurrent"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeAccountStateFrozenWithHash"
+          }
+        ],
+        "description": "Target local account state. Frozen accounts can be derived from the current active StateInit hash with source=current, or set from an explicit frozen_hash."
+      },
+      "ChangeAccountStateNonexist": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["nonexist"]
+          }
+        }
+      },
+      "ChangeAccountStateUninit": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["uninit"]
+          },
+          "balance": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "default": "0",
+            "description": "Optional nanogram balance for the uninitialized account. Defaults to 0."
+          }
+        }
+      },
+      "ChangeAccountStateFrozenFromCurrent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "source"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["frozen"]
+          },
+          "source": {
+            "type": "string",
+            "enum": ["current"],
+            "description": "Freeze the current active account by replacing its StateInit with the StateInit representation hash and preserving its balance."
+          }
+        }
+      },
+      "ChangeAccountStateFrozenWithHash": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "frozen_hash"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["frozen"]
+          },
+          "frozen_hash": {
+            "type": "string",
+            "description": "Explicit 32-byte frozen StateInit hash, encoded as hex or base64."
+          },
+          "balance": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "default": "0",
+            "description": "Optional nanogram balance for the frozen account. Defaults to 0."
+          }
+        }
+      },
+      "SendBocRequest": {
+        "type": "object",
+        "required": ["boc"],
+        "properties": {
+          "boc": {
+            "$ref": "#/components/schemas/Base64Boc"
+          }
+        }
+      },
+      "MineBlocksRequest": {
+        "type": "object",
+        "properties": {
+          "blocks": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "description": "Number of mining attempts. Empty blocks follow the current mining mode."
+          }
+        }
+      },
+      "MineBlocksResult": {
+        "type": "object",
+        "required": ["blocks_mined", "skipped_empty_blocks", "last_block_seqno", "blocks"],
+        "properties": {
+          "blocks_mined": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "skipped_empty_blocks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "last_block_seqno": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LocalnetBlockId"
+            }
+          }
+        }
+      },
+      "CreateSnapshotRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 128,
+            "description": "Optional display name"
+          }
+        }
+      },
+      "SnapshotRequest": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SnapshotResult": {
+        "type": "object",
+        "required": ["id", "name", "created_at", "block_seqno", "size_bytes"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix creation time in seconds"
+          },
+          "block_seqno": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Size of the saved JSON file"
+          }
+        }
+      },
+      "IncreaseTimeRequest": {
+        "type": "object",
+        "required": ["seconds"],
+        "properties": {
+          "seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Seconds to add to the virtual Simulator clock."
+          }
+        }
+      },
+      "SetTimeRequest": {
+        "type": "object",
+        "required": ["timestamp"],
+        "properties": {
+          "timestamp": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp to use for the current virtual Simulator time."
+          }
+        }
+      },
+      "SetNextBlockTimestampRequest": {
+        "type": "object",
+        "required": ["timestamp"],
+        "properties": {
+          "timestamp": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp to use for the next mined block only."
+          }
+        }
+      },
+      "LocalnetTimeInfo": {
+        "type": "object",
+        "required": ["current_unix_time", "time_offset_seconds", "next_block_timestamp"],
+        "properties": {
+          "current_unix_time": {
+            "type": "integer",
+            "description": "Current virtual Unix timestamp used by Simulator."
+          },
+          "time_offset_seconds": {
+            "type": "integer",
+            "description": "Signed offset applied to wall-clock time in seconds."
+          },
+          "next_block_timestamp": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Pending one-shot timestamp for the next mined block, if configured."
+          }
+        }
+      },
+      "MiningMode": {
+        "type": "object",
+        "required": ["skip_empty_blocks"],
+        "properties": {
+          "skip_empty_blocks": {
+            "type": "boolean",
+            "description": "Skip mining when no messages are pending. The startup default is true."
+          }
+        }
+      },
+      "SetNetworkConditionsRequest": {
+        "type": "object",
+        "required": ["response_delay_ms"],
+        "properties": {
+          "response_delay_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Response delay in milliseconds for /api/v2, /api/v3, and /api/emulate/v1 responses. Use 0 to disable."
+          }
+        }
+      },
+      "NetworkConditions": {
+        "type": "object",
+        "required": ["response_delay_ms"],
+        "properties": {
+          "response_delay_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Response delay in milliseconds for TON Center-compatible API responses."
+          }
+        }
+      },
+      "SendMessageResult": {
+        "type": "object",
+        "required": ["@type", "hash"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["ok"]
+          },
+          "hash": {
+            "type": "string"
+          },
+          "hash_norm": {
+            "type": "string"
+          }
+        }
+      },
+      "StartupAccount": {
+        "type": "object",
+        "required": ["name", "version", "network", "address"],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "network": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        }
+      },
+      "NodeInfo": {
+        "type": "object",
+        "required": [
+          "uptime_seconds",
+          "last_block_seqno",
+          "state_source",
+          "fork_network",
+          "fork_block_number",
+          "current_unix_time",
+          "time_offset_seconds",
+          "next_block_timestamp",
+          "auto_mining",
+          "block_time_ms",
+          "rate_limit_rps",
+          "mining_mode",
+          "network_conditions"
+        ],
+        "properties": {
+          "uptime_seconds": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "last_block_seqno": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "state_source": {
+            "type": "string",
+            "enum": ["local", "remote"]
+          },
+          "fork_network": {
+            "type": "string",
+            "nullable": true
+          },
+          "fork_block_number": {
+            "type": "integer",
+            "nullable": true
+          },
+          "current_unix_time": {
+            "type": "integer",
+            "description": "Current virtual Unix timestamp used by Simulator."
+          },
+          "time_offset_seconds": {
+            "type": "integer",
+            "description": "Signed offset applied to wall-clock time in seconds."
+          },
+          "next_block_timestamp": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Pending one-shot timestamp for the next mined block, if configured."
+          },
+          "auto_mining": {
+            "type": "boolean"
+          },
+          "block_time_ms": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "rate_limit_rps": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true
+          },
+          "mining_mode": {
+            "$ref": "#/components/schemas/MiningMode"
+          },
+          "network_conditions": {
+            "$ref": "#/components/schemas/NetworkConditions"
+          }
+        }
+      }
+    }
+  }
+}

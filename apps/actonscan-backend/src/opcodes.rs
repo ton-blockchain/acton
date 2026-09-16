@@ -15,7 +15,7 @@ pub(crate) const MAX_TRANSACTION_EXAMPLES: usize = 2;
 /// Aggregate statistics for one message opcode.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, ToSchema)]
 pub struct OpcodeCount {
-    /// The first 32 bits of the message body after an optional bounce prefix.
+    /// The original payload's opcode, unwrapping legacy and rich bounced bodies.
     pub opcode: u32,
     /// Unique messages that contain this opcode.
     pub messages: u64,
@@ -251,11 +251,10 @@ impl OpcodeAccumulator {
     }
 }
 
-fn opcode_from_body(mut body: CellSlice<'_>, bounced: bool) -> Option<u32> {
-    if bounced {
-        body.load_u32().ok()?;
-    }
-    body.load_u32().ok()
+fn opcode_from_body(body: CellSlice<'_>, bounced: bool) -> Option<u32> {
+    tvm_ffi::message::original_message_body(body, bounced)?
+        .load_u32()
+        .ok()
 }
 
 #[cfg(test)]
@@ -282,6 +281,24 @@ mod tests {
         assert_eq!(
             opcode_from_body(bounced.as_slice().unwrap(), true),
             Some(0x1234_5678)
+        );
+
+        let mut rich = CellBuilder::new();
+        rich.store_u32(0xffff_fffe).unwrap();
+        rich.store_reference(regular).unwrap();
+        rich.store_reference(tycho_types::cell::Cell::default())
+            .unwrap();
+        rich.store_u8(0).unwrap();
+        rich.store_u32((-14_i32) as u32).unwrap();
+        rich.store_bit_zero().unwrap();
+        let rich = rich.build().unwrap();
+        assert_eq!(
+            opcode_from_body(rich.as_slice().unwrap(), true),
+            Some(0x1234_5678)
+        );
+        assert_eq!(
+            opcode_from_body(rich.as_slice().unwrap(), false),
+            Some(0xffff_fffe)
         );
     }
 

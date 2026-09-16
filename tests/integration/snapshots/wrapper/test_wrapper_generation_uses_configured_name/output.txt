@@ -1,1 +1,1 @@
-   Generated wrappers/FriendlyWallet.gen.tolk
+   Generated wrappers/ConfiguredId.gen.tolk

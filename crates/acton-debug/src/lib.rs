@@ -36,3 +36,15 @@ pub use types_render::{
 };
 
 pub(crate) use core::types_render;
+
+/// Identifies compiler or library helpers hidden from user-facing traces and stepping.
+///
+/// Only the function or method name must start with `__`; a receiver name or an
+/// embedded `__` does not make a public function internal. Generic suffixes are allowed.
+#[must_use]
+pub fn is_internal_function_name(function_name: &str) -> bool {
+    let leaf_name = function_name
+        .rsplit_once('.')
+        .map_or(function_name, |(_, name)| name);
+    leaf_name.starts_with("__")
+}

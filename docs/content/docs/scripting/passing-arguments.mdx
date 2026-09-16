@@ -163,6 +163,10 @@ fun main(owner: address, backup: address?) {
 acton script scripts/processAddress.tolk EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ null
 ```
 
+<AvailabilityBadge since="Acton 1.2" />
+
+For `any_address`, pass an internal address or `addr_none`. For `any_address?`, `null` is also allowed and is distinct from `addr_none`.
+
 ## Unsupported types
 
 The script CLI does not currently accept every ABI type directly. These parameter types are rejected:
@@ -170,5 +174,4 @@ The script CLI does not currently accept every ABI type directly. These paramete
 - `tuple`
 - `map` and `dict`
 - `builder`
-- `any_address`
 - structs, aliases, unions, `unknown`, and `lisp_list`

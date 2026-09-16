@@ -16,7 +16,7 @@ use axum::{
     responses(
         (
             status = 200,
-            description = "Parameter committed to the simulated localnet",
+            description = "Parameter committed to the simulator",
             body = NetworkConfigUpdate
         ),
         (

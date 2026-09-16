@@ -310,7 +310,7 @@ export function OverviewPage({
             <PanelMessage
               icon={<Boxes size={20} aria-hidden="true" />}
               title="No virtual environments"
-              description="Create a simulated or full localnet for this workspace"
+              description="Create a simulator or localnet for this workspace"
             />
           ) : (
             <>

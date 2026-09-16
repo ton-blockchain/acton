@@ -1,5 +1,6 @@
 pub mod app;
 pub mod blockchain;
+mod compilation_queue;
 pub mod compilers;
 pub mod config;
 pub mod payment;

@@ -5,6 +5,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+const EXCLUDED_TEMPLATE_DIRS: &[&str] = &[".git", "dist", "node_modules", "target"];
+
 fn main() {
     println!("cargo:rerun-if-env-changed=ACTON_RELEASE_CHANNEL");
 
@@ -79,7 +81,7 @@ fn compress_project_templates() {
     for template_name in TEMPLATE_NAMES {
         let template_dir = templates_dir.join(template_name);
         let mut files = Vec::new();
-        collect_files(&template_dir, &mut files);
+        collect_template_files(&template_dir, &mut files);
         files.sort();
 
         for path in files {
@@ -101,18 +103,29 @@ fn compress_project_templates() {
         .expect("failed to finish project templates compression");
 }
 
-fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) {
+fn collect_template_files(dir: &Path, files: &mut Vec<PathBuf>) {
     let entries =
         fs::read_dir(dir).unwrap_or_else(|err| panic!("failed to read {}: {err}", dir.display()));
 
     for entry in entries {
         let path = entry.expect("failed to read template entry").path();
         if path.is_dir() {
-            collect_files(&path, files);
+            if is_excluded_template_dir(&path) {
+                continue;
+            }
+            collect_template_files(&path, files);
         } else if path.is_file() {
             files.push(path);
         }
     }
+}
+
+fn is_excluded_template_dir(path: &Path) -> bool {
+    path.file_name().is_some_and(|name| {
+        EXCLUDED_TEMPLATE_DIRS
+            .iter()
+            .any(|excluded| name == OsStr::new(excluded))
+    })
 }
 
 fn compress_man() {

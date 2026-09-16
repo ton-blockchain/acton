@@ -13,7 +13,8 @@ use crate::retrace::{
 use acton_config::color::{OwoColorize, colors_enabled};
 use acton_config::test::BacktraceMode;
 use acton_debug::{
-    PrettyAddressFormat, PrettyRenderOptions, RenderedValue, exit_codes, render_tuple_as_tolk_type,
+    PrettyAddressFormat, PrettyRenderOptions, RenderedValue, exit_codes, is_internal_function_name,
+    render_tuple_as_tolk_type,
 };
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
@@ -28,6 +29,7 @@ use tolk_compiler::dynamic_unpack::{self, UnpackedValue};
 use tolk_compiler::types_kernel::TyIdx;
 use tolk_source_map::SourceLocation;
 use ton_api::Network;
+use tvm_ffi::message::original_message_body;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice, HashBytes};
@@ -87,11 +89,10 @@ mod preferred_opcode_message_name_tests {
 #[derive(Debug, Clone)]
 struct SendResult {
     tx: Transaction,
-    children_ids: Vec<i64>,
-    parent_lt: Option<i64>,
+    children_ids: Vec<u64>,
+    parent_lt: Option<u64>,
     #[allow(dead_code)]
     actions: Cell,
-    #[allow(dead_code)]
     out_messages: Vec<Cell>,
     externals: Vec<Cell>,
 }
@@ -552,12 +553,12 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                     children_ids: child_ids
                         .iter()
                         .filter_map(|id| match id {
-                            TupleItem::Int(int) => int.to_i64(),
+                            TupleItem::Int(int) => int.to_u64(),
                             _ => None,
                         })
                         .collect(),
                     parent_lt: match tuple.get(3) {
-                        Some(TupleItem::Int(int)) => int.to_i64(),
+                        Some(TupleItem::Int(int)) => int.to_u64(),
                         _ => None,
                     },
                     actions: actions.clone(),
@@ -682,49 +683,78 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
 
     /// Build transaction tree from `SendResult` list
     fn build_transaction_tree(&self, send_results: Vec<SendResult>) -> Vec<TransactionNode> {
-        let mut lt_to_result: HashMap<i64, SendResult> = HashMap::new();
-
-        for result in send_results {
-            lt_to_result.insert(result.tx.lt as i64, result);
+        // Logical time is unique only within an account. Include the full address
+        // so transactions in different accounts or workchains keep their branches.
+        let mut transactions_by_address_and_lt = HashMap::new();
+        for (index, result) in send_results.iter().enumerate() {
+            let address = result
+                .tx
+                .load_in_msg()
+                .ok()
+                .flatten()
+                .and_then(|message| match message.info {
+                    MsgInfo::Int(info) => Some(info.dst),
+                    MsgInfo::ExtIn(info) => Some(info.dst),
+                    MsgInfo::ExtOut(_) => None,
+                })
+                .or_else(|| {
+                    // Tick-tock transactions have no inbound message.
+                    result.out_messages.iter().find_map(|cell| {
+                        match cell.parse::<Message>().ok()?.info {
+                            MsgInfo::Int(info) => Some(info.src),
+                            MsgInfo::ExtOut(info) => Some(info.src),
+                            MsgInfo::ExtIn(_) => None,
+                        }
+                    })
+                });
+            if let Some(address) = address {
+                transactions_by_address_and_lt.insert((address, result.tx.lt), index);
+            }
         }
 
-        let mut roots = Vec::new();
+        let mut root_indices = Vec::new();
+        let mut child_indices = vec![Vec::new(); send_results.len()];
+        for (index, result) in send_results.iter().enumerate() {
+            let parent_index = result.parent_lt.and_then(|lt| {
+                let message = result.tx.load_in_msg().ok()??;
+                let MsgInfo::Int(info) = message.info else {
+                    return None;
+                };
+                transactions_by_address_and_lt.get(&(info.src, lt)).copied()
+            });
+            if let Some(parent_index) = parent_index {
+                child_indices[parent_index].push(index);
+            } else {
+                root_indices.push(index);
+            }
+        }
+
         let mut processed = HashSet::new();
-
-        for (lt, result) in &lt_to_result {
-            if processed.contains(lt) {
-                continue;
-            }
-
-            if result.parent_lt.is_none()
-                || !lt_to_result.contains_key(&result.parent_lt.unwrap_or(-1))
-            {
-                let node = Self::build_node_recursive(*lt, &lt_to_result, &mut processed);
-                if let Some(node) = node {
-                    roots.push(node);
-                }
-            }
-        }
-
+        let mut roots = root_indices
+            .into_iter()
+            .filter_map(|index| {
+                Self::build_node_recursive(index, &send_results, &child_indices, &mut processed)
+            })
+            .collect::<Vec<_>>();
         roots.sort_by_key(|node| node.send_result.tx.lt);
         roots
     }
 
     /// Recursively build transaction tree node
     fn build_node_recursive(
-        lt: i64,
-        lt_to_result: &HashMap<i64, SendResult>,
-        processed: &mut HashSet<i64>,
+        index: usize,
+        send_results: &[SendResult],
+        child_indices: &[Vec<usize>],
+        processed: &mut HashSet<usize>,
     ) -> Option<TransactionNode> {
-        if !processed.insert(lt) {
+        if !processed.insert(index) {
             return None;
         }
 
-        let result = lt_to_result.get(&lt)?;
-
         let mut children = Vec::new();
-        for child_lt in &result.children_ids {
-            let child_node = Self::build_node_recursive(*child_lt, lt_to_result, processed);
+        for &child_index in &child_indices[index] {
+            let child_node =
+                Self::build_node_recursive(child_index, send_results, child_indices, processed);
             if let Some(child_node) = child_node {
                 children.push(child_node);
             }
@@ -732,7 +762,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         children.sort_by_key(|node| node.send_result.tx.lt);
 
         Some(TransactionNode {
-            send_result: result.clone(),
+            send_result: send_results[index].clone(),
             children,
         })
     }
@@ -1260,10 +1290,10 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         direction: MessageBodyDirection,
         bounced: bool,
     ) -> Option<DecodedMessageBody> {
-        let (opcode, body_tail) = Self::opcode_and_body_tail_after_bounce_prefix(body, bounced)
-            .map_or((None, None), |(opcode, body_tail)| {
-                (Some(opcode), Some(body_tail))
-            });
+        let body = original_message_body(body, bounced)?;
+        let mut parser = body;
+        let opcode = parser.load_u32().ok();
+        let body_tail = opcode.map(|_| parser);
 
         if let Some(decoded) = Self::try_decode_text_comment_body(opcode, body_tail) {
             return Some(decoded);
@@ -1276,12 +1306,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         };
         for abi in abis {
             let body_candidates = Self::compiler_message_candidates(&abi, direction, opcode);
-            if let Some(decoded) = self.try_decode_message_body_types(
-                body,
-                &abi,
-                body_candidates,
-                if bounced { 32 } else { 0 },
-            ) {
+            if let Some(decoded) = self.try_decode_message_body_types(body, &abi, body_candidates) {
                 return Some(decoded);
             }
         }
@@ -1540,22 +1565,6 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         })
     }
 
-    fn opcode_after_bounce_prefix(body: CellSlice<'_>, bounced: bool) -> Option<u32> {
-        Self::opcode_and_body_tail_after_bounce_prefix(body, bounced).map(|(opcode, _)| opcode)
-    }
-
-    fn opcode_and_body_tail_after_bounce_prefix(
-        body: CellSlice<'_>,
-        bounced: bool,
-    ) -> Option<(u32, CellSlice<'_>)> {
-        let mut parser = body;
-        if bounced {
-            parser.load_u32().ok()?;
-        }
-        let opcode = parser.load_u32().ok()?;
-        Some((opcode, parser))
-    }
-
     fn try_decode_text_comment_body(
         opcode: Option<u32>,
         body_tail: Option<CellSlice<'_>>,
@@ -1597,17 +1606,12 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         body: CellSlice<'_>,
         abi: &ContractABI,
         candidates: I,
-        prefix_to_skip: u16,
     ) -> Option<DecodedMessageBody>
     where
         I: IntoIterator<Item = TyIdx>,
     {
         for body_ty_idx in candidates {
             let mut parser = body;
-            if prefix_to_skip > 0 && parser.skip_first(prefix_to_skip, 0).is_err() {
-                continue;
-            }
-
             let Ok(data) = dynamic_unpack::unpack_from_slice(&mut parser, abi, body_ty_idx) else {
                 continue;
             };
@@ -2167,14 +2171,17 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
 
     #[must_use]
     pub(crate) fn format_backtrace(backtrace: &[TolkBacktraceFrame]) -> Vec<String> {
-        let max_function_name_len = backtrace
+        // Internal helpers should neither appear in user traces nor widen visible frames.
+        let visible_frames = backtrace
             .iter()
+            .filter(|frame| !is_internal_function_name(&frame.function_name));
+        let max_function_name_len = visible_frames
+            .clone()
             .map(|frame| frame.function_name.len() + 2)
             .max()
             .unwrap_or(0);
 
-        backtrace
-            .iter()
+        visible_frames
             .map(|frame| {
                 format!(
                     "{:<width$} at {}",
@@ -2530,11 +2537,11 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             RelaxedMsgInfo::Int(info) => info.bounced,
             RelaxedMsgInfo::ExtOut(_) => false,
         };
-        Self::opcode_after_bounce_prefix(in_msg.body, bounced)
+        Self::opcode_from_body(in_msg.body, bounced)
     }
 
     fn opcode_from_body(body: CellSlice<'_>, bounced: bool) -> Option<u32> {
-        Self::opcode_after_bounce_prefix(body, bounced)
+        original_message_body(body, bounced)?.load_u32().ok()
     }
 
     fn color_message_name(name: &str) -> String {
@@ -3535,6 +3542,10 @@ impl FormatterContext<'_> {
 
     #[must_use]
     pub fn format_get_method_assert_failure_title(failure: &GetMethodAssertFailure) -> String {
+        if let Some(message) = &failure.message {
+            return format!("Get method {}: {message}", failure.get_method_presentation);
+        }
+
         if failure.vm_exit_code == 11 {
             if let Some(suggested_name) = &failure.suggested_name {
                 return format!(
@@ -3565,7 +3576,8 @@ impl FormatterContext<'_> {
     pub fn format_get_method_assert_failure(&self, failure: &GetMethodAssertFailure) -> String {
         let mut output = Self::format_get_method_assert_failure_title(failure);
 
-        if (failure.vm_exit_code == 11 || failure.vm_exit_code == 2)
+        if failure.message.is_none()
+            && (failure.vm_exit_code == 11 || failure.vm_exit_code == 2)
             && failure.missing_libraries.is_empty()
         {
             return output;

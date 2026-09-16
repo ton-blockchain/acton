@@ -1,0 +1,21 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling getter
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/get_method_meta.test.tolk (1 test)
+  ✗ metadata is available before decoding [TIME]
+    └─ Error: Get method 'empty' returned '[]' that cannot be deserialized to 'int'. Make sure you passed all parameters to the get method.
+    └─ Test output:
+       GetMethodMeta {
+           gasUsed: 591,
+           exitCode: 0,
+       }
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

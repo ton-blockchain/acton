@@ -1,0 +1,41 @@
+warning[S009]: prefer `grams()` over `ton()`
+  --> [ROOT]/contracts/main[LINE]
+  |
+2 |             const amount = ton("0.1");
+  |                            ^^^ use the standard-library function `grams`
+
+help: replace `ton` with `grams`
+  --> [ROOT]/contracts/main[LINE]
+  |
+2 |             const amount = ton("0.1");
+  |                            ^^^ grams
+
+warning[S009]: prefer `grams()` over `ton()`
+  --> [ROOT]/contracts/main[LINE]
+  |
+4 |                 value: coins = ton("0.2")
+  |                                ^^^ use the standard-library function `grams`
+
+help: replace `ton` with `grams`
+  --> [ROOT]/contracts/main[LINE]
+  |
+4 |                 value: coins = ton("0.2")
+  |                                ^^^ grams
+
+warning[S009]: prefer `grams()` over `ton()`
+  --> [ROOT]/contracts/main[LINE]
+  |
+7 |                 return ton("0.3") + grams("0.4");
+  |                        ^^^ use the standard-library function `grams`
+
+help: replace `ton` with `grams`
+  --> [ROOT]/contracts/main[LINE]
+  |
+7 |                 return ton("0.3") + grams("0.4");
+  |                        ^^^ grams
+
+
+3 issues can be fixed automatically, rerun with --fix flag.
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain S009

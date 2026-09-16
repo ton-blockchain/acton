@@ -6,7 +6,7 @@ use crate::ast::{
     dangerous_send_mode_missing_safety_comment, deprecated_symbol_use, dict_type_use,
     duplicated_condition, enum_cast_missing_safety_comment, explicit_return_type,
     identical_conditional_branches, missing_contract_header, negated_is_type_can_use_not_is,
-    no_bounce_handler, no_global_variables, several_not_null_assertions,
+    no_bounce_handler, no_global_variables, prefer_grams, several_not_null_assertions,
     throw_requires_documented_error_value, throw_requires_errors_enum,
     unnecessary_not_null_assertion,
 };
@@ -26,7 +26,7 @@ use std::sync::Arc;
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{FileId, SymbolId};
 use tolk_resolver::resolve_index::FileResolveIndex;
-use tolk_resolver::{AstNodeSpanExt, NameUse, Resolved};
+use tolk_resolver::{AstNodeSpanExt, NameUse, Resolved, SymbolKind};
 use tolk_syntax::{
     AsCast, Assert, Call, Expr, ExprStmt, Func, FunctionLike, GetMethod, GlobalVar, HasAnnotations,
     HasGenericParams, HasName, Ident, If, IfAlt, InstanceArg, Method, NotNull, SourceFile, Ternary,
@@ -72,6 +72,7 @@ pub struct Checker<'a> {
     pub diagnostics: Vec<Diagnostic>,
     pub settings: HashMap<Rule, LintLevel>,
     project_root: Option<PathBuf>,
+    has_stdlib_grams: bool,
 
     /// Map from file ID to a map of line number to list of suppressed rule names/codes
     pub file_suppressions: FxHashMap<FileId, FxHashMap<usize, Vec<String>>>,
@@ -141,6 +142,16 @@ impl<'a> Checker<'a> {
         type_db: &'a mut TypeDb<'a>,
         body_types: &'a WorkspaceBodyTypes,
     ) -> Self {
+        let index = type_db.project_index;
+        let has_stdlib_grams = index.global_symbols().get("grams").is_some_and(|symbols| {
+            symbols.iter().any(|id| {
+                file_db.is_stdlib_file(id.file_id)
+                    && index
+                        .resolve_symbol(*id)
+                        .is_some_and(|symbol| matches!(symbol.kind, SymbolKind::Function { .. }))
+            })
+        });
+
         Self {
             file_db,
             type_db,
@@ -149,6 +160,7 @@ impl<'a> Checker<'a> {
             diagnostics: Vec::new(),
             settings: HashMap::new(),
             project_root: None,
+            has_stdlib_grams,
             file_suppressions: FxHashMap::default(),
             line_starts: FxHashMap::default(),
             #[cfg(feature = "profile_rules")]
@@ -937,6 +949,21 @@ impl CheckerWalker<'_, '_> {
                 Rule::DictTypeUse,
                 dict_type_use::check_resolved_reference(self.checker, self.file_id, node, symbol)
             );
+            let mut prefers_grams = false;
+            run_rule!(self.checker, Rule::PreferGrams, {
+                prefers_grams = prefer_grams::check_resolved_reference(
+                    self.checker,
+                    self.file_id,
+                    node,
+                    symbol,
+                    resolve_index,
+                )
+                .is_some();
+            });
+            if prefers_grams {
+                return;
+            }
+
             run_rule!(
                 self.checker,
                 Rule::DeprecatedSymbolUse,

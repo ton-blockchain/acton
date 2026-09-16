@@ -27,7 +27,9 @@ use crate::{
         SourceBundleCompiler, SourceBundleFile, SourceBundleInput, SourceBundleSource,
         compute_source_bundle_hash,
     },
-    source_storage::{CompilerMetadata, SourceStorageFile, StoreSourceBundleRequest},
+    source_storage::{
+        CompilerMetadata, SourceStorageFile, StoreSourceBundleRequest, StoredSourceBundle,
+    },
     state::AppState,
     verification::{ResolvedVerificationTarget, VerificationTarget},
 };
@@ -57,10 +59,10 @@ const MAX_SOURCE_PATH_CHARS: usize = 128;
         (status = 401, description = "A valid API key is required to set verified_at or skip payment", body = crate::error::ErrorResponse),
         (status = 402, description = "Payment is missing or invalid", body = crate::error::ErrorResponse),
         (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
-        (status = 409, description = "Payment is already used or in progress", body = crate::error::ErrorResponse),
+        (status = 409, description = "Payment is already used or in progress, or the address exists on both TON networks", body = crate::error::ErrorResponse),
         (status = 413, description = "The request exceeds the configured upload limit", body = crate::error::ErrorResponse),
         (status = 502, description = "Compiler, blockchain, payment provider, or source storage failure", body = crate::error::ErrorResponse),
-        (status = 503, description = "Payment history recovery is in progress", body = crate::error::ErrorResponse)
+        (status = 503, description = "Verifier is read-only or payment history recovery is in progress", body = crate::error::ErrorResponse)
     ),
     params(
         ("X-Verifier-Key" = Option<String>, Header, description = "API key used to authorize verified_at and verification without payment")
@@ -167,21 +169,19 @@ async fn handle_multipart(
     let target = VerificationTarget { address, code_hash };
 
     let resolved_target = state.verification_service().resolve_target(target).await?;
-    if let Some(bundle) = state
-        .verification_registry()
-        .verified_bundle(VerifiedBundleRequest {
-            code_hash: resolved_target.code_hash.clone(),
-        })
-        .await?
-        .bundle
-    {
-        return Ok(Json(VerifyResponse {
-            code_hash: resolved_target.code_hash,
-            compiled_code_hash: None,
-            verification_result: VerificationResult::AlreadyVerified,
-            source_bundle_hash: Some(bundle.manifest.source_bundle_hash),
-            storage_revision: Some(bundle.storage_revision),
-        }));
+    let verified_bundle = find_verified_bundle(state, &resolved_target.code_hash).await?;
+
+    let has_submitted_payment = !has_valid_api_key
+        && tx_hash
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty());
+
+    if !has_submitted_payment && let Some(bundle) = &verified_bundle {
+        return Ok(already_verified_response(resolved_target.code_hash, bundle));
+    }
+
+    if verified_bundle.is_none() && state.read_only() {
+        return Err(ApiError::read_only());
     }
 
     let payment_claim = if has_valid_api_key {
@@ -190,13 +190,7 @@ async fn handle_multipart(
         let tx_hash = non_empty_text(tx_hash).ok_or_else(|| {
             ApiError::payment_required("missing required field: tx_hash".to_owned())
         })?;
-        let tx_hash = normalize_hash(&tx_hash);
-        if !is_valid_hash(&tx_hash) {
-            return Err(ApiError::bad_request(
-                "payment_tx_hash_invalid: transaction hash must be 64 hexadecimal characters or a 32-byte base64 value"
-                    .to_owned(),
-            ));
-        }
+        let tx_hash = normalize_payment_transaction_hash(&tx_hash)?;
         Some(
             state
                 .payment_verifier()
@@ -212,15 +206,10 @@ async fn handle_multipart(
     let task = state.spawn_background_task(async move {
         let started = Instant::now();
         let target_hash = resolved_target.code_hash.clone();
-        tracing::info!(
-            operation = "verify",
-            target = %target_hash,
-            outcome = "started",
-            "verification started"
-        );
-        let result = verify_unverified(
+        let result = verify_target(
             &task_state,
             resolved_target,
+            verified_bundle,
             language,
             compile_params,
             sources,
@@ -249,7 +238,7 @@ async fn handle_multipart(
             target = %target_hash,
             duration_ms = started.elapsed().as_millis(),
             outcome = if result.is_ok() { "completed" } else { "failed" },
-            "verification finished"
+            "verification request finished"
         );
 
         result
@@ -260,9 +249,10 @@ async fn handle_multipart(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn verify_unverified(
+async fn verify_target(
     state: &AppState,
     resolved_target: ResolvedVerificationTarget,
+    verified_bundle: Option<StoredSourceBundle>,
     language: String,
     compile_params: Value,
     sources: Option<Vec<SourceMetadata>>,
@@ -270,12 +260,31 @@ async fn verify_unverified(
     verified_at: Option<u64>,
     payment_tx_hash: Option<String>,
 ) -> Result<Json<VerifyResponse>, ApiError> {
+    let verified_bundle = match verified_bundle {
+        Some(bundle) => Some(bundle),
+        None => find_verified_bundle(state, &resolved_target.code_hash).await?,
+    };
+    if let Some(bundle) = verified_bundle {
+        return Ok(already_verified_response(
+            resolved_target.code_hash,
+            &bundle,
+        ));
+    }
+
+    tracing::info!(
+        operation = "verify",
+        target = %resolved_target.code_hash,
+        outcome = "started",
+        "verification started"
+    );
+
     let CompileInput {
         configuration,
         sources: mut retained_sources,
     } = prepare_compile_input(&language, &compile_params, sources, files)?;
     let compiled = run_compiler(
         state,
+        &resolved_target.code_hash,
         &configuration,
         &compile_params,
         retained_sources.clone(),
@@ -363,20 +372,23 @@ async fn verify_unverified(
 
 async fn run_compiler(
     state: &AppState,
+    code_hash: &str,
     configuration: &CompileConfiguration,
     compile_params: &Value,
     sources: Vec<CompileSource>,
 ) -> Result<CompileOutput, CompilerError> {
     state
-        .compiler_service()
-        .compile(CompileRequest {
-            language: configuration.language.clone(),
-            compiler_version: configuration.compiler_version.clone(),
-            entrypoint: configuration.entrypoint.clone(),
-            import_mappings: configuration.import_mappings.clone(),
-            compile_params: compile_params.clone(),
-            sources,
-        })
+        .compile(
+            code_hash,
+            CompileRequest {
+                language: configuration.language.clone(),
+                compiler_version: configuration.compiler_version.clone(),
+                entrypoint: configuration.entrypoint.clone(),
+                import_mappings: configuration.import_mappings.clone(),
+                compile_params: compile_params.clone(),
+                sources,
+            },
+        )
         .await
 }
 
@@ -443,6 +455,43 @@ fn storage_files_from_sources(sources: &[CompileSource]) -> Vec<SourceStorageFil
 
 fn non_empty_text(value: Option<String>) -> Option<String> {
     value.filter(|value| !value.trim().is_empty())
+}
+
+fn normalize_payment_transaction_hash(value: &str) -> Result<String, ApiError> {
+    let transaction_hash = normalize_hash(value);
+    if !is_valid_hash(&transaction_hash) {
+        return Err(ApiError::bad_request(
+            "payment_tx_hash_invalid: transaction hash must be 64 hexadecimal characters or a 32-byte base64 value"
+                .to_owned(),
+        ));
+    }
+    Ok(transaction_hash)
+}
+
+fn already_verified_response(
+    code_hash: String,
+    bundle: &StoredSourceBundle,
+) -> Json<VerifyResponse> {
+    Json(VerifyResponse {
+        code_hash,
+        compiled_code_hash: None,
+        verification_result: VerificationResult::AlreadyVerified,
+        source_bundle_hash: Some(bundle.manifest.source_bundle_hash.clone()),
+        storage_revision: Some(bundle.storage_revision.clone()),
+    })
+}
+
+async fn find_verified_bundle(
+    state: &AppState,
+    code_hash: &str,
+) -> Result<Option<StoredSourceBundle>, ApiError> {
+    Ok(state
+        .verification_registry()
+        .verified_bundle(VerifiedBundleRequest {
+            code_hash: code_hash.to_owned(),
+        })
+        .await?
+        .bundle)
 }
 
 fn prepare_compile_input(
@@ -773,7 +822,7 @@ pub(super) struct VerifyMultipartRequest {
     /// Requires a valid `X-Verifier-Key` header.
     #[schema(nullable = false, example = 1_700_000_000_000_u64)]
     verified_at: Option<u64>,
-    /// Finalized TON testnet transaction hash for this verification attempt.
+    /// Finalized TON transaction hash for this verification attempt.
     tx_hash: Option<String>,
     #[schema(
         value_type = String,

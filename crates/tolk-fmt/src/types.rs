@@ -29,7 +29,8 @@ pub fn print_type<'a>(ctx: &Context<'_>, typ: &Type) -> Option<RcDoc<'a>> {
     Some(RcDoc::concat(docs))
 }
 
-fn print_type_naked<'a>(ctx: &Context<'_>, typ: &Type) -> Option<RcDoc<'a>> {
+/// Prints a type whose outer comments are owned by its enclosing list or wrapper.
+pub(crate) fn print_type_naked<'a>(ctx: &Context<'_>, typ: &Type) -> Option<RcDoc<'a>> {
     match typ {
         Type::TypeIdent(ident) => Some(common::print_node_text(ctx, &ident.0)?),
         Type::TypeInstantiatedTs(inst) => print_type_instantiated_ts(ctx, inst),
@@ -50,8 +51,8 @@ pub fn print_union_type<'a>(ctx: &Context<'_>, union: &UnionType) -> Option<RcDo
     collect_union_parts(union, &mut parts);
 
     let mut parts_docs = vec![];
-    for part in parts {
-        let part_doc = print_type(ctx, &part)?;
+    for part in &parts {
+        let part_doc = print_type(ctx, part)?;
         parts_docs.push(part_doc);
     }
 
@@ -61,6 +62,12 @@ pub fn print_union_type<'a>(ctx: &Context<'_>, union: &UnionType) -> Option<RcDo
         let kind = p.kind();
         kind == "type_alias_declaration"
     });
+    let parenthesized_with_comments = union
+        .0
+        .parent()
+        .is_some_and(|parent| parent.kind() == "parenthesized_type")
+        && comments::has_inline_line_comment_in_subtree(ctx, union.0);
+
     // we want to preserve user's newlines
     let source_has_newline = union
         .0
@@ -98,14 +105,28 @@ pub fn print_union_type<'a>(ctx: &Context<'_>, union: &UnionType) -> Option<RcDo
     ]);
 
     let mut tail_docs = vec![];
-    for doc in rest {
-        tail_docs.push(RcDoc::line());
+    for (i, doc) in rest.iter().enumerate() {
+        // A line comment on the preceding variant must end before the next `|`.
+        tail_docs.push(
+            if parenthesized_with_comments
+                || comments::has_inline_line_comment_in_subtree(ctx, parts[i].syntax())
+            {
+                RcDoc::hardline()
+            } else {
+                RcDoc::line()
+            },
+        );
         tail_docs.push(RcDoc::text("| "));
         tail_docs.push(force_alias_breaks(doc.clone()));
     }
 
-    let union_doc =
-        RcDoc::concat([RcDoc::softline_(), first_doc, RcDoc::concat(tail_docs)]).nest(4);
+    let union_doc = RcDoc::concat([RcDoc::softline_(), first_doc, RcDoc::concat(tail_docs)]);
+    // Multiline parentheses already indent their contents, including every union variant.
+    let union_doc = if parenthesized_with_comments {
+        union_doc
+    } else {
+        union_doc.nest(4)
+    };
 
     if in_type_alias {
         return Some(if source_has_newline {
@@ -144,6 +165,17 @@ pub fn print_parenthesized_type<'a>(
 ) -> Option<RcDoc<'a>> {
     let inner = paren.inner()?;
     let inner_doc = print_type(ctx, &inner)?;
+
+    // A line comment requires multiline parentheses so it cannot swallow the closing delimiter.
+    if comments::has_inline_line_comment_in_subtree(ctx, inner.syntax()) {
+        return Some(RcDoc::concat([
+            RcDoc::text("("),
+            RcDoc::concat([RcDoc::hardline(), inner_doc]).nest(4),
+            RcDoc::hardline(),
+            RcDoc::text(")"),
+        ]));
+    }
+
     Some(RcDoc::concat([
         RcDoc::text("("),
         inner_doc,
@@ -154,27 +186,28 @@ pub fn print_parenthesized_type<'a>(
 #[must_use]
 pub fn print_tensor_type<'a>(ctx: &Context<'_>, tensor: &TensorType) -> Option<RcDoc<'a>> {
     let elements: Vec<_> = tensor.elements().collect();
-    print_tuple_tensor_type(ctx, &elements, "(", ")")
+    print_tuple_tensor_type(ctx, &elements, tensor.0, "(", ")")
 }
 
 #[must_use]
 pub fn print_tuple_type<'a>(ctx: &Context<'_>, tuple: &TupleType) -> Option<RcDoc<'a>> {
     let elements: Vec<_> = tuple.elements().collect();
-    print_tuple_tensor_type(ctx, &elements, "[", "]")
+    print_tuple_tensor_type(ctx, &elements, tuple.0, "[", "]")
 }
 
 fn print_tuple_tensor_type<'a>(
     ctx: &Context,
     elements: &[Type],
+    node: tree_sitter::Node<'_>,
     open_quote: &'a str,
     close_quote: &'a str,
 ) -> Option<RcDoc<'a>> {
     common::print_list(
         ctx,
         elements,
-        print_type,
+        print_type_naked,
         Type::syntax,
-        |_| vec![],
+        |_| common::collect_lonely_comments(node),
         common::ListOptions {
             brackets: (RcDoc::text(open_quote), RcDoc::text(close_quote)),
             never_break_if_items_lt: 3,
@@ -203,25 +236,22 @@ pub fn print_type_instantiated_ts<'a>(
     let args = inst.arguments()?;
     let types: Vec<_> = args.types().collect();
 
-    if let [single_type] = types.as_slice()
-        && single_type_argument_should_stay_inline(single_type)
-    {
-        let single_type_doc = print_type(ctx, single_type)?;
-        return Some(RcDoc::concat([
-            name_doc,
-            RcDoc::text("<"),
-            single_type_doc,
-            RcDoc::text(">"),
-        ]));
-    }
-
     let types_doc = common::print_list(
         ctx,
         &types,
-        print_type,
+        print_type_naked,
         Type::syntax,
         |_| vec![],
-        common::ListOptions::triangle_bracket_list(),
+        common::ListOptions {
+            never_break_if_items_lt: if matches!(types.as_slice(), [single_type]
+                if single_type_argument_should_stay_inline(single_type))
+            {
+                2
+            } else {
+                0
+            },
+            ..common::ListOptions::triangle_bracket_list()
+        },
     )?;
 
     Some(RcDoc::concat([name_doc, types_doc]))

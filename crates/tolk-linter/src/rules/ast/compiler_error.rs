@@ -11,7 +11,7 @@ use tolk_macros::ViolationMetadata;
 /// - In machine-readable output, compiler errors use code `C001`; parse errors
 ///   are grouped under `compiler-error` but currently have no `code` field.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct CompilerError;
 
 impl Violation for CompilerError {

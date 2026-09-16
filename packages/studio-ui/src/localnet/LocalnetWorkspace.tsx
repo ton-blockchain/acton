@@ -102,7 +102,7 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/dashboard": "Network status and recent activity",
   "/network/health": "API readiness, indexer lag and service health",
   "/network/config": "Update on-chain configuration parameters",
-  "/network/activity": "Generate on-chain transfers, tokens and NFTs in your Full localnet",
+  "/network/activity": "Generate on-chain transfers, tokens and NFTs in your Localnet",
   "/network": "Throughput, topology and consensus health",
   "/network/nodes": "Node availability, synchronization and diagnostics",
   "/network/validators": "Elections, validator sets and block production",
@@ -126,8 +126,8 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/integrate": "Connect Acton projects, applications and TON-compatible tools to this network",
   "/api-reference/v2": "Explore the v2 API",
   "/api-reference/v3": "Explore the v3 API",
-  "/api-reference/admin": "Inspect and manage Full localnet services",
-  "/api-reference/config": "Read Full localnet configuration and connection endpoints",
+  "/api-reference/admin": "Inspect and manage Localnet services",
+  "/api-reference/config": "Read Localnet configuration and connection endpoints",
   "/api-reference/control": "Explore network management methods",
   "/api-calls": "Review requests made to this environment",
 }
@@ -970,8 +970,8 @@ const LocalnetAuthOverlay: FC<LocalnetAuthOverlayProps> = ({
   const title = required ? "Localnet API token required" : "Localnet API token"
   const description =
     required && localnetApiToken
-      ? "The saved token was rejected by simulated localnet — paste its current API token"
-      : "For simulated localnet started with --require-auth, use the token printed at startup or set through ACTON_LOCALNET_AUTH_TOKEN — it is saved only in this browser"
+      ? "The saved token was rejected by simulator — paste its current API token"
+      : "For simulator started with --require-auth, use the token printed at startup or set through ACTON_LOCALNET_AUTH_TOKEN — it is saved only in this browser"
 
   return (
     <Dialog

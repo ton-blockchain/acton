@@ -1,9 +1,9 @@
 ---
-title: Private overlays in full localnet
-description: Configure private TON overlays between selected nodes in a full localnet.
+title: Private overlays in Localnet
+description: Configure private TON overlays between selected nodes in a Localnet.
 ---
 
-Full localnet can connect selected nodes through private TON overlays. Each overlay
+Localnet can connect selected nodes through private TON overlays. Each overlay
 member sends blocks and external messages to the other members. A node can belong
 to several overlays, and an overlay can connect additional nodes without including
 the genesis node.
@@ -14,13 +14,13 @@ does not automatically relay it to another private overlay with overlapping memb
 
 ## Create nodes and apply a configuration
 
-Start a full localnet and add nodes:
+Start a Localnet and add nodes:
 
 ```sh
-acton full-localnet start overlay-demo --detach
-acton full-localnet node overlay-demo add relay-a
-acton full-localnet node overlay-demo add relay-b
-acton full-localnet status overlay-demo --json
+acton localnet start overlay-demo --detach
+acton localnet node overlay-demo add relay-a
+acton localnet node overlay-demo add relay-b
+acton localnet status overlay-demo --json
 ```
 
 Use the stable `id` values from the status response's `nodes` array. For a newly
@@ -48,7 +48,7 @@ Save this as `overlays.json`, replacing the node IDs if necessary:
 Apply the configuration:
 
 ```sh
-acton full-localnet overlays overlay-demo --config overlays.json
+acton localnet overlays overlay-demo --config overlays.json
 ```
 
 The command waits until the configuration is applied to the nodes; completion
@@ -66,7 +66,7 @@ Cold snapshots include overlay configuration and restore it with the saved nodes
 Run the same command without `--config` to print the saved configuration as JSON:
 
 ```sh
-acton full-localnet overlays overlay-demo
+acton localnet overlays overlay-demo
 ```
 
 Overlay names must be unique and contain 1 to 80 ASCII letters, digits, hyphens,

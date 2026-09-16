@@ -23,7 +23,7 @@ use tolk_resolver::file_index::{FileId, Span};
 /// import "@libs/math";
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.1")]
+#[violation_metadata(stable_since = "v1.0.0")]
 pub struct ImportPathCanUseMappings;
 
 impl Violation for ImportPathCanUseMappings {

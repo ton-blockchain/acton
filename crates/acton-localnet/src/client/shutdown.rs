@@ -14,6 +14,8 @@ impl Client {
     /// Requests shutdown and waits for durable cleanup results and released ownership.
     /// HTTP becoming unavailable is expected during shutdown and is not completion.
     /// A replacement service is never stopped or mistaken for the original owner.
+    /// A failure before deployment remains recorded even after successful shutdown:
+    /// there are no Docker resources to clean up in that case.
     pub async fn shutdown(&self) -> Result<(), Error> {
         let requested = self
             .request::<Value>(Method::POST, "/v1/shutdown", None)
@@ -47,8 +49,14 @@ impl Client {
 
             if !locked {
                 let network: Network = storage::read_json(&self.root.join("network.json")).await?;
+                let runtime_path = self.root.join("runtime.json");
+                let failed_before_deployment = network.status == Status::Failed
+                    && !tokio::fs::try_exists(&runtime_path)
+                        .await
+                        .map_err(|error| Error::storage(&runtime_path, error))?;
                 if descriptor.is_none()
-                    && matches!(network.status, Status::Stopped | Status::Deleted)
+                    && (matches!(network.status, Status::Stopped | Status::Deleted)
+                        || failed_before_deployment)
                 {
                     return Ok(());
                 }

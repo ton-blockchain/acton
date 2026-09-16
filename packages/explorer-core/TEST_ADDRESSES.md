@@ -26,6 +26,7 @@ These addresses are not fixtures and their balances or recent history can change
 | [`EQAlL9ItlyCN7VbZyDV3lLxoTcwPCl3zUT62xB9VAwJ_USDC`](https://actonscan.com/address/EQAlL9ItlyCN7VbZyDV3lLxoTcwPCl3zUT62xB9VAwJ_USDC?network=mainnet) | Mobile account header, address suffix preservation, QR, favorite, edit, and copy action layout | 2026-07-30 |
 | [`EQDXgkYbrxDpRZD6PUZd0jwdjZmYYQd7l5YOE2UeXunLD8Wm`](https://actonscan.com/address/EQDXgkYbrxDpRZD6PUZd0jwdjZmYYQd7l5YOE2UeXunLD8Wm?network=mainnet) | Wallet with many Renew DNS actions and TON DNS collectibles; check generated domain artwork in previews, the Collectibles grid and history chips | 2026-09-14 |
 | [`EQCk6gynsiRSPuwWDv89LNr5NpPxP8nsjHpdoJUVBQjenCK3`](https://actonscan.com/address/EQCk6gynsiRSPuwWDv89LNr5NpPxP8nsjHpdoJUVBQjenCK3?network=mainnet) | `bybit.ton` DNS NFT; generated domain artwork in the overview and metadata dialog, with a local NFT placeholder when the image service is unavailable | 2026-09-14 |
+| [`EQCdqXGvONLwOr3zCNX5FjapflorB6ZsOdcdfLrjsDLt3Fy9`](https://actonscan.com/address/EQCdqXGvONLwOr3zCNX5FjapflorB6ZsOdcdfLrjsDLt3Fy9?network=mainnet#nfts) | Load more collectibles: `With metadata` shows 52 items; `All` appends 19 items without metadata. Search `1854`: it appears only in `All`, with a local placeholder and `Unknown collection`. This NFT and items `3902`, `2169`, `1076` have no resolved item or collection metadata in Toncenter (`valid: false`); their metadata URLs at `192.236.162.114` time out | 2026-09-14 |
 | [`EQD5MEMHNCHR-zkATB3elGUvRfNiZAlK_luIj0matDI1xCIC`](https://actonscan.com/address/EQD5MEMHNCHR-zkATB3elGUvRfNiZAlK_luIj0matDI1xCIC?network=mainnet) | Wallet with a Change DNS action in transaction `e9bffd9d…aad9a0`, useful for checking that the affected domain is rendered as an NFT chip instead of the raw DNS record-category hash | 2026-09-08 |
 | [`EQDoxOcDo0EkHBNVL6tFfH5K-BAWI9PSO44zlgWdOwgeqw7m`](https://actonscan.com/address/EQDoxOcDo0EkHBNVL6tFfH5K-BAWI9PSO44zlgWdOwgeqw7m?network=mainnet) | Wallet V5 with repeated 250-action bulk sends, useful for action pagination; Simulator: fetch wallet ID and seqno, build a 0.1 GRAM self-message with a comment, emulate with Ignore CHKSIG and verify compute/action exit code 0 | 2026-09-08 |
 | [`EQDYzZmfsrGzhObKJUw4gzdeIxEai3jAFbiGKGwxvxHinaPP`](https://actonscan.com/address/EQDYzZmfsrGzhObKJUw4gzdeIxEai3jAFbiGKGwxvxHinaPP?network=mainnet) | Wallet with more than 1,000 NFTs and safety-filtered items in early batches, useful for checking uninterrupted incremental loading in the NFTs tab | 2026-07-31 |
@@ -109,13 +110,13 @@ The early `v0 -> v1 -> v0 -> v1` rollback means this history cannot be found saf
 | --- | --- | --- |
 | [`db94261627fb6a8282159d45e03d287a6417905887c77d1e6172b4f50a3a9f0e`](https://actonscan.com/verified/db94261627fb6a8282159d45e03d287a6417905887c77d1e6172b4f50a3a9f0e?network=testnet) | Root entrypoint `comment_payer_hl.tolk` with a `main` marker and generated ABI under `output`; source-tree toggle must not overlap the first file or marker, including at narrow desktop widths | 2026-09-14 |
 
-## Full localnet
+## Localnet
 
 These accounts belong to an isolated local test environment, not a public network. Recreate the imported account from the fixture in `crates/acton-studio/src/local_process/imports/tests.rs` when the environment is no longer available
 
 | Address | What to verify | Last checked |
 | --- | --- | --- |
-| `kQBFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRdNV` | After importing into a running full localnet, Explorer shows an active account with 1 GRAM and no transaction history; Contracts shows its imported name. Verified on two running nodes, with code and data matching the source and an unrelated account preserved | 2026-09-07 |
+| `kQBFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRdNV` | After importing into a running localnet, Explorer shows an active account with 1 GRAM and no transaction history; Contracts shows its imported name. Verified on two running nodes, with code and data matching the source and an unrelated account preserved | 2026-09-07 |
 
 ## Adding an entry
 

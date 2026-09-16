@@ -4,6 +4,246 @@ use crate::common::check;
 use expect_test::expect;
 
 #[test]
+fn test_comment_only_file_is_preserved() {
+    check(
+        "// A module placeholder\n// More context\n",
+        expect![[r"
+            // A module placeholder
+            // More context"]],
+    );
+    check(
+        "/* A module placeholder */",
+        expect!["/* A module placeholder */"],
+    );
+}
+
+#[test]
+fn test_comments_between_control_flow_branches_are_preserved() {
+    check(
+        r"
+            fun test() {
+                if (ready) {
+                    work();
+                } /* alternative */ else {
+                    fallback();
+                }
+                try {
+                    work();
+                } // handler
+                catch (error) {
+                    fallback();
+                }
+                do {
+                    work();
+                } // condition
+                while (ready);
+            }
+        ",
+        expect![[r"
+            fun test() {
+                if (ready) {
+                    work();
+                } /* alternative */ else {
+                    fallback();
+                }
+                try {
+                    work();
+                } // handler
+                catch (error) {
+                    fallback();
+                }
+                do {
+                    work();
+                } // condition
+                while (ready);
+            }"]],
+    );
+}
+
+#[test]
+fn test_comments_inside_empty_lists_are_preserved() {
+    check(
+        r"
+            fun test(/* parameters */) {
+                foo(/* arguments */);
+                val a = Foo { /* fields */ };
+                val b = [ /* tuple */ ];
+                val c = ( /* unit */ );
+                val d = match (value) { /* cases */ };
+                val callback = fun(/* lambda parameters */) {};
+            }
+        ",
+        expect![[r"
+            fun test(
+                /* parameters */
+            ) {
+                foo(
+                    /* arguments */
+                );
+                val a = Foo {
+                    /* fields */
+                };
+                val b = [
+                    /* tuple */
+                ];
+                val c = (
+                    /* unit */
+                );
+                val d = match (value) {
+                    /* cases */
+                };
+                val callback = fun(
+                    /* lambda parameters */
+                ) {};
+            }"]],
+    );
+}
+
+#[test]
+fn test_comments_inside_empty_type_and_annotation_lists_are_preserved() {
+    check(
+        r"
+            type Unit = (/* tensor type */);
+            @custom(/* annotation */)
+            fun test</* type parameters */>() {}
+        ",
+        expect![[r"
+            type Unit = (
+                /* tensor type */
+            )
+
+            @custom(
+                /* annotation */
+            )
+            fun test<
+                /* type parameters */
+            >() {}"]],
+    );
+}
+
+#[test]
+fn test_comments_in_single_generic_arguments_preserve_closing_brackets() {
+    check(
+        r"
+            type Values = array<
+                int // scalar
+            >;
+            fun test() {
+                identity<
+                    int // scalar
+                >(42);
+                value.convert<
+                    // Result type
+                    int
+                >();
+            }
+        ",
+        expect![[r"
+            type Values = array<
+                int, // scalar
+            >
+
+            fun test() {
+                identity<
+                    int, // scalar
+                >(42);
+                value.convert<
+                    // Result type
+                    int,
+                >();
+            }"]],
+    );
+}
+
+#[test]
+fn test_comments_on_tuple_elements_are_printed_once() {
+    check(
+        r#"
+            fun test() {
+                val pair = (true, // enabled
+                    false);
+                val tuple = ["hello", // greeting
+                    null];
+                val refs = (value, // selected
+                    42);
+            }
+        "#,
+        expect![[r#"
+            fun test() {
+                val pair = (
+                    true, // enabled
+                    false,
+                );
+                val tuple = [
+                    "hello", // greeting
+                    null,
+                ];
+                val refs = (
+                    value, // selected
+                    42,
+                );
+            }"#]],
+    );
+}
+
+#[test]
+fn test_comments_on_type_list_elements_are_printed_once() {
+    check(
+        r"
+            type Pair = (int, // first
+                bool);
+            type Tuple = [int, // first
+                bool];
+            type Map = map<int, // key
+                slice>;
+            fun test() {
+                convert<int, // source
+                    slice>();
+            }
+        ",
+        expect![[r"
+            type Pair = (
+                int, // first
+                bool,
+            )
+
+            type Tuple = [
+                int, // first
+                bool,
+            ]
+
+            type Map = map<
+                int, // key
+                slice,
+            >
+
+            fun test() {
+                convert<
+                    int, // source
+                    slice,
+                >();
+            }"]],
+    );
+}
+
+#[test]
+fn test_comments_on_annotation_arguments_are_printed_once() {
+    check(
+        r#"
+            @custom("hello", // greeting
+                true)
+            fun test() {}
+        "#,
+        expect![[r#"
+            @custom(
+                "hello", // greeting
+                true,
+            )
+            fun test() {}"#]],
+    );
+}
+
+#[test]
 fn test_comment_grouping_for_declarations() {
     check(
         "
