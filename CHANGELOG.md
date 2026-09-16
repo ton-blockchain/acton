@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 This release introduces **Acton Studio**, a browser workspace for testing,
 deploying, and debugging TON applications. **Simulator** provides lightweight
-local execution and network forks, while **Localnet** runs real TON validators
+local execution and network forks, while **localnet** runs real TON validators
 in Docker. **Actonscan** and the new source verifier bring transaction inspection,
 verified contract code, and browser-based debugging into the same workflow.
 
@@ -267,7 +267,7 @@ Actonscan. Clients solve a proof-of-work challenge before submitting a claim.
 
 ### Retrace and Diagnostics
 
-- Retrace supports tick-tock transactions, Localnet, and custom networks through
+- Retrace supports tick-tock transactions, localnet, and custom networks through
   configured TON Center endpoints. Replay loads previous masterchain blocks
   and checks account-history continuity.
 - Failure backtraces filter internal `__` helper frames from call-site lists.

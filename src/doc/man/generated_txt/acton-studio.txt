@@ -15,7 +15,7 @@ DESCRIPTION
        command running while using Studio.
 
        Workspace metadata, test history, and managed environment data are
-       stored under .studio/ in the project. Docker is required for Localnet
+       stored under .studio/ in the project. Docker is required for localnet
        environments; Simulator environments do not require Docker.
 
 OPTIONS
