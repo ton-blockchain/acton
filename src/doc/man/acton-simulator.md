@@ -531,4 +531,4 @@ expose the localnet server publicly.
 ## See Also
 
 - `acton help wallet`
-- [Simulator guide](https://ton-blockchain.github.io/acton/docs/simulator/overview)
+- [Simulator guide](https://ton-blockchain.github.io/acton/docs/environments/simulator/overview)

@@ -1,0 +1,65 @@
+---
+title: "How to control simulator time and blocks"
+sidebarTitle: "Control time and blocks"
+description: "Mine blocks, advance virtual time, and test time-dependent contract behavior on a simulator network"
+---
+
+import {Tabs, Tab} from "fumadocs-ui/components/tabs";
+
+Use simulator time controls for expirations, delayed messages, and other time-dependent scenarios. Manual mining queues accepted messages until a block is mined.
+
+## Prerequisites
+
+- A running [simulator network](/docs/environments/create-network).
+- A [checkpoint](/docs/environments/snapshots) before changes that must be reversible.
+
+## Advance time and mine
+
+<Tabs items={["UI", "Simulator CLI"]}>
+<Tab value="UI">
+
+1. During creation, expand <kbd>Network and mining</kbd>. Set the initial block interval or enable <kbd>Manual mining</kbd> for explicit control of message inclusion.
+1. In the running environment, open sidebar settings → <kbd>Mining</kbd> and enable <kbd>Mine empty blocks</kbd> if blocks must advance without pending messages.
+1. Open <kbd>Home</kbd> → <kbd>Advance time</kbd>, enter `3600` under <kbd>Seconds</kbd>, review the resulting time, and select <kbd>Advance</kbd>.
+1. Select <kbd>Mine block</kbd> and inspect the new block and transaction timestamps.
+
+Automatic mining and the block interval are creation settings. While running, only <kbd>Mine empty blocks</kbd> can change under <kbd>Mining</kbd>.
+
+The <kbd>Home</kbd> control advances time by an offset. For an absolute time or a one-shot next-block timestamp, use the corresponding operations under <kbd>API reference</kbd> → <kbd>Control API</kbd>, or the CLI commands.
+
+</Tab>
+<Tab value="Simulator CLI">
+
+Start a network with manual mining and empty blocks enabled:
+
+```bash
+acton simulator start --port 5411 --no-mining --mine-empty-blocks
+```
+
+In another terminal, advance one hour and mine a block:
+
+```bash
+acton simulator increase-time 3600 --port 5411
+acton simulator mine --port 5411
+acton simulator status --port 5411 --json
+```
+
+Replace `<TIMESTAMP>` with a Unix timestamp in seconds at or after the latest mined block time. Choose one of these alternatives:
+
+```bash
+acton simulator set-time <TIMESTAMP> --port 5411
+```
+
+```bash
+acton simulator set-next-block-timestamp <TIMESTAMP> --port 5411
+acton simulator mine --port 5411
+```
+
+The next-block override is consumed by the next mined block. With automatic mining, a block can consume it before another command runs; use manual mining when exact sequencing matters.
+
+</Tab>
+</Tabs>
+
+## Verify the scenario
+
+Check the latest block timestamp in explorer, then rerun the relevant getter or script action. Advancing time alone does not execute a contract; a subsequent message exercises time-dependent code. Restore the checkpoint to repeat the same scenario from its original state.

@@ -1,14 +1,11 @@
 {
-  "title": "Acton Simulator",
-  "icon": "Server",
+  "title": "Simulator",
   "pages": [
     "overview",
-    "getting-started",
-    "forking-from-network",
-    "startup-accounts",
-    "persistence-and-snapshots",
-    "control-api",
+    "time",
+    "network-conditions",
     "api-compatibility",
-    "liteapi-support"
+    "liteapi",
+    "control-api"
   ]
 }

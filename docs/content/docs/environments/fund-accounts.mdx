@@ -1,0 +1,63 @@
+---
+title: "How to fund virtual accounts"
+sidebarTitle: "Fund accounts"
+description: "Fund simulator and localnet accounts with GRAM and use the simulator Jetton faucet"
+---
+
+import {Tabs, Tab} from "fumadocs-ui/components/tabs";
+
+Fund accounts in the selected development network. These balances are independent of testnet and mainnet.
+
+## Prerequisites
+
+- A running environment and a recipient address on that environment.
+
+## Request funds
+
+<Tabs items={["UI", "Simulator CLI", "Localnet CLI"]}>
+<Tab value="UI">
+
+1. Open <kbd>Faucet</kbd> in the selected environment.
+1. Keep GRAM selected, enter an <kbd>Amount</kbd>, and select or paste the <kbd>Recipient</kbd>.
+1. Select <kbd>Send GRAM</kbd>. Follow the resulting transaction in Explorer.
+
+For simulator Jettons, open the asset selector, choose a token or paste its minter address, enter an amount and recipient, then select <kbd>Mint jetton</kbd>. The master must be mintable and supported by the faucet. Localnet provides GRAM funding; use normal contract messages for Jetton minting there.
+
+With manual simulator mining, select <kbd>Home</kbd> → <kbd>Mine block</kbd> to process queued funding.
+
+</Tab>
+<Tab value="Simulator CLI">
+
+Replace `<ADDRESS>` with the local recipient:
+
+```bash
+acton simulator airdrop <ADDRESS> --amount 100 --port 5411
+```
+
+With manual mining, process the queued transfer:
+
+```bash
+acton simulator mine --port 5411
+```
+
+For Jetton funding through HTTP, use the [control API](/docs/environments/simulator/control-api).
+
+</Tab>
+<Tab value="Localnet CLI">
+
+Read the Admin endpoint with `acton localnet status dev`. Replace `<ADMIN_URL>` with that URL and `<ADDRESS>` with the local recipient. The amount is in nanograms: `100000000000` is 100 GRAM.
+
+```bash
+curl --fail '<ADMIN_URL>/acton_fundAccount' \
+  -H 'content-type: application/json' \
+  -d '{"address":"<ADDRESS>","amount":100000000000}'
+```
+
+The localnet faucet submits a transfer from its genesis wallet and waits for API v2 to find it.
+
+</Tab>
+</Tabs>
+
+## Verify the balance
+
+Open the recipient in <kbd>Explorer</kbd> and inspect its balance and funding transaction. For missing transactions, use the [diagnostic checks](/docs/environments/inspect-network#verify-the-diagnosis).

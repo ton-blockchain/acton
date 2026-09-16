@@ -5,6 +5,10 @@ description: "Learn how to generate Tolk wrappers and use them in tests and scri
 
 [`acton wrapper`](/docs/commands/wrapper) generates a typed Tolk wrapper from a contract's compiler ABI. The wrapper exposes methods to create, deploy, send messages to, and call get methods on the contract — the same API works in both tests and scripts.
 
+<Callout type="tip">
+  Reuse generated wrappers through the [Studio workflow](/docs/studio): local emulator tests, scripts connected to a [simulator network](/docs/environments/connect), then testnet and mainnet. The `--net` option selects the destination network.
+</Callout>
+
 ## Generate a Tolk wrapper
 
 Run `acton wrapper` with the contract name from `Acton.toml`:
@@ -23,8 +27,7 @@ acton wrapper --all
 
 When generating all wrappers, use `--output-dir` to choose a directory. `--output` is only for a single contract because it names one file.
 
-Precompiled `.boc` contracts can also have wrappers when their contract section
-points `types` to a Tolk interface file:
+Precompiled `.boc` contracts can also have wrappers when their contract section points `types` to a Tolk interface file:
 
 ```acton-toml title="Acton.toml"
 [contracts.Precompiled]
@@ -32,11 +35,7 @@ src = "contracts/Precompiled.boc"
 types = "contracts/Precompiled.types.tolk"
 ```
 
-Acton reads deployable code from the BoC and reads the ABI from
-`Precompiled.types.tolk`. A BoC contract without `types` is skipped by
-`acton wrapper --all`, and `acton wrapper Precompiled` reports that `types` is
-required. See [Precompiled BoC contracts](/docs/building/precompiled-boc) for
-the build and wrapper workflow.
+Acton reads deployable code from the BoC and reads the ABI from `Precompiled.types.tolk`. A BoC contract without `types` is skipped by `acton wrapper --all`, and `acton wrapper Precompiled` reports that `types` is required. See [Precompiled BoC contracts](/docs/building/precompiled-boc) for the build and wrapper workflow.
 
 Pass `--test` to also emit a runnable test stub alongside the wrapper:
 
@@ -58,10 +57,7 @@ The generated file provides:
 - `counter.sendAnyExternal(body)` — sends a custom external-in body when the contract declares external incoming messages.
 - `counter.{getMethodName}()` — one method per declared get method.
 
-In local emulation, `ExternalSendResult.isAccepted()` reports whether the
-contract accepted the external-in message. After a network broadcast, use
-`waitForFirstTransaction()` or `waitForTrace()` instead: successful submission
-does not prove contract acceptance, so `isAccepted()` exits with an error.
+In local emulation, `ExternalSendResult.isAccepted()` reports whether the contract accepted the external-in message. After a network broadcast, use `waitForFirstTransaction()` or `waitForTrace()` instead: successful submission does not prove contract acceptance, so `isAccepted()` exits with an error.
 
 Fine tune wrapper generation with the `contract { ... }` header in the contract entrypoint file:
 
@@ -163,8 +159,7 @@ test-output-dir = "tests"
 output-dir = "wrappers-ts"
 ```
 
-Override any of these fields for one contract by nesting the same tables under
-its contract entry:
+Override any of these fields for one contract by nesting the same tables under its contract entry:
 
 ```acton-toml title="Acton.toml"
 [contracts.Counter.wrappers.tolk]
@@ -175,10 +170,7 @@ generate-test = false
 output-dir = "app/src/wrappers/counter"
 ```
 
-Acton resolves each field independently, so omitted per-contract fields inherit
-the project defaults. CLI output and test options still have the highest
-priority. `acton wrapper --all` applies the resulting settings separately to
-each contract.
+Acton resolves each field independently, so omitted per-contract fields inherit the project defaults. CLI output and test options still have the highest priority. `acton wrapper --all` applies the resulting settings separately to each contract.
 
 See the [build reference](/docs/building/reference#wrappers-section) for all available fields.
 

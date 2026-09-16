@@ -28,8 +28,7 @@ Five built-in templates are available:
 | `nft`          | NFT collection and item contracts with wrappers, tests, and scripts.      |
 | `w5-extension` | Wallet V5 extension contract and subscription example. Alias: `w5-plugin`.|
 
-`acton new` is interactive when stdin/stdout are terminals. It prompts for project name, template, optional app layout, and whether to configure advanced options such as description, license, Git hooks, and `AGENTS.md` guidance.
-When running from scripts or CI, pass `--template` explicitly.
+`acton new` is interactive when stdin/stdout are terminals. It prompts for project name, template, optional app layout, and whether to configure advanced options such as description, license, Git hooks, and `AGENTS.md` guidance. When running from scripts or CI, pass `--template` explicitly.
 
 Pass flags to skip prompts:
 
@@ -86,6 +85,18 @@ Rerun `acton init` when the project needs a light reset:
 - `.gitignore` is missing the commonly ignored Acton-related entries.
 
 `acton init` does not alter **other** files, override project structure, or delete existing files.
+
+### Work in the Studio
+
+[Acton Studio](/docs/studio) watches the project, rebuilds artifacts, and provides the development workspace. Start with local emulator tests and actions, continue on a [simulator network](/docs/environments/simulator/overview), then validate the project on testnet.
+
+Start the Studio from the directory containing `Acton.toml`:
+
+```bash
+acton studio
+```
+
+See the [Studio overview](/docs/studio) page for more.
 
 ### Default project layout
 
@@ -263,8 +274,7 @@ test-output-dir = "tests"
 output-dir = "wrappers-ts"
 ```
 
-For a multi-contract project, nest the same tables below a contract to give it
-a different layout while keeping the project defaults for every other contract:
+For a multi-contract project, nest the same tables below a contract to give it a different layout while keeping the project defaults for every other contract:
 
 ```acton-toml title="Acton.toml"
 [contracts.Counter.wrappers.tolk]
@@ -274,8 +284,7 @@ output-dir = "generated/counter"
 output-dir = "app/src/wrappers/counter"
 ```
 
-Only fields present in the contract table override project defaults. This also
-works with `acton wrapper --all`, which resolves settings contract by contract.
+Only fields present in the contract table override project defaults. This also works with `acton wrapper --all`, which resolves settings contract by contract.
 
 The `@wrappers` in `import "@wrappers/..."` always resolves to the Tolk wrapper directory, regardless of existence of non-Tolk wrappers.
 

@@ -1,0 +1,68 @@
+---
+title: "How to manage virtual environment lifecycle"
+sidebarTitle: "Manage environment lifecycle"
+description: "Stop, resume, rename, and delete development networks without confusing saved state with running processes"
+---
+
+import {Tabs, Tab} from "fumadocs-ui/components/tabs";
+
+Stop a network to release runtime resources while preserving saved state.
+
+## Prerequisites
+
+- A created environment and a saved snapshot of any state that must be retained.
+
+## Stop or resume work
+
+<Tabs items={["UI", "Simulator CLI", "Localnet CLI"]}>
+<Tab value="UI">
+
+The <kbd>Environment settings</kbd> icon at the bottom of the sidebar opens identity, endpoints, and runtime settings.
+
+1. Open <kbd>Virtual environments</kbd> and stop the selected environment from its row actions.
+1. Restart it when needed. The same environment retains its identity.
+1. To rename it, open the sidebar settings, edit <kbd>Name</kbd>, and select <kbd>Save</kbd>.
+1. To remove it permanently, open the settings' <kbd>Danger zone</kbd>, select <kbd>Delete environment</kbd>, and confirm.
+
+A stopped environment still exposes settings and [snapshot controls](/docs/environments/snapshots#save-and-restore-state).
+
+</Tab>
+<Tab value="Simulator CLI">
+
+Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the simulator terminal. Resume committed state with the same database:
+
+```bash
+acton simulator start --port 5411 --db-path .acton/simulator.sqlite
+```
+
+For state beyond committed blocks, use [simulator checkpoints](/docs/environments/snapshots#retain-simulator-checkpoints). The standalone simulator CLI has no named-network rename or delete command.
+
+</Tab>
+<Tab value="Localnet CLI">
+
+```bash
+acton localnet list
+acton localnet stop dev
+acton localnet start dev --detach
+```
+
+Use the same `--state-dir` for commands managing a custom catalog. Resuming a named network preserves its blockchain and does not replenish startup wallets. Creation options are rejected on an existing network; choose another name for a different initial scenario.
+
+To delete a network, run the interactive command and review its confirmation:
+
+```bash
+acton localnet delete dev
+```
+
+The CLI has no rename subcommand. A name belongs to its saved network definition.
+
+</Tab>
+</Tabs>
+
+## Verify the result
+
+A stopped network remains listed with its saved state. A deleted network disappears from the catalog. On restart, inspect the previous block and account state before continuing work.
+
+<Callout type="caution">
+  Deleting a Studio-managed environment removes its saved state and snapshots. Deleting a localnet also removes its managed Docker containers and volumes. Stopping preserves them.
+</Callout>

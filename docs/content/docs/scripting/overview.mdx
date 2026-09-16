@@ -6,7 +6,7 @@ description: "Learn how to run Tolk files as standalone scripts for local experi
 
 Acton provides the ability to run individual Tolk files as standalone scripts through the `script` command. Such scripts can be used both for learning the Tolk language, local experiments, and for real tasks like contract deployment or sending messages to the real blockchain.
 
-Scripts can use all the functions that are used in tests, which means that within scripts it is possible to deploy a contract to a local blockchain, send messages, and call get methods. In the default emulation mode, state is not preserved between script runs. With `--net`, sent transactions affect the selected public network.
+Scripts can use all the functions that are used in tests, which means that within scripts it is possible to deploy a contract to a local blockchain, send messages, and call get methods. In the default emulation mode, state is not preserved between script runs. With `--net`, sent transactions affect the selected [virtual](/docs/environments/overview) or public network.
 
 The main difference between scripts and tests is that scripts define a `main()` function which becomes the entry point. The `main()` function can optionally accept arguments passed from the command line, and those arguments are parsed against the ABI for `main()`.
 

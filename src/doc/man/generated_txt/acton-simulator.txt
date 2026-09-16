@@ -491,5 +491,5 @@ SEE ALSO
        o  acton help wallet
 
        o  Simulator guide
-          <https://ton-blockchain.github.io/acton/docs/simulator/overview>
+          <https://ton-blockchain.github.io/acton/docs/environments/simulator/overview>
 

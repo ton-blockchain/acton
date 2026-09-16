@@ -1,0 +1,66 @@
+---
+title: "How to fork or import network state"
+sidebarTitle: "Fork or import state"
+description: "Fork public state into a simulator or copy account state into a localnet"
+---
+
+import {Tabs, Tab} from "fumadocs-ui/components/tabs";
+
+A simulator fork resolves remote accounts on demand from a pinned public-network block while executing locally. A localnet import copies selected accounts into a separate blockchain. Neither operation broadcasts changes to the source network or continuously mirrors its future state.
+
+## Prerequisites
+
+- Acton and an `Acton.toml` project.
+- Access to the source RPC provider; historical forks need a provider that serves the selected block.
+- For localnet, its [Docker requirements](/docs/environments/localnet/overview#requirements-and-startup).
+
+## Select the source state
+
+<Tabs items={["UI", "Simulator CLI", "Localnet CLI"]}>
+<Tab value="UI">
+
+For a simulator:
+
+1. Open <kbd>Create environment</kbd> and select <kbd>Simulator</kbd>.
+1. Set <kbd>Initial state</kbd> to <kbd>Fork testnet</kbd> or <kbd>Fork mainnet</kbd>.
+1. Optionally enter a masterchain sequence number in <kbd>Fork block</kbd>.
+1. Select startup accounts and create the environment.
+
+For localnet, add account imports during creation or open <kbd>Import accounts</kbd> on an existing network. Select a source environment, enter each active account address, optionally name the contract, then submit. Imports copy code, data, and balances.
+
+<Callout type="caution">
+  Importing into an existing localnet pauses it for a hardfork, replaces accounts at the selected addresses, then resumes the network. Save a [snapshot](/docs/environments/snapshots) before replacing needed state.
+</Callout>
+
+</Tab>
+<Tab value="Simulator CLI">
+
+Pin testnet state at a masterchain block served by the provider. Replace `<BLOCK_SEQNO>` with that block's sequence number:
+
+```bash
+acton simulator start --port 5411 --fork-net testnet --fork-block-number <BLOCK_SEQNO>
+```
+
+Omit `--fork-block-number` to resolve the latest block once during startup. Use `--fork-net mainnet` for mainnet, or `custom:<NAME>` for a network entry in `Acton.toml`, replacing `<NAME>` with its name. Use a fresh database when changing the fork origin.
+
+Acton loads matching provider keys from `.env`: `TONCENTER_TESTNET_API_KEY`, `TONCENTER_MAINNET_API_KEY`, or `<NORMALIZED_NAME>_API_KEY` for custom networks. Custom names are uppercased and non-alphanumeric characters become underscores.
+
+A historical fork uses the selected block's configuration and Unix time. A latest fork uses the pinned block's configuration and starts its clock from system time. Masterchain state is cached under `build/cache/masterchain-snapshots/` for 24 hours; a latest fork still resolves the latest block on startup. Pass the global `--clear-cache` flag to discard cached snapshots.
+
+</Tab>
+<Tab value="Localnet CLI">
+
+Prepare `accounts.json` as an array of hexadecimal `ShardAccount` BoCs. Each entry must contain a complete active basechain account with a distinct address. Plain addresses, base64 strings, and contract data cells alone are not valid imports.
+
+```bash
+acton localnet start imported --accounts-file accounts.json --detach
+```
+
+`--accounts-file` applies only when creating a network. To replace accounts in an existing network, use Studio's import dialog or the [administrative API](/docs/environments/localnet/admin-actions). Imported dependencies must be included explicitly; localnet does not fetch missing accounts lazily.
+
+</Tab>
+</Tabs>
+
+## Verify the imported state
+
+In a simulator, inspect the fork block on <kbd>Home</kbd> and open a source account in Explorer. In localnet, inspect imported code, storage, and balance. Source transactions do not appear as local history. [Save a snapshot](/docs/environments/snapshots) before modifying the copied state.

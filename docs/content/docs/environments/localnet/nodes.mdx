@@ -1,0 +1,57 @@
+---
+title: "How to manage localnet nodes and validators"
+sidebarTitle: "Manage nodes and validators"
+description: "Add nodes, control validation, and inspect election membership on a localnet"
+---
+
+import {Tabs, Tab} from "fumadocs-ui/components/tabs";
+
+Use additional localnet nodes to test synchronization, validator participation, and consensus behavior. Before adding nodes, check the [Docker disk allocation](/docs/environments/localnet/overview#requirements-and-startup).
+
+## Prerequisites
+
+- A running localnet with enough Docker resources for the additional nodes.
+
+## Manage participation
+
+<Tabs items={["UI", "Localnet CLI"]}>
+<Tab value="UI">
+
+1. Open <kbd>Network</kbd> → <kbd>Nodes</kbd> and select <kbd>Add node</kbd>.
+1. Enter a name and choose whether the new node participates as a validator. Confirm creation.
+1. Inspect synchronization and readiness before relying on the node.
+1. Use the node's validation controls to enter or leave validation. Inspect <kbd>Network</kbd> → <kbd>Validators</kbd> for current and next elected sets.
+
+Node start/stop controls preserve its state. Removing an additional node deletes its state. The genesis validator cannot be removed through these controls.
+
+</Tab>
+<Tab value="Localnet CLI">
+
+```bash
+acton localnet node dev add validator-b --validator
+acton localnet status dev --json
+```
+
+Without `--validator`, the added node is a full node that does not participate in elections. Replace `<NODE_ID>` with the ID from the result or status. Enable or disable future participation:
+
+```bash
+acton localnet node dev enter-validation <NODE_ID>
+acton localnet node dev leave-validation <NODE_ID>
+```
+
+After the node leaves both the current and next elected sets, remove it:
+
+```bash
+acton localnet node dev remove <NODE_ID> --yes
+```
+
+</Tab>
+</Tabs>
+
+## Verify election membership
+
+Entering validation enables election participation; it does not immediately elect the node. Leaving validation still requires serving its existing elected duties. Check the current and next sets before removal.
+
+<Callout type="caution">
+  Node removal deletes its state. Forcing removal of an elected validator can disrupt consensus. Save a [localnet snapshot](/docs/environments/snapshots) before topology experiments.
+</Callout>

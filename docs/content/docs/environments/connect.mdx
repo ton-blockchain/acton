@@ -1,0 +1,92 @@
+---
+title: "How to connect scripts and applications"
+sidebarTitle: "Connect clients"
+description: "Connect Acton deployments, TypeScript clients, and other TON tools to the selected virtual environment"
+---
+
+import {Tabs, Tab} from "fumadocs-ui/components/tabs";
+
+Configure deployment scripts, RPC clients, and wallet signing for the selected environment.
+
+## Prerequisites
+
+- A [running environment](/docs/environments/create-network).
+- An Acton project with a deployment script, or an application with a TON RPC client.
+
+## Connect a client
+
+<Tabs items={["UI", "Simulator CLI", "Localnet CLI"]}>
+<Tab value="UI">
+
+1. Open the environment, then <kbd>Home</kbd> → <kbd>Connect environment</kbd>.
+1. Select <kbd>Acton project</kbd> and copy the generated network entry into `Acton.toml`.
+1. Run the accompanying deployment command with a funded startup wallet.
+1. For a frontend, select <kbd>JavaScript app</kbd> and apply the generated `@ton/ton` client settings for JavaScript or TypeScript. <kbd>RPC endpoints</kbd> lists TON Center URLs for other tools.
+
+The <kbd>Integrate</kbd> page retains these examples. Generated Studio proxy URLs remain stable across runtime restarts and environment renames. Use the command's generated network name; selecting another browser workspace does not change the CLI destination.
+
+![Studio connection examples for Acton projects, JavaScript applications, and RPC clients](../imgs/environment-dashboard-dark.png)
+
+For dApp signing, open <kbd>Wallets</kbd> and use its TON Connect controls. The wallet connection and RPC client must target the same environment. TON Connect configures signing; <kbd>Integrate</kbd> configures reads and message submission.
+
+</Tab>
+<Tab value="Simulator CLI">
+
+For the simulator started on port `5411`, add this entry to `Acton.toml`:
+
+```toml title="Acton.toml"
+[networks.localnet]
+api.v2 = "http://127.0.0.1:5411/api/v2"
+api.v3 = "http://127.0.0.1:5411/api/v3"
+```
+
+Run a deployment script from the project root:
+
+```bash
+acton script scripts/deploy.tolk --net localnet
+```
+
+`localnet` is the Acton network selector here; it can target a simulator. For Studio observation, use its generated proxy URLs as described under <kbd>UI</kbd>.
+
+</Tab>
+<Tab value="Localnet CLI">
+
+Read the actual endpoints first:
+
+```bash
+acton localnet status dev
+```
+
+For a network created with `--port-base 19000`, use:
+
+```toml title="Acton.toml"
+[networks.localnet]
+api.v2 = "http://127.0.0.1:19002/api/v2"
+api.v3 = "http://127.0.0.1:19003/api/v3"
+```
+
+```bash
+acton script scripts/deploy.tolk --net localnet
+```
+
+For multiple connections, use a named entry such as `[networks.dev]` and select `--net custom:dev`. Use the URLs printed for that network rather than assuming the example ports.
+
+</Tab>
+</Tabs>
+
+## Verify the destination
+
+Open the deployed address in the selected environment's <kbd>Explorer</kbd>. When using Studio proxy URLs, inspect <kbd>API calls</kbd> and <kbd>Contracts</kbd>. A build provides source and ABI artifacts; source matching requires the deployed code hash to match.
+
+## Localnet control API
+
+Some administrative tasks have an HTTP API without a dedicated CLI subcommand. For a standalone localnet, find its ID with `acton localnet status dev --json`. Under `.acton-localnet/networks/`, locate the directory whose `network.json` has that `id`. Its private `service.json` contains `url` and `token` while the service runs. Directory names include a sanitized name and an ID hash; they are not the network ID itself. A custom `--state-dir` changes the catalog root.
+
+In the HTTP examples, replace `<CONTROL_URL>` with the descriptor's loopback `url` and `<CONTROL_TOKEN>` with its `token`. These credentials belong to the Acton control service, not the container's Config or Admin endpoint. Keep the token private and verify the service:
+
+```bash
+curl --fail '<CONTROL_URL>/v1/health' \
+  -H 'Authorization: Bearer <CONTROL_TOKEN>'
+```
+
+The response identifies `acton-localnet` and protocol version `1`. Re-read the descriptor after a service restart. Prefer the Studio UI for interactive configuration and administrative work.

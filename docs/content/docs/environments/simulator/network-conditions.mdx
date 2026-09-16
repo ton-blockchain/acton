@@ -1,0 +1,56 @@
+---
+title: "How to set simulator API conditions"
+sidebarTitle: "Simulate API conditions"
+description: "Set simulator request limits and response delay to test client behavior"
+---
+
+import {Tabs, Tab} from "fumadocs-ui/components/tabs";
+
+Use simulator network conditions to test loading states, timeouts, and rate-limit handling. These controls affect API access, independently of virtual block time.
+
+## Prerequisites
+
+- A [simulator network](/docs/environments/create-network) and a connected client.
+
+## Configure conditions
+
+<Tabs items={["UI", "Simulator CLI"]}>
+<Tab value="UI">
+
+1. In <kbd>Create environment</kbd>, select <kbd>Simulator</kbd> and expand <kbd>Network and mining</kbd>.
+1. Set <kbd>Rate limit</kbd> to `2` requests per second and <kbd>Response delay</kbd> to `300` milliseconds.
+1. Create the environment and connect the client.
+1. To change latency later, open sidebar settings → <kbd>Network</kbd>, adjust <kbd>Response delay</kbd>, and select <kbd>Apply</kbd>. Use `0` to disable the delay.
+
+The running network's rate limit is displayed for reference. Create another environment to use a different startup rate limit.
+
+</Tab>
+<Tab value="Simulator CLI">
+
+```bash
+acton simulator start --port 5411 --rate-limit 2 --response-delay-ms 300
+```
+
+Change latency while the process runs:
+
+```bash
+curl --fail http://127.0.0.1:5411/acton_setNetworkConditions \
+  -H 'content-type: application/json' -d '{"response_delay_ms":600}'
+```
+
+Use `{"response_delay_ms":0}` to disable latency. Startup defaults can be stored in `Acton.toml`:
+
+```toml title="Acton.toml"
+[localnet]
+rate-limit = 2
+response-delay-ms = 300
+```
+
+</Tab>
+</Tabs>
+
+## Verify client behavior
+
+Send requests through the environment endpoint and inspect timings and statuses in <kbd>API calls</kbd>. Exceeding the configured rate should exercise the client's handling of HTTP `429` responses.
+
+Rate limiting applies to `/api/*` routes. Response delay applies to TON Center v2/v3 and Emulate API responses. Control endpoints and UI assets are not delayed; streaming responses are not subject to the artificial latency setting.

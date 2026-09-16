@@ -1,0 +1,41 @@
+---
+title: "Virtual environments"
+sidebarTitle: "Overview"
+description: "Choose a simulator network or localnet for persistent contract and application development in Acton Studio"
+---
+
+Virtual environments are local TON networks shared by deployment scripts, wallets, tools, and integration tests. Their state persists between interactions, so a frontend can use contracts deployed by a script and inspect the same transactions in [Acton Studio](/docs/studio).
+
+The usual development sequence is:
+
+1. Run emulator tests under <kbd>Local tests</kbd> and emulate scripts without `--net`.
+1. Exercise deployments and application interactions on a <kbd>Simulator</kbd> network.
+1. Validate public-network deployments under <kbd>Real networks</kbd> → <kbd>Testnet</kbd>.
+1. Deploy to <kbd>Real networks</kbd> → <kbd>Mainnet</kbd> after validation.
+
+Changing the selected network does not move contracts, balances, or transaction history.
+
+## Choose a network
+
+| Need | Environment |
+| ---- | ----------- |
+| Daily contract, script, and frontend development | [Simulator](/docs/environments/simulator/overview) |
+| Reproduce public account state or control time and blocks | [Simulator](/docs/environments/simulator/overview) |
+| Exercise validators, elections, node synchronization, or the full indexer stack | [Localnet](/docs/environments/localnet/overview) |
+| Validate public-network behavior before production | [Testnet](/docs/scripting/blockchain-interaction) |
+
+Simulator is the default choice and requires no additional resources, whereas the localnet runs real TON nodes and services in Docker containers and is very memory-intensive. Prefer to use the simulator networks unless a project needs deep node administration.
+
+[Create a network](/docs/environments/create-network), then [connect scripts and applications](/docs/environments/connect). Studio rebuilds project artifacts as sources change. Test persistent network interactions through scripts, RPC clients, or application integration tests connected to the selected environment.
+
+<Callout type="note">
+  Local emulator tests remain isolated. Running [`acton test`](/docs/commands/test) does not switch those tests to a simulator network.
+</Callout>
+
+## Develop and inspect
+
+- [Fund accounts](/docs/environments/fund-accounts) and [fork or import state](/docs/environments/fork-and-import).
+- [Change blockchain configuration](/docs/environments/change-config) in the shared Studio editor.
+- [Save and restore snapshots](/docs/environments/snapshots).
+- [Inspect requests, transactions, and network health](/docs/environments/inspect-network).
+- [Stop, resume, rename, or delete environments](/docs/environments/manage-lifecycle).

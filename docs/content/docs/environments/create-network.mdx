@@ -1,0 +1,74 @@
+---
+title: "How to create a virtual network"
+sidebarTitle: "Create a virtual network"
+description: "Create a simulator network or localnet with project wallets using Studio or the CLI"
+---
+
+import {Tabs, Tab} from "fumadocs-ui/components/tabs";
+
+Create an isolated network for scripts and application integration tests.
+
+## Prerequisites
+
+- [Acton](/docs/installation) {{ acton_version }} or later and an `Acton.toml` project.
+- [Configured wallets](/docs/wallets#create-a-wallet) when startup accounts are needed.
+- For localnet only, the [Docker requirements](/docs/environments/localnet/overview#requirements-and-startup).
+
+## Create the network
+
+<Tabs items={["UI", "Simulator CLI", "Localnet CLI"]}>
+<Tab value="UI">
+
+Start Studio from the project root:
+
+```bash
+acton studio
+```
+
+1. Open <kbd>Virtual environments</kbd> → <kbd>Create environment</kbd>.
+1. Select <kbd>Simulator</kbd> or <kbd>Localnet</kbd> and enter a name.
+1. For a simulator, keep <kbd>Clean network</kbd> or choose a public-network fork.
+1. Select project wallets under <kbd>Startup accounts</kbd>, or clear the selection for no startup wallets.
+1. Select <kbd>Create environment</kbd> and wait for readiness. Open the resulting environment.
+
+Studio preselects `[localnet].accounts`, but initializes only the wallets submitted in the form. Each selected wallet starts with 100 GRAM.
+
+![Studio environment creation and startup account selection](../imgs/create-environment-dark.png)
+
+</Tab>
+<Tab value="Simulator CLI">
+
+Start a persistent network on port `5411`:
+
+```bash
+acton simulator start --port 5411 --db-path .acton/simulator.sqlite --accounts deployer
+```
+
+`deployer` must be a configured wallet. Omit `--accounts` to use `[localnet].accounts`, or pass `--accounts ""` to select none. Keep this terminal open. In another terminal, inspect readiness:
+
+```bash
+acton simulator status --port 5411 --json
+```
+
+[Configure defaults](/docs/acton-toml#localnet) in `Acton.toml`; explicit flags override them.
+
+</Tab>
+<Tab value="Localnet CLI">
+
+Create a named network and leave it running in the background:
+
+```bash
+acton localnet start dev --port-base 19000 --accounts deployer --detach
+acton localnet status dev --json
+```
+
+`deployer` must be a configured wallet. The command waits for readiness and prints endpoint URLs. The port range `19000`–`19004` must be free. Omit `--port-base` to let Acton choose a range. Omit `--accounts` to use `[localnet].accounts`, or use `--accounts ""` for no project wallets.
+
+These options apply to new networks; [resume an existing network](/docs/environments/manage-lifecycle#stop-or-resume-work) without creation options. Without `--detach`, a newly launched service stays in the foreground and <kbd>Ctrl</kbd>+<kbd>C</kbd> stops it.
+
+</Tab>
+</Tabs>
+
+## Verify and continue
+
+In Studio, confirm the environment is running and open <kbd>Home</kbd>. From the CLI, confirm `running: true` for the simulator or `status: "running"` for localnet. [Connect scripts and applications](/docs/environments/connect) using the reported URLs.

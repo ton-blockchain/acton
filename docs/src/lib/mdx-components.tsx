@@ -1,5 +1,6 @@
 import defaultMdxComponents from "fumadocs-ui/mdx"
 import {Cards, Card} from "fumadocs-ui/components/card"
+import {Tab, Tabs} from "fumadocs-ui/components/tabs"
 import * as Twoslash from "fumadocs-twoslash/ui"
 import type {MDXComponents} from "mdx/types"
 import {
@@ -26,6 +27,8 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
     AvailabilityBadge,
     Cards,
     Card,
+    Tab,
+    Tabs,
     APIPage,
     File,
     Folder,

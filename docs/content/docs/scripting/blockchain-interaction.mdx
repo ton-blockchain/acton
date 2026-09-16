@@ -5,6 +5,10 @@ description: "Learn how to use scripts to deploy contracts and send transactions
 
 Acton scripts can interact with the real TON blockchain, enabling contract deployment, transaction sending, and state querying. By using `--net <network>`, Tolk scripts can execute real operations using configured wallets.
 
+<Callout type="tip">
+  Start with local emulator tests and actions, continue on a [simulator network](/docs/environments/simulator/overview), then validate on testnet before mainnet. [Acton Studio](/docs/studio) provides the same deployment and inspection tools throughout.
+</Callout>
+
 ## Prerequisites
 
 Before interacting with the real blockchain, configure a wallet. Follow the [wallet management](/docs/wallets) guide to either set up a funded wallet or connect one through TON Connect via passing `--tonconnect` on the CLI:
@@ -18,21 +22,24 @@ acton script <SCRIPT_PATH> --net testnet --tonconnect
 Scripts in Acton can run in two modes:
 
 1. **Local mode** (default): Uses a local blockchain emulator with test wallets
-2. **Broadcast mode** (`--net <network>`): Connects to the real blockchain and uses configured wallets
+2. **Broadcast mode** (`--net <network>`): Connects to the selected virtual or public network and uses configured wallets
 
 | Aspect            | Local Mode             | Broadcast Mode          |
 |-------------------|------------------------|-------------------------|
-| Blockchain        | Local emulator         | Real blockchain         |
+| Blockchain        | Local emulator         | Selected virtual or public network |
 | Wallets           | Generated test wallets | Configured real wallets |
-| GRAM spent        | None (emulated)        | Real GRAM               |
+| GRAM spent        | None (emulated)        | Selected network wallet balance |
 | Transaction speed | Instant                | Real network timing     |
 | State persistence | Lost after script ends | Permanent on blockchain |
 
-Always test the scripts without `--net` first. The local emulator allows validating the logic before spending real GRAM on testnet or mainnet:
+Always test scripts without `--net` first. The local emulator allows validating the logic before spending real GRAM on testnet or mainnet:
 
 ```bash
 # Test locally without spending real GRAM
 acton script deploy.tolk
+
+# Exercise a simulator through its configured localnet entry
+acton script deploy.tolk --net localnet
 
 # Deploy to testnet using real testnet wallet
 acton script deploy.tolk --net testnet
@@ -40,6 +47,8 @@ acton script deploy.tolk --net testnet
 # Deploy to mainnet using real mainnet wallet
 acton script deploy.tolk --net mainnet
 ```
+
+The `--net localnet` deployment above requires the `[networks.localnet]` to be configured in `Acton.toml` with the [selected simulator endpoints](/docs/environments/connect) prior.
 
 ### Manually controlling broadcasting mode
 
@@ -273,11 +282,7 @@ Both wait helpers automatically adapt to the execution mode:
 | `--net <network>` | Polls the network until the transaction or trace is found            |
 
 <Callout type="warn">
-  Do not use `ExternalSendResult.isAccepted()` after broadcasting an external-in
-  message. The send API confirms submission, but it does not report whether the
-  destination contract accepted the message. `isAccepted()` exits with an error
-  in this case. Use `waitForFirstTransaction()` or `waitForTrace()` to look for
-  the transaction on-chain.
+  Do not use `ExternalSendResult.isAccepted()` after broadcasting an external-in message. The send API confirms submission, but it does not report whether the destination contract accepted the message. `isAccepted()` exits with an error in this case. Use `waitForFirstTransaction()` or `waitForTrace()` to look for the transaction on-chain.
 </Callout>
 
 Check the current mode using `net.isBroadcasting()`:
@@ -302,8 +307,7 @@ fun main() {
 }
 ```
 
-Use `net.runGetMethodExt()` to inspect gas usage and the VM exit code.
-Call `unwrap()` to check success and decode the result:
+Use `net.runGetMethodExt()` to inspect gas usage and the VM exit code. Call `unwrap()` to check success and decode the result:
 
 ```tolk
 val execution = net.runGetMethodExt<int>(counterAddress, "currentCounter");
@@ -312,14 +316,9 @@ println("Counter value: {}", currentValue);
 println("Gas used: {}", execution.meta.gasUsed);
 ```
 
-`GetMethodResult<Ret>.meta` contains `gasUsed` and `exitCode` for the contract's
-get-method execution. `isSuccess()` returns `true` for VM exit codes `0` and `1`.
-Neither metadata access nor `isSuccess()` decodes the result as `Ret`.
+`GetMethodResult<Ret>.meta` contains `gasUsed` and `exitCode` for the contract's get-method execution. `isSuccess()` returns `true` for VM exit codes `0` and `1`. Neither metadata access nor `isSuccess()` decodes the result as `Ret`.
 
-On VM failure, `unwrap()` reports the getter's error and stops execution.
-For a successful nullable getter, `unwrap()` can return `null`.
-If `Ret` does not match the saved stack, `unwrap()` reports a decoding error.
-Repeated calls to `unwrap()` decode the same saved stack.
+On VM failure, `unwrap()` reports the getter's error and stops execution. For a successful nullable getter, `unwrap()` can return `null`. If `Ret` does not match the saved stack, `unwrap()` reports a decoding error. Repeated calls to `unwrap()` decode the same saved stack.
 
 In tests, use `toHaveExitCode()` to check an expected failure with getter diagnostics:
 
@@ -329,9 +328,7 @@ expect(execution).toHaveExitCode(123);
 expect(execution.meta.gasUsed).toBeLess(1000);
 ```
 
-`net.runGetMethod()` checks success and decodes the result before returning it.
-Both functions throw if the contract is not deployed, has no code, or the emulator
-cannot run.
+`net.runGetMethod()` checks success and decodes the result before returning it. Both functions throw if the contract is not deployed, has no code, or the emulator cannot run.
 
 ### Local vs remote state
 
@@ -348,32 +345,17 @@ acton script query.tolk --fork-net mainnet
 TONCENTER_TESTNET_API_KEY=YOUR_API_KEY acton script query.tolk --fork-net testnet
 ```
 
-When `--fork-net` is enabled, Acton automatically fetches account state from
-the real blockchain and caches it locally for the script execution. This allows
-to:
+When `--fork-net` is enabled, Acton automatically fetches account state from the real blockchain and caches it locally for the script execution. This allows to:
 
 - Query real contract state
 - Test interactions with deployed contracts
 - Verify contract behavior against live data
 
-Acton resolves one masterchain block for the script run. Account state and the
-network configuration come from that block. Use `--fork-block-number` to select
-an exact block and use its Unix time. If you omit it, Acton resolves the latest
-block once, pins it for the script run, and uses the current system Unix time.
+Acton resolves one masterchain block for the script run. Account state and the network configuration come from that block. Use `--fork-block-number` to select an exact block and use its Unix time. If you omit it, Acton resolves the latest block once, pins it for the script run, and uses the current system Unix time.
 
-If the script also passes `--fork-block-number`, fetched account states are
-persisted under
-`build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`. Later script
-runs with the same fork network, block number, and address reuse that file
-before calling the remote API. Fork runs without an explicit block also persist
-accounts under the resolved sequence number.
+If the script also passes `--fork-block-number`, fetched account states are persisted under `build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`. Later script runs with the same fork network, block number, and address reuse that file before calling the remote API. Fork runs without an explicit block also persist accounts under the resolved sequence number.
 
-Acton stores the matching network configuration and, for explicit historical
-forks, block time for 24 hours under
-`build/cache/masterchain-snapshots/<network>/<seqno>.json`. Use
-`--no-fork-cache` to force fresh account and library reads for a run. This option
-does not disable the masterchain snapshot cache. Use `--clear-cache` to remove
-the persisted entries with the rest of `build/cache`.
+Acton stores the matching network configuration and, for explicit historical forks, block time for 24 hours under `build/cache/masterchain-snapshots/<network>/<seqno>.json`. Use `--no-fork-cache` to force fresh account and library reads for a run. This option does not disable the masterchain snapshot cache. Use `--clear-cache` to remove the persisted entries with the rest of `build/cache`.
 
 When the script runs with `--net`, the selected network already becomes the default remote read network. This means deploy scripts can send a transaction, wait for it, and immediately call `net.runGetMethod()` or wrapper getters against the same chain without passing `--fork-net`.
 

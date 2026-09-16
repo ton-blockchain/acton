@@ -1,0 +1,68 @@
+---
+title: "How to edit localnet account state"
+sidebarTitle: "Edit account state"
+description: "Apply administrative account changes through Studio and the localnet control API"
+---
+
+import {Tabs, Tab} from "fumadocs-ui/components/tabs";
+
+Administrative actions create controlled account states for localnet tests. They can set balances, replace code or data, freeze accounts, make them uninitialized, delete them, or replace a complete `ShardAccount`.
+
+## Prerequisites
+
+- A running localnet with all its nodes available.
+- A [snapshot](/docs/environments/snapshots) of any state that must be retained.
+- The target account address and replacement value or BoC.
+
+## Apply an account change
+
+<Tabs items={["UI", "Localnet CLI"]}>
+<Tab value="UI">
+
+1. Open <kbd>Admin actions</kbd> in the localnet workspace.
+1. Select an <kbd>Action</kbd>, such as <kbd>Set balance</kbd>, and enter the <kbd>Account address</kbd>.
+1. Enter the replacement value. Balance uses GRAM; code/data and complete account replacements accept a BoC in hex or base64.
+1. Select <kbd>Apply changes</kbd> and wait for completion. Studio pauses the network, saves recovery snapshots, applies the change on every node, and resumes it.
+
+<kbd>Freeze account</kbd>, <kbd>Make account uninitialized</kbd>, and <kbd>Delete account</kbd> change account status rather than sending ordinary contract messages. To copy state from another network, use [Import accounts](/docs/environments/fork-and-import).
+
+</Tab>
+<Tab value="Localnet CLI">
+
+There is no dedicated administrative subcommand. Prepare `account-edit.json`, replacing `<OPERATION_UUID>` with a fresh UUID and `<ADDRESS>` with the target's raw address. This example sets its balance to 10 GRAM, expressed as a decimal string of nanograms:
+
+```json title="account-edit.json"
+{
+  "kind": "accounts",
+  "id": "<OPERATION_UUID>",
+  "edits": [{"address": "<ADDRESS>", "type": "balance", "balance": "10000000000"}]
+}
+```
+
+Use the [control connection](/docs/environments/connect#localnet-control-api), replacing `<CONTROL_URL>` and `<CONTROL_TOKEN>` with the service values:
+
+```bash
+curl --fail '<CONTROL_URL>/v1/network/admin' \
+  -H 'Authorization: Bearer <CONTROL_TOKEN>' \
+  -H 'content-type: application/json' --data-binary @account-edit.json
+```
+
+Poll the same operation UUID until `finishedAt` is non-null and `error` is null:
+
+```bash
+curl --fail '<CONTROL_URL>/v1/network/admin?id=<OPERATION_UUID>' \
+  -H 'Authorization: Bearer <CONTROL_TOKEN>'
+```
+
+After a lost response, reuse the same UUID and identical payload to retry. Do not generate a new UUID until the previous operation's outcome is known. Reusing an ID with different edits is rejected.
+
+</Tab>
+</Tabs>
+
+## Verify the changed state
+
+Open the account in explorer and inspect its balance, code, storage, and status. Administrative edits are hardforks, not normal contract transactions. Test normal message behavior separately.
+
+<Callout type="caution">
+  These actions replace account state across the localnet and may invalidate an ongoing scenario. If recovery fails, keep the reported recovery files and logs. Restore a saved snapshot before continuing instead of deleting runtime files manually.
+</Callout>

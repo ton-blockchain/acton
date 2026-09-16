@@ -6,6 +6,10 @@ icon: "Lock"
 
 Source code verification publishes reproducible local Tolk sources for a compiled code hash. Acton compiles the contract, requests a verification ticket, sends the required TON testnet payment, and uploads the source bundle to the TON verifier.
 
+<Callout type="caution">
+  Validate contract behavior in local tests and a [simulator network](/docs/environments/simulator/overview) before testnet deployment and source verification.
+</Callout>
+
 ## Before verification
 
 Prepare these inputs before running `acton verify`:
@@ -41,25 +45,19 @@ To compare the compiled code with an active testnet contract before payment, pas
 acton verify Counter --address EQDt7LL... --wallet deployer
 ```
 
-Acton first sends the compiled code hash to `/api/v1/take_ticket`. If that code
-hash is verified, Acton stops successfully and does not request wallet access.
+Acton first sends the compiled code hash to `/api/v1/take_ticket`. If that code hash is verified, Acton stops successfully and does not request wallet access.
 
-For new code, the backend returns a testnet address, a minimum amount, and a
-comment. The comment has this form:
+For new code, the backend returns a testnet address, a minimum amount, and a comment. The comment has this form:
 
 ```text
 acton-verify:v1:<code_hash>
 ```
 
-Acton displays the quote and requests payment approval. Then Acton sends the
-payment and waits for the finalized recipient transaction. The source upload
-contains that transaction hash.
+Acton displays the quote and requests payment approval. Then Acton sends the payment and waits for the finalized recipient transaction. The source upload contains that transaction hash.
 
-One transaction can authorize only one verification attempt. The backend also
-makes sure that the amount, destination, finality, and comment are correct.
+One transaction can authorize only one verification attempt. The backend also makes sure that the amount, destination, finality, and comment are correct.
 
-If an upload retry needs an existing payment, pass its finalized recipient
-transaction hash:
+If an upload retry needs an existing payment, pass its finalized recipient transaction hash:
 
 ```bash
 acton verify Counter --payment-tx-hash '<transaction-hash>'
@@ -77,8 +75,7 @@ If exactly one wallet is configured, Acton selects it automatically. If multiple
 
 The verifier uses the amount from the payment ticket.
 
-If a backend reports that the code hash is verified, Acton exits successfully
-without another transaction.
+If a backend reports that the code hash is verified, Acton exits successfully without another transaction.
 
 ## Use TON Connect for the verification transaction
 
@@ -98,9 +95,7 @@ Use `--dry-run` to prepare verification without sending payment or uploading sou
 acton verify Counter --address EQDt7LL... --dry-run
 ```
 
-Acton requests a ticket and prepares the source request. It does not send the
-testnet payment or upload the sources. Therefore, this mode does
-not confirm that the backend accepts the source package.
+Acton requests a ticket and prepares the source request. It does not send the testnet payment or upload the sources. Therefore, this mode does not confirm that the backend accepts the source package.
 
 ## Pin the compiler version
 
@@ -137,8 +132,7 @@ ACTON_VERIFY_BACKEND=http://127.0.0.1:3000 \
 acton verify Counter --dry-run
 ```
 
-Reuse the same payment only when the backend explicitly reports a retryable
-source storage failure. Other results after the payment claim consume the payment.
+Reuse the same payment only when the backend explicitly reports a retryable source storage failure. Other results after the payment claim consume the payment.
 
 ## See also
 

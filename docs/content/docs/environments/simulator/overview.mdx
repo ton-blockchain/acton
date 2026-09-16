@@ -1,53 +1,29 @@
 ---
-title: "Acton Simulator"
-description: "Use Acton's simplified TON simulation with compatible blocks and APIs for local development"
+title: "Simulator networks"
+sidebarTitle: "Overview"
+description: "Develop against a persistent emulated TON network with forks, funding, mining controls, virtual time, and snapshots"
 ---
 
-`acton simulator` is a fast, deterministic TON development environment for local
-execution, forked-state workflows, and faucet-based funding. It produces TON-compatible
-basechain and masterchain block cells and exposes compatible LiteAPI, TON Center v2,
-TON Center v3, Streaming API, and Emulate API surfaces.
+A simulator network is Acton's simplified TON implementation, also called simulated localnet. It produces TON-compatible basechain and masterchain blocks without validators or consensus. Acton is the only required runtime; Studio can create a simulator without a project when no project wallets are selected.
 
-This covers a large part of contract and dApp development. The environment is Acton's custom
-simplified implementation, **not a real TON network or validator cluster**. It does not model
-validators, consensus, shard elections, or the full production node and indexer stack. Use a
-Localnet when the behavior under test depends on those parts of TON.
+## Create and connect
 
-## Why use it
+[Create a network](/docs/environments/create-network) and [connect clients](/docs/environments/connect) through Studio or the standalone CLI. A standalone simulator serves its bundled explorer at the printed HTTP address, such as `http://127.0.0.1:5411/`.
 
-- Fast local feedback loop for deploys, transactions, and get-method calls.
-- Optional fork mode for querying real blockchain state from testnet or mainnet.
-- Built-in faucet and startup wallet bootstrap for zero-friction local testing.
-- Reproducible environments with SQLite persistence and saved JSON snapshots.
-- Runtime network-condition controls for simulating slower API responses.
+The [persistence guide](/docs/environments/snapshots#retain-simulator-checkpoints) covers databases and checkpoints for standalone simulators.
 
-## Built-in explorer UI
+## Simulator controls
 
-The local node serves a bundled explorer UI from the same HTTP server as the API.
+- [Fork public state](/docs/environments/fork-and-import) and [fund accounts or mint jettons](/docs/environments/fund-accounts).
+- [Control time and mining](/docs/environments/simulator/time) for time-dependent scenarios.
+- [Set API conditions](/docs/environments/simulator/network-conditions) to test latency and rate-limit handling.
+- [Save checkpoints](/docs/environments/snapshots) and [change blockchain configuration](/docs/environments/change-config).
+- Edit account state through the [control API](/docs/environments/simulator/control-api).
 
-- The root path serves the explorer UI, and client-side routes such as `/explorer`, `/tokens`, `/nfts`, `/explorer/address/<ADDR>`, and `/explorer/tx/<HASH>` all resolve through the same single-page app shell.
-- The UI reads blockchain data from `/api/v2` and `/api/v3`, and uses `/acton_getAddressName` plus `/acton_getCompilerAbi` for local alias and ABI lookups.
-- Account pages subscribe to `/api/streaming/v2/sse` so new transactions and account state changes appear without waiting for a polling interval.
+## Compatibility and limits
 
-## Learn more
+The simulator exposes TON Center v2/v3, Streaming, Emulate, and optional LiteAPI endpoints. The [HTTP coverage matrices](/docs/environments/simulator/api-compatibility) and [LiteAPI reference](/docs/environments/simulator/liteapi) document their limits.
 
-<Cards>
-  <Card href="/docs/simulator/getting-started" title="Getting Started">
-    Start the node, send your first airdrop, and verify that the API is available.
-  </Card>
-  <Card href="/docs/simulator/forking-from-network" title="Forking from Network">
-    Use testnet or mainnet state locally, including historical forks at a specific block.
-  </Card>
-  <Card href="/docs/simulator/startup-accounts" title="Startup Accounts">
-    Auto-fund and auto-deploy configured wallets on node startup.
-  </Card>
-  <Card href="/docs/simulator/persistence-and-snapshots" title="Persistence and State">
-    Persist chain state to SQLite and save JSON snapshots for repeatable scenarios.
-  </Card>
-  <Card href="/docs/simulator/api-compatibility" title="API Compatibility">
-    Use TON Center-compatible v2/v3, Streaming API, and control endpoints.
-  </Card>
-  <Card href="/docs/simulator/liteapi-support" title="LiteAPI Support">
-    Connect LiteServer-compatible tools and check supported binary API methods.
-  </Card>
-</Cards>
+Message simulation in <kbd>Transaction emulator</kbd> previews execution without committing it. Sending a message to the simulator network changes its local blockchain.
+
+The simulator does not model validator elections, consensus, or shard split/merge behavior. Use a [localnet](/docs/environments/localnet/overview) for tests that depend on validator or indexer infrastructure.

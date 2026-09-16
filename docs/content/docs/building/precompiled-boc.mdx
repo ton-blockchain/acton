@@ -3,13 +3,13 @@ title: "Precompiled BoC contracts"
 description: "Use a precompiled .boc file as a contract source while keeping wrappers and ABI available"
 ---
 
-Most contracts in an Acton project start from `.tolk` files. Sometimes you only
-have the compiled contract code: a `.boc` artifact from another repository, a
-release bundle, or a contract whose source is generated elsewhere.
+Most contracts in an Acton project start from `.tolk` files. Sometimes there is only the compiled contract code: a `.boc` artifact from another repository, a release bundle, or a contract whose source is generated elsewhere.
 
-In that case, you can still make the contract feel like a normal Acton contract.
-Start by teaching Acton where the BoC is. If you later want typed wrappers or
-ABI JSON, add a small Tolk file that describes the contract interface.
+In that case, you can still make the contract feel like a normal Acton contract. Start by teaching Acton where the BoC is. If you later want typed wrappers or ABI JSON, add a small Tolk file that describes the contract interface.
+
+<Callout type="tip">
+  Exercise the configured contract in local tests, then on a [simulator network](/docs/environments/simulator/overview), before testnet and mainnet. [Acton Studio](/docs/studio) can use its supplied ABI for decoding — precompiled bytecode alone does not provide source-level inspection.
+</Callout>
 
 ## Configure the contract
 

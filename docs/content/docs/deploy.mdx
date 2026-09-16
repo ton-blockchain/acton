@@ -4,7 +4,7 @@ description: "Learn how to deploy Tolk smart contracts on testnet and mainnet wi
 icon: "Rocket"
 ---
 
-There is no dedicated `acton deploy` command. Instead, contracts are deployed using [Tolk scripts](/docs/commands/script). The same deployment script can be used for local emulation and for testnet or mainnet broadcasts.
+There is no dedicated `acton deploy` command. Instead, contracts are deployed using [Tolk scripts](/docs/commands/script). The same deployment script can be used for isolated emulation, persistent [virtual environments](/docs/environments/overview), and testnet or mainnet broadcasts.
 
 Local emulation environment in scripts matches that of Acton tests. Each run is isolated, state is not preserved between script executions, transactions are instantaneous, and emulated wallets are used instead of real [configured testnet or mainnet wallets](/docs/wallets). As such, locally emulated deployments are useful for checking contract address derivation, initial state, deployment statuses, and post-deploy getter calls before deploying contracts to a public network.
 

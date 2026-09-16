@@ -1,0 +1,69 @@
+---
+title: "How to generate localnet test traffic"
+sidebarTitle: "Generate test traffic"
+description: "Generate bounded transfers, Jetton operations, and NFT operations to exercise localnet behavior"
+---
+
+import {Tabs, Tab} from "fumadocs-ui/components/tabs";
+
+Generate repeatable classes of on-chain activity to observe nodes and indexers under load. The localnet service owns the run, so closing the Studio page does not stop it.
+
+## Prerequisites
+
+- A running localnet and sufficient Docker resources for the intended workload.
+
+## Configure and run traffic
+
+<Tabs items={["UI", "Localnet CLI"]}>
+<Tab value="UI">
+
+1. Open <kbd>Network</kbd> → <kbd>Activity</kbd>.
+1. Choose the mix of <kbd>Transfers</kbd>, <kbd>Batch transfers</kbd>, <kbd>Jettons</kbd>, and <kbd>NFTs</kbd>. A weight of zero disables that scenario family.
+1. Set a bounded duration, interval, and concurrency. Adjust amounts and batch size under <kbd>Scenario settings</kbd> when needed.
+1. Select <kbd>Start activity</kbd>. Inspect completed/failed scenarios and confirmed messages.
+1. Select <kbd>Stop activity</kbd> to finish early. Wait for in-flight work to settle.
+
+Transfers use fresh wallets; Jetton and NFT scenarios include deployment and subsequent actions. Scenario weights control scenario starts, not exact transaction counts.
+
+</Tab>
+<Tab value="Localnet CLI">
+
+Use the [control API connection](/docs/environments/connect#localnet-control-api), replacing `<CONTROL_URL>` and `<CONTROL_TOKEN>`. Save this bounded workload as `activity.json`:
+
+```json title="activity.json"
+{
+  "intervalSeconds": 10,
+  "scenariosPerLaunch": 1,
+  "concurrency": 2,
+  "durationSeconds": 60,
+  "maxBatchSize": 16,
+  "randomizeBatchSize": false,
+  "transferAmount": 100000000,
+  "walletVersions": ["v5r1"],
+  "scenarios": {"transfers": 50, "batches": 20, "jettons": 20, "nfts": 10}
+}
+```
+
+`transferAmount` is in nanograms; this example uses 0.1 GRAM. Start and inspect the run:
+
+```bash
+curl --fail '<CONTROL_URL>/v1/network/activity/start' \
+  -H 'Authorization: Bearer <CONTROL_TOKEN>' \
+  -H 'content-type: application/json' --data-binary @activity.json
+curl --fail '<CONTROL_URL>/v1/network/activity' \
+  -H 'Authorization: Bearer <CONTROL_TOKEN>'
+```
+
+Stop before the configured duration when needed:
+
+```bash
+curl --fail -X POST '<CONTROL_URL>/v1/network/activity/stop' \
+  -H 'Authorization: Bearer <CONTROL_TOKEN>'
+```
+
+</Tab>
+</Tabs>
+
+## Verify the workload
+
+Inspect the recent scenario results and open the associated addresses in explorer. Compare node statistics and indexer lag under <kbd>Network</kbd>. A stopped run can still have submitted transactions on-chain. Interrupted runs are not automatically replayed after a service restart.

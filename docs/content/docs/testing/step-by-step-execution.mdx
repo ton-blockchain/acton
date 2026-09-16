@@ -22,6 +22,10 @@ Import `@acton/emulation/testing` in test files that use the cursor APIs from th
 import "@acton/emulation/testing"
 ```
 
+<Callout type="tip">
+  Transaction cursors control isolated emulator tests. To control time in a persistent virtual network, use [simulator time controls](/docs/environments/simulator/time) in the [Acton Studio](/docs/studio).
+</Callout>
+
 ## Mental model
 
 [`testing.createTraceIterationCursor(from, message)`](/docs/standard_library/emulation/testing#testingcreatetraceiterationcursor) starts a cursor for one root message and returns a [`TxCursor`](/docs/standard_library/emulation/testing#txcursor).

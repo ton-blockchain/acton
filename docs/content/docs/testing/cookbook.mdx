@@ -3,19 +3,13 @@ title: "Cookbook"
 description: "Practical examples and code snippets for common testing scenarios in Tolk smart contracts"
 ---
 
-This page is a collection of practical testing patterns. For the full API
-surface, use the [built-in matchers and helpers](/docs/testing/built-in-matchers-and-helpers)
-reference.
+This page is a collection of practical testing patterns. For the full API surface, use the [built-in matchers and helpers](/docs/testing/built-in-matchers-and-helpers) reference.
 
-For complete real-world suites, use
-[acton-contracts](https://github.com/ton-blockchain/acton-contracts) as a reference:
-it contains larger Jetton, NFT, wallet, multisig, DNS, elector, and config
-contract tests built with these patterns.
+For complete real-world suites, use the [`acton-contracts` repository](https://github.com/ton-blockchain/acton-contracts) as a reference: it contains larger Jetton, NFT, wallet, multisig, DNS, elector, and config contract tests built with these patterns.
 
 ## Start from a shared setup
 
-Keep deployment and common actors in one helper. Larger projects usually put
-this in `tests/test-utils.tolk` and import it from scenario files.
+Keep deployment and common actors in one helper. Larger projects usually put this in `tests/test-utils.tolk` and import it from scenario files.
 
 ```tolk
 fun setupCounter(): (Counter, Treasury, Treasury) {
@@ -43,8 +37,7 @@ acton wrapper Counter --test
 
 ## Assert the initial state
 
-After deployment, assert the storage and get methods that define the contract's
-invariants. This catches bad initial state before message-flow tests get noisy.
+After deployment, assert the storage and get methods that define the contract's invariants. This catches bad initial state before message-flow tests get noisy.
 
 ```tolk
 get fun `test deploy exposes initial owner`() {
@@ -57,8 +50,7 @@ get fun `test deploy exposes initial owner`() {
 
 ## Test an internal happy path
 
-Prefer generated wrapper methods for normal messages. Name important traces so
-gas reports, saved traces, and the Test UI stay readable.
+Prefer generated wrapper methods for normal messages. Name important traces so gas reports, saved traces, and the Test UI stay readable.
 
 ```tolk
 get fun `test owner can increase counter`() {
@@ -78,8 +70,7 @@ get fun `test owner can increase counter`() {
 
 ## Search for a transaction and inspect its body
 
-Use `findTransaction<T>()` when the test needs values from the transaction
-instead of only asserting that it exists.
+Use `findTransaction<T>()` when the test needs values from the transaction instead of only asserting that it exists.
 
 ```tolk
 val response = res.findTransaction<ResponseWalletAddress>({
@@ -105,8 +96,7 @@ expect(res).toHaveTx<TransferNotificationForRecipient>({
 
 ## Test a rejected internal message
 
-For negative paths, assert both the failure and the unchanged state. If the
-contract must not emit a follow-up message, assert that too.
+For negative paths, assert both the failure and the unchanged state. If the contract must not emit a follow-up message, assert that too.
 
 ```tolk
 get fun `test non-owner cannot change counter`() {
@@ -130,8 +120,7 @@ get fun `test non-owner cannot change counter`() {
 
 ## Send a malformed or unknown body
 
-Wrappers also generate `sendAny(...)`, which is useful for payload validation
-and unknown-opcode tests.
+Wrappers also generate `sendAny(...)`, which is useful for payload validation and unknown-opcode tests.
 
 ```tolk
 get fun `test unknown message is rejected`() {
@@ -169,8 +158,7 @@ expect(res).toHaveTx<AskToTransfer>({
 
 ## Test bounced messages
 
-When the contract has special bounce logic, build the bounced message explicitly
-and assert it with `toHaveBouncedTx()`.
+When the contract has special bounce logic, build the bounced message explicitly and assert it with `toHaveBouncedTx()`.
 
 ```tolk
 val bounced = createMessage({
@@ -186,8 +174,7 @@ expect(res).toHaveBouncedTx({ to: counter.address });
 
 ## Assert external-out messages
 
-Use `toEmitExternalMessage<T>()` for a simple existence check, and
-`findExternalOutMessage<T>()` when you need to inspect the body.
+Use `toEmitExternalMessage<T>()` for a simple existence check, and `findExternalOutMessage<T>()` when you need to inspect the body.
 
 ```tolk
 expect(res).toEmitExternalMessage<TransferEvent>();
@@ -202,8 +189,7 @@ expect(event!.loadBody()).toEqual(TransferEvent { value: 123 });
 
 ## Test accepted external-in messages
 
-`net.sendExternal(...)` and generated `sendExternal*` wrapper methods return
-`ExternalSendResult`. Assert acceptance before unwrapping the trace.
+`net.sendExternal(...)` and generated `sendExternal*` wrapper methods return `ExternalSendResult`. Assert acceptance before unwrapping the trace.
 
 ```tolk
 get fun `test signed external transfer`() {
@@ -235,8 +221,7 @@ expect(trace).toBeNotNull();
 
 ## Test rejected external-in messages
 
-For an external-in rejection, assert the external status directly. Do not
-unwrap it just to check for `null`.
+For an external-in rejection, assert the external status directly. Do not unwrap it just to check for `null`.
 
 ```tolk
 get fun `test bad signature is rejected`() {
@@ -252,14 +237,11 @@ get fun `test bad signature is rejected`() {
 }
 ```
 
-Rejected external-in matcher failures include source location and emulator
-diagnostics. Run with `--backtrace full` to also see the contract-side
-`onExternalMessage` backtrace when source maps are available.
+Rejected external-in matcher failures include source location and emulator diagnostics. Run with `--backtrace full` to also see the contract-side `onExternalMessage` backtrace when source maps are available.
 
 ## Check balances and fees
 
-Balance tests are usually strongest when they include the transaction fee that
-was charged to the receiving account.
+Balance tests are usually strongest when they include the transaction fee that was charged to the receiving account.
 
 ```tolk
 val before = testing.getAccountBalance(receiver.address);
@@ -294,13 +276,11 @@ acton test --snapshot gas-baseline.json
 acton test --baseline-snapshot gas-baseline.json --fail-on-diff
 ```
 
-See [gas profiling and snapshots](/docs/testing/gas-profiling-with-snapshots)
-for baseline reports and CI setup.
+See [gas profiling and snapshots](/docs/testing/gas-profiling-with-snapshots) for baseline reports and CI setup.
 
 ## Inspect out actions
 
-Use out-action helpers when the interesting behavior is in C5 actions rather
-than the delivered child transactions.
+Use out-action helpers when the interesting behavior is in C5 actions rather than the delivered child transactions.
 
 ```tolk
 val tx = res.at(0);
@@ -312,14 +292,11 @@ val body = actions.getSendMessageBodyAt<TransferNotification>(0);
 expect(body).toBeNotNull();
 ```
 
-Remember that action indexing is reversed: index `0` is the last produced
-action. See [out-action helpers](/docs/testing/built-in-matchers-and-helpers#out-action-helpers)
-for details.
+Remember that action indexing is reversed: index `0` is the last produced action. See [out-action helpers](/docs/testing/built-in-matchers-and-helpers#out-action-helpers) for details.
 
 ## Control time
 
-Use `testing.setNow(...)` for expiration windows, replay protection, and
-time-dependent get methods.
+Use `testing.setNow(...)` for expiration windows, replay protection, and time-dependent get methods.
 
 ```tolk
 testing.setNow(1700000000);
@@ -335,8 +312,7 @@ expect(res).toHaveSuccessfulTx<NewOrderRequest>({
 
 ## Control config
 
-Use config overrides for tests that depend on fees, prices, or global chain
-parameters.
+Use config overrides for tests that depend on fees, prices, or global chain parameters.
 
 ```tolk
 import "@acton/emulation/config"
@@ -353,8 +329,7 @@ expect(testing.setConfig(config)).toEqual(true);
 
 ## Work with deterministic addresses
 
-Use treasuries for accounts that send messages, and named random addresses for
-passive accounts. Names show up in transaction trees and matcher failures.
+Use treasuries for accounts that send messages, and named random addresses for passive accounts. Names show up in transaction trees and matcher failures.
 
 ```tolk
 val owner = testing.treasury("owner");
@@ -366,9 +341,7 @@ testing.topUp(passiveAddress, grams("0.5"));
 
 ## Read account state
 
-Use `testing.isDeployed(...)` before get methods that should tolerate lazy
-deployment, and `testing.getAccountState(...)` when you need balance or storage
-metadata.
+Use `testing.isDeployed(...)` before get methods that should tolerate lazy deployment, and `testing.getAccountState(...)` when you need balance or storage metadata.
 
 ```tolk
 fun JettonWallet.getJettonBalance(self): coins {
@@ -394,8 +367,7 @@ expect(balance).toBeGreater(0);
 
 ## Save and restore world state
 
-World-state snapshots are useful when setup is expensive and several tests need
-the same deployed base state.
+World-state snapshots are useful when setup is expensive and several tests need the same deployed base state.
 
 ```tolk
 val saved = testing.saveSnapshot("build/test-state/after-deploy.json");
@@ -406,8 +378,7 @@ val loaded = testing.loadSnapshot("build/test-state/after-deploy.json");
 expect(loaded).toBeTrue();
 ```
 
-See [world state snapshots](/docs/testing/world-state-snapshots) for file
-layout and caveats.
+See [world state snapshots](/docs/testing/world-state-snapshots) for file layout and caveats.
 
 ## Split a long chain into steps
 
@@ -423,14 +394,11 @@ val rest = cursor.executeAllRemaining();
 expect(rest).toHaveAllSuccessfulTxs();
 ```
 
-See [step-by-step execution](/docs/testing/step-by-step-execution) for
-`executeTill(...)`, batching, and trace export behavior.
+See [step-by-step execution](/docs/testing/step-by-step-execution) for `executeTill(...)`, batching, and trace export behavior.
 
 ## Write staged end-to-end tests
 
-For large flows, split the scenario into named stage helpers. This keeps each
-assertion close to the state transition it validates and lets you reuse early
-stages as smaller benchmark tests.
+For large flows, split the scenario into named stage helpers. This keeps each assertion close to the state transition it validates and lets you reuse early stages as smaller benchmark tests.
 
 ```tolk
 fun deployStage(): FlowContext {
@@ -455,8 +423,7 @@ get fun `test full flow`() {
 
 ## Use attributes for test intent
 
-Use dotted `@test.*` attributes for expected failures, gas limits, skipped work,
-and fuzzing.
+Use dotted `@test.*` attributes for expected failures, gas limits, skipped work, and fuzzing.
 
 ```tolk
 @test.fail_with(Errors.NotOwner)
@@ -480,13 +447,11 @@ get fun `test amount is bounded`(rawAmount: int) {
 }
 ```
 
-See [test attributes](/docs/testing/test-attributes) and
-[fuzz testing](/docs/testing/fuzz-testing) for the complete syntax.
+See [test attributes](/docs/testing/test-attributes) and [fuzz testing](/docs/testing/fuzz-testing) for the complete syntax.
 
 ## Register libraries in setup
 
-If a transaction tree reports a missing library, register the code before the
-message that needs it.
+If a transaction tree reports a missing library, register the code before the message that needs it.
 
 ```tolk
 fun setupWithLibrary(): ContractWithLib {
@@ -512,7 +477,4 @@ val res = counter.sendIncreaseCounter(deployer.address, 123);
 println(res);
 ```
 
-The printed tree is the same format used by matcher failures. See
-[reading transaction chains](/docs/testing/reading-transaction-chains) for the
-format and [Test UI](/docs/testing/test-ui/overview) for interactive trace
-inspection.
+The printed tree is the same format used by matcher failures. See [reading transaction chains](/docs/testing/reading-transaction-chains) for the format and [Test UI](/docs/testing/test-ui/overview) for interactive trace inspection.

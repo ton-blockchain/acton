@@ -7,12 +7,14 @@ import {LandingVideo} from "@/components/LandingVideo"
 
 The [TON plugin for JetBrains IDEs](https://plugins.jetbrains.com/plugin/23382-ton) supports Acton development, providing project automation and toolchain integration.
 
+<Callout type="tip">
+  Keep [Acton Studio](/docs/studio) running alongside the editor for rebuilds and additional development tools.
+</Callout>
+
 For installation instructions, see the [official TON documentation](https://docs.ton.org/contracts/ide/jetbrains).
 
 <Callout type="warning" title="Install the TOML plugin">
-  Install the [JetBrains TOML plugin](https://plugins.jetbrains.com/plugin/8195-toml) as well.
-  Acton project configuration relies on TOML support, and the TON plugin works correctly only when
-  TOML files are handled by the IDE.
+  Install the [JetBrains TOML plugin](https://plugins.jetbrains.com/plugin/8195-toml) as well. Acton project configuration relies on TOML support, and the TON plugin works correctly only when TOML files are handled by the IDE.
 </Callout>
 
 The plugin targets JetBrains 2025.2+ IDEs and is compatible with WebStorm, GoLand, PyCharm, CLion, and other JetBrains IDEs.
@@ -117,15 +119,13 @@ When copying a contract from another project, the plugin suggests registering it
 
 ### Contract actions
 
-For contracts declared in Tolk files, the plugin provides actions to build the contract and generate
-Tolk or TypeScript wrappers.
+For contracts declared in Tolk files, the plugin provides actions to build the contract and generate Tolk or TypeScript wrappers.
 
 ![](imgs/jetbrains/contract-actions.png)
 
 ### Disassembly
 
-The plugin can compile a Tolk contract and open the generated assembly, making it easier to inspect
-the code that will run on TVM.
+The plugin can compile a Tolk contract and open the generated assembly, making it easier to inspect the code that will run on TVM.
 
 ![](imgs/jetbrains/disassembly.png)
 
@@ -186,8 +186,7 @@ When a test fails, the plugin highlights the specific `expect` call that failed 
 
 ### Debugging
 
-Set breakpoints in Tolk tests and contracts, start debugging from the IDE, and inspect stack frames,
-local values, and TVM registers.
+Set breakpoints in Tolk tests and contracts, start debugging from the IDE, and inspect stack frames, local values, and TVM registers.
 
 ![](imgs/jetbrains/debug.png)
 

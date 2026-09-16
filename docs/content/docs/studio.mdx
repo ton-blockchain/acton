@@ -109,77 +109,30 @@ To override the project default, set `studio-reporting = false` in `Acton.toml` 
 
 ### Virtual environments
 
-Create isolated local TON networks, keep presets and move between active environments:
+Isolated local TON networks with persistent presets and unified UI.
 
-| Environment | Use it for | Network controls |
-| ----------- | ---------- | ---------------- |
-| [`simulator` network](/docs/commands/simulator) | Daily contract and frontend development with an emulated network and TON-compatible APIs | Forked state, funding, mining, virtual time, snapshots, API latency, and request rate limits |
-| [`localnet`](/docs/commands/localnet) | Testing with real validator-engine nodes and TON Center indexers running in Docker | Node management, logs, health, test traffic, and blockchain snapshots |
-
-A simulator network needs only Acton to emulate the TON network state without running validators or consensus. It is a fast, lightweight development solution when local tests are no longer enough and the project is not ready for testnet or mainnet yet.
-
-A localnet also requires Docker to be installed and running, with enough memory and disk space for TON nodes and indexers. Each running localnet might use more than 10 GB of disk space per day. It is generally not needed unless a project needs deep tests and integrations in a real network, and the TON testnet falls short on fast iteration, required funds, or other factors like its current load.
+<Cards>
+  <Card href="/docs/environments/overview" title="Overview">
+    Compare development networks and find task guides.
+  </Card>
+  <Card href="/docs/environments/create-network" title="Network creation">
+    Set up a network and select optional startup wallets.
+  </Card>
+  <Card href="/docs/environments/connect" title="Client connections">
+    Configure scripts, applications, and wallets.
+  </Card>
+  <Card href="/docs/environments/snapshots" title="Save and restore snapshots">
+    Keep checkpoints for repeatable scenarios.
+  </Card>
+  <Card href="/docs/environments/simulator/overview" title="Simulator">
+    Explore simulator controls and API compatibility.
+  </Card>
+  <Card href="/docs/environments/localnet/overview" title="Localnet">
+    Find Docker requirements and node management guides.
+  </Card>
+</Cards>
 
 ![Virtual environments with running and stopped localnet networks](imgs/environments-dark.png)
-
-#### Basic setup
-
-To start the common development loop:
-
-1. Open <kbd>Virtual environments</kbd> → <kbd>Create environment</kbd>.
-1. Keep <kbd>Simulator</kbd> selected, enter a name, and choose a clean network or a testnet/mainnet fork.
-1. Select project wallets as <kbd>Startup accounts</kbd> to initialize and fund each with 100 GRAM.
-1. Create the environment and open <kbd>Home</kbd> → <kbd>Connect environment</kbd>.
-1. Select <kbd>Acton project</kbd>, copy the generated network entry into `Acton.toml`, and run the accompanying deployment command.
-
-![Create environment dialog configured for a simulator network](imgs/create-environment-dark.png)
-
-<Callout type="note">
-  For simulator timing and load scenarios, expand <kbd>Network and mining</kbd> during creation. Choose automatic or manual mining, block time, request rate limits, and artificial response delay.
-</Callout>
-
-Alternative setups:
-
-- <kbd>JavaScript app</kbd> provides client setup for TypeScript code running `@ton/ton`.
-- <kbd>RPC endpoints</kbd> lists TON Center endpoints for other compatible tools.
-
-The <kbd>Integrate</kbd> page in the network sidebar keeps all setup examples available. Use Studio's generated URLs to observe requests and deployments — those URLs remain stable across runtime restarts.
-
-![Localnet home page with project integration settings, node information, and recent transactions](imgs/environment-dashboard-dark.png)
-
-#### State forks
-
-A simulator network can fork public account state at a chosen block. A localnet can import selected accounts during creation or later through <kbd>Import accounts</kbd>. Imports copy balances, code, and data, without source-network transaction history.
-
-Importing into an existing localnet pauses it for a hardfork, replaces accounts at the selected addresses, then resumes the network.
-
-#### Faucets
-
-Both simulator and localnet provide a GRAM <kbd>Faucet</kbd>, while the simulator networks also provide a Jetton faucet.
-
-#### Config management
-
-Open <kbd>Network</kbd> → <kbd>Config</kbd> to inspect and edit blockchain configuration parameters in either environment.
-
-#### Additional tools
-
-On localnet, <kbd>Network</kbd> also provides node and validator management, logs, statistics, and service health. Its <kbd>Activity</kbd> page generates transfers, Jettons, and NFTs for testing. <kbd>Admin actions</kbd> edits account balances, code, and state through a hardfork.
-
-Use <kbd>Snapshots</kbd> to save named states and restore them for repeatable tests. Simulator snapshots support JSON import and export. A localnet pauses while creating a blockchain snapshot — restoration restarts services and rebuilds indexed data.
-
-![Localnet snapshots with saved block, archive size, state size, and restore actions](imgs/snapshots-dark.png)
-
-#### Network settings
-
-The settings icon at the bottom of the sidebar opens environment identity, endpoints, and runtime settings.
-
-For a running simulator, adjust <kbd>Response delay</kbd> and <kbd>Mine empty blocks</kbd> there — the request rate limit and initial mining schedule are chosen during creation.
-
-Stopped environments are preserved. Renaming an environment does not affect its original endpoints.
-
-<Callout type="caution">
-  Deleting an environment permanently removes its managed state and snapshots. Stop it instead to preserve that state for later development.
-</Callout>
 
 ### Real networks
 
@@ -264,4 +217,5 @@ Filter requests by endpoint, read/write, status, or Studio origin. Inspect reque
 ## Next steps
 
 - [Write and configure tests](/docs/testing/overview) for the local emulator.
+- [Continue development on a simulator network](/docs/environments/overview).
 - [Prepare deployment scripts](/docs/deploy) and [configure wallets](/docs/wallets) for network interaction.
