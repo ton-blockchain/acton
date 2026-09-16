@@ -38,8 +38,8 @@ get fun `test admin: deploy should create minter without bounce`() {
         nextAdminAddress: null,
     });
 
-    val deployResult = minter.sendDeploy(deployer.address, { value: ton("10") });
-    expect(deployResult).toHaveSuccessfulDeploy<TopUpTons>({
+    val deployResult = minter.sendDeploy(deployer.address, { value: grams("10") });
+    expect(deployResult).toHaveSuccessfulDeploy<TopUpGrams>({
         from: deployer.address,
         to: minter.address,
     });
@@ -53,8 +53,8 @@ get fun `test admin: deploy should create minter without bounce`() {
 get fun `test admin: minter admin should be able to mint jettons`() {
     val (minter, deployer, notDeployer) = setupTest();
     val supplyBefore = minter.getTotalSupply();
-    val deployerMint = ton("25");
-    val otherMint = ton("7");
+    val deployerMint = grams("25");
+    val otherMint = grams("7");
 
     val deployerWallet = mintTo(minter, deployer, deployer.address, deployerMint);
     val otherWallet = mintTo(minter, deployer, notDeployer.address, otherMint);
@@ -72,9 +72,9 @@ get fun `test admin: non-admin should not be able to mint jettons`() {
     val mintResult = minter.sendMint(
         notDeployer.address,
         deployer.address,
-        ton("5"),
-        ton("0.05"),
-        ton("0.3"),
+        grams("5"),
+        grams("0.05"),
+        grams("0.3"),
     );
     expect(mintResult).toHaveFailedTx<MintNewJettons>({
         from: notDeployer.address,
@@ -191,7 +191,7 @@ get fun `test admin: non-admin cannot change metadata uri`() {
 
 get fun `test admin: discovery should return expected wallet and optional owner`() {
     val (minter, deployer, notDeployer) = setupTest();
-    mintTo(minter, deployer, deployer.address, ton("1"));
+    mintTo(minter, deployer, deployer.address, grams("1"));
 
     val expectedDeployerWallet = userWallet(minter, deployer.address).address;
     val withOwnerRes = minter.sendDiscovery(deployer.address, deployer.address, true);
@@ -260,7 +260,7 @@ get fun `test admin: discovery should return none for non-basechain owner`() {
 get fun `test admin: non-admin should not be able to upgrade minter`() {
     val (minter, deployer, notDeployer) = setupTest();
     val newData = MinterStorage {
-        totalSupply: ton("99"),
+        totalSupply: grams("99"),
         adminAddress: deployer.address,
         nextAdminAddress: null,
         metadata: buildTestMetadata("meta-upgrade"),
@@ -279,7 +279,7 @@ get fun `test admin: non-admin should not be able to upgrade minter`() {
 
 get fun `test admin: admin should be able to upgrade minter code and data`() {
     val (minter, deployer, _) = setupTest();
-    val upgradedSupply = ton("42");
+    val upgradedSupply = grams("42");
     val upgradedUri = "https://upgraded.meta.example/jetton.json";
     val newData = MinterStorage {
         totalSupply: upgradedSupply,
@@ -308,7 +308,7 @@ get fun `test admin: admin should be able to upgrade minter code and data`() {
 
 get fun `test shard: wallet address should keep owner shard prefix in get/discovery/transfer`() {
     val (minter, deployer, _) = setupTest();
-    val senderWallet = mintTo(minter, deployer, deployer.address, ton("100"));
+    val senderWallet = mintTo(minter, deployer, deployer.address, grams("100"));
 
     var prefix = 0;
     while (prefix < 32) {

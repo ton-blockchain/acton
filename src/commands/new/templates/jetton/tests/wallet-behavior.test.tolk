@@ -10,8 +10,8 @@ import "test-utils"
 
 get fun `test wallet: owner can send jettons`() {
     val (minter, deployer, notDeployer) = setupTest();
-    val transferAmount = ton("5");
-    val senderWallet = mintTo(minter, deployer, deployer.address, ton("20"));
+    val transferAmount = grams("5");
+    val senderWallet = mintTo(minter, deployer, deployer.address, grams("20"));
     val receiverWallet = userWallet(minter, notDeployer.address);
 
     val res = senderWallet.sendTransferPayloadInline(
@@ -29,19 +29,19 @@ get fun `test wallet: owner can send jettons`() {
         to: senderWallet.address,
     });
 
-    expect(senderWallet.getJettonBalance()).toEqual(ton("15"));
+    expect(senderWallet.getJettonBalance()).toEqual(grams("15"));
     expect(receiverWallet.getJettonBalance()).toEqual(transferAmount);
 }
 
 get fun `test wallet: non-owner cannot send jettons`() {
     val (minter, deployer, notDeployer) = setupTest();
-    val wallet = mintTo(minter, deployer, deployer.address, ton("7"));
+    val wallet = mintTo(minter, deployer, deployer.address, grams("7"));
     val balanceBefore = wallet.getJettonBalance();
 
     val res = wallet.sendTransferPayloadInline(
         notDeployer.address,
         DEFAULT_TRANSFER_MSG_VALUE,
-        ton("3"),
+        grams("3"),
         notDeployer.address,
         deployer.address,
         null,
@@ -59,13 +59,13 @@ get fun `test wallet: non-owner cannot send jettons`() {
 
 get fun `test wallet: cannot send more jettons than balance`() {
     val (minter, deployer, notDeployer) = setupTest();
-    val wallet = mintTo(minter, deployer, deployer.address, ton("2"));
+    val wallet = mintTo(minter, deployer, deployer.address, grams("2"));
     val balanceBefore = wallet.getJettonBalance();
 
     val res = wallet.sendTransferPayloadInline(
         deployer.address,
         DEFAULT_TRANSFER_MSG_VALUE,
-        ton("5"),
+        grams("5"),
         notDeployer.address,
         deployer.address,
         null,
@@ -81,15 +81,15 @@ get fun `test wallet: cannot send more jettons than balance`() {
     expect(wallet.getJettonBalance()).toEqual(balanceBefore);
 }
 
-get fun `test wallet: zero forward ton means no transfer notification`() {
+get fun `test wallet: zero forward GRAM means no transfer notification`() {
     val (minter, deployer, notDeployer) = setupTest();
-    val senderWallet = mintTo(minter, deployer, deployer.address, ton("2"));
+    val senderWallet = mintTo(minter, deployer, deployer.address, grams("2"));
     val receiverWallet = userWallet(minter, notDeployer.address);
 
     val res = senderWallet.sendTransferPayloadInline(
         deployer.address,
         DEFAULT_TRANSFER_MSG_VALUE,
-        ton("1"),
+        grams("1"),
         notDeployer.address,
         deployer.address,
         null,
@@ -108,9 +108,9 @@ get fun `test wallet: zero forward ton means no transfer notification`() {
 
 get fun `test wallet: transfer notification should preserve forward payload`() {
     val (minter, deployer, notDeployer) = setupTest();
-    val senderWallet = mintTo(minter, deployer, deployer.address, ton("2"));
+    val senderWallet = mintTo(minter, deployer, deployer.address, grams("2"));
     val receiverWallet = userWallet(minter, notDeployer.address);
-    val sentAmount = ton("0.5");
+    val sentAmount = grams("0.5");
     val forwardPayload = beginCell().storeUint(0x1234567890abcdef, 128).endCell();
 
     val res = senderWallet.sendTransferPayloadInRef(
@@ -158,10 +158,10 @@ get fun `test wallet: transfer notification should preserve forward payload`() {
 
 get fun `test wallet: transfer to undeployed recipient wallet should still work`() {
     val (minter, deployer, _) = setupTest();
-    val senderWallet = mintTo(minter, deployer, deployer.address, ton("2"));
+    val senderWallet = mintTo(minter, deployer, deployer.address, grams("2"));
     val recipientOwner = randomAddress();
     val recipientWallet = userWallet(minter, recipientOwner);
-    val sentAmount = ton("0.5");
+    val sentAmount = grams("0.5");
 
     val res = senderWallet.sendTransferPayloadInline(
         deployer.address,
@@ -184,8 +184,8 @@ get fun `test wallet: transfer to undeployed recipient wallet should still work`
 
 get fun `test wallet: owner can burn jettons`() {
     val (minter, deployer, _) = setupTest();
-    val burnAmount = ton("3");
-    val wallet = mintTo(minter, deployer, deployer.address, ton("10"));
+    val burnAmount = grams("3");
+    val wallet = mintTo(minter, deployer, deployer.address, grams("10"));
     val supplyBefore = minter.getTotalSupply();
 
     val res = wallet.sendBurn(
@@ -197,20 +197,20 @@ get fun `test wallet: owner can burn jettons`() {
     );
     expect(res).toHaveSuccessfulTx<AskToBurn>({ from: deployer.address, to: wallet.address });
 
-    expect(wallet.getJettonBalance()).toEqual(ton("7"));
+    expect(wallet.getJettonBalance()).toEqual(grams("7"));
     expect(minter.getTotalSupply()).toEqual(supplyBefore - burnAmount);
 }
 
 get fun `test wallet: non-owner cannot burn jettons`() {
     val (minter, deployer, notDeployer) = setupTest();
-    val wallet = mintTo(minter, deployer, deployer.address, ton("6"));
+    val wallet = mintTo(minter, deployer, deployer.address, grams("6"));
     val balanceBefore = wallet.getJettonBalance();
     val supplyBefore = minter.getTotalSupply();
 
     val res = wallet.sendBurn(
         notDeployer.address,
         DEFAULT_BURN_MSG_VALUE,
-        ton("2"),
+        grams("2"),
         deployer.address,
         null,
     );
@@ -226,14 +226,14 @@ get fun `test wallet: non-owner cannot burn jettons`() {
 
 get fun `test wallet: cannot burn more jettons than balance`() {
     val (minter, deployer, _) = setupTest();
-    val wallet = mintTo(minter, deployer, deployer.address, ton("1"));
+    val wallet = mintTo(minter, deployer, deployer.address, grams("1"));
     val balanceBefore = wallet.getJettonBalance();
     val supplyBefore = minter.getTotalSupply();
 
     val res = wallet.sendBurn(
         deployer.address,
         DEFAULT_BURN_MSG_VALUE,
-        ton("5"),
+        grams("5"),
         deployer.address,
         null,
     );

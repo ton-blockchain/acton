@@ -80,7 +80,7 @@ your shell. Metadata and minting scripts also read:
 - `JETTON_DECIMALS`
 - `JETTON_MINT_AMOUNT`
 
-1. Create a local wallet and request testnet TON:
+1. Create a local wallet and request testnet GRAM:
 
 ```bash
 acton wallet new --name deployer --local --airdrop

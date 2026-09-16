@@ -14,7 +14,7 @@ contract JettonWallet {
     storage: WalletStorage
 }
 
-type AllowedMessageToWallet = AskToTransfer | AskToBurn | InternalTransferStep | TopUpTons
+type AllowedMessageToWallet = AskToTransfer | AskToBurn | InternalTransferStep | TopUpGrams
 
 type BounceOpToHandle = InternalTransferStep | BurnNotificationForMinter
 
@@ -70,7 +70,7 @@ fun onInternalMessage(in: InMessage) {
 
             if (msg.sendExcessesTo != null) {
                 val toLeaveOnBalance = contract.getOriginalBalance() - in.valueCoins +
-                contract.getStorageDuePayment();
+                    contract.getStorageDuePayment();
                 reserveGramsOnBalance(
                     max(toLeaveOnBalance, calculateJettonWalletMinStorageFee()),
                     RESERVE_MODE_AT_MOST,
@@ -151,8 +151,8 @@ fun onInternalMessage(in: InMessage) {
             );
         }
 
-        TopUpTons => {
-            // just accept tons
+        TopUpGrams => {
+            // just accept grams
         }
 
         else => throw 0xFFFF,

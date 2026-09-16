@@ -18,7 +18,7 @@ fun main() {
         JETTON_DEFAULT_MINT_AMOUNT,
     );
 
-    val res = minter.sendMint(admin.address, recipient, mintAmount, 1, ton("0.08"));
+    val res = minter.sendMint(admin.address, recipient, mintAmount, 1, grams("0.08"));
     println(res.waitForTrace());
 
     printJettonMinterInfo(minter, "JETTON");

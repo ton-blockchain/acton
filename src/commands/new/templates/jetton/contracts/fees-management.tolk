@@ -61,14 +61,14 @@ fun calcMinimalTransferAmount(forwardTonAmount: int, fwdFee: int): int {
         : jettonWalletGasConsumption;
 
     return forwardTonAmount +
-    // 3 messages: wal1->wal2, wal2->owner, wal2->response
-    // but last one is optional (it is ok if it fails)
-    fwdCount * fwdFee +
-    forwardInitStateOverhead() +
-    // additional fwd fees related to initstate in internal_transfer
-    calculateGasFee(MY_WORKCHAIN, sendTransferGasConsumption) +
-    calculateGasFee(MY_WORKCHAIN, receiveTransferGasConsumption) +
-    calculateJettonWalletMinStorageFee();
+        // 3 messages: wal1->wal2, wal2->owner, wal2->response
+        // but last one is optional (it is ok if it fails)
+        fwdCount * fwdFee +
+        forwardInitStateOverhead() +
+        // additional fwd fees related to initstate in internal_transfer
+        calculateGasFee(MY_WORKCHAIN, sendTransferGasConsumption) +
+        calculateGasFee(MY_WORKCHAIN, receiveTransferGasConsumption) +
+        calculateJettonWalletMinStorageFee();
 }
 
 fun checkAmountIsEnoughToTransfer(msgValue: int, forwardTonAmount: int, fwdFee: int) {
@@ -87,8 +87,8 @@ fun calcMinimalBurnAmount(): coins {
         MESSAGE_SIZE_BURN_NOTIFICATION_BITS,
         MESSAGE_SIZE_BURN_NOTIFICATION_CELLS,
     ) +
-    calculateGasFee(MY_WORKCHAIN, sendBurnGasConsumption) +
-    calculateGasFee(MY_WORKCHAIN, GAS_CONSUMPTION_BURN_NOTIFICATION);
+        calculateGasFee(MY_WORKCHAIN, sendBurnGasConsumption) +
+        calculateGasFee(MY_WORKCHAIN, GAS_CONSUMPTION_BURN_NOTIFICATION);
 }
 
 fun checkAmountIsEnoughToBurn(msgValue: int) {

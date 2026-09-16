@@ -27,7 +27,7 @@ get fun `test state: minter deploy helper preserves sharding`() {
         { fixedPrefixLength: 8, closeTo: deployer.address },
     );
 
-    val result = minter.sendDeploy(deployer.address, { value: ton("10") });
+    val result = minter.sendDeploy(deployer.address, { value: grams("10") });
     expect(result).toHaveSuccessfulDeploy({ to: minter.address });
     expect(minter.getJettonData().adminAddress).toEqual(deployer.address);
 }
@@ -45,7 +45,7 @@ get fun `test state: minter deploy helper preserves workchain`() {
         MASTERCHAIN,
     );
 
-    val result = minter.sendDeploy(deployer.address, { value: ton("10") });
+    val result = minter.sendDeploy(deployer.address, { value: grams("10") });
     expect(result).toHaveSuccessfulDeploy({ to: minter.address });
     expect(minter.address.getWorkchain()).toEqual(MASTERCHAIN);
 }
@@ -81,8 +81,8 @@ get fun `test state: should mint max jetton value`() {
         deployer.address,
         deployer.address,
         MAX_JETTON_VALUE,
-        ton("0.05"),
-        ton("0.3"),
+        grams("0.05"),
+        grams("0.3"),
     );
     expect(mintResult).toHaveSuccessfulTx<MintNewJettons>({
         from: deployer.address,
@@ -102,7 +102,13 @@ get fun `test state: wallet storage and init-state bounds should match fee const
     val recipient = randomAddress();
     val recipientWallet = userWallet(minter, recipient);
 
-    val mintResult = minter.sendMint(deployer.address, recipient, TEST_JETTON_UNIT, 0, ton("0.3"));
+    val mintResult = minter.sendMint(
+        deployer.address,
+        recipient,
+        TEST_JETTON_UNIT,
+        0,
+        grams("0.3"),
+    );
     expect(mintResult).toHaveSuccessfulTx<InternalTransferStep>({
         from: minter.address,
         to: recipientWallet.address,

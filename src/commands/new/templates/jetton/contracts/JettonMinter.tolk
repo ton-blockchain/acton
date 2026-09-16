@@ -23,7 +23,7 @@ type AllowedMessageToMinter =
     | DropMinterAdmin
     | ChangeMinterMetadata
     | UpgradeMinterCode
-    | TopUpTons
+    | TopUpGrams
 
 fun onBouncedMessage(in: InMessageBounced) {
     in.bouncedBody.skipBouncedPrefix();
@@ -125,7 +125,7 @@ fun onInternalMessage(in: InMessage) {
             storage.save();
 
             reserveGramsOnBalance(
-                ton("0.01"),
+                grams("0.01"),
                 RESERVE_MODE_EXACT_AMOUNT,
             ); // reserve for storage fees
 
@@ -180,8 +180,8 @@ fun onInternalMessage(in: InMessage) {
             contract.setData(msg.newData);
         }
 
-        TopUpTons => {
-            // just accept tons
+        TopUpGrams => {
+            // just accept grams
         }
 
         else => throw 0xFFFF,

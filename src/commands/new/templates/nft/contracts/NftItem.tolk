@@ -53,7 +53,7 @@ fun onInternalMessage(in: InMessage) {
             assert (msg.newOwnerAddress.getWorkchain() == BASECHAIN) throw Errors.InvalidWorkchain;
 
             val fwdFee = in.originalForwardFee;
-            var restAmount = contract.getOriginalBalance() - MIN_TONS_FOR_STORAGE;
+            var restAmount = contract.getOriginalBalance() - MIN_GRAMS_FOR_STORAGE;
             if (msg.forwardTonAmount != 0) {
                 restAmount -= (msg.forwardTonAmount + fwdFee);
             }

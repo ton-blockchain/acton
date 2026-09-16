@@ -12,7 +12,7 @@ fun main() {
         deployer.address,
         0,
         newAdmin,
-        { value: ton("0.05"), bounce: true },
+        { value: grams("0.05"), bounce: true },
     );
     println(res.waitForTrace());
 
