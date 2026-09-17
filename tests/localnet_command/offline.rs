@@ -49,7 +49,7 @@ async fn stopped_service_keeps_logs_operations_and_observed_status_available() {
         serde_json::to_vec(&record).expect("stale record"),
     )
     .expect("record file");
-    std::fs::write(directory.join("fixture-running"), "").expect("containers running");
+    std::fs::write(directory.join("fixture-force-running"), "").expect("containers running");
     let running = cli(&service.state(), &["status"]).await;
     std::fs::write(service.root.path().join("docker-unavailable"), "").expect("daemon unavailable");
     let unknown = cli(&service.state(), &["status"]).await;

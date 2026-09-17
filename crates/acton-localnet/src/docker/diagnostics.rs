@@ -5,12 +5,10 @@ use super::{
     STARTUP_ERROR_LINES,
 };
 use crate::{DockerContainer, Error, Node, ServiceHealth, ServiceHealthStatus};
-use serde::Deserialize;
-use std::{
-    process::{ExitStatus, Stdio},
-    time::Duration,
-};
-use tokio::{process::Command, time::timeout};
+use bollard::query_parameters::LogsOptions;
+use futures::TryStreamExt;
+use std::{fmt::Write as _, time::Duration};
+use tokio::time::timeout;
 
 const CORE_SERVICES: [&str; 9] = [
     "localton",
@@ -26,26 +24,18 @@ const CORE_SERVICES: [&str; 9] = [
 
 const ONE_SHOT_SERVICES: [&str; 2] = ["v3-basechain-bootstrap", "v3-migrations"];
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-struct ComposeContainerState {
-    #[serde(default, rename = "ID")]
+#[derive(Debug)]
+struct ContainerState {
     id: String,
-    #[serde(default)]
     name: String,
-    #[serde(default)]
     image: String,
-    #[serde(default)]
     service: String,
-    #[serde(default)]
     state: String,
-    #[serde(default)]
     health: String,
-    #[serde(default)]
     exit_code: i32,
 }
 
-impl ComposeContainerState {
+impl ContainerState {
     fn failed(&self) -> bool {
         self.exit_code != 0
             || self.health.eq_ignore_ascii_case("unhealthy")
@@ -137,16 +127,10 @@ impl DockerNetwork {
         nodes: &[Node],
         stopping: bool,
     ) -> Option<crate::OperationProgress> {
-        let mut command = self.compose_command();
-        command.args(["ps", "--all", "--format", "json"]);
-        let output = timeout(Duration::from_secs(2), diagnostic_output(command))
+        let states = timeout(Duration::from_secs(2), self.container_states())
             .await
-            .ok()??;
-        if !output.status.success() {
-            return None;
-        }
-
-        let states = parse_compose_container_states(&String::from_utf8_lossy(&output.stdout));
+            .ok()?
+            .ok()?;
         let mut pending = Vec::new();
         let mut completed = 0;
 
@@ -212,20 +196,10 @@ impl DockerNetwork {
         })
     }
 
-    /// Returns the current state of every Compose service in stable lifecycle order.
+    /// Returns the current state of every managed service in stable lifecycle order.
     /// Missing services remain visible as stopped so clients can explain an incomplete deployment.
     pub(crate) async fn service_health(&self, nodes: &[Node]) -> Result<Vec<ServiceHealth>, Error> {
-        let mut command = self.compose_command();
-        command.args(["ps", "--all", "--no-trunc", "--format", "json"]);
-        let output = self
-            .command_output(
-                command,
-                "inspect service health",
-                "service_health_failed",
-                DOCKER_METADATA_TIMEOUT,
-            )
-            .await?;
-        let states = parse_compose_container_states(&String::from_utf8_lossy(&output.stdout));
+        let states = self.container_states().await?;
 
         // Completed setup jobs lead the list because they explain whether the durable
         // index schema and starting boundary were prepared before live services ran.
@@ -264,19 +238,9 @@ impl DockerNetwork {
             .collect())
     }
 
-    /// Classifies the Compose deployment while ignoring successful one-shot jobs.
+    /// Classifies the deployment while ignoring successful one-shot jobs.
     pub(crate) async fn status(&self, nodes: &[Node]) -> Result<crate::Status, Error> {
-        let mut command = self.compose_command();
-        command.args(["ps", "--all", "--format", "json"]);
-        let output = self
-            .command_output(
-                command,
-                "inspect network state",
-                "status_failed",
-                DOCKER_METADATA_TIMEOUT,
-            )
-            .await?;
-        let states = parse_compose_container_states(&String::from_utf8_lossy(&output.stdout));
+        let states = self.container_states().await?;
         if states.iter().all(|s| s.state != "running") {
             return Ok(crate::Status::Stopped);
         }
@@ -307,12 +271,8 @@ impl DockerNetwork {
         Ok(crate::Status::Running)
     }
 
-    pub(crate) async fn startup_failure_message(
-        &self,
-        operation: &str,
-        status: ExitStatus,
-    ) -> String {
-        let mut message = format!("Docker exited with {status} while trying to {operation}");
+    pub(crate) async fn startup_failure_message(&self, operation: &str, error: &Error) -> String {
+        let mut message = format!("Docker failed to {operation}: {error}");
         if let Ok(output) = tokio::fs::read_to_string(&self.startup_log_file).await {
             let lines = output
                 .lines()
@@ -336,146 +296,116 @@ impl DockerNetwork {
             message.push_str(&diagnostics);
         }
         format!(
-            "Docker could not {operation}\nInspect the diagnostic details and full log, resolve the reported cause, then retry\n\n{message}"
+            "Docker could not {operation}\nInspect the diagnostic details and full log, resolve the reported cause, then retry\nFull log: {}\n\n{message}",
+            self.startup_log_file.display()
         )
     }
 
-    async fn failed_container_diagnostics(&self) -> Option<String> {
-        let mut command = self.compose_command();
-        command.args(["ps", "--all", "--format", "json"]);
-        let output = diagnostic_output(command).await?;
-        if !output.status.success() {
-            return None;
-        }
+    /// Reads structured state, including exit codes which list-containers omits.
+    /// An inspect racing with deletion is treated as an absent service.
+    async fn container_states(&self) -> Result<Vec<ContainerState>, Error> {
+        timeout(DOCKER_METADATA_TIMEOUT, async {
+            let client = self.client().await?;
+            let mut states = Vec::new();
+            for container in self.containers().await? {
+                let Some(service) = container
+                    .labels
+                    .as_ref()
+                    .and_then(|l| l.get(super::engine::SERVICE_LABEL))
+                else {
+                    continue;
+                };
+                let Some(id) = container.id else {
+                    continue;
+                };
+                let inspected = match client.inspect_container(&id, None).await {
+                    Ok(inspected) => inspected,
+                    Err(error) if super::engine::missing(&error) => continue,
+                    Err(error) => return Err(super::prerequisites::api_error(error)),
+                };
+                let state = inspected.state.unwrap_or_default();
+                states.push(ContainerState {
+                    id,
+                    service: service.clone(),
+                    name: inspected
+                        .name
+                        .unwrap_or_default()
+                        .trim_start_matches('/')
+                        .to_owned(),
+                    image: inspected.config.and_then(|c| c.image).unwrap_or_default(),
+                    state: state.status.map(|s| s.to_string()).unwrap_or_default(),
+                    health: state
+                        .health
+                        .and_then(|h| h.status)
+                        .map(|s| s.to_string())
+                        .unwrap_or_default(),
+                    exit_code: state.exit_code.unwrap_or_default().try_into().unwrap_or(-1),
+                });
+            }
+            Ok(states)
+        })
+        .await
+        .map_err(|_| Error::Internal {
+            code: "docker_check_failed",
+            message: "Docker state query exceeded 10 seconds".into(),
+        })?
+    }
 
-        let states = parse_compose_container_states(&String::from_utf8_lossy(&output.stdout));
-        let failed = states
-            .into_iter()
-            .filter(ComposeContainerState::failed)
-            .collect::<Vec<_>>();
-        if failed.is_empty() {
-            return None;
-        }
-
-        let mut diagnostics = Vec::with_capacity(failed.len());
-        for container in failed {
-            let mut section = container.label();
-            let mut details = Vec::new();
-            if !container.name.is_empty() {
-                if container.health.eq_ignore_ascii_case("unhealthy") {
-                    let mut command = self.docker_command();
-                    command.args([
-                        "inspect",
-                        "--format",
-                        "{{range .State.Health.Log}}{{println .Output}}{{end}}",
-                        &container.name,
-                    ]);
-                    if let Some(output) = diagnostic_output(command).await {
-                        let health_output = diagnostic_text(&output);
-                        if !health_output.is_empty() {
-                            details.push(format!("Health check output:\n{health_output}"));
+    pub(super) async fn failed_container_diagnostics(&self) -> Option<String> {
+        timeout(DOCKER_DIAGNOSTICS_TIMEOUT, async {
+            let states = self.container_states().await.ok()?;
+            let client = self.client().await.ok()?;
+            let mut diagnostics = Vec::new();
+            for container in states.into_iter().filter(ContainerState::failed) {
+                let mut section = container.label();
+                if let Ok(inspected) = client.inspect_container(&container.id, None).await {
+                    for entry in inspected
+                        .state
+                        .and_then(|s| s.health)
+                        .and_then(|h| h.log)
+                        .unwrap_or_default()
+                    {
+                        if let Some(output) = entry.output {
+                            let _ = write!(section, "\nHealth check: {output}");
                         }
                     }
                 }
-
-                let mut command = self.docker_command();
-                command
-                    .args(["logs", "--tail"])
-                    .arg(FAILED_CONTAINER_LOG_LINES.to_string())
-                    .arg(&container.name);
-                if let Some(output) = diagnostic_output(command).await {
-                    let logs = diagnostic_text(&output);
-                    if !logs.is_empty() {
-                        details.push(format!("Container logs:\n{logs}"));
+                let mut logs = client.logs(
+                    &container.id,
+                    Some(LogsOptions {
+                        stdout: true,
+                        stderr: true,
+                        tail: FAILED_CONTAINER_LOG_LINES.to_string(),
+                        ..Default::default()
+                    }),
+                );
+                let mut bytes = Vec::new();
+                while let Ok(Some(frame)) = logs.try_next().await {
+                    let remaining = (256 * 1024usize).saturating_sub(bytes.len());
+                    bytes.extend_from_slice(&frame.as_ref()[..frame.as_ref().len().min(remaining)]);
+                    if bytes.len() >= 256 * 1024 {
+                        break;
                     }
                 }
+                if !bytes.is_empty() {
+                    let _ = write!(
+                        section,
+                        "\nContainer logs:\n{}",
+                        String::from_utf8_lossy(&bytes)
+                    );
+                }
+                diagnostics.push(section);
             }
-
-            if !details.is_empty() {
-                section.push_str(":\n");
-                section.push_str(&details.join("\n\n"));
+            let diagnostics = diagnostics.join("\n\n");
+            if diagnostics.is_empty() {
+                None
+            } else {
+                let _ = self.log_line(&diagnostics).await;
+                Some(diagnostics)
             }
-            diagnostics.push(section);
-        }
-        Some(diagnostics.join("\n\n"))
-    }
-}
-
-async fn diagnostic_output(mut command: Command) -> Option<std::process::Output> {
-    command.stdin(Stdio::null()).kill_on_drop(true);
-    timeout(DOCKER_DIAGNOSTICS_TIMEOUT, command.output())
+        })
         .await
-        .ok()?
         .ok()
-}
-
-fn diagnostic_text(output: &std::process::Output) -> String {
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    [stdout.trim(), stderr.trim()]
-        .into_iter()
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-fn parse_compose_container_states(output: &str) -> Vec<ComposeContainerState> {
-    serde_json::from_str(output).unwrap_or_else(|_| {
-        output
-            .lines()
-            .filter_map(|line| serde_json::from_str(line).ok())
-            .collect()
-    })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::parse_compose_container_states;
-    use expect_test::expect;
-
-    #[test]
-    fn compose_health_preserves_container_identity_in_both_json_formats() {
-        // Compose versions return either a JSON array or one JSON object per line.
-        // Keep Docker's uppercase ID intact while projecting its public metadata.
-        let container = r#"{"ID":"0123456789abcdef","Name":"acton-test-localton-1","Image":"localton:dev","Service":"localton","State":"running","Health":"healthy","ExitCode":0}"#;
-        let snapshot = [format!("[{container}]"), format!("{container}\n")].map(|output| {
-            parse_compose_container_states(&output)
-                .into_iter()
-                .map(|state| state.health(false))
-                .collect::<Vec<_>>()
-        });
-
-        expect![[r#"
-            [
-              [
-                {
-                  "name": "localton",
-                  "status": "ready",
-                  "state": "running",
-                  "health": "healthy",
-                  "exitCode": 0,
-                  "container": {
-                    "id": "0123456789abcdef",
-                    "name": "acton-test-localton-1",
-                    "image": "localton:dev"
-                  }
-                }
-              ],
-              [
-                {
-                  "name": "localton",
-                  "status": "ready",
-                  "state": "running",
-                  "health": "healthy",
-                  "exitCode": 0,
-                  "container": {
-                    "id": "0123456789abcdef",
-                    "name": "acton-test-localton-1",
-                    "image": "localton:dev"
-                  }
-                }
-              ]
-            ]"#]]
-        .assert_eq(&serde_json::to_string_pretty(&snapshot).expect("container health snapshot"));
+        .flatten()
     }
 }

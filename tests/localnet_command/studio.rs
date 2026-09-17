@@ -1,5 +1,7 @@
 //! Studio exercises the actual Acton CLI and control service; only Docker and TON APIs are fixtures.
 
+use std::os::unix::fs::PermissionsExt;
+
 use super::*;
 use acton_studio::{
     ContractRegistryStore, CreateEnvironmentConfig, CreateEnvironmentRequest,
@@ -18,10 +20,12 @@ import json, os, sys
 root = json.loads({root:?})
 binary = json.loads({binary:?})
 os.environ.update({{'PATH': root + '/bin:' + os.environ.get('PATH', ''),
-    'ACTON_LOCALNET_IMAGE': 'localton:fixture', 'DOCKER_CONTEXT': 'localnet-test',
+    'ACTON_LOCALNET_IMAGE': 'localton:fixture', 'DOCKER_HOST': open(root + '/docker-host').read(),
+    'DOCKER_CONFIG': root + '/docker-config',
     'LOCALNET_TEST_DIR': root, 'ACTON_LOG_DIR': root + '/logs', 'NO_COLOR': '1'}})
+os.environ.pop('DOCKER_CONTEXT', None)
 if {block_start}:
-    os.environ['LOCALNET_TEST_BLOCK_START'] = '1'
+    open(root + '/block-start', 'w').close()
 with open(root + '/acton-commands', 'a') as output:
     output.write(json.dumps(sys.argv[1:]) + '\n')
 os.execv(binary, [binary] + sys.argv[1:])
@@ -213,7 +217,7 @@ async fn studio_uses_cli_for_lifecycle_and_http_for_nodes_and_snapshots() {
     let timings = ready.startup_timings.expect("shared startup timings");
     expect![["true:true:true:true"]].assert_eq(&format!(
         "{}:{}:{}:{}",
-        timings.compose_ms.is_some(),
+        timings.containers_ms.is_some(),
         timings.ton_ready_ms.is_some(),
         timings.api_ready_ms.is_some(),
         timings.indexer_ready_ms.is_some()
@@ -344,68 +348,15 @@ async fn studio_uses_cli_for_lifecycle_and_http_for_nodes_and_snapshots() {
           "networkOwnerStillRunning": true,
           "nodeCommands": [
             {
-              "command": [
-                "up",
-                "-d",
-                "--wait",
-                "--wait-timeout",
-                "600",
-                "node-1"
-              ],
+              "command": "start",
               "node": "node-1"
             },
             {
-              "command": [
-                "stop",
-                "--timeout",
-                "30",
-                "node-1"
-              ],
+              "command": "stop",
               "node": "node-1"
             },
             {
-              "command": [
-                "stop",
-                "--timeout",
-                "30",
-                "node-1"
-              ],
-              "node": "node-1"
-            },
-            {
-              "command": [
-                "up",
-                "-d",
-                "--no-deps",
-                "--wait",
-                "--wait-timeout",
-                "600",
-                "node-1"
-              ],
-              "node": "node-1"
-            },
-            {
-              "command": [
-                "up",
-                "-d",
-                "--no-deps",
-                "--wait",
-                "--wait-timeout",
-                "600",
-                "node-1"
-              ],
-              "node": "node-1"
-            },
-            {
-              "command": [
-                "up",
-                "-d",
-                "--no-deps",
-                "--wait",
-                "--wait-timeout",
-                "600",
-                "node-1"
-              ],
+              "command": "start",
               "node": "node-1"
             }
           ],

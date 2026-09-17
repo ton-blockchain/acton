@@ -3048,6 +3048,9 @@ fn setup_logging() -> anyhow::Result<()> {
             ));
         })
         .level(log::LevelFilter::Debug)
+        // Bollard's debug records include complete request/response bodies,
+        // including imported account state and administrative payloads.
+        .level_for("bollard", log::LevelFilter::Info)
         .chain(log_file)
         .apply()?;
 

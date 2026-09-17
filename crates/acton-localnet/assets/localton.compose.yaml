@@ -1,4 +1,4 @@
-# Acton expands the markers before passing this template to Docker Compose.
+# Acton expands this private topology template and creates its services through Docker Engine.
 services:
   localton:
     image: "__LOCALTON_IMAGE__"

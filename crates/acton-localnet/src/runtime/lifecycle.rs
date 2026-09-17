@@ -3,7 +3,6 @@
 use super::{Context, Runtime};
 use crate::{Error, Status, docker::DockerNetwork};
 use std::time::{Duration, Instant};
-use tokio::process::Child;
 
 impl Context {
     pub(super) async fn start(&mut self, driver: &DockerNetwork) -> Result<(), Error> {
@@ -13,40 +12,13 @@ impl Context {
             record.startup_timings = Some(crate::StartupTimings::default());
         }
         self.phase("checkingImage").await?;
-        let present = self
-            .wait_child(
-                driver,
-                driver.spawn_image_inspect()?,
-                Duration::from_secs(15),
-            )
-            .await?;
-        if !present.success() {
+        if !self
+            .wait_work(driver, driver.image_present(), Duration::from_secs(15))
+            .await?
+        {
             self.phase("pullingImage").await?;
-            let isolated = driver.isolated_pull_target().await.ok().flatten();
-            let child = match &isolated {
-                Some(target) => driver.spawn_isolated_pull(target)?,
-                None => driver.spawn_normal_pull()?,
-            };
-
-            let mut status = self
-                .wait_child(driver, child, Duration::from_secs(1800))
+            self.wait_work(driver, driver.pull(), Duration::from_secs(1800))
                 .await?;
-            if !status.success() && isolated.is_some() {
-                status = self
-                    .wait_child(
-                        driver,
-                        driver.spawn_normal_pull()?,
-                        Duration::from_secs(1800),
-                    )
-                    .await?;
-            }
-
-            if !status.success() {
-                return Err(Error::Internal {
-                    code: "image_pull_failed",
-                    message: driver.startup_failure_message("pull image", status).await,
-                });
-            }
         }
 
         self.phase("startingContainers").await?;
@@ -72,8 +44,8 @@ impl Context {
         let started = Instant::now();
         self.entry.record.write().await.startup_timings = Some(crate::StartupTimings::default());
         let (readiness, probe) = super::readiness::observe(std::sync::Arc::clone(&self.entry));
-        // The probe runs alongside Compose so UI timings include services that
-        // became usable before Compose finished waiting for all containers.
+        // The probe runs alongside container startup so UI timings include services that
+        // became usable before every container became healthy.
         let result = self.finish_startup(driver, started, readiness).await;
         probe.abort();
         let _ = probe.await;
@@ -86,19 +58,19 @@ impl Context {
         started: Instant,
         mut readiness: tokio::sync::watch::Receiver<crate::OperationProgress>,
     ) -> Result<(), Error> {
-        let status = self
-            .wait_child(driver, driver.spawn_compose_up()?, Duration::from_secs(660))
-            .await?;
-        if !status.success() {
+        if let Err(error) = self
+            .wait_work(driver, driver.start_all(), Duration::from_secs(660))
+            .await
+        {
             return Err(Error::Internal {
                 code: "network_start_failed",
                 message: driver
-                    .startup_failure_message("start network", status)
+                    .startup_failure_message("start network", &error)
                     .await,
             });
         }
         if let Some(timings) = &mut self.entry.record.write().await.startup_timings {
-            timings.compose_ms = Some(started.elapsed().as_millis() as u64);
+            timings.containers_ms = Some(started.elapsed().as_millis() as u64);
         }
         self.phase("waitingForApis").await?;
         let deadline = Instant::now() + Duration::from_secs(180);
@@ -130,31 +102,23 @@ impl Context {
         }
     }
 
-    async fn wait_child(
+    async fn wait_work<T>(
         &mut self,
         driver: &DockerNetwork,
-        mut child: Child,
+        work: impl Future<Output = Result<T, Error>>,
         duration: Duration,
-    ) -> Result<std::process::ExitStatus, Error> {
+    ) -> Result<T, Error> {
         let mut closing = self.runtime.inner.closing.subscribe();
-        let wait = async {
+        self.observe(driver, async {
             tokio::select! {
-                result = tokio::time::timeout(duration, child.wait()) => match result {
-                    Ok(Ok(status)) => Ok(status),
-                    Ok(Err(error)) => Err(Error::Internal { code: "process_wait_failed", message: error.to_string() }),
-                    Err(_) => Err(Error::Internal { code: "process_timeout", message: format!("Docker operation exceeded {} seconds", duration.as_secs()) }),
-                },
-                _ = async { if !*closing.borrow() { let _ = closing.changed().await; } } => Err(Error::Conflict { code: "service_stopping", message: "Startup interrupted by graceful service shutdown".to_owned() }),
+                result = tokio::time::timeout(duration, work) => result.unwrap_or_else(|_| Err(Error::Internal {
+                    code: "docker_timeout", message: format!("Docker operation exceeded {} seconds", duration.as_secs()),
+                })),
+                _ = async { if !*closing.borrow() { let _ = closing.changed().await; } } => Err(Error::Conflict {
+                    code: "service_stopping", message: "Startup interrupted by graceful service shutdown".to_owned(),
+                }),
             }
-        };
-        let result = self.observe(driver, wait).await;
-
-        if result.is_err() {
-            let _ = child.kill().await;
-            let _ = child.wait().await;
-        }
-
-        result
+        }).await
     }
 }
 

@@ -26,7 +26,7 @@ export function EnvironmentStartupProgress({
     ["API", timings.apiReadyMs],
     ["Indexer", timings.indexerReadyMs],
   ] as const
-  const composeComplete = timings.composeMs !== undefined
+  const containersComplete = timings.containersMs !== undefined
   const operation = startup?.operation
   const imageComplete =
     operation !== undefined &&
@@ -99,19 +99,19 @@ export function EnvironmentStartupProgress({
         ) : undefined}
         <div className={styles.summary} data-separated={environmentId ? "true" : undefined}>
           <div>
-            <StatusIcon complete={composeComplete} />
+            <StatusIcon complete={containersComplete} />
             <span>
-              <strong>Docker Compose</strong>
+              <strong>Docker services</strong>
               <small>
-                {composeComplete ? "All services are healthy" : "Starting network services"}
+                {containersComplete ? "All services are healthy" : "Starting network services"}
               </small>
             </span>
           </div>
           <span className={styles.duration}>
-            {composeComplete ? (
+            {containersComplete ? (
               <>
                 Completed in{" "}
-                <Duration display="startup" unit="milliseconds" value={timings.composeMs} />
+                <Duration display="startup" unit="milliseconds" value={timings.containersMs} />
               </>
             ) : (
               "Running"

@@ -1,7 +1,10 @@
 //! Snapshots support for the localnet Docker runtime.
 
+#[cfg(test)]
+mod tests;
+
 use super::{
-    COMPOSE_DELETE_TIMEOUT, DockerNetwork, LOCALTON_SNAPSHOT_DIR, LOCALTON_STATE_DIR,
+    DockerNetwork, LOCALTON_SNAPSHOT_DIR, LOCALTON_STATE_DIR, NETWORK_DELETE_TIMEOUT,
     SNAPSHOT_TIMEOUT,
 };
 use crate::{Error, Node, Snapshot, storage};
@@ -248,15 +251,11 @@ impl DockerNetwork {
             .iter()
             .filter(|node| !restored.iter().any(|saved| saved.id == node.id))
         {
-            let mut command = self.docker_command();
-            command
-                .args(["volume", "rm", "--force"])
-                .arg(format!("{}_{}-state", self.project_name, node.id));
-            self.run_command(
-                command,
-                "discard state of a node outside the restored topology",
+            self.operation(
+                "remove_obsolete_node",
                 "environment_snapshot_restore_failed",
-                COMPOSE_DELETE_TIMEOUT,
+                NETWORK_DELETE_TIMEOUT,
+                self.remove_volume(&format!("{}-state", node.id)),
             )
             .await?;
         }
@@ -295,27 +294,21 @@ impl DockerNetwork {
     }
 
     pub(crate) async fn reset_indexer(&self) -> Result<(), Error> {
-        self.run_compose(
-            ["down", "--remove-orphans"],
-            "prepare to rebuild the index",
+        self.operation(
+            "reset_indexer",
             "environment_snapshot_restore_failed",
-            COMPOSE_DELETE_TIMEOUT,
+            NETWORK_DELETE_TIMEOUT,
+            self.down(),
         )
         .await?;
         // A scanner checkpoint is valid only for the database it populated.
         // Keeping it after dropping Postgres silently skips unchanged accounts.
         for volume in ["postgres-data", "ton-index-workdir", "ton-account-scan"] {
-            let mut command = self.docker_command();
-            command
-                .arg("volume")
-                .arg("rm")
-                .arg("--force")
-                .arg(format!("{}_{volume}", self.project_name));
-            self.run_command(
-                command,
-                "remove derived index data",
+            self.operation(
+                "remove_index_volume",
                 "environment_snapshot_restore_failed",
-                COMPOSE_DELETE_TIMEOUT,
+                NETWORK_DELETE_TIMEOUT,
+                self.remove_volume(volume),
             )
             .await?;
         }
@@ -339,8 +332,9 @@ impl DockerNetwork {
         } else {
             "localton"
         };
-        let mut command = self.offline_command(mounted_service);
-        command.arg("snapshot").args(args).args([
+        let mut command = vec!["snapshot"];
+        command.extend_from_slice(args);
+        command.extend_from_slice(&[
             "--state-dir",
             LOCALTON_STATE_DIR,
             "--snapshot-dir",
@@ -348,12 +342,7 @@ impl DockerNetwork {
         ]);
         let result = async {
             let output = self
-                .command_output(
-                    command,
-                    "manage snapshots",
-                    "environment_snapshot_failed",
-                    SNAPSHOT_TIMEOUT,
-                )
+                .offline(mounted_service, &command, None, SNAPSHOT_TIMEOUT)
                 .await?;
             serde_json::from_slice(&output.stdout).map_err(|error| Error::Internal {
                 code: "environment_snapshot_failed",
@@ -376,6 +365,3 @@ impl DockerNetwork {
         })
     }
 }
-
-#[cfg(test)]
-mod tests;

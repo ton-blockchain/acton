@@ -1,5 +1,8 @@
 //! Coordinates a cold, recoverable administrative operation across the cluster.
 
+#[cfg(test)]
+mod tests;
+
 use super::{
     DOCKER_METADATA_TIMEOUT, Deserialize, DockerNetwork, Duration, LOCALTON_SNAPSHOT_DIR,
     LOCALTON_STATE_DIR, SNAPSHOT_TIMEOUT, Serialize, Uuid,
@@ -7,13 +10,10 @@ use super::{
 use crate::{AdminOperation, AdminRequest, Status, admin::phase};
 use crate::{Error, Node};
 use std::collections::BTreeMap;
-use std::process::Stdio;
 use tokio::{
-    io::AsyncWriteExt,
     sync::RwLock,
     time::{Instant, sleep},
 };
-use tokio::{process::Command, time::timeout};
 
 const ADMIN_TIMEOUT: Duration = Duration::from_secs(180);
 const JOURNAL: &str = "admin-recovery.json";
@@ -203,23 +203,27 @@ impl DockerNetwork {
                 "Could not verify administrative hardfork support in this environment's Localton image: {error}"
             )))?;
 
-        let mut inspect = self.docker_command();
-        inspect.args([
-            "image",
-            "inspect",
-            "--format",
-            "{{ index .Config.Labels \"org.ton.localton.admin-hardforks\" }}",
-            &self.image,
-        ]);
         let image = self
-            .command_output(
-                inspect,
-                "check hardfork indexer support",
+            .operation(
+                "inspect_image",
                 "environment_admin_failed",
                 DOCKER_METADATA_TIMEOUT,
+                async {
+                    self.client()
+                        .await?
+                        .inspect_image(&self.image)
+                        .await
+                        .map_err(super::prerequisites::api_error)
+                },
             )
             .await?;
-        if String::from_utf8_lossy(&image.stdout).trim() != "1" {
+        if image
+            .config
+            .and_then(|c| c.labels)
+            .and_then(|l| l.get("org.ton.localton.admin-hardforks").cloned())
+            .as_deref()
+            != Some("1")
+        {
             return Err(failure(
                 "This Localton image does not support account indexing after a hardfork. Create an environment with a compatible image",
             ));
@@ -453,25 +457,23 @@ impl DockerNetwork {
     }
 
     async fn start_core(&self, services: &[String]) -> Result<(), Error> {
-        let mut command = self.compose_command();
-        command.args(["up", "-d", "--no-deps"]).args(services);
-        self.run_command(
-            command,
-            "start network nodes",
+        self.operation(
+            "start_nodes",
             "environment_admin_failed",
             ADMIN_TIMEOUT,
+            self.start_services(Some(services), false, false),
         )
         .await
     }
 
-    async fn start_all(&self) -> Result<(), Error> {
-        let mut command = self.compose_command();
-        command.args(["up", "-d", "--wait", "--wait-timeout", "600"]);
-        self.run_command(
-            command,
-            "restart the complete environment",
-            "environment_admin_failed",
+    /// Starts the complete topology and waits for health probes and setup jobs.
+    /// Boxing keeps Bollard's large request futures off the enclosing lifecycle stack.
+    pub(crate) async fn start_all(&self) -> Result<(), Error> {
+        self.operation(
+            "start_network",
+            "network_start_failed",
             Duration::from_secs(660),
+            self.start_services(None, true, true),
         )
         .await
     }
@@ -493,34 +495,23 @@ impl DockerNetwork {
         args: &[&str],
         input: Option<Vec<u8>>,
     ) -> Result<serde_json::Value, Error> {
-        let mut command = self.compose_command();
-        command
-            .args(["exec", "-T", service, "/usr/local/bin/localton"])
-            .args(args);
-
-        // --help is intentionally not a JSON command.
+        let mut command = vec!["/usr/local/bin/localton"];
+        command.extend_from_slice(args);
         if args.contains(&"--help") {
-            self.run_command(
-                command,
-                "check administrator support",
-                "environment_admin_failed",
-                ADMIN_TIMEOUT,
-            )
-            .await?;
+            self.exec(service, &command, input.as_deref(), ADMIN_TIMEOUT)
+                .await?;
             return Ok(serde_json::Value::Null);
         }
-
-        command.args(["--state-dir", LOCALTON_STATE_DIR]);
+        command.extend_from_slice(&["--state-dir", LOCALTON_STATE_DIR]);
+        let duration = if args.first() == Some(&"godmode") {
+            Duration::from_secs(900)
+        } else {
+            Duration::from_secs(90)
+        };
         self.admin_json(
-            command,
             service,
             args,
-            input,
-            if args.first() == Some(&"godmode") {
-                Duration::from_secs(900)
-            } else {
-                Duration::from_secs(90)
-            },
+            self.exec(service, &command, input.as_deref(), duration),
         )
         .await
     }
@@ -531,62 +522,29 @@ impl DockerNetwork {
         args: &[&str],
         input: Option<Vec<u8>>,
     ) -> Result<serde_json::Value, Error> {
-        let mut command = self.offline_command(service);
-        command.args(args).args(["--state-dir", LOCALTON_STATE_DIR]);
-        self.admin_json(command, service, args, input, SNAPSHOT_TIMEOUT)
-            .await
+        let mut command = args.to_vec();
+        command.extend_from_slice(&["--state-dir", LOCALTON_STATE_DIR]);
+        self.admin_json(
+            service,
+            args,
+            self.offline(service, &command, input.as_deref(), SNAPSHOT_TIMEOUT),
+        )
+        .await
     }
 
-    /// Streams request data separately from command diagnostics. Both pipes must
-    /// drain together, and an early process failure takes priority over broken stdin.
+    /// Records action names and duration without including account payloads in logs.
     async fn admin_json(
         &self,
-        mut command: Command,
         service: &str,
         args: &[&str],
-        input: Option<Vec<u8>>,
-        command_timeout: Duration,
+        work: impl Future<Output = Result<super::process::Output, Error>>,
     ) -> Result<serde_json::Value, Error> {
         let started = Instant::now();
-        // Only command names belong in progress logs, never the request payload.
         let action = args.iter().take(2).copied().collect::<Vec<_>>().join(" ");
-        log::info!("operation=admin_command node={service} action={action:?} phase=started");
-
-        command
-            .kill_on_drop(true)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        let result = timeout(command_timeout, async {
-            let mut child = command.spawn().map_err(failure)?;
-            let mut stdin = child
-                .stdin
-                .take()
-                .ok_or_else(|| failure("Missing command stdin"))?;
-            let write = async move {
-                if let Some(input) = input {
-                    stdin.write_all(&input).await?;
-                }
-                drop(stdin);
-                Ok::<_, std::io::Error>(())
-            };
-            let (written, output) = tokio::join!(write, child.wait_with_output());
-            let output = output.map_err(failure)?;
-            if !output.status.success() {
-                return Err(failure(format!(
-                    "Command exited with {}: {}",
-                    output.status,
-                    String::from_utf8_lossy(&output.stderr)
-                )));
-            }
-
-            written.map_err(failure)?;
-            serde_json::from_slice(&output.stdout).map_err(failure)
-        })
-        .await
-        .map_err(failure)
-        .and_then(|result| result);
-
+        log::info!(
+            "operation=admin_command node={service} action={action:?} duration_ms=0 outcome=started"
+        );
+        let result = async { serde_json::from_slice(&work.await?.stdout).map_err(failure) }.await;
         log::info!(
             "operation=admin_command node={service} action={action:?} duration_ms={} outcome={}",
             started.elapsed().as_millis(),
@@ -596,558 +554,6 @@ impl DockerNetwork {
                 "failed"
             }
         );
-
         result.map_err(|error| failure(format!("{service}: {action}: {error}")))
-    }
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
-mod tests {
-    use super::*;
-    use crate::{
-        CreateNetwork, NetworkConfig, Runtime,
-        activity::{ActivityConfig, ActivityStatus},
-        catalog,
-        docker::DockerTarget,
-        storage,
-    };
-
-    #[tokio::test]
-    async fn admin_command_preserves_process_diagnostics_when_stdin_closes_early() {
-        let dir = tempfile::tempdir().unwrap();
-        let driver = DockerNetwork {
-            compose_file: dir.path().join("compose.yaml"),
-            compose_config: NetworkConfig {
-                port_base: 0,
-                ports: None,
-                block_time_ms: None,
-                election_time_seconds: None,
-                imported_account_bocs: vec![],
-                startup_wallets: vec![],
-            },
-            docker_target: DockerTarget::Context("unused".into()),
-            isolated_docker_config_dir: None,
-            image: "unused".into(),
-            project_name: "unused".into(),
-            startup_log_file: dir.path().join("startup.log"),
-        };
-
-        // Closing stdin before consuming a large payload forces a broken pipe.
-        // The actionable error still comes from the child process's stderr.
-        let mut command = Command::new("sh");
-        command.args(["-c", "exec 0<&-; echo snapshot restore failed >&2; exit 1"]);
-        let error = driver
-            .admin_json(
-                command,
-                "node-1",
-                &["snapshot", "restore"],
-                Some(vec![0; 1024 * 1024]),
-                Duration::from_secs(5),
-            )
-            .await
-            .unwrap_err();
-
-        expect_test::expect![["node-1: snapshot restore: Command exited with exit status: 1: snapshot restore failed\n"]]
-            .assert_eq(&error.to_string());
-    }
-
-    async fn run_edit(runtime: &Runtime, request: AdminRequest) -> Result<u32, Error> {
-        let accepted = runtime.start_admin(request.clone()).await?;
-        let retried = runtime.start_admin(request).await?;
-        if retried.id != accepted.id || !retried.is_active() {
-            return Err(failure("Retry did not return the active operation"));
-        }
-
-        let mut phase = String::new();
-        loop {
-            // Inventory reads committed manifests without taking the mutation lock,
-            // so Studio can keep polling while the edit and its recovery run.
-            runtime.snapshots().await?;
-
-            let operation = runtime
-                .admin_operation()
-                .await?
-                .ok_or_else(|| failure("Lost administrative operation"))?;
-            if operation.phase != phase {
-                eprintln!("Admin phase: {}", operation.phase);
-                phase = operation.phase.clone();
-            }
-            if operation.finished_at.is_some() {
-                return match operation.error {
-                    Some(error) => Err(failure(error)),
-                    None => operation
-                        .block_seqno
-                        .ok_or_else(|| failure("No verified block")),
-                };
-            }
-            sleep(Duration::from_millis(250)).await;
-        }
-    }
-
-    #[tokio::test]
-    async fn operation_ids_survive_restarts_and_reject_different_content() {
-        let dir = tempfile::tempdir().unwrap();
-        let driver = DockerNetwork {
-            compose_file: dir.path().join("compose.yaml"),
-            compose_config: NetworkConfig {
-                port_base: 0,
-                ports: None,
-                block_time_ms: None,
-                election_time_seconds: None,
-                imported_account_bocs: vec![],
-                startup_wallets: vec![],
-            },
-            docker_target: DockerTarget::Context("unused".into()),
-            isolated_docker_config_dir: None,
-            image: "unused".into(),
-            project_name: "unused".into(),
-            startup_log_file: dir.path().join("startup.log"),
-        };
-        let request: AdminRequest = serde_json::from_value(serde_json::json!({
-            "kind": "accounts",
-            "id": Uuid::new_v4().to_string(),
-            "edits": [{
-                "address": format!("0:{}", "11".repeat(32)),
-                "type": "balance",
-                "balance": "1"
-            }]
-        }))
-        .unwrap();
-        request.validate().unwrap();
-        let operation = AdminOperation {
-            id: request.id().into(),
-            phase: "preparing".into(),
-            started_at: chrono::Utc::now().to_rfc3339(),
-            finished_at: None,
-            error: None,
-            block_seqno: None,
-        };
-        driver
-            .save_admin_operation(&request, &operation)
-            .await
-            .unwrap();
-        let interrupted = driver
-            .saved_admin_operation(None, None)
-            .await
-            .unwrap()
-            .unwrap();
-        assert!(!interrupted.is_active());
-        assert_eq!(interrupted.phase, "failed");
-        let retry = driver
-            .saved_admin_operation(Some(&request), None)
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(retry.finished_at, interrupted.finished_at);
-        let mut changed = serde_json::to_value(&request).unwrap();
-        changed["edits"][0]["balance"] = "2".into();
-        let changed: AdminRequest = serde_json::from_value(changed).unwrap();
-        assert!(
-            driver
-                .saved_admin_operation(Some(&changed), None)
-                .await
-                .unwrap_err()
-                .to_string()
-                .contains("different request")
-        );
-    }
-
-    #[tokio::test]
-    #[ignore = "requires Docker and ACTON_LOCALNET_IMAGE built with localton-admin-dev"]
-    async fn new_nodes_bootstrap_after_repeated_administrative_hardforks() {
-        use crate::{OperationStatus, runtime::Action};
-
-        assert!(std::env::var("ACTON_LOCALNET_IMAGE").is_ok());
-        let dir = tempfile::tempdir_in("/tmp").unwrap();
-        let location = catalog::create(
-            dir.path(),
-            CreateNetwork {
-                name: "hardfork-join-regression".into(),
-                port_base: Some(28600),
-                block_time_ms: Some(1000),
-                election_time_seconds: Some(3600),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
-        let driver =
-            DockerNetwork::materialize(&location.path, dir.path(), &location.network, false)
-                .await
-                .unwrap();
-        eprintln!(
-            "Hardfork join project: {} ({})",
-            driver.project_name,
-            dir.path().display()
-        );
-
-        let result: Result<serde_json::Value, Error> = async {
-            driver.start_all().await?;
-            let runtime = Runtime::open(&location.path).await?;
-            runtime.reconcile().await;
-            let basechain = format!("0:{}", "42".repeat(32));
-            let masterchain = format!("-1:{}", "a4".repeat(32));
-            let mut joins = Vec::new();
-
-            for (index, address, balance) in [
-                (1, &basechain, "42000000000"),
-                (2, &masterchain, "7000000000"),
-            ] {
-                // The second edit leaves the basechain unchanged. Its state must
-                // still be downloadable under the new masterchain bootstrap block.
-                let request = serde_json::from_value(serde_json::json!({
-                    "kind": "accounts",
-                    "id": Uuid::new_v4().to_string(),
-                    "edits": [{
-                        "address": address,
-                        "type": "balance",
-                        "balance": balance,
-                    }],
-                }))
-                .map_err(failure)?;
-                let fork = run_edit(&runtime, request).await?;
-
-                eprintln!("Joining fresh node {index} after hardfork {fork}");
-                let accepted = runtime
-                    .submit(Action::AddNode {
-                        name: format!("after-fork-{index}"),
-                        validator: false,
-                    })
-                    .await?;
-
-                loop {
-                    let operation = runtime.operation(&accepted.id).await?;
-                    match operation.status {
-                        OperationStatus::Running => sleep(Duration::from_millis(250)).await,
-                        OperationStatus::Completed => break,
-                        OperationStatus::Failed => {
-                            return Err(failure(
-                                operation.error.unwrap_or_else(|| "Node join failed".into()),
-                            ));
-                        }
-                    }
-                }
-
-                let service = format!("node-{index}");
-                let native = driver
-                    .live_admin(&service, &["lite", "account", address], None)
-                    .await?;
-                let preserved = driver
-                    .live_admin(&service, &["lite", "account", &basechain], None)
-                    .await?;
-                joins.push(serde_json::json!({
-                    "node": service,
-                    "balance": native["balance_nano"],
-                    "preservedBasechainBalance": preserved["balance_nano"],
-                    "pastHardfork": native["block"]["seqno"].as_u64().is_some_and(|n| n > u64::from(fork)),
-                }));
-            }
-
-            // Persisted init blocks must also allow all existing databases to reopen.
-            driver.stop().await?;
-            driver.start_all().await?;
-
-            let mut restarted = Vec::new();
-            for service in ["localton", "node-1", "node-2"] {
-                let account = driver
-                    .live_admin(service, &["lite", "account", &basechain], None)
-                    .await?;
-                restarted.push(account["balance_nano"].clone());
-            }
-
-            Ok(serde_json::json!({"joins": joins, "restartedBalances": restarted}))
-        }
-        .await;
-
-        if result.is_err() {
-            let mut command = driver.compose_command();
-            command.args(["logs", "--tail", "30"]);
-            if let Ok(output) = command.output().await {
-                eprintln!("{}", String::from_utf8_lossy(&output.stdout));
-            }
-        }
-        driver.delete().await.unwrap();
-        expect_test::expect![[r#"
-            Object {
-                "joins": Array [
-                    Object {
-                        "balance": String("42000000000"),
-                        "node": String("node-1"),
-                        "pastHardfork": Bool(true),
-                        "preservedBasechainBalance": String("42000000000"),
-                    },
-                    Object {
-                        "balance": String("7000000000"),
-                        "node": String("node-2"),
-                        "pastHardfork": Bool(true),
-                        "preservedBasechainBalance": String("42000000000"),
-                    },
-                ],
-                "restartedBalances": Array [
-                    String("42000000000"),
-                    String("42000000000"),
-                    String("42000000000"),
-                ],
-            }
-        "#]]
-        .assert_debug_eq(&result.unwrap());
-    }
-
-    #[tokio::test]
-    #[ignore = "requires Docker and ACTON_LOCALNET_IMAGE built with localton-admin-dev"]
-    async fn administrative_hardfork_and_rollback_on_two_nodes() {
-        assert!(std::env::var("ACTON_LOCALNET_IMAGE").is_ok());
-        let dir = tempfile::tempdir_in("/tmp").unwrap();
-        let nodes = vec![Node {
-            id: "node-1".into(),
-            name: "replica".into(),
-            validator: false,
-            port_base: 19000,
-            stopped: false,
-        }];
-        let mut location = catalog::create(
-            dir.path(),
-            CreateNetwork {
-                name: "admin-smoke".into(),
-                port_base: Some(28300),
-                block_time_ms: Some(1000),
-                election_time_seconds: Some(3600),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
-        location.network.nodes = nodes.clone();
-        storage::write_json(&location.path.join("network.json"), &location.network)
-            .await
-            .unwrap();
-        let driver =
-            DockerNetwork::materialize(&location.path, dir.path(), &location.network, false)
-                .await
-                .unwrap();
-        eprintln!(
-            "Docker admin test project: {} ({})",
-            driver.project_name,
-            dir.path().display()
-        );
-        let result: Result<(), Error> = async {
-            driver.start_all().await?;
-            eprintln!("Complete environment started");
-
-            let address = format!("0:{}", "22".repeat(32));
-            let request: AdminRequest = serde_json::from_value(serde_json::json!({
-                "kind": "accounts",
-                "id": Uuid::new_v4().to_string(),
-                "edits": [{
-                    "address": address,
-                    "type": "balance",
-                    "balance": "42000000000"
-                }]
-            }))
-            .unwrap();
-
-            let runtime = Runtime::open(&location.path).await?;
-            runtime.reconcile().await;
-            runtime
-                .configure_activity(ActivityConfig::default(), true)
-                .await?;
-
-            let seqno = run_edit(&runtime, request).await?;
-            if runtime.activity().await?.status != ActivityStatus::Stopped {
-                return Err(failure(
-                    "Activity generator was not stopped before the hardfork",
-                ));
-            }
-
-            eprintln!("Hardfork completed at {seqno}");
-            let account = driver
-                .live_admin("localton", &["lite", "account", &address], None)
-                .await?;
-            if account["balance_nano"] != "42000000000" {
-                return Err(failure(format!("Incorrect native account: {account}")));
-            }
-
-            let replica = driver
-                .live_admin("node-1", &["lite", "account", &address], None)
-                .await?;
-            if replica["balance_nano"] != "42000000000" {
-                return Err(failure(format!("Incorrect replica account: {replica}")));
-            }
-
-            let account_url =
-                format!("http://127.0.0.1:28303/api/v3/accountStates?address={address}");
-            let response: serde_json::Value = reqwest::get(&account_url)
-                .await
-                .map_err(failure)?
-                .json()
-                .await
-                .map_err(failure)?;
-            eprintln!("Indexed account: {response}");
-            if response["accounts"][0]["balance"] != "42000000000" {
-                return Err(failure(format!("Incorrect indexed account: {response}")));
-            }
-
-            // Both edits preserve transaction LT. Indexing must still replace
-            // the first hardfork's account state with the second one.
-            let changed: AdminRequest = serde_json::from_value(serde_json::json!({
-                "kind": "accounts",
-                "id": Uuid::new_v4().to_string(),
-                "edits": [{
-                    "address": address,
-                    "type": "balance",
-                    "balance": "43000000000"
-                }]
-            }))
-            .unwrap();
-            run_edit(&runtime, changed).await?;
-            let updated: serde_json::Value = reqwest::get(&account_url)
-                .await
-                .map_err(failure)?
-                .json()
-                .await
-                .map_err(failure)?;
-            if updated["accounts"][0]["balance"] != "43000000000" {
-                return Err(failure(format!(
-                    "A second hardfork was not indexed: {updated}"
-                )));
-            }
-
-            eprintln!("Repeated account overwrite was indexed");
-
-            // A masterchain-only balance edit must update global supply too.
-            // Resumed native block production checks the resulting state rules.
-            // Keep the fixture separate from the Elector at -1:333...333,
-            // whose balance changes as it receives ordinary block rewards.
-            let masterchain_address = format!("-1:{}", "a4".repeat(32));
-            let masterchain_edit = serde_json::from_value(serde_json::json!({
-                "kind": "accounts",
-                "id": Uuid::new_v4().to_string(),
-                "edits": [{
-                    "address": masterchain_address,
-                    "type": "balance",
-                    "balance": "7000000000"
-                }]
-            }))
-            .unwrap();
-            run_edit(&runtime, masterchain_edit).await?;
-
-            for service in ["localton", "node-1"] {
-                let account = driver
-                    .live_admin(service, &["lite", "account", &masterchain_address], None)
-                    .await?;
-                if account["balance_nano"] != "7000000000" {
-                    return Err(failure(format!(
-                        "Masterchain balance edit was not applied on {service}: {account}"
-                    )));
-                }
-            }
-
-            eprintln!("Masterchain-only hardfork resumed block production on both nodes");
-
-            // Freezing an uninitialized account fails after snapshots exist,
-            // exercising rollback rather than transport-level validation.
-            let invalid: AdminRequest = serde_json::from_value(serde_json::json!({
-                "kind": "accounts",
-                "id": Uuid::new_v4().to_string(),
-                "edits": [{"address": address, "type": "freeze"}]
-            }))
-            .unwrap();
-            let error = run_edit(&runtime, invalid)
-                .await
-                .err()
-                .ok_or_else(|| failure("Invalid edit was accepted"))?;
-            eprintln!("Expected rejected operation: {error}");
-
-            if !error.to_string().contains("Only an active account") {
-                return Err(error);
-            }
-            if driver.has_admin_recovery() {
-                return Err(failure("Recovery journal remains"));
-            }
-            if !driver.admin_is_running(&nodes).await {
-                return Err(failure("Environment did not recover"));
-            }
-
-            let account = driver
-                .live_admin("localton", &["lite", "account", &address], None)
-                .await?;
-            if account["balance_nano"] != "43000000000" {
-                return Err(failure(format!("Incorrect native account: {account}")));
-            }
-
-            drop(runtime);
-
-            for ready in [false, true] {
-                driver.stop().await?;
-                let mut journal = Recovery::default();
-                if ready {
-                    for service in ["localton", "node-1"] {
-                        let directory =
-                            format!("{LOCALTON_SNAPSHOT_DIR}/admin/recovery-test/{service}");
-                        let snapshot = driver
-                            .offline_admin(
-                                service,
-                                &["snapshot", "create", "--snapshot-dir", &directory],
-                                None,
-                            )
-                            .await?;
-                        journal.backups.insert(
-                            service.into(),
-                            Backup {
-                                id: snapshot["id"]
-                                    .as_str()
-                                    .ok_or_else(|| failure("Missing snapshot id"))?
-                                    .into(),
-                                directory,
-                            },
-                        );
-                    }
-                    journal.ready = true;
-                }
-                driver.save_recovery(&journal).await?;
-                if ready {
-                    // Simulate the crash after validator suspension; restoring the
-                    // cold archives must recover election keys as well as accounts.
-                    for service in ["localton", "node-1"] {
-                        driver
-                            .offline_admin(service, &["godmode", "suspend"], None)
-                            .await?;
-                    }
-                }
-                // No explicit start: opening the new owner must finish recovery.
-                let reopened = Runtime::open(&location.path).await?;
-                reopened.reconcile().await;
-                if reopened.get().await.status != Status::Running || driver.has_admin_recovery() {
-                    return Err(failure(format!(
-                        "Startup recovery did not complete (ready={ready})"
-                    )));
-                }
-                for service in ["localton", "node-1"] {
-                    let account = driver
-                        .live_admin(service, &["lite", "account", &address], None)
-                        .await?;
-                    if account["balance_nano"] != "43000000000" {
-                        return Err(failure(format!(
-                            "Recovery lost account state on {service}: {account}"
-                        )));
-                    }
-                }
-                eprintln!("Startup recovery restarted both nodes (ready={ready})");
-            }
-
-            Ok(())
-        }
-        .await;
-
-        if result.is_err() {
-            let mut command = driver.compose_command();
-            command.args(["logs", "--tail", "35", "v3-worker", "localton", "node-1"]);
-            if let Ok(output) = command.output().await {
-                eprintln!("{}", String::from_utf8_lossy(&output.stdout));
-            }
-        }
-        driver.delete().await.unwrap();
-        result.unwrap();
     }
 }

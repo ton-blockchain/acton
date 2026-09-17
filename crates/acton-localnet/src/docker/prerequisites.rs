@@ -1,38 +1,39 @@
 //! Checks Docker before persisting a deployment identity or starting containers.
 
-use std::{io, process::Stdio};
-
-use tokio::{process::Command, time::timeout};
-
-use super::{DOCKER_METADATA_TIMEOUT, DockerTarget};
+use super::DockerTarget;
 use crate::Error;
+
+/// Classifies daemon errors while retaining the Engine's diagnostic message.
+/// Request bodies (which can contain imported account state) are never formatted.
+pub(super) fn api_error(error: bollard::errors::Error) -> Error {
+    let details = match error {
+        bollard::errors::Error::DockerResponseServerError { message, .. } => message,
+        bollard::errors::Error::JsonDataError { .. } => "Docker returned an invalid API response".to_owned(),
+        bollard::errors::Error::UnsupportedURISchemeError { .. } => "Unsupported Docker transport; use a Unix socket, Windows named pipe, or TCP/TLS endpoint".to_owned(),
+        other => {
+            let mut details = other.to_string();
+            let mut source = std::error::Error::source(&other);
+            while let Some(cause) = source {
+                details.push_str(": ");
+                details.push_str(&cause.to_string());
+                source = cause.source();
+            }
+            details
+        },
+    };
+    runtime_failure(&details).unwrap_or_else(|| {
+        failure(
+            "docker_api_failed",
+            "Docker Engine API request failed",
+            &details,
+        )
+    })
+}
 
 fn failure(code: &'static str, message: &str, details: &str) -> Error {
     Error::Internal {
         code,
         message: format!("{message}\n\n{details}"),
-    }
-}
-
-/// Keeps a missing executable distinct from an engine or registry failure.
-pub(super) fn spawn_error(error: &io::Error, operation: &str) -> Error {
-    let details = format!("Failed to {operation}: {error}");
-    match error.kind() {
-        io::ErrorKind::NotFound => failure(
-            "docker_not_found",
-            "Docker CLI was not found on PATH\nInstall Docker Desktop or Docker Engine with Compose v2 and make `docker` available to Acton",
-            &details,
-        ),
-        io::ErrorKind::PermissionDenied => failure(
-            "docker_permission_denied",
-            "Permission to run Docker was denied\nCheck the Docker executable permissions, then retry",
-            &details,
-        ),
-        _ => failure(
-            "docker_command_failed",
-            "Docker could not be started",
-            &details,
-        ),
     }
 }
 
@@ -43,14 +44,8 @@ pub(super) fn runtime_failure(details: &str) -> Option<Error> {
     let local_endpoint =
         text.contains("unix://") || text.contains("docker.sock") || text.contains("//./pipe/");
 
-    let (code, message) = if text.contains("compose")
-        && (text.contains("is not a docker command") || text.contains("unknown command"))
-    {
-        (
-            "docker_compose_unavailable",
-            "Docker Compose is not available\nInstall or enable Compose v2, then retry",
-        )
-    } else if (text.contains("permission denied") || text.contains("access is denied"))
+    let (code, message) = if (text.contains("permission denied")
+        || text.contains("access is denied"))
         && (local_endpoint || text.contains("connect"))
     {
         (
@@ -60,6 +55,7 @@ pub(super) fn runtime_failure(details: &str) -> Option<Error> {
     } else if text.contains("x509:")
         || text.contains("tls handshake")
         || text.contains("certificate verify failed")
+        || text.contains("invalid peer certificate")
     {
         (
             "docker_tls_failed",
@@ -89,7 +85,7 @@ pub(super) fn runtime_failure(details: &str) -> Option<Error> {
     {
         (
             "docker_registry_access_denied",
-            "Docker could not access the image registry\nCheck the image name and sign in to its registry with `docker login` if it requires authentication",
+            "Docker could not access the image registry\nCheck the image name and configure inline registry credentials in Docker config.json if it requires authentication",
         )
     } else if text.contains("manifest unknown") || text.contains("no matching manifest") {
         (
@@ -112,6 +108,7 @@ pub(super) fn runtime_failure(details: &str) -> Option<Error> {
             "Docker could not reach the requested endpoint\nCheck the host, network, VPN and proxy settings shown in the diagnostic details, then retry",
         )
     } else if text.trim() == "docker daemon is unavailable"
+        || text.starts_with("socket not found:")
         || (local_endpoint
             && (text.contains("cannot connect to the docker daemon")
                 || text.contains("connection refused")
@@ -137,50 +134,18 @@ pub(super) fn runtime_failure(details: &str) -> Option<Error> {
     Some(failure(code, message, details))
 }
 
-impl DockerTarget {
-    pub(super) fn command(&self) -> Command {
-        let mut command = Command::new("docker");
-        match self {
-            Self::Context(context) => command.arg("--context").arg(context),
-            Self::Host(host) => command.arg("--host").arg(host),
-        };
-        command
-    }
-}
-
-/// Probes the selected target on every start, so fixing Docker never requires
-/// restarting Studio. These read-only checks precede deployment persistence.
+/// Probes the selected engine before persisting a new deployment identity.
 pub(super) async fn check(target: &DockerTarget) -> Result<(), Error> {
-    for args in [
-        &["info", "--format", "{{.ServerVersion}}"] as &[&str],
-        &["compose", "version", "--short"],
-    ] {
-        let operation = format!("docker {}", args.join(" "));
-        let mut command = target.command();
-        command.args(args).stdin(Stdio::null()).kill_on_drop(true);
-        let output = timeout(DOCKER_METADATA_TIMEOUT, command.output())
-            .await
-            .map_err(|_| Error::Internal {
-                code: "docker_check_failed",
-                message: format!(
-                    "Docker did not respond within {} seconds\nCheck the selected Docker context and connection, then retry\n\nCheck: {operation}",
-                    DOCKER_METADATA_TIMEOUT.as_secs()
-                ),
-            })?
-            .map_err(|error| spawn_error(&error, &operation))?;
-
-        if output.status.success() && !output.stdout.trim_ascii().is_empty() {
-            continue;
-        }
-
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        // Keep the original diagnostic in the operation log. Do not print DOCKER_HOST:
-        // it can contain credentials, unlike this fixed command description.
-        return Err(runtime_failure(stderr.trim()).unwrap_or_else(|| Error::Internal {
-            code: "docker_check_failed",
-            message: format!("Docker could not complete its availability check\nRun `{operation}` with the selected Docker context to inspect the failure\n\nExit status: {}\n{}", output.status, stderr.trim()),
-        }));
-    }
-
+    let client = target.connect().await?;
+    tokio::time::timeout(super::DOCKER_METADATA_TIMEOUT, client.ping())
+        .await
+        .map_err(|_| {
+            failure(
+                "docker_check_failed",
+                "Docker did not respond within 10 seconds",
+                "Check the selected Docker engine, then retry",
+            )
+        })?
+        .map_err(api_error)?;
     Ok(())
 }

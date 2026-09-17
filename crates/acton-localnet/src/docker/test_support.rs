@@ -37,34 +37,28 @@ pub(super) async fn completed(runtime: &Runtime, action: Action) -> Result<Value
 async fn lite(driver: &DockerNetwork, service: &str, query: &str) -> Result<String> {
     // Address each node's own liteserver. The pinned image's generic CLI can
     // select the downloaded bootstrap config instead of the joined node config.
-    let mut command = driver.compose_command();
-    command.args([
-        "exec",
-        "-T",
-        service,
-        "/opt/ton/lite-client",
-        "-v",
-        "0",
-        "-t",
-        "10",
-        "-C",
-        "/var/lib/localton/node/global.config.json",
-        "-c",
-        query,
-    ]);
-    command.kill_on_drop(true);
-    let output = tokio::time::timeout(Duration::from_secs(15), command.output())
-        .await
-        .with_context(|| format!("Liteserver query timed out on {service}"))??;
+    let output = driver
+        .exec(
+            service,
+            &[
+                "/opt/ton/lite-client",
+                "-v",
+                "0",
+                "-t",
+                "10",
+                "-C",
+                "/var/lib/localton/node/global.config.json",
+                "-c",
+                query,
+            ],
+            None,
+            Duration::from_secs(15),
+        )
+        .await?;
     let text = format!(
         "{}\n{}",
         String::from_utf8(output.stdout)?,
         String::from_utf8(output.stderr)?
-    );
-    ensure!(
-        output.status.success(),
-        "Liteserver query {query} failed on {service} ({}): {text}",
-        output.status
     );
     Ok(text)
 }

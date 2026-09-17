@@ -288,7 +288,7 @@ export type EnvironmentSnapshotOperationPhase =
   | "failed"
 
 export interface EnvironmentStartupTimings {
-  readonly composeMs?: number
+  readonly containersMs?: number
   readonly tonReadyMs?: number
   readonly indexerReadyMs?: number
   readonly apiReadyMs?: number

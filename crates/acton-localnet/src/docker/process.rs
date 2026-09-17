@@ -1,320 +1,313 @@
-//! Process support for the localnet Docker runtime.
+//! Container execution and explicit lifecycle through the Docker Engine API.
+
+#[cfg(test)]
+mod tests;
 
 use super::{
-    COMPOSE_DELETE_TIMEOUT, COMPOSE_STOP_TIMEOUT, COMPOSE_WAIT_TIMEOUT_SECONDS, DockerNetwork,
-    DockerTarget, LOCALTON_SNAPSHOT_DIR, LOCALTON_STATE_DIR, descriptor::docker_text,
+    DockerNetwork, LOCALTON_SNAPSHOT_DIR, LOCALTON_STATE_DIR, NETWORK_DELETE_TIMEOUT,
+    NETWORK_STOP_TIMEOUT, prerequisites::api_error,
 };
 use crate::Error;
-use std::{ffi::OsStr, fs::OpenOptions, process::Stdio, time::Duration};
-use tokio::{
-    process::{Child, Command},
-    time::timeout,
+use bollard::{
+    container::LogOutput,
+    exec::StartExecResults,
+    models::{ContainerCreateBody, ExecConfig, HostConfig},
+    query_parameters::{
+        AttachContainerOptions, ListVolumesOptions, RemoveContainerOptions, RemoveVolumeOptions,
+    },
 };
+use futures::{Stream, TryStreamExt};
+use std::{pin::Pin, time::Duration};
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 
-pub(crate) struct IsolatedPullTarget {
-    docker_host: String,
-    platform: String,
+#[derive(Default)]
+pub(super) struct Output {
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+}
+
+/// Drains both channels while feeding stdin, so large requests cannot deadlock
+/// against a tool that writes diagnostics before consuming its input.
+async fn exchange(
+    mut output: Pin<Box<dyn Stream<Item = Result<LogOutput, bollard::errors::Error>> + Send>>,
+    mut input: Pin<Box<dyn AsyncWrite + Send>>,
+    bytes: Option<&[u8]>,
+) -> Result<(Output, std::io::Result<()>), Error> {
+    let send = async {
+        if let Some(bytes) = bytes {
+            input.write_all(bytes).await?;
+        }
+        let closed = input.shutdown().await;
+        if bytes.is_some() { closed } else { Ok(()) }
+    };
+    let receive = async {
+        let mut result = Output::default();
+        while let Some(frame) = output.try_next().await.map_err(api_error)? {
+            let buffer = match &frame {
+                LogOutput::StdErr { .. } => &mut result.stderr,
+                _ => &mut result.stdout,
+            };
+            if buffer.len() + frame.as_ref().len() > 64 * 1024 * 1024 {
+                return Err(Error::invalid("Localton tool output exceeded 64 MiB"));
+            }
+            buffer.extend_from_slice(frame.as_ref());
+        }
+        Ok(result)
+    };
+    let (sent, received) = tokio::join!(send, receive);
+    Ok((received?, sent))
+}
+
+fn completed(
+    output: Output,
+    sent: std::io::Result<()>,
+    exit: Option<i64>,
+) -> Result<Output, Error> {
+    // Prefer the tool's diagnostic over a broken pipe from an early exit.
+    if exit != Some(0) {
+        return Err(Error::Internal {
+            code: "localton_command_failed",
+            message: format!(
+                "Localton tool exited with {exit:?}: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ),
+        });
+    }
+    sent.map_err(|error| Error::Internal {
+        code: "localton_stdin_failed",
+        message: format!("Failed to send Localton tool input: {error}"),
+    })?;
+    Ok(output)
 }
 
 impl DockerNetwork {
-    /// Runs the same offline Localton tool for snapshot and administrative work.
-    /// Only the selected deployment's node and archive volumes are mounted.
-    pub(super) fn offline_command(&self, service: &str) -> Command {
-        let mut command = self.docker_command();
-        command
-            .args(["run", "--rm", "-i", "--network", "none", "--volume"])
-            .arg(format!(
-                "{}_{}-state:{LOCALTON_STATE_DIR}",
-                self.project_name, service
-            ))
-            .arg("--volume")
-            .arg(format!(
-                "{}_localton-snapshots:{LOCALTON_SNAPSHOT_DIR}",
-                self.project_name
-            ))
-            .args(["--entrypoint", "/usr/local/bin/localton", &self.image]);
-        command
-    }
-
-    pub(crate) fn spawn_normal_pull(&self) -> Result<Child, Error> {
-        let mut command = self.normal_pull_command();
-        self.spawn_logged(
-            &mut command,
-            true,
-            "pull the full TON network image with Docker",
-        )
-    }
-
-    pub(crate) fn spawn_image_inspect(&self) -> Result<Child, Error> {
-        let mut command = self.image_inspect_command();
-        self.spawn_logged(
-            &mut command,
-            false,
-            "inspect the full TON network image with Docker",
-        )
-    }
-
-    pub(crate) fn spawn_isolated_pull(&self, target: &IsolatedPullTarget) -> Result<Child, Error> {
-        let mut command = self
-            .isolated_pull_command(target)
-            .ok_or_else(|| Error::Internal {
-                code: "environment_start_failed",
-                message: "The isolated Docker pull is unavailable for a custom image".to_owned(),
-            })?;
-        self.spawn_logged(
-            &mut command,
-            false,
-            "pull the public full TON network image with an isolated Docker configuration",
-        )
-    }
-
-    pub(crate) fn spawn_compose_up(&self) -> Result<Child, Error> {
-        let mut command = self.compose_command();
-        command
-            .arg("up")
-            .arg("-d")
-            .arg("--wait")
-            .arg("--wait-timeout")
-            .arg(COMPOSE_WAIT_TIMEOUT_SECONDS.to_string());
-        self.spawn_logged(
-            &mut command,
-            false,
-            "start the full TON network with Docker Compose",
-        )
-    }
-
-    pub(super) fn spawn_logged(
-        &self,
-        command: &mut Command,
-        truncate: bool,
-        operation: &str,
-    ) -> Result<Child, Error> {
-        let stdout = OpenOptions::new()
-            .create(true)
-            .truncate(truncate)
-            .append(!truncate)
-            .write(true)
-            .open(&self.startup_log_file)
-            .map_err(|error| Error::Internal {
-                code: "environment_start_failed",
-                message: format!(
-                    "Failed to open Docker startup log at {}: {error}",
-                    self.startup_log_file.display()
-                ),
-            })?;
-        let stderr = stdout.try_clone().map_err(|error| Error::Internal {
-            code: "environment_start_failed",
-            message: format!(
-                "Failed to open Docker startup log at {}: {error}",
-                self.startup_log_file.display()
-            ),
-        })?;
-        command
-            .stdin(Stdio::null())
-            .stdout(Stdio::from(stdout))
-            .stderr(Stdio::from(stderr))
-            .kill_on_drop(true);
-        command
-            .spawn()
-            .map_err(|error| super::prerequisites::spawn_error(&error, operation))
-    }
-
-    pub(crate) async fn stop(&self) -> Result<(), Error> {
-        self.run_compose(
-            ["stop"],
-            "stop",
-            "environment_stop_failed",
-            COMPOSE_STOP_TIMEOUT,
-        )
-        .await
-    }
-
-    pub(crate) async fn delete(&self) -> Result<(), Error> {
-        self.run_compose(
-            ["down", "--volumes", "--remove-orphans"],
-            "delete",
-            "environment_delete_failed",
-            COMPOSE_DELETE_TIMEOUT,
-        )
-        .await
-    }
-
-    pub(crate) async fn isolated_pull_target(&self) -> Result<Option<IsolatedPullTarget>, Error> {
-        if self.isolated_docker_config_dir.is_none() {
-            return Ok(None);
-        }
-
-        let docker_host = match &self.docker_target {
-            DockerTarget::Host(host) => host.clone(),
-            DockerTarget::Context(context) => {
-                self.docker_text([
-                    "context",
-                    "inspect",
-                    "--format",
-                    "{{.Endpoints.docker.Host}}",
-                    context,
-                ])
-                .await?
-            }
-        };
-
-        if !docker_host.starts_with("unix://") {
-            return Err(Error::Internal {
-                code: "environment_start_failed",
-                message: format!(
-                    "The isolated image pull is unsafe for Docker endpoint {docker_host}"
-                ),
-            });
-        }
-
-        let server_platform = self
-            .docker_text(["version", "--format", "{{.Server.Os}}/{{.Server.Arch}}"])
-            .await?;
-        let platform = match server_platform.as_str() {
-            "linux/arm64" | "linux/aarch64" => "linux/arm64",
-            "linux/amd64" | "linux/x86_64" => "linux/amd64",
-            _ => {
-                return Err(Error::Internal {
-                    code: "environment_start_failed",
-                    message: format!(
-                        "The isolated image pull does not support Docker platform {server_platform}"
-                    ),
-                });
-            }
-        };
-
-        Ok(Some(IsolatedPullTarget {
-            docker_host,
-            platform: platform.to_owned(),
-        }))
-    }
-
-    fn normal_pull_command(&self) -> Command {
-        let mut command = self.docker_command();
-        command.arg("pull").arg(&self.image);
-        command
-    }
-
-    fn image_inspect_command(&self) -> Command {
-        let mut command = self.docker_command();
-        command
-            .arg("image")
-            .arg("inspect")
-            .arg("--format")
-            .arg("{{.Id}}")
-            .arg(&self.image);
-        command
-    }
-
-    fn isolated_pull_command(&self, target: &IsolatedPullTarget) -> Option<Command> {
-        let config_dir = self.isolated_docker_config_dir.as_ref()?;
-        let mut command = Command::new("docker");
-        command
-            .arg("--config")
-            .arg(config_dir)
-            .arg("--host")
-            .arg(&target.docker_host)
-            .arg("pull")
-            .arg("--platform")
-            .arg(&target.platform)
-            .arg(&self.image);
-        Some(command)
-    }
-
-    pub(super) fn compose_command(&self) -> Command {
-        let mut command = self.docker_command();
-        command
-            .arg("compose")
-            .arg("-p")
-            .arg(&self.project_name)
-            .arg("-f")
-            .arg(&self.compose_file);
-        command
-    }
-
-    pub(super) fn docker_command(&self) -> Command {
-        self.docker_target.command()
-    }
-
-    async fn docker_text<I, S>(&self, args: I) -> Result<String, Error>
-    where
-        I: IntoIterator<Item = S>,
-        S: AsRef<OsStr>,
-    {
-        let mut command = self.docker_command();
-        command.args(args);
-        docker_text(command).await
-    }
-
-    pub(super) async fn run_command(
-        &self,
-        command: Command,
-        operation: &str,
-        code: &'static str,
-        operation_timeout: Duration,
-    ) -> Result<(), Error> {
-        self.command_output(command, operation, code, operation_timeout)
+    /// Executes inside an existing service. Dropping an exec connection does not
+    /// kill its process; mutation callers must allow this bounded operation to finish.
+    pub(super) fn exec<'a>(
+        &'a self,
+        service: &'a str,
+        args: &'a [&'a str],
+        input: Option<&'a [u8]>,
+        duration: Duration,
+    ) -> futures::future::BoxFuture<'a, Result<Output, Error>> {
+        Box::pin(async move {
+            self.operation(
+                "exec_localton",
+                "localton_command_failed",
+                duration,
+                async {
+                    let client = self.client().await?;
+                    let name = self.container_name(service);
+                    let container = client
+                        .inspect_container(&name, None)
+                        .await
+                        .map_err(api_error)?;
+                    self.owned(container.config.as_ref().and_then(|c| c.labels.as_ref()))?;
+                    let created = client
+                        .create_exec(
+                            &name,
+                            ExecConfig {
+                                attach_stdin: Some(input.is_some()),
+                                attach_stdout: Some(true),
+                                attach_stderr: Some(true),
+                                cmd: Some(args.iter().map(|s| (*s).to_owned()).collect()),
+                                ..Default::default()
+                            },
+                        )
+                        .await
+                        .map_err(api_error)?;
+                    let StartExecResults::Attached {
+                        output,
+                        input: stdin,
+                    } = client
+                        .start_exec(&created.id, None)
+                        .await
+                        .map_err(api_error)?
+                    else {
+                        return Err(Error::invalid("Docker did not attach to the Localton tool"));
+                    };
+                    let (output, sent) = exchange(output, stdin, input).await?;
+                    loop {
+                        let state = client.inspect_exec(&created.id).await.map_err(api_error)?;
+                        if state.running != Some(true) {
+                            return completed(output, sent, state.exit_code);
+                        }
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                    }
+                },
+            )
             .await
-            .map(|_| ())
-    }
-
-    pub(super) async fn command_output(
-        &self,
-        mut command: Command,
-        operation: &str,
-        code: &'static str,
-        operation_timeout: Duration,
-    ) -> Result<std::process::Output, Error> {
-        command.stdin(Stdio::null()).kill_on_drop(true);
-        let output = timeout(operation_timeout, command.output())
-            .await
-            .map_err(|_| Error::Internal {
-                code,
-                message: format!(
-                    "Timed out after {} seconds while trying to {operation}",
-                    operation_timeout.as_secs()
-                ),
-            })?
-            .map_err(|error| super::prerequisites::spawn_error(&error, operation))?;
-        if output.status.success() {
-            return Ok(output);
-        }
-
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let details = stderr.trim();
-        if let Some(error) = super::prerequisites::runtime_failure(details) {
-            return Err(error);
-        }
-
-        Err(Error::Internal {
-            code,
-            message: if details.is_empty() {
-                format!("Could not {operation} ({})", output.status)
-            } else {
-                format!("Could not {operation}: {details}")
-            },
         })
     }
 
-    pub(super) async fn run_compose<I, S>(
-        &self,
-        args: I,
-        operation: &str,
-        code: &'static str,
-        operation_timeout: Duration,
-    ) -> Result<(), Error>
-    where
-        I: IntoIterator<Item = S>,
-        S: AsRef<OsStr>,
-    {
-        let mut command = self.compose_command();
-        command.args(args);
-        self.run_command(
-            command,
-            &format!("{operation} the full TON network with Docker Compose"),
-            code,
-            operation_timeout,
-        )
-        .await
+    /// Offline tools mount only the selected node and snapshot volumes with no
+    /// network. Explicit cleanup runs after success, failure, or operation timeout.
+    pub(super) fn offline<'a>(
+        &'a self,
+        service: &'a str,
+        args: &'a [&'a str],
+        input: Option<&'a [u8]>,
+        duration: Duration,
+    ) -> futures::future::BoxFuture<'a, Result<Output, Error>> {
+        Box::pin(async move {
+            self.ensure_volume(&format!("{service}-state")).await?;
+            self.ensure_volume("localton-snapshots").await?;
+            let client = self.client().await?;
+            let created = client
+                .create_container(
+                    None,
+                    ContainerCreateBody {
+                        image: Some(self.image.clone()),
+                        entrypoint: Some(vec!["/usr/local/bin/localton".into()]),
+                        cmd: Some(args.iter().map(|s| (*s).to_owned()).collect()),
+                        labels: Some(self.labels(None)),
+                        attach_stdout: Some(true),
+                        attach_stderr: Some(true),
+                        attach_stdin: Some(input.is_some()),
+                        open_stdin: Some(input.is_some()),
+                        stdin_once: Some(true),
+                        host_config: Some(HostConfig {
+                            network_mode: Some("none".into()),
+                            binds: Some(vec![
+                                format!(
+                                    "{}_{}-state:{LOCALTON_STATE_DIR}",
+                                    self.project_name, service
+                                ),
+                                format!(
+                                    "{}_localton-snapshots:{LOCALTON_SNAPSHOT_DIR}",
+                                    self.project_name
+                                ),
+                            ]),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .map_err(api_error)?;
+            let result = self
+                .operation(
+                    "offline_localton",
+                    "localton_command_failed",
+                    duration,
+                    async {
+                        let attached = client
+                            .attach_container(
+                                &created.id,
+                                Some(AttachContainerOptions {
+                                    stream: true,
+                                    stdout: true,
+                                    stderr: true,
+                                    stdin: input.is_some(),
+                                    ..Default::default()
+                                }),
+                            )
+                            .await
+                            .map_err(api_error)?;
+                        client
+                            .start_container(&created.id, None)
+                            .await
+                            .map_err(api_error)?;
+                        let (output, sent) =
+                            exchange(attached.output, attached.input, input).await?;
+                        let exit = match client.wait_container(&created.id, None).try_next().await {
+                            Ok(Some(wait)) => wait.status_code,
+                            Err(bollard::errors::Error::DockerContainerWaitError {
+                                code, ..
+                            }) => code,
+                            Err(error) => return Err(api_error(error)),
+                            Ok(None) => {
+                                return Err(Error::invalid(
+                                    "Docker returned no offline tool exit status",
+                                ));
+                            }
+                        };
+                        completed(output, sent, Some(exit))
+                    },
+                )
+                .await;
+            let cleanup = tokio::time::timeout(
+                Duration::from_secs(60),
+                client.remove_container(
+                    &created.id,
+                    Some(RemoveContainerOptions {
+                        force: true,
+                        ..Default::default()
+                    }),
+                ),
+            )
+            .await;
+            match cleanup {
+                Ok(Ok(())) => result,
+                cleanup => Err(Error::Internal {
+                    code: "localton_cleanup_failed",
+                    message: format!(
+                        "Offline container {} cleanup failed: {cleanup:?}; operation: {}",
+                        created.id,
+                        result
+                            .as_ref()
+                            .err()
+                            .map_or_else(|| "completed".into(), ToString::to_string)
+                    ),
+                }),
+            }
+        })
+    }
+
+    pub(crate) fn stop(&self) -> futures::future::BoxFuture<'_, Result<(), Error>> {
+        Box::pin(async move {
+            self.operation(
+                "stop_network",
+                "environment_stop_failed",
+                NETWORK_STOP_TIMEOUT,
+                async {
+                    let containers = self.containers().await?;
+                    let services: Vec<_> = containers
+                        .iter()
+                        .filter_map(|c| c.labels.as_ref()?.get(super::engine::SERVICE_LABEL))
+                        .filter(|s| s.as_str() != "localton")
+                        .collect();
+                    let results =
+                        futures::future::join_all(services.iter().map(|s| self.stop_service(s)))
+                            .await;
+                    let owner = self.stop_service("localton").await;
+                    // Attempt every stop even when one service fails.
+                    for result in results {
+                        result?;
+                    }
+                    owner
+                },
+            )
+            .await
+        })
+    }
+
+    pub(crate) fn delete(&self) -> futures::future::BoxFuture<'_, Result<(), Error>> {
+        Box::pin(async move {
+            self.operation(
+                "delete_network",
+                "environment_delete_failed",
+                NETWORK_DELETE_TIMEOUT,
+                async {
+                    self.down().await?;
+                    let client = self.client().await?;
+                    let volumes = client
+                        .list_volumes(Some(ListVolumesOptions {
+                            filters: Some(self.filters()),
+                        }))
+                        .await
+                        .map_err(api_error)?;
+                    for volume in volumes.volumes.unwrap_or_default() {
+                        self.owned(Some(&volume.labels))?;
+                        client
+                            .remove_volume(&volume.name, None::<RemoveVolumeOptions>)
+                            .await
+                            .map_err(api_error)?;
+                    }
+                    Ok(())
+                },
+            )
+            .await
+        })
     }
 }

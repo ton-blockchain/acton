@@ -215,7 +215,7 @@ pub struct ServiceHealth {
     pub container: Option<DockerContainer>,
 }
 
-/// Container identity sampled by the localnet owner from Docker Compose.
+/// Container identity sampled by the localnet owner from Docker services.
 ///
 /// This describes the deployed container, not the configured image for a future
 /// start. Recreating a service changes its ID, so clients must refresh the sample.
@@ -367,7 +367,7 @@ pub struct Snapshot {
 #[serde(rename_all = "camelCase")]
 pub struct StartupTimings {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub compose_ms: Option<u64>,
+    pub containers_ms: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ton_ready_ms: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]

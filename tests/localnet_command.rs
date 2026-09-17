@@ -7,8 +7,11 @@ use acton_localnet::{CreateNetwork, Network, Operation, catalog, client::Client}
 use expect_test::expect;
 use reqwest::Method;
 use serde_json::{Value, json};
-use std::{os::unix::fs::PermissionsExt, path::Path, process::Stdio, time::Duration};
+use std::{path::Path, process::Stdio, time::Duration};
 use tokio::process::{Child, Command};
+
+#[path = "localnet_command/engine.rs"]
+mod engine;
 
 #[path = "localnet_command/docker_prerequisites.rs"]
 mod docker_prerequisites;
@@ -42,6 +45,7 @@ static FIXTURE_PORTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(())
 struct Service {
     root: tempfile::TempDir,
     child: Child,
+    _engine: Child,
     network: catalog::NetworkDirectory,
     _port_guard: tokio::sync::MutexGuard<'static, ()>,
 }
@@ -56,11 +60,33 @@ impl Service {
         let root = tempfile::tempdir().expect("test workspace");
         let bin = root.path().join("bin");
         std::fs::create_dir(&bin).expect("fixture bin");
-        let docker = bin.join("docker");
+        let docker = bin.join("engine.py");
         std::fs::write(&docker, include_str!("fixtures/localnet/docker.py"))
-            .expect("Docker fixture");
-        std::fs::set_permissions(&docker, std::fs::Permissions::from_mode(0o755))
-            .expect("executable fixture");
+            .expect("Engine fixture");
+        let engine_log = std::fs::File::create(root.path().join("engine.log")).expect("Engine log");
+        let engine = Command::new("python3")
+            .arg(&docker)
+            .env("LOCALNET_TEST_DIR", root.path())
+            .stdout(Stdio::null())
+            .stderr(Stdio::from(engine_log))
+            .kill_on_drop(true)
+            .spawn()
+            .expect("Engine server");
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !root.path().join("docker-host").exists() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap_or_else(|error| {
+            panic!(
+                "Engine listening: {error}: {}",
+                std::fs::read_to_string(root.path().join("engine.log")).unwrap_or_default()
+            )
+        });
+        if block_start {
+            std::fs::write(root.path().join("block-start"), "").expect("hold health check");
+        }
 
         let network = catalog::create(
             &root.path().join(".acton-localnet"),
@@ -93,6 +119,7 @@ impl Service {
 
         Self {
             root,
+            _engine: engine,
             child: command.spawn().expect("localnet service"),
             network,
             _port_guard: port_guard,
@@ -186,16 +213,14 @@ fn acton(root: &Path, args: &[&str]) -> std::process::Command {
         .arg(root)
         .arg("localnet")
         .args(args)
-        .env(
-            "PATH",
-            format!(
-                "{}:{}",
-                root.join("bin").display(),
-                std::env::var("PATH").unwrap_or_default()
-            ),
-        )
+        .env("PATH", root.join("bin"))
         .env("ACTON_LOCALNET_IMAGE", "localton:fixture")
-        .env("DOCKER_CONTEXT", "localnet-test")
+        .env_remove("DOCKER_CONTEXT")
+        .env(
+            "DOCKER_HOST",
+            std::fs::read_to_string(root.join("docker-host")).expect("Engine endpoint"),
+        )
+        .env("DOCKER_CONFIG", root.join("docker-config"))
         .env("LOCALNET_TEST_DIR", root)
         .env("ACTON_LOG_DIR", root.join("logs"))
         .env("NO_COLOR", "1");
@@ -207,7 +232,26 @@ async fn cli(state: &Path, args: &[&str]) -> Value {
     let output = command.arg("--json").output().await.expect("CLI output");
 
     if !output.status.success() {
-        panic!("CLI failed: {}", String::from_utf8_lossy(&output.stderr));
+        let root = state.parent().expect("workspace");
+        panic!(
+            "CLI failed: {}\nService log: {}\nEngine log: {}\nDebug log: {}\nLast Engine requests: {:?}",
+            String::from_utf8_lossy(&output.stderr),
+            std::fs::read_to_string(root.join("service.log")).unwrap_or_default(),
+            std::fs::read_to_string(root.join("engine.log")).unwrap_or_default(),
+            std::fs::read_to_string(root.join("logs/debug.log"))
+                .unwrap_or_default()
+                .lines()
+                .rev()
+                .take(15)
+                .collect::<Vec<_>>()
+                .join("\n"),
+            std::fs::read_to_string(root.join("engine-events"))
+                .unwrap_or_default()
+                .lines()
+                .rev()
+                .take(3)
+                .collect::<Vec<_>>()
+        );
     }
     serde_json::from_slice(&output.stdout).expect("CLI JSON")
 }
@@ -350,6 +394,12 @@ async fn cli_and_http_share_lifecycle_snapshots_and_persisted_state() {
 async fn shutdown_interrupts_startup_and_conflicting_mutations_are_rejected() {
     let mut service = Service::start(true).await;
     let client = service.client().await;
+    let configuration = service.root.path().join("docker-config");
+    std::fs::create_dir_all(&configuration).expect("Docker configuration");
+    std::fs::write(configuration.join("config.json"),
+        r#"{"auths":{"https://index.docker.io/v1/":{"auth":"Zml4dHVyZS11c2VyOmZpeHR1cmUtdG9rZW4="}}}"#).expect("fixture credentials");
+    std::fs::write(service.root.path().join("require-registry-auth"), "")
+        .expect("require pull credentials");
     std::fs::write(service.root.path().join("force-pull"), "").expect("missing image");
     let operation: Operation = client
         .request(Method::POST, "/v1/network/start", None)
@@ -367,6 +417,14 @@ async fn shutdown_interrupts_startup_and_conflicting_mutations_are_rejected() {
     .assert_eq(&serde_json::to_string_pretty(&pulling.progress).expect("pull progress"));
     std::fs::write(service.root.path().join("continue-pull"), "").expect("finish pull");
 
+    expect![["true"]].assert_eq(
+        &service
+            .root
+            .path()
+            .join("registry-auth-accepted")
+            .exists()
+            .to_string(),
+    );
     let starting = wait_for_progress(&client, &operation.id, "startingContainers", 3).await;
     expect![[r#"
         {

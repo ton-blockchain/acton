@@ -150,6 +150,8 @@ ctr = "0.9"
 curve25519-dalek = "4.1"
 derivative = "2.2"
 futures = "0.3"
+bollard = { version = "0.21.1", features = ["ssl"] }
+serde_yaml_ng = "0.10"
 pin-project = "1.1"
 tl-proto = { version = "0.5.3", features = ["derive"] }
 tokio-tower = "0.6.0"

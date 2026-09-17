@@ -1,4 +1,10 @@
-//! Docker deployment identity shared by the compose and process modules.
+//! Persistent Docker deployment identity and direct Engine API integration.
+//!
+//! Bollard connects through local sockets, named pipes, or TCP/TLS. Docker contexts
+//! are read from disk; SSH and external registry credential helpers are not invoked.
+//! Our bundled YAML describes a private subset of Compose; Acton owns orchestration.
+//! Large Engine operations return boxed futures to keep generated Docker models off
+//! the stack of the enclosing lifecycle and recovery tasks.
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -11,8 +17,7 @@ use crate::{Error, Network, NetworkConfig};
 const COMPOSE_TEMPLATE: &str = include_str!("../../assets/localton.compose.yaml");
 const DEFAULT_LOCALTON_IMAGE: &str =
     "ghcr.io/ton-blockchain/localton:sha-72bf7425d9d034adf81ac7ebd900c7d03182f234";
-const COMPOSE_WAIT_TIMEOUT_SECONDS: u16 = 600;
-const DOCKER_CONFIG_DIRECTORY: &str = "docker-pull-config";
+const SERVICE_START_TIMEOUT_SECONDS: u16 = 600;
 const RUNTIME_DESCRIPTOR_FILE: &str = "runtime.json";
 const RUNTIME_DESCRIPTOR_VERSION: u16 = 2;
 const STARTUP_LOG_FILE: &str = "startup.log";
@@ -20,21 +25,22 @@ const STARTUP_ERROR_LINES: usize = 12;
 const FAILED_CONTAINER_LOG_LINES: usize = 80;
 const DOCKER_METADATA_TIMEOUT: Duration = Duration::from_secs(10);
 const DOCKER_DIAGNOSTICS_TIMEOUT: Duration = Duration::from_secs(15);
-const COMPOSE_STOP_TIMEOUT: Duration = Duration::from_secs(2 * 60);
-const COMPOSE_DELETE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
-const COMPOSE_NODE_REMOVE_TIMEOUT: Duration = Duration::from_secs(2 * 60);
-const COMPOSE_NODE_COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
+const NETWORK_STOP_TIMEOUT: Duration = Duration::from_secs(2 * 60);
+const NETWORK_DELETE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+const NODE_REMOVE_TIMEOUT: Duration = Duration::from_secs(2 * 60);
+const NODE_COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
 const SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 const LOCALTON_STATE_DIR: &str = "/var/lib/localton";
 const LOCALTON_SNAPSHOT_DIR: &str = "/var/lib/localton-snapshots";
 
-/// Docker deployment identity and process commands, independent of localnet service.
+/// Docker deployment identity and Engine operations, independent of localnet service.
 #[derive(Clone)]
 pub(crate) struct DockerNetwork {
     compose_file: PathBuf,
     compose_config: NetworkConfig,
     docker_target: DockerTarget,
-    isolated_docker_config_dir: Option<PathBuf>,
+    client: std::sync::Arc<tokio::sync::OnceCell<bollard::Docker>>,
+    pull_progress: std::sync::Arc<tokio::sync::RwLock<Option<crate::OperationProgress>>>,
     image: String,
     project_name: String,
     startup_log_file: PathBuf,
@@ -58,8 +64,11 @@ struct RuntimeDescriptor {
 
 mod admin;
 mod compose;
+mod connection;
+mod deployment;
 mod descriptor;
 mod diagnostics;
+mod engine;
 mod nodes;
 mod prerequisites;
 mod process;
@@ -88,10 +97,11 @@ impl DockerNetwork {
         };
 
         Ok(Some(Self {
+            client: Default::default(),
+            pull_progress: Default::default(),
             compose_file: data_dir.join("compose.yaml"),
             compose_config: network.config.clone(),
             docker_target: runtime.docker_target,
-            isolated_docker_config_dir: None,
             image: runtime.image,
             project_name: runtime.project_name,
             startup_log_file: data_dir.join(STARTUP_LOG_FILE),
@@ -108,7 +118,7 @@ impl DockerNetwork {
     /// Pins Docker identity on first use and renders the persisted network definition.
     /// Reading the existing descriptor keeps restarts attached to the same volumes.
     /// Startup verifies Docker before pinning that identity; status and shutdown
-    /// paths skip the preflight and use their existing bounded Docker commands.
+    /// paths skip the preflight and use their existing bounded Engine requests.
     pub(crate) async fn materialize(
         data_dir: &Path,
         workspace_root: &Path,
@@ -149,22 +159,6 @@ impl DockerNetwork {
             ..
         } = runtime;
         let compose_file = data_dir.join("compose.yaml");
-        let isolated_docker_config_dir = if image == DEFAULT_LOCALTON_IMAGE {
-            let path = data_dir.join(DOCKER_CONFIG_DIRECTORY);
-            tokio::fs::create_dir_all(&path)
-                .await
-                .map_err(|error| Error::Internal {
-                    code: "environment_storage_failed",
-                    message: format!(
-                        "Failed to create isolated Docker pull configuration at {}: {error}",
-                        path.display()
-                    ),
-                })?;
-            Some(path)
-        } else {
-            None
-        };
-
         let compose = render_compose(&image, &network.config, &network.nodes);
         tokio::fs::write(&compose_file, compose)
             .await
@@ -177,10 +171,11 @@ impl DockerNetwork {
             })?;
 
         Ok(Self {
+            client: Default::default(),
+            pull_progress: Default::default(),
             compose_file,
             compose_config: network.config.clone(),
             docker_target,
-            isolated_docker_config_dir,
             image,
             project_name,
             startup_log_file: data_dir.join(STARTUP_LOG_FILE),

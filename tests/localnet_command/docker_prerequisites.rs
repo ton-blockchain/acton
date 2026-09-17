@@ -14,6 +14,7 @@ async fn docker_failures_keep_their_cause_and_do_not_materialize_a_deployment() 
             "stopped",
             "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?",
         ),
+        ("native-socket", "Socket not found: /fixture/docker.sock"),
         (
             "windows-stopped",
             "error during connect: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified",
@@ -115,6 +116,14 @@ async fn docker_failures_keep_their_cause_and_do_not_materialize_a_deployment() 
             "code": "docker_engine_unavailable",
             "deploymentCreated": false,
             "diagnosticsRetained": true,
+            "scenario": "native-socket",
+            "status": "failed",
+            "summary": "Docker is not running\nStart Docker Desktop or your Docker Engine service, wait until it is ready, then retry"
+          },
+          {
+            "code": "docker_engine_unavailable",
+            "deploymentCreated": false,
+            "diagnosticsRetained": true,
             "scenario": "windows-stopped",
             "status": "failed",
             "summary": "Docker is not running\nStart Docker Desktop or your Docker Engine service, wait until it is ready, then retry"
@@ -181,7 +190,7 @@ async fn docker_failures_keep_their_cause_and_do_not_materialize_a_deployment() 
             "diagnosticsRetained": true,
             "scenario": "registry-auth",
             "status": "failed",
-            "summary": "Docker could not access the image registry\nCheck the image name and sign in to its registry with `docker login` if it requires authentication"
+            "summary": "Docker could not access the image registry\nCheck the image name and configure inline registry credentials in Docker config.json if it requires authentication"
           },
           {
             "code": "docker_image_unavailable",
@@ -200,18 +209,18 @@ async fn docker_failures_keep_their_cause_and_do_not_materialize_a_deployment() 
             "summary": "The image registry rate limit was reached\nSign in to the registry or wait before retrying the image download"
           },
           {
-            "code": "docker_check_failed",
+            "code": "docker_api_failed",
             "deploymentCreated": false,
             "diagnosticsRetained": true,
             "scenario": "unknown",
             "status": "failed",
-            "summary": "Docker could not complete its availability check\nRun `docker info --format {{.ServerVersion}}` with the selected Docker context to inspect the failure"
+            "summary": "Docker Engine API request failed"
           }
         ]"#]].assert_eq(&serde_json::to_string_pretty(&outcomes).expect("failure summaries"));
 }
 
 #[tokio::test]
-async fn missing_tools_and_timeout_remain_actionable_after_cli_shutdown() {
+async fn engine_failures_remain_actionable_after_cli_shutdown() {
     let mut service = Service::start(false).await;
     let client = service.client().await;
     service.stop(&client).await;
@@ -219,25 +228,11 @@ async fn missing_tools_and_timeout_remain_actionable_after_cli_shutdown() {
     std::fs::create_dir(&empty_path).expect("isolated PATH");
     let mut results = Vec::new();
 
-    for scenario in [
-        "missing",
-        "missing-context",
-        "docker-unavailable",
-        "compose-unavailable",
-        "docker-timeout",
-    ] {
+    for scenario in ["docker-unavailable", "docker-timeout"] {
         let marker = service.root.path().join(scenario);
         let mut command = acton(service.root.path(), &["start", "integration"]);
-        if scenario.starts_with("missing") {
-            command.env("PATH", &empty_path);
-            if scenario == "missing-context" {
-                command
-                    .env_remove("DOCKER_CONTEXT")
-                    .env_remove("DOCKER_HOST");
-            }
-        } else {
-            std::fs::write(&marker, "").expect("Docker failure mode");
-        }
+        command.env("PATH", &empty_path);
+        std::fs::write(&marker, "").expect("Docker failure mode");
 
         let output = tokio::time::timeout(Duration::from_secs(25), Command::from(command).output())
             .await
@@ -276,40 +271,12 @@ async fn missing_tools_and_timeout_remain_actionable_after_cli_shutdown() {
             "containersStarted": service.root.path().join("events").exists(),
             "serviceLeftRunning": service.network.path.join("service.json").exists(),
         }));
-        if !scenario.starts_with("missing") {
-            std::fs::remove_file(marker).expect("clear only this test's Docker failure marker");
-        }
+        std::fs::remove_file(marker).expect("clear only this test's Docker failure marker");
     }
 
     drop(service);
     expect![[r#"
         [
-          {
-            "cliExplainsRecovery": true,
-            "cliFailed": true,
-            "code": "docker_not_found",
-            "composeCreated": false,
-            "containersStarted": false,
-            "descriptorCreated": false,
-            "error": "Docker CLI was not found on PATH\nInstall Docker Desktop or Docker Engine with Compose v2 and make `docker` available to Acton",
-            "logExplainsRecovery": true,
-            "scenario": "missing",
-            "serviceLeftRunning": false,
-            "status": "failed"
-          },
-          {
-            "cliExplainsRecovery": true,
-            "cliFailed": true,
-            "code": "docker_not_found",
-            "composeCreated": false,
-            "containersStarted": false,
-            "descriptorCreated": false,
-            "error": "Docker CLI was not found on PATH\nInstall Docker Desktop or Docker Engine with Compose v2 and make `docker` available to Acton",
-            "logExplainsRecovery": true,
-            "scenario": "missing-context",
-            "serviceLeftRunning": false,
-            "status": "failed"
-          },
           {
             "cliExplainsRecovery": true,
             "cliFailed": true,
@@ -320,19 +287,6 @@ async fn missing_tools_and_timeout_remain_actionable_after_cli_shutdown() {
             "error": "Docker is not running\nStart Docker Desktop or your Docker Engine service, wait until it is ready, then retry",
             "logExplainsRecovery": true,
             "scenario": "docker-unavailable",
-            "serviceLeftRunning": false,
-            "status": "failed"
-          },
-          {
-            "cliExplainsRecovery": true,
-            "cliFailed": true,
-            "code": "docker_compose_unavailable",
-            "composeCreated": false,
-            "containersStarted": false,
-            "descriptorCreated": false,
-            "error": "Docker Compose is not available\nInstall or enable Compose v2, then retry",
-            "logExplainsRecovery": true,
-            "scenario": "compose-unavailable",
             "serviceLeftRunning": false,
             "status": "failed"
           },

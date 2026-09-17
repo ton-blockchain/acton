@@ -8,24 +8,19 @@ use serde_json::{Value, json};
 use std::time::Duration;
 
 async fn indexed_accounts(driver: &DockerNetwork) -> Result<String> {
-    let mut command = driver.compose_command();
-    command.args([
-        "exec",
-        "-T",
-        "postgres",
-        "psql",
-        "-U",
-        "postgres",
-        "-d",
-        "ton_index",
-        "-Atc",
-        "SELECT account FROM latest_account_states ORDER BY account",
-    ]);
     let output = driver
-        .command_output(
-            command,
-            "check indexed accounts",
-            "snapshot_test",
+        .exec(
+            "postgres",
+            &[
+                "psql",
+                "-U",
+                "postgres",
+                "-d",
+                "ton_index",
+                "-Atc",
+                "SELECT account FROM latest_account_states ORDER BY account",
+            ],
+            None,
             Duration::from_secs(30),
         )
         .await?;

@@ -1,9 +1,8 @@
 //! Descriptor support for the localnet Docker runtime.
 
-use super::{DOCKER_METADATA_TIMEOUT, DockerTarget, RUNTIME_DESCRIPTOR_VERSION, RuntimeDescriptor};
+use super::{DockerTarget, RUNTIME_DESCRIPTOR_VERSION, RuntimeDescriptor};
 use crate::Error;
-use std::{path::Path, process::Stdio};
-use tokio::{process::Command, time::timeout};
+use std::path::Path;
 use uuid::Uuid;
 use xxhash_rust::xxh3::xxh3_64;
 
@@ -102,45 +101,14 @@ pub(super) async fn resolve_docker_target() -> Result<DockerTarget, Error> {
         }
     }
 
-    let mut command = Command::new("docker");
-    // Docker 20.10 does not provide `context show`. Inspecting the implicit active context works
-    // with both older Docker Desktop releases and current Docker CLI versions.
-    command.args(["context", "inspect", "--format", "{{.Name}}"]);
-    docker_text(command).await.map(DockerTarget::Context)
-}
-
-pub(super) async fn docker_text(mut command: Command) -> Result<String, Error> {
-    command.stdin(Stdio::null()).kill_on_drop(true);
-    let output = timeout(DOCKER_METADATA_TIMEOUT, command.output())
-        .await
-        .map_err(|_| Error::Internal {
-            code: "environment_start_failed",
-            message: "Timed out while inspecting the active Docker context".to_owned(),
-        })?
-        .map_err(|error| {
-            super::prerequisites::spawn_error(&error, "inspect the active Docker context")
-        })?;
-    if !output.status.success() {
-        let details = String::from_utf8_lossy(&output.stderr);
-        if let Some(error) = super::prerequisites::runtime_failure(details.trim()) {
-            return Err(error);
-        }
-
-        return Err(Error::Internal {
-            code: "environment_start_failed",
-            message: format!("Docker context inspection failed: {}", details.trim()),
-        });
-    }
-
-    let value = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-    if value.is_empty() {
-        return Err(Error::Internal {
-            code: "environment_start_failed",
-            message: "Docker context inspection returned an empty value".to_owned(),
-        });
-    }
-
-    Ok(value)
+    let config = super::connection::configuration().await?;
+    Ok(DockerTarget::Context(
+        config["currentContext"]
+            .as_str()
+            .filter(|name| !name.is_empty())
+            .unwrap_or("default")
+            .to_owned(),
+    ))
 }
 
 pub(super) fn compose_project_name(

@@ -15,8 +15,8 @@ impl Context {
     }
 
     /// Observes long Docker work without cancelling it when a client disconnects.
-    /// Sampling failures do not fail the operation; its own process result remains
-    /// authoritative. Startup cancellation is owned by `wait_child`.
+    /// Sampling failures do not fail the operation; its own API result remains
+    /// authoritative. Startup cancellation is owned by `wait_work`.
     pub(super) async fn observe<T>(
         &mut self,
         driver: &DockerNetwork,
@@ -28,7 +28,7 @@ impl Context {
         let nodes = self.entry.record.read().await.nodes.clone();
 
         // Keep polling in its own future so a slow Docker metadata request cannot
-        // delay process completion or a graceful startup cancellation.
+        // delay operation completion or a graceful startup cancellation.
         let updates = async {
             loop {
                 interval.tick().await;

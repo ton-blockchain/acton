@@ -1,19 +1,18 @@
 //! Nodes support for the localnet Docker runtime.
 
-use super::{
-    COMPOSE_NODE_COMMAND_TIMEOUT, COMPOSE_NODE_REMOVE_TIMEOUT, COMPOSE_WAIT_TIMEOUT_SECONDS,
-    DockerNetwork, LOCALTON_STATE_DIR, compose::render_compose,
-};
-use crate::{Error, Node};
-use std::time::Duration;
-use tokio::time::timeout;
-
 #[cfg(test)]
 mod tests;
 
+use super::{
+    DockerNetwork, LOCALTON_STATE_DIR, NODE_COMMAND_TIMEOUT, NODE_REMOVE_TIMEOUT,
+    SERVICE_START_TIMEOUT_SECONDS, compose::render_compose,
+};
+use crate::{Error, Node};
+use std::time::Duration;
+
 impl DockerNetwork {
     /// Starts or gracefully stops one service without removing its container or state volume.
-    /// Explicit service selection and --no-deps leave the network owner and peer nodes alone.
+    /// Explicit service selection leaves the network owner and peer nodes alone.
     pub(crate) async fn node_running(
         &self,
         nodes: &[Node],
@@ -21,31 +20,21 @@ impl DockerNetwork {
         running: bool,
     ) -> Result<(), Error> {
         self.write_compose(nodes).await?;
-        let mut command = self.compose_command();
-        if running {
-            command
-                .args(["up", "-d", "--no-deps", "--wait", "--wait-timeout"])
-                .arg(COMPOSE_WAIT_TIMEOUT_SECONDS.to_string())
-                .arg(id);
-        } else {
-            command.args(["stop", "--timeout", "30", id]);
-        }
-        self.run_command(
-            command,
-            if running {
-                "start the node"
-            } else {
-                "stop the node"
-            },
+        self.operation(
+            if running { "start_node" } else { "stop_node" },
             if running {
                 "environment_node_start_failed"
             } else {
                 "environment_node_stop_failed"
             },
-            if running {
-                Duration::from_secs(u64::from(COMPOSE_WAIT_TIMEOUT_SECONDS) + 10)
-            } else {
-                COMPOSE_NODE_REMOVE_TIMEOUT
+            Duration::from_secs(u64::from(SERVICE_START_TIMEOUT_SECONDS) + 10),
+            async {
+                if running {
+                    self.start_services(Some(&[id.to_owned()]), false, true)
+                        .await
+                } else {
+                    self.stop_service(id).await
+                }
             },
         )
         .await
@@ -60,51 +49,14 @@ impl DockerNetwork {
         nodes.push(node.clone());
         self.write_compose(&nodes).await?;
 
-        let mut command = self.compose_command();
-        command
-            .arg("up")
-            .arg("-d")
-            .arg("--wait")
-            .arg("--wait-timeout")
-            .arg(COMPOSE_WAIT_TIMEOUT_SECONDS.to_string())
-            .arg(&node.id);
-        let mut child = match self.spawn_logged(
-            &mut command,
-            false,
-            "join a node to the full TON network with Docker Compose",
-        ) {
-            Ok(child) => child,
-            Err(error) => {
-                let _ = self.write_compose(existing_nodes).await;
-                return Err(error);
-            }
-        };
-
-        let result = match timeout(
-            Duration::from_secs(u64::from(COMPOSE_WAIT_TIMEOUT_SECONDS)),
-            child.wait(),
-        )
-        .await
-        {
-            Ok(Ok(status)) if status.success() => Ok(()),
-            Ok(Ok(status)) => Err(Error::Internal {
-                code: "environment_node_start_failed",
-                message: self.startup_failure_message("join the node", status).await,
-            }),
-            Ok(Err(error)) => Err(Error::Internal {
-                code: "environment_node_start_failed",
-                message: format!("Failed to wait for the joining node: {error}"),
-            }),
-            Err(_) => {
-                let _ = child.kill().await;
-                Err(Error::Internal {
-                    code: "environment_node_start_timeout",
-                    message: format!(
-                        "The joining node did not start within {COMPOSE_WAIT_TIMEOUT_SECONDS} seconds"
-                    ),
-                })
-            }
-        };
+        let result = self
+            .operation(
+                "join_node",
+                "environment_node_start_failed",
+                Duration::from_secs(u64::from(SERVICE_START_TIMEOUT_SECONDS)),
+                self.start_services(Some(std::slice::from_ref(&node.id)), true, true),
+            )
+            .await;
 
         if result.is_err() {
             let _ = self.write_compose(existing_nodes).await;
@@ -117,45 +69,38 @@ impl DockerNetwork {
     /// Localton keeps the validator engine online until TON replaces the elected set. The setting
     /// survives container restarts and observability reports the intermediate `leaving` state.
     pub(crate) async fn leave_validation(&self, node: &Node) -> Result<(), Error> {
-        let mut command = self.compose_command();
-        command.args([
-            "exec",
-            "--no-TTY",
+        self.exec(
             &node.id,
-            "/usr/local/bin/localton",
-            "validator",
-            "disable",
-            "--state-dir",
-            LOCALTON_STATE_DIR,
-        ]);
-        self.run_command(
-            command,
-            "disable future validator elections",
-            "environment_node_validation_leave_failed",
-            COMPOSE_NODE_COMMAND_TIMEOUT,
+            &[
+                "/usr/local/bin/localton",
+                "validator",
+                "disable",
+                "--state-dir",
+                LOCALTON_STATE_DIR,
+            ],
+            None,
+            NODE_COMMAND_TIMEOUT,
         )
         .await
+        .map(|_| ())
     }
 
+    /// Restores election participation in the joined validator's durable state.
     pub(crate) async fn enter_validation(&self, node: &Node) -> Result<(), Error> {
-        let mut command = self.compose_command();
-        command.args([
-            "exec",
-            "--no-TTY",
+        self.exec(
             &node.id,
-            "/usr/local/bin/localton",
-            "validator",
-            "enable",
-            "--state-dir",
-            LOCALTON_STATE_DIR,
-        ]);
-        self.run_command(
-            command,
-            "enable future validator elections",
-            "environment_node_validation_enter_failed",
-            COMPOSE_NODE_COMMAND_TIMEOUT,
+            &[
+                "/usr/local/bin/localton",
+                "validator",
+                "enable",
+                "--state-dir",
+                LOCALTON_STATE_DIR,
+            ],
+            None,
+            NODE_COMMAND_TIMEOUT,
         )
         .await
+        .map(|_| ())
     }
 
     /// Stops one joined service, removes its private state volume, and persists the new topology.
@@ -167,17 +112,6 @@ impl DockerNetwork {
         existing_nodes: &[Node],
         node: &Node,
     ) -> Result<(), Error> {
-        let mut command = self.compose_command();
-        command.args(["ps", "--all", "--quiet", &node.id]);
-        let output = self
-            .command_output(
-                command,
-                "locate the node container",
-                "environment_node_remove_failed",
-                COMPOSE_NODE_REMOVE_TIMEOUT,
-            )
-            .await?;
-        let container_id = String::from_utf8_lossy(&output.stdout).trim().to_owned();
         let remaining = existing_nodes
             .iter()
             .filter(|candidate| candidate.id != node.id)
@@ -188,43 +122,30 @@ impl DockerNetwork {
         // return on the next environment restart if the Compose definition cannot be updated.
         self.write_compose(&remaining).await?;
 
-        if !container_id.is_empty() {
-            let mut command = self.docker_command();
-            command.args(["rm", "--force", &container_id]);
-            if let Err(error) = self
-                .run_command(
-                    command,
-                    "remove the node container",
-                    "environment_node_remove_failed",
-                    COMPOSE_NODE_REMOVE_TIMEOUT,
-                )
-                .await
-            {
-                let _ = self.write_compose(existing_nodes).await;
-                return Err(error);
-            }
-        }
-
-        let volume = format!("{}_{}-state", self.project_name, node.id);
-        let mut command = self.docker_command();
-        command.args(["volume", "rm", "--force", &volume]);
         if let Err(error) = self
-            .run_command(
-                command,
-                "remove the node state volume",
+            .operation(
+                "remove_node",
                 "environment_node_remove_failed",
-                COMPOSE_NODE_REMOVE_TIMEOUT,
+                NODE_REMOVE_TIMEOUT,
+                self.remove_service(&node.id),
             )
             .await
         {
-            tracing::warn!(
-                operation = "remove_full_ton_node_state",
-                node = %node.name,
-                target = %volume,
-                outcome = "error",
-                %error,
-                "Node container was removed but its state volume could not be deleted"
-            );
+            let _ = self.write_compose(existing_nodes).await;
+            return Err(error);
+        }
+        let volume = format!("{}-state", node.id);
+        if let Err(error) = self
+            .operation(
+                "remove_node_volume",
+                "environment_node_remove_failed",
+                NODE_REMOVE_TIMEOUT,
+                self.remove_volume(&volume),
+            )
+            .await
+        {
+            tracing::warn!(operation = "remove_node_volume", node = %node.name, target = %volume,
+                outcome = "error", %error, "Node container was removed but its state volume could not be deleted");
         }
 
         Ok(())
