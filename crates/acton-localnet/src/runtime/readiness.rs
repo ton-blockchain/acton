@@ -31,6 +31,7 @@ pub(super) fn observe(entry: Arc<Entry>) -> (watch::Receiver<OperationProgress>,
             .unwrap_or_default()
             .as_secs();
         let Ok(client) = reqwest::Client::builder()
+            .use_rustls_tls()
             .timeout(Duration::from_millis(750))
             .build()
         else {

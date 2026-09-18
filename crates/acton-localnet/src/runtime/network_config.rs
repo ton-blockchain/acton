@@ -18,8 +18,19 @@ impl Context {
         }
 
         self.phase("confirmingConfig").await?;
-        let response = reqwest::Client::new().post(format!("{}/v1/network/config", network.endpoints.admin))
-            .timeout(Duration::from_secs(70)).json(&request).send().await
+        let client = reqwest::Client::builder()
+            .use_rustls_tls()
+            .build()
+            .map_err(|error| Error::Internal {
+                code: "config_update_failed",
+                message: format!("Failed to configure Localton HTTP client: {error}"),
+            })?;
+        let response = client
+            .post(format!("{}/v1/network/config", network.endpoints.admin))
+            .timeout(Duration::from_secs(70))
+            .json(&request)
+            .send()
+            .await
             .map_err(|error| Error::Internal { code: "config_update_failed", message: format!("Localton config update failed: {error}; reload the configuration before retrying") })?;
         let status = response.status();
         let result: serde_json::Value = response.json().await.map_err(|error| Error::Internal {

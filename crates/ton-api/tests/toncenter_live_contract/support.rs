@@ -44,6 +44,7 @@ impl Live {
         }
 
         let client = Client::builder()
+            .use_rustls_tls()
             .connect_timeout(Duration::from_secs(10))
             .timeout(REQUEST_TIMEOUT)
             .build()

@@ -157,7 +157,10 @@ async fn run(
         .await;
     }
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .use_rustls_tls()
+        .build()
+        .map_err(error)?;
     if status == EnvironmentStatus::Stopped {
         // Match localnet restoration: the restored environment becomes available to use.
         restart_environment_locked(runtime, environment).await?;
