@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import json
 import re
@@ -32,8 +34,13 @@ _TARGET_MAP: dict[str, dict[str, str]] = {
 }
 
 _OTOOL_PATH = "/usr/bin/otool"
+_OBJDUMP_PATH = "/usr/bin/objdump"
 _STRINGS_PATH = "/usr/bin/strings"
 _NM_PATH = "/usr/bin/nm"
+
+_OPENSSL_DYNAMIC_LIBRARY_PATTERN: re.Pattern[str] = re.compile(
+    r"^lib(?:ssl|crypto)\.so(?:\..+)?$",
+)
 
 
 class RustTarget(NamedTuple):
@@ -97,6 +104,45 @@ class OtoolParser:
 
         message = f"unable to find '{field_name}' in '{block_name}' block"
         raise ValueError(message)
+
+
+class ObjdumpParser:
+    def __init__(self, output: str) -> None:
+        self.output = output
+
+    @staticmethod
+    def _run(binary_path: str) -> str:
+        try:
+            result = subprocess.run(
+                [_OBJDUMP_PATH, "-p", binary_path],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError as error:
+            message = "objdump is not available"
+            raise ValueError(message) from error
+
+        if result.returncode != 0:
+            message = result.stderr.strip()
+            if len(message) == 0:
+                message = f"objdump failed for '{binary_path}'"
+            raise ValueError(message)
+
+        return result.stdout
+
+    @classmethod
+    def from_binary_path(cls, binary_path: str) -> "ObjdumpParser":
+        return cls(cls._run(binary_path))
+
+    def parse_needed_libraries(self) -> list[str]:
+        libraries: set[str] = set()
+        for line in self.output.splitlines():
+            parts = line.split()
+            if len(parts) == 2 and parts[0] == "NEEDED":
+                libraries.add(parts[1])
+
+        return sorted(libraries)
 
 
 class StringsParser:
@@ -192,6 +238,25 @@ def _run_linux_checks(target: RustTarget, binary_path: str) -> list[str]:
     parser = StringsParser.from_binary_path(binary_path)
 
     errors: list[str] = []
+    try:
+        dynamic_libraries = ObjdumpParser.from_binary_path(binary_path).parse_needed_libraries()
+    except ValueError as error:
+        errors.append(f"linux check failed for '{target_key}': {error}")
+    else:
+        openssl_libraries = [
+            library
+            for library in dynamic_libraries
+            if _OPENSSL_DYNAMIC_LIBRARY_PATTERN.fullmatch(library)
+        ]
+        if openssl_libraries:
+            errors.append(
+                (
+                    f"linux check failed for '{target_key}': Acton dynamically links "
+                    f"OpenSSL libraries ({', '.join(openssl_libraries)}); network clients "
+                    "must use rustls because the TON archives bundle OpenSSL"
+                ),
+            )
+
     for symbol_name, expected_version in expected_versions.items():
         try:
             versions = parser.parse_symbol_versions(symbol_name)

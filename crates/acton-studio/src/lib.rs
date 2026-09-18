@@ -2609,7 +2609,10 @@ mod proxy_header_tests {
         incoming.insert("user-agent", HeaderValue::from_static("Acton Studio"));
         incoming.insert("if-none-match", HeaderValue::from_static("\"revision\""));
         let server_key = sensitive_header_value("server-key").expect("server key must be valid");
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .use_rustls_tls()
+            .build()
+            .expect("test HTTP client must build");
         let testnet = remote_environment(PublicTonNetwork::Testnet, true);
         let mainnet = remote_environment(PublicTonNetwork::Mainnet, true);
         let managed = remote_environment(PublicTonNetwork::Testnet, false);
@@ -2698,7 +2701,10 @@ if-none-match: "revision""#]]
             PublicTonNetwork::Mainnet,
             sensitive_header_value("mainnet-key"),
         );
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .use_rustls_tls()
+            .build()
+            .expect("test HTTP client must build");
         let testnet = remote_environment(PublicTonNetwork::Testnet, true);
         let mainnet = remote_environment(PublicTonNetwork::Mainnet, true);
         let managed = remote_environment(PublicTonNetwork::Testnet, false);

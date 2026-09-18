@@ -499,7 +499,14 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                         });
                     }
 
-                    let response = reqwest::Client::new()
+                    let client = reqwest::Client::builder()
+                        .use_rustls_tls()
+                        .build()
+                        .map_err(|error| EnvironmentRuntimeError::Internal {
+                            code: "config_update_failed",
+                            message: format!("Failed to configure simulator HTTP client: {error}"),
+                        })?;
+                    let response = client
                         .post(format!("http://127.0.0.1:{port}/acton_setConfigParam"))
                         .timeout(Duration::from_secs(30))
                         .json(&request)
