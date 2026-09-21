@@ -362,7 +362,7 @@ tar = { workspace = true }
 zstd = { workspace = true }
 
 # Keep application debug checks while avoiding expensive RaptorQ matrix checks.
-[profile.dev.package.raptorq]
+[profile.dev.package.everscale-raptorq]
 opt-level = 3
 debug-assertions = false
 

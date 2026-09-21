@@ -47,8 +47,7 @@ pub async fn use_latest_block(
 
     let zero_state = config.zero_state();
     let latest = timeout(request_timeout, async {
-        let mut client =
-            TonutilsLiteClient::connect_path_with_parallelism(global_config, 1).await?;
+        let mut client = TonutilsLiteClient::connect_path(global_config).await?;
         client.latest_for_network(zero_state.into()).await
     })
     .await

@@ -1,0 +1,36 @@
+[package]
+name = "ton-sync"
+description = "Download TON masterchain and shard blocks over P2P"
+version = "0.1.0"
+authors = ["TON Core"]
+edition = "2024"
+rust-version = "1.97.1"
+repository = "https://github.com/ton-blockchain/acton"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace]
+
+# RaptorQ's debug matrix checks make large FEC parts impractical to decode.
+# Keep application debugging enabled while using an optimized decoder.
+[profile.dev.package.everscale-raptorq]
+opt-level = 3
+debug-assertions = false
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.48", features = ["rt-multi-thread", "macros", "signal", "sync", "time"] }
+ton-indexer-core = { path = "../../crates/ton-indexer-core" }
+ton-indexer-p2p = { path = "../../crates/ton-indexer-p2p" }
+ton-p2p = { path = "../../crates/ton-p2p" }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+unwrap_used = "deny"

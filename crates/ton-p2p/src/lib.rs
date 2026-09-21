@@ -4,14 +4,17 @@
 //! not validate consensus or execute state transitions. Consumers select shard
 //! IDs and decide how to process downloaded blocks.
 
+mod benchmark;
 mod client;
 mod config;
 mod download;
 mod identity;
 mod network;
+mod peers;
 mod rldp;
 mod storage;
 
+pub use benchmark::{BenchmarkReport, benchmark_peers};
 pub use client::{Client, ClientOptions};
 pub use config::NetworkConfig;
 pub use identity::load_identity;

@@ -32,6 +32,7 @@ pub struct IndexerConfig {
     pub(crate) source: SourceKind,
     pub(crate) p2p: P2pConfig,
     pub(crate) global_config_path: PathBuf,
+    pub(crate) peer_stats_path: PathBuf,
     pub(crate) parallelism: usize,
     pub(crate) backfill_batches: u32,
     pub(crate) poll_interval: Duration,
@@ -51,6 +52,7 @@ pub(crate) enum SourceKind {
 pub(crate) struct P2pConfig {
     pub address: SocketAddrV4,
     pub data_dir: PathBuf,
+    pub peers_file: Option<PathBuf>,
     pub parallelism: usize,
     pub timeout_seconds: u64,
     pub from_latest: bool,
@@ -61,6 +63,7 @@ impl Default for P2pConfig {
         Self {
             address: SocketAddrV4::new(std::net::Ipv4Addr::LOCALHOST, 0),
             data_dir: PathBuf::from(".actonscan-p2p"),
+            peers_file: None,
             parallelism: 16,
             timeout_seconds: 30,
             from_latest: false,
@@ -148,20 +151,24 @@ impl Config {
             .global_config_path
             .unwrap_or(default_global_config);
 
+        let database_path = file
+            .storage
+            .database_path
+            .unwrap_or_else(|| PathBuf::from(DEFAULT_DATABASE_PATH));
+        let peer_stats_path = database_path.with_extension("liteserver-peers.json");
+
         Ok(Self {
             bind_addr,
             logging_level: file
                 .logging
                 .level
                 .unwrap_or_else(|| DEFAULT_LOG_LEVEL.to_owned()),
-            database_path: file
-                .storage
-                .database_path
-                .unwrap_or_else(|| PathBuf::from(DEFAULT_DATABASE_PATH)),
+            database_path,
             indexer: IndexerConfig {
                 source: file.indexer.source,
                 p2p: file.indexer.p2p,
                 global_config_path,
+                peer_stats_path,
                 parallelism,
                 backfill_batches,
                 poll_interval: Duration::from_millis(poll_interval_ms),

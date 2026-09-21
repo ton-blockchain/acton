@@ -9,6 +9,9 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "apps/actonscan-backend/**"
+      - "crates/service-pool/**"
+      - "crates/ton-p2p/**"
+      - "crates/ton-indexer-p2p/**"
       - "crates/ton-indexer-core/**"
       - "crates/ton-indexer-liteserver/**"
   push:
@@ -19,6 +22,9 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "apps/actonscan-backend/**"
+      - "crates/service-pool/**"
+      - "crates/ton-p2p/**"
+      - "crates/ton-indexer-p2p/**"
       - "crates/ton-indexer-core/**"
       - "crates/ton-indexer-liteserver/**"
   workflow_dispatch:

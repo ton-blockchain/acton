@@ -1,31 +1,21 @@
 //! Downloads blocks and maintains a resumable cache independently of consumers.
 
-use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result, ensure};
 use futures::{StreamExt, stream};
-use tokio::{
-    sync::Semaphore,
-    task::JoinSet,
-    time::{Instant, timeout},
-};
-use ton_fullnode_master::tl::{Answer, Query};
-use tracing::{debug, info, warn};
+use service_pool::{Failure, Pool};
+use tokio::{task::JoinSet, time::Instant};
+use tracing::{debug, info};
 use tycho_types::models::{BlockId, ShardIdent};
 
 use crate::{
     NetworkConfig, NetworkOptions,
-    download::{
-        MAX_DOWNLOAD_SIZE, download_from_peer, fullnode_query, small_query, validate_block, wire_id,
-    },
-    network::{Network, Peer},
+    download::{download_from_peer, download_shard_from_peer, validate_block},
+    network::Network,
+    peers::{self, PeerEndpoint},
     storage::{Storage, atomic_write},
 };
-
-const DISCOVERY_INTERVAL: Duration = Duration::from_secs(30);
-const METADATA_TIMEOUT: Duration = Duration::from_secs(3);
-const PEER_ATTEMPTS: usize = 16;
-const PARALLEL_PEER_ATTEMPTS: usize = 8;
 
 /// Connection settings and cache location for one client.
 /// The data directory remains exclusively locked until the client is dropped.
@@ -34,7 +24,11 @@ pub struct ClientOptions {
     pub network: NetworkOptions,
     /// Original block BOCs and the masterchain download checkpoint.
     pub data_dir: PathBuf,
-    /// Maximum concurrent shard requests, including competing peers, in the range 1..=128.
+    /// Optional read-only peer profile produced by calibration. Runtime updates
+    /// remain in the data directory. Available since trunk.
+    pub peers_file: Option<PathBuf>,
+    /// Shared limit for masterchain and shard download attempts, including competing peers.
+    /// Accepted values are 1..=128. Available since trunk.
     pub parallelism: usize,
 }
 
@@ -46,24 +40,22 @@ pub struct Client {
     network: Arc<Network>,
     storage: Storage,
     ids: BTreeMap<u32, BlockId>,
-    peers: Vec<Peer>,
-    discovered_at: Option<Instant>,
-    discovery: JoinSet<(Duration, Result<Vec<Peer>>)>,
+    peers: Pool<PeerEndpoint>,
+    _discovery: JoinSet<()>,
     masterchain_download: JoinSet<Option<DownloadedMasterchain>>,
     options: ClientOptions,
 }
 
 /// A downloaded block awaiting commit. The background task cannot update storage.
 struct DownloadedMasterchain {
-    peer: Peer,
     id: BlockId,
     block: Vec<u8>,
     proof: Vec<u8>,
 }
 
 impl Client {
-    /// Opens the cache and UDP transport. Peer discovery starts with the first
-    /// download. Fails if settings, the saved head, or the directory lock are invalid.
+    /// Opens the cache and UDP transport, restores peers, and starts discovery.
+    /// Fails if settings, the saved head, or the directory lock are invalid.
     pub fn open(config: &NetworkConfig, options: ClientOptions) -> Result<Self> {
         ensure!(
             !options.network.timeout.is_zero(),
@@ -78,6 +70,15 @@ impl Client {
         storage.restore()?;
         let ids = storage.masterchain_ids()?;
         let network = Arc::new(Network::new(config, &options.network)?);
+        let peers = peers::open(&network, &options)?;
+        let mut discovery = JoinSet::new();
+        discovery.spawn(peers::discover(
+            Arc::clone(&network),
+            peers.clone(),
+            options.data_dir.clone(),
+            options.network.timeout,
+            options.parallelism,
+        ));
 
         info!(
             operation = "p2p_client",
@@ -94,9 +95,8 @@ impl Client {
             network,
             storage,
             ids,
-            peers: Vec::new(),
-            discovered_at: None,
-            discovery: JoinSet::new(),
+            peers,
+            _discovery: discovery,
             masterchain_download: JoinSet::new(),
             options,
         })
@@ -138,12 +138,7 @@ impl Client {
     /// Returns `None` when the current peers cannot supply it. The next block is
     /// prefetched in the background, but remains uncommitted until the next call.
     pub async fn next_masterchain(&mut self) -> Result<Option<BlockId>> {
-        self.refresh_peers().await?;
         let downloaded = self.advance_masterchain().await?;
-
-        if !downloaded {
-            self.rotate_peers();
-        }
 
         Ok(downloaded.then(|| self.storage.head()))
     }
@@ -171,125 +166,14 @@ impl Client {
                 .all(|id| !id.shard.is_masterchain() && id.seqno > 0),
             "shard downloads require nonzero shard block IDs"
         );
-        self.refresh_peers().await?;
 
-        // Peer races share one budget across all shards. A stalled peer must
-        // not serialize a block, and a wide frontier must not multiply the limit.
-        let requests = Semaphore::new(self.options.parallelism);
-        let mut downloads = stream::iter(ids.iter().copied().enumerate())
-            .map(|(index, id)| {
-                download_shard(
-                    &self.network,
-                    &self.peers,
-                    &self.options,
-                    &requests,
-                    index,
-                    id,
-                )
-            })
-            .buffered(self.options.parallelism);
-        let mut blocks = Vec::with_capacity(ids.len());
-        let mut preferred = Vec::new();
-
-        while let Some(result) = downloads.next().await {
-            match result? {
-                Some((boc, peer)) => {
-                    blocks.push(Some(boc));
-
-                    if let Some(peer) = peer {
-                        preferred.push(peer);
-                    }
-                }
-                None => blocks.push(None),
-            }
-        }
-        drop(downloads);
-
-        for peer in preferred.into_iter().rev() {
-            if let Some(index) = self.peers.iter().position(|known| known.id == peer.id) {
-                let peer = self.peers.remove(index);
-                self.peers.insert(0, peer);
-            }
-        }
-
-        // Some peers may serve the current shards but lack a predecessor.
-        // Give other peers a turn when retrying an incomplete set of blocks.
-        if blocks.iter().any(Option::is_none) {
-            self.rotate_peers();
-        }
-
-        Ok(blocks)
-    }
-
-    fn rotate_peers(&mut self) {
-        let count = self.peers.len().min(PEER_ATTEMPTS);
-        self.peers.rotate_left(count);
-    }
-
-    async fn refresh_peers(&mut self) -> Result<()> {
-        let interval = if self.peers.is_empty() {
-            Duration::from_secs(2)
-        } else {
-            DISCOVERY_INTERVAL
-        };
-        if self.discovery.is_empty() && self.discovered_at.is_none_or(|at| at.elapsed() >= interval)
-        {
-            let network = Arc::clone(&self.network);
-            let deadline = self.options.network.timeout;
-            self.discovery.spawn(async move {
-                let started = Instant::now();
-                let result = timeout(deadline, network.find_peers())
-                    .await
-                    .context("block peer discovery timed out")
-                    .and_then(std::convert::identity);
-                (started.elapsed(), result)
-            });
-        }
-
-        // Wait only during startup. Later DHT refreshes run alongside downloads.
-        // Dropping the JoinSet cancels the outstanding discovery task.
-        let result = if self.peers.is_empty() {
-            self.discovery.join_next().await
-        } else {
-            self.discovery.try_join_next()
-        };
-        let Some(result) = result else {
-            return Ok(());
-        };
-        let (duration, result) = result.context("block peer discovery task failed")?;
-
-        match result {
-            Ok(peers) => {
-                // Keep successful peers at the front and add newly discovered
-                // addresses. A DHT refresh can return only a subset of members.
-                for peer in peers {
-                    if let Some(known) = self.peers.iter_mut().find(|known| known.id == peer.id) {
-                        known.address = peer.address;
-                    } else {
-                        self.peers.push(peer);
-                    }
-                }
-                info!(
-                    operation = "p2p_discovery",
-                    node = %self.network.dht.key().id(),
-                    target = %self.network.overlay_id,
-                    peers = self.peers.len(),
-                    duration_ms = duration.as_millis(),
-                    outcome = "refreshed",
-                    "refreshed block download peers",
-                );
-            }
-            Err(error) => warn!(
-                operation = "p2p_discovery",
-                target = %self.network.overlay_id,
-                duration_ms = duration.as_millis(),
-                outcome = "retry",
-                error = %format!("{error:#}"),
-                "could not refresh block download peers",
-            ),
-        }
-        self.discovered_at = Some(Instant::now());
-        Ok(())
+        stream::iter(ids.iter().copied())
+            .map(|id| download_shard(&self.network, &self.peers, &self.options, id))
+            .buffered(self.options.parallelism)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect()
     }
 
     /// Downloads one successor while the caller processes the committed block.
@@ -303,49 +187,42 @@ impl Client {
         let previous = (!self.storage.needs_anchor()).then_some(head);
         let network = Arc::clone(&self.network);
         let deadline = self.options.network.timeout;
-        let parallelism = self.options.parallelism.min(PARALLEL_PEER_ATTEMPTS);
-        let peers = self
-            .peers
-            .iter()
-            .take(PEER_ATTEMPTS)
-            .cloned()
-            .collect::<Vec<_>>();
+        let peers = self.peers.clone();
 
         self.masterchain_download.spawn(async move {
-            let network = &*network;
-            let mut requests = stream::iter(peers)
-                .map(|peer| async move {
-                    let result =
-                        download_from_peer(network, &peer, &head, previous.as_ref(), deadline)
-                            .await;
-                    (peer, result)
-                })
-                .buffer_unordered(parallelism);
-
-            // Race several peers so one unresponsive peer cannot stall downloads.
-            // The first valid result cancels the remaining requests.
-            while let Some((peer, result)) = requests.next().await {
-                match result {
-                    Ok(Some((id, block, proof))) => {
-                        return Some(DownloadedMasterchain {
-                            peer,
-                            id,
-                            block,
-                            proof,
-                        });
+            let result = peers
+                .execute_with_probes("masterchain", move |endpoint| {
+                    let network = Arc::clone(&network);
+                    async move {
+                        download_from_peer(
+                            &network,
+                            &endpoint.peer,
+                            &head,
+                            previous.as_ref(),
+                            deadline,
+                        )
+                        .await
+                        .map_err(crate::download::pool_failure)?
+                        .ok_or_else(|| {
+                            Failure::Unavailable(format!("masterchain successor of {head}"))
+                        })
                     }
-                    Ok(None) => {}
-                    Err(error) => debug!(
+                })
+                .await;
+
+            match result {
+                Ok((id, block, proof)) => Some(DownloadedMasterchain { id, block, proof }),
+                Err(error) => {
+                    debug!(
                         operation = "block_download",
-                        target = %peer.id,
-                        block = %head,
-                        error = %format!("{error:#}"),
+                        target = %head,
                         outcome = "retry",
-                        "masterchain peer failed",
-                    ),
+                        error = %error,
+                        "masterchain download exhausted available peers",
+                    );
+                    None
                 }
             }
-            None
         });
     }
 
@@ -356,22 +233,22 @@ impl Client {
             return Ok(false);
         };
 
-        let Some(DownloadedMasterchain {
-            peer,
-            id,
-            block,
-            proof,
-        }) = result.context("masterchain download task failed")?
+        let Some(DownloadedMasterchain { id, block, proof }) =
+            result.context("masterchain download task failed")?
         else {
             return Ok(false);
         };
 
+        let started = Instant::now();
         self.storage.commit(id, &block, &proof)?;
         self.ids.insert(id.seqno, id);
-
-        if let Some(index) = self.peers.iter().position(|known| known.id == peer.id) {
-            self.peers.swap(0, index);
-        }
+        debug!(
+            operation = "masterchain_cache",
+            target = %id,
+            duration_ms = started.elapsed().as_millis(),
+            outcome = "committed",
+            "masterchain block and proof committed to cache",
+        );
 
         self.prefetch_masterchain();
         Ok(true)
@@ -381,13 +258,11 @@ impl Client {
 /// Requests a shard by the full ID obtained from a masterchain block or a shard
 /// predecessor reference. Peers on the masterchain overlay can serve shard data.
 async fn download_shard(
-    network: &Network,
-    peers: &[Peer],
+    network: &Arc<Network>,
+    peers: &Pool<PeerEndpoint>,
     options: &ClientOptions,
-    requests: &Semaphore,
-    offset: usize,
     id: BlockId,
-) -> Result<Option<(Vec<u8>, Option<Peer>)>> {
+) -> Result<Option<Vec<u8>>> {
     let directory = options
         .data_dir
         .join("shards")
@@ -399,7 +274,7 @@ async fn download_shard(
     match tokio::fs::read(&path).await {
         Ok(boc) => {
             validate_block(&id, &boc)?;
-            return Ok(Some((boc, None)));
+            return Ok(Some(boc));
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => {
@@ -407,90 +282,47 @@ async fn download_shard(
         }
     }
 
-    let candidates = peers
-        .iter()
-        .cycle()
-        .skip(offset % peers.len().max(1))
-        .take(peers.len().min(PEER_ATTEMPTS))
-        .cloned()
-        .collect::<Vec<_>>();
-    let mut downloads = stream::iter(candidates)
-        .map(|peer| async move {
-            let started = Instant::now();
-            let result = async {
-                let _permit = requests.acquire().await?;
-
-                match small_query(
-                    network,
-                    &peer,
-                    Query::PrepareBlock {
-                        block: wire_id(&id),
-                    },
-                    options.network.timeout.min(METADATA_TIMEOUT),
-                )
-                .await?
-                {
-                    Answer::NotFound => return Ok(None),
-                    Answer::Prepared => {}
-                    _ => anyhow::bail!("unexpected prepare-block response"),
-                }
-
-                let boc = fullnode_query(
-                    network,
-                    &peer,
-                    Query::DownloadBlock {
-                        block: wire_id(&id),
-                    },
-                    options.network.timeout,
-                    MAX_DOWNLOAD_SIZE,
-                )
-                .await?;
-                validate_block(&id, &boc)?;
-                Ok::<_, anyhow::Error>(Some(boc))
-            }
-            .await;
-
-            (peer, started, result)
+    let started = Instant::now();
+    let network = Arc::clone(network);
+    let deadline = options.network.timeout;
+    let result = peers
+        .execute_with_probes("shard", move |endpoint| {
+            let network = Arc::clone(&network);
+            async move { download_shard_from_peer(&network, &endpoint.peer, id, deadline).await }
         })
-        .buffer_unordered(options.parallelism.min(PARALLEL_PEER_ATTEMPTS));
+        .await;
 
-    while let Some((peer, started, result)) = downloads.next().await {
-        match result {
-            Ok(Some(boc)) => {
-                // Stop the losing requests before persisting the verified winner.
-                drop(downloads);
-
-                // Persist the original BOC: reserialization can change file_hash.
-                let boc = tokio::task::spawn_blocking(move || {
-                    std::fs::create_dir_all(&directory)?;
-                    atomic_write(&directory, &name, &boc)?;
-                    Ok::<_, anyhow::Error>(boc)
-                })
-                .await
-                .context("shard cache write task failed")??;
-                debug!(
-                    operation = "shard_download",
-                    node = %network.dht.key().id(),
-                    target = %peer.id,
-                    block = %id,
-                    bytes = boc.len(),
-                    duration_ms = started.elapsed().as_millis(),
-                    outcome = "stored",
-                    "shard block saved",
-                );
-                return Ok(Some((boc, Some(peer))));
-            }
-            Ok(None) => {}
-            Err(error) => debug!(
+    let boc = match result {
+        Ok(boc) => boc,
+        Err(error) => {
+            debug!(
                 operation = "shard_download",
-                target = %peer.id,
-                block = %id,
+                target = %id,
                 duration_ms = started.elapsed().as_millis(),
                 outcome = "retry",
-                error = %format!("{error:#}"),
-                "shard peer failed",
-            ),
+                error = %error,
+                "shard download exhausted available peers",
+            );
+            return Ok(None);
         }
-    }
-    Ok(None)
+    };
+
+    // Preserve the downloaded serialization because file_hash covers original bytes.
+    let boc = tokio::task::spawn_blocking(move || {
+        std::fs::create_dir_all(&directory)?;
+        atomic_write(&directory, &name, &boc)?;
+        Ok::<_, anyhow::Error>(boc)
+    })
+    .await
+    .context("shard cache write task failed")??;
+
+    debug!(
+        operation = "shard_download",
+        target = %id,
+        bytes = boc.len(),
+        duration_ms = started.elapsed().as_millis(),
+        outcome = "stored",
+        "shard block saved",
+    );
+    Ok(Some(boc))
 }

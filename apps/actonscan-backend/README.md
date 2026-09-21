@@ -72,6 +72,35 @@ file. The container uses `docker/config.toml`.
 Set `[storage].database_path` to the SQLite database path. If the parent
 directory does not exist, the backend creates it.
 
+Available since trunk: SQLite uses WAL mode with `synchronous=FULL` to flush
+each transaction at commit. Keep the database on a local filesystem. For a live
+backup, use SQLite's backup API; copying only the database file can omit commits
+that are still in its `-wal` file.
+
+## Endpoint selection
+
+Available since trunk.
+
+Both sources use a shared endpoint pool. It measures latency separately for
+metadata and block requests, accounts for active attempts, and measures other
+endpoints in background tasks. Probes finish independently of foreground
+requests. Slow requests can start a second attempt after 100 ms.
+Only a validated response wins. Missing data permits failover without marking
+the server unhealthy; transport failures and invalid responses suspend it.
+
+P2P spaces operations to each peer by at least 35 ms, across masterchain and
+shard requests. Selection includes this admission wait when comparing peers.
+Recovery probes recheck previously responsive peers while discovery probes are pending.
+
+The backend saves P2P measurements in `peers.json` inside the download directory.
+LiteServer measurements use the database path with a `.liteserver-peers.json`
+extension. Snapshots are written atomically at most once per ten seconds.
+Restarts reuse recent latency estimates. P2P also saves signed overlay
+descriptors and addresses in `peer-nodes.json` after discovery. On restart it
+validates those descriptors and reconnects without waiting for discovery.
+Discovery refreshes the address book in the background. Active requests and
+transport sessions are never restored.
+
 ## Index blocks through P2P
 
 Set these values in the backend config:
@@ -83,6 +112,8 @@ global_config_path = "global.config.json"
 poll_interval_ms = 1000
 
 [indexer.p2p]
+# Optional read-only profile from ton-sync benchmark-peers (available since trunk)
+# peers_file = "/path/to/peers.json"
 address = "164.132.76.12:19002"
 data_dir = ".actonscan-p2p"
 parallelism = 16
@@ -92,7 +123,7 @@ from_latest = true
 
 Replace `address` with your reachable IPv4 address and UDP port.
 P2P uses ADNL UDP, DHT, and RLDP2 for all block downloads.
-Available since trunk: `parallelism` limits concurrent shard requests to 1–128, including requests to competing peers. Its default is 16.
+Available since trunk: `parallelism` limits concurrent masterchain and shard download attempts to 1–128, including attempts on competing peers. Its default is 16.
 
 Available since trunk: `from_latest = true` uses LiteServer to select a recent starting block ID for a new index and download directory.
 It checks the server's network zerostate, then closes the LiteServer connections before downloading blocks through P2P.

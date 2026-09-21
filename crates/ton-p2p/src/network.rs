@@ -3,8 +3,9 @@
 use std::{net::SocketAddrV4, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result, bail, ensure};
-use everscale_network::{adnl, dht, overlay};
-use serde::Serialize;
+use base64::{Engine, engine::general_purpose::STANDARD};
+use everscale_network::{adnl, crypto, dht, overlay, proto};
+use serde::{Deserialize, Serialize};
 use tokio::time::{Instant, sleep, timeout};
 use ton_fullnode_master::tl::{Answer, Query};
 use tracing::{info, warn};
@@ -189,6 +190,17 @@ pub(crate) struct Network {
 pub(crate) struct Peer {
     pub(crate) id: adnl::NodeIdShort,
     pub(crate) address: SocketAddrV4,
+    pub(crate) descriptor: PeerDescriptor,
+}
+
+/// The signed overlay identity and resolved address needed to reconnect over ADNL.
+/// A saved descriptor is revalidated for this overlay before registering its key.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct PeerDescriptor {
+    pub(crate) address: SocketAddrV4,
+    public_key: String,
+    version: u32,
+    signature: String,
 }
 
 impl Network {
@@ -196,7 +208,13 @@ impl Network {
         let keystore = adnl::Keystore::builder()
             .with_tagged_key(options.secret_key, 0)?
             .build();
-        let adnl = adnl::Node::new(options.address, keystore, Default::default(), None)?;
+        // TON peers use the ordinary ADNL channel. Everscale's priority-channel
+        // extension otherwise drops initial queries until its fallback activates.
+        let adnl_options = adnl::NodeOptions {
+            force_use_priority_channels: false,
+            ..Default::default()
+        };
+        let adnl = adnl::Node::new(options.address, keystore, adnl_options, None)?;
         let shutdown = Shutdown(Arc::clone(&adnl));
         let dht = dht::Node::new(Arc::clone(&adnl), 0, Default::default())?;
         let rldp = rldp::Client::new(&adnl)?;
@@ -244,37 +262,70 @@ impl Network {
         let mut peers = Vec::new();
 
         for (address, node) in self.dht.find_overlay_nodes(&self.overlay_id).await? {
-            if let Err(error) = self
-                .overlay_id
-                .verify_overlay_node(&node.as_equivalent_ref())
-            {
-                warn!(
+            match self.add_peer(address, &node) {
+                Ok(Some(peer)) => peers.push(peer),
+                Ok(None) => {}
+                Err(error) => warn!(
                     operation = "p2p_discovery",
                     target = %address,
                     %error,
                     "invalid overlay descriptor",
-                );
-                continue;
+                ),
             }
-
-            let full_id = adnl::NodeIdFull::try_from(node.id.as_equivalent_ref())?;
-            let id = full_id.compute_short_id();
-
-            if id == *self.dht.key().id() {
-                continue;
-            }
-
-            self.adnl.add_peer(
-                adnl::NewPeerContext::PublicOverlay,
-                self.dht.key().id(),
-                &id,
-                address,
-                full_id,
-            )?;
-            peers.push(Peer { id, address });
         }
 
         Ok(peers)
+    }
+
+    pub(crate) fn restore_peer(&self, descriptor: &PeerDescriptor) -> Result<Option<Peer>> {
+        let key: [u8; 32] = STANDARD
+            .decode(&descriptor.public_key)?
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("saved peer public key must contain 32 bytes"))?;
+        let node = proto::overlay::NodeOwned {
+            id: crypto::tl::PublicKeyOwned::Ed25519 { key },
+            overlay: *self.overlay_id.as_slice(),
+            version: descriptor.version,
+            signature: STANDARD.decode(&descriptor.signature)?.into(),
+        };
+        self.add_peer(descriptor.address, &node)
+    }
+
+    fn add_peer(
+        &self,
+        address: SocketAddrV4,
+        node: &proto::overlay::NodeOwned,
+    ) -> Result<Option<Peer>> {
+        self.overlay_id
+            .verify_overlay_node(&node.as_equivalent_ref())?;
+        let full_id = adnl::NodeIdFull::try_from(node.id.as_equivalent_ref())?;
+        let id = full_id.compute_short_id();
+        let crypto::tl::PublicKeyOwned::Ed25519 { key } = &node.id else {
+            bail!("overlay peer must use an Ed25519 key");
+        };
+
+        if id == *self.dht.key().id() {
+            return Ok(None);
+        }
+
+        self.adnl.add_peer(
+            adnl::NewPeerContext::PublicOverlay,
+            self.dht.key().id(),
+            &id,
+            address,
+            full_id,
+        )?;
+
+        Ok(Some(Peer {
+            id,
+            address,
+            descriptor: PeerDescriptor {
+                address,
+                public_key: STANDARD.encode(key),
+                version: node.version,
+                signature: STANDARD.encode(&node.signature),
+            },
+        }))
     }
 }
 

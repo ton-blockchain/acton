@@ -6,18 +6,27 @@
 #[cfg(test)]
 mod tests;
 
-use std::{collections::HashMap, path::Path, time::Duration};
+mod transport;
+
+use std::{
+    collections::HashMap,
+    path::Path,
+    sync::{Arc, atomic::Ordering},
+    time::Duration,
+};
 
 use async_trait::async_trait;
-use futures::{StreamExt, future::join_all, stream::FuturesUnordered};
+use futures::{StreamExt, stream};
+use service_pool::{Endpoint, Failure, Options, Pool, Snapshot};
+use sha2::{Digest, Sha256};
 use ton_indexer_core::{
     BlockData, BlockGraphClient, BlockId, BlockIdShort, Hash256, RawBlock, SourceError,
 };
 use tonutils::{
-    liteclient::client::LiteClient,
-    network_config::{ConfigGlobal, ConfigLiteServer},
+    network_config::ConfigGlobal,
     tl::common::{BlockId as LiteBlockId, BlockIdExt as LiteBlockIdExt, Int256},
 };
+use transport::{Counters, Server, classify};
 
 /// Counts `LiteServer` TL requests issued by [`TonutilsLiteClient`].
 ///
@@ -69,17 +78,17 @@ impl LiteRequestStats {
     }
 }
 
-/// Direct ADNL/LiteAPI client backed by `tonutils`.
+/// ADNL/LiteAPI client with shared endpoint admission, failover, and measurements.
+/// Responses are validated before accepting a speculative attempt. Available since trunk.
 pub struct TonutilsLiteClient {
-    inner: LiteClient,
-    exact_clients: Vec<LiteClient>,
+    pool: Pool<Server>,
+    parallelism: usize,
     decoded: HashMap<BlockId, BlockData>,
-    request_stats: LiteRequestStats,
+    counters: Arc<Counters>,
 }
 
 impl TonutilsLiteClient {
     const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
-    const WORKER_CONNECT_TIMEOUT: Duration = Duration::from_secs(1);
     const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
     const DEFAULT_PARALLEL_CLIENTS: usize = 4;
     const MAX_PARALLEL_CLIENTS: usize = 16;
@@ -94,10 +103,11 @@ impl TonutilsLiteClient {
         Self::connect_with_parallelism(config, Self::DEFAULT_PARALLEL_CLIENTS).await
     }
 
-    /// Connects with a bounded number of clients for concurrent exact block loads.
+    /// Bounds simultaneous upstream operations, including speculative attempts.
+    /// Available since trunk.
     ///
     /// Values above 16 are capped to protect public liteservers. Zero is treated
-    /// as one client.
+    /// as one active operation. Idle connections can remain on several servers.
     ///
     /// # Errors
     ///
@@ -107,63 +117,68 @@ impl TonutilsLiteClient {
         config: &ConfigGlobal,
         parallelism: usize,
     ) -> Result<Self, SourceError> {
+        Self::connect_pool(config, parallelism, None).await
+    }
+
+    async fn connect_pool(
+        config: &ConfigGlobal,
+        parallelism: usize,
+        stats_path: Option<&Path>,
+    ) -> Result<Self, SourceError> {
         if config.liteservers.is_empty() {
             return Err(SourceError::GlobalConfig(
                 "network config has no liteservers".into(),
             ));
         }
 
-        let mut failures = Vec::with_capacity(config.liteservers.len());
-        let mut request_stats = LiteRequestStats::default();
-        let mut attempts = FuturesUnordered::new();
-        for (index, liteserver) in config.liteservers.iter().enumerate() {
-            attempts.push(async move {
-                let (probed, result) = connect_liteserver(liteserver, Self::CONNECT_TIMEOUT).await;
-                (index, liteserver.clone(), probed, result)
-            });
+        let parallelism = parallelism.clamp(1, Self::MAX_PARALLEL_CLIENTS);
+        let counters = Arc::new(Counters::default());
+        let servers: Vec<_> = config
+            .liteservers
+            .iter()
+            .map(|settings| Server::new(settings.clone(), Arc::clone(&counters)))
+            .collect();
+        let mut identities: Vec<_> = servers.iter().map(Endpoint::id).collect();
+        identities.sort_unstable();
+        identities.dedup();
+        // ConfigGlobal contains only server keys. Scope saved measurements to this
+        // trusted inventory so a different config cannot inherit its ranking.
+        let namespace = format!(
+            "ton-liteserver:{}",
+            hex::encode(Sha256::digest(identities.join(",")))
+        );
+        let mut pool = Pool::new(
+            namespace,
+            Options {
+                max_in_flight: parallelism,
+                max_in_flight_per_endpoint: parallelism.min(4),
+                attempt_timeout: Self::REQUEST_TIMEOUT,
+                request_timeout: Self::REQUEST_TIMEOUT,
+                ..Options::default()
+            },
+        )
+        .map_err(source_failure)?;
+
+        if let Some(path) = stats_path {
+            pool.persist_to(path).map_err(|error| {
+                SourceError::Transport(format!("cannot restore {}: {error}", path.display()))
+            })?;
+        }
+        for server in servers {
+            pool.upsert(server);
         }
 
-        let mut selected = None;
-        while let Some((index, liteserver, probed, result)) = attempts.next().await {
-            request_stats.get_masterchain_info += u64::from(probed);
-            match result {
-                Ok(client) => {
-                    selected = Some((liteserver, client));
-                    break;
-                }
-                Err(error) => failures.push(format!("#{index}: {error}")),
-            }
-        }
-        drop(attempts);
-
-        if let Some((liteserver, inner)) = selected {
-            let parallelism = parallelism.clamp(1, Self::MAX_PARALLEL_CLIENTS);
-            let worker_attempts = (1..parallelism).map(|_| async {
-                connect_liteserver(&liteserver, Self::WORKER_CONNECT_TIMEOUT).await
-            });
-            let mut exact_clients = Vec::with_capacity(parallelism - 1);
-            for (probed, result) in join_all(worker_attempts).await {
-                request_stats.get_masterchain_info += u64::from(probed);
-                if let Ok(client) = result {
-                    exact_clients.push(client);
-                }
-            }
-            return Ok(Self {
-                inner,
-                exact_clients,
-                decoded: HashMap::new(),
-                request_stats,
-            });
-        }
-
-        Err(SourceError::Transport(format!(
-            "none of {} configured liteservers is responsive ({})",
-            config.liteservers.len(),
-            failures.join("; ")
-        )))
+        let mut client = Self {
+            pool,
+            parallelism,
+            decoded: HashMap::new(),
+            counters,
+        };
+        client.latest().await?;
+        Ok(client)
     }
 
-    /// Reads a global config and connects to its first responsive liteserver.
+    /// Reads a global config and opens a pool of its liteservers.
     ///
     /// # Errors
     ///
@@ -183,14 +198,40 @@ impl TonutilsLiteClient {
         path: impl AsRef<Path>,
         parallelism: usize,
     ) -> Result<Self, SourceError> {
-        let path = path.as_ref();
-        let source = tokio::fs::read_to_string(path).await.map_err(|error| {
-            SourceError::GlobalConfig(format!("failed to read {}: {error}", path.display()))
-        })?;
-        let config = source.parse::<ConfigGlobal>().map_err(|error| {
-            SourceError::GlobalConfig(format!("failed to parse {}: {error}", path.display()))
-        })?;
-        Self::connect_with_parallelism(&config, parallelism).await
+        Self::connect_pool(&read_config(path.as_ref()).await?, parallelism, None).await
+    }
+
+    /// Restores endpoint measurements before selecting the first server, and saves
+    /// updates atomically beside caller-owned data. Available since trunk.
+    ///
+    /// # Errors
+    /// Returns an error for an unreadable config or malformed statistics file,
+    /// or when no configured server answers within the request deadline.
+    pub async fn connect_path_with_stats(
+        path: impl AsRef<Path>,
+        parallelism: usize,
+        stats_path: impl AsRef<Path>,
+    ) -> Result<Self, SourceError> {
+        Self::connect_pool(
+            &read_config(path.as_ref()).await?,
+            parallelism,
+            Some(stats_path.as_ref()),
+        )
+        .await
+    }
+
+    /// Captures endpoint outcomes and latency estimates for monitoring. Available since trunk.
+    #[must_use]
+    pub fn peer_stats(&self) -> Snapshot {
+        self.pool.snapshot()
+    }
+
+    /// Saves measurements before a controlled shutdown. Available since trunk.
+    ///
+    /// # Errors
+    /// Returns an error when the configured statistics file cannot be written.
+    pub async fn flush_peer_stats(&self) -> std::io::Result<()> {
+        self.pool.flush().await
     }
 
     /// Returns the latest masterchain id without constructing a source.
@@ -209,32 +250,52 @@ impl TonutilsLiteClient {
         &mut self,
         zero_state: BlockId,
     ) -> Result<BlockId, SourceError> {
-        self.request_stats.get_masterchain_info += 1;
-        let info = self
-            .inner
-            .get_masterchain_info()
-            .await
-            .map_err(|error| SourceError::Transport(error.to_string()))?;
-
         if !zero_state.is_masterchain()
             || zero_state.shard != BlockId::FULL_SHARD
             || zero_state.seqno != 0
-            || info.init.workchain != zero_state.workchain
-            || info.init.root_hash.0 != zero_state.root_hash.into_bytes()
-            || info.init.file_hash.0 != zero_state.file_hash.into_bytes()
         {
             return Err(SourceError::InvalidBlockId(
-                "liteserver zerostate does not match the requested network".into(),
+                "network anchor must be a masterchain zerostate".into(),
             ));
         }
+        self.head(Some(zero_state)).await
+    }
 
-        let last = from_lite_block_id(&info.last)?;
-        if !last.is_masterchain() || last.shard != BlockId::FULL_SHARD {
-            return Err(SourceError::InvalidBlockId(
-                "liteserver head must belong to the masterchain".into(),
-            ));
-        }
-        Ok(last)
+    async fn head(&self, zero_state: Option<BlockId>) -> Result<BlockId, SourceError> {
+        self.pool
+            .execute_with_probes("metadata", move |server| async move {
+                let counters = Arc::clone(&server.counters);
+                let request = server.request(move |client| {
+                    Box::pin(async move {
+                        counters.head.fetch_add(1, Ordering::Relaxed);
+                        let info = client.get_masterchain_info().await.map_err(classify)?;
+                        if zero_state.is_some_and(|zero| {
+                            info.init.workchain != zero.workchain
+                                || info.init.root_hash.0 != zero.root_hash.into_bytes()
+                                || info.init.file_hash.0 != zero.file_hash.into_bytes()
+                        }) {
+                            return Err(Failure::Invalid(
+                                "liteserver zerostate does not match the requested network".into(),
+                            ));
+                        }
+
+                        let last = from_lite_block_id(&info.last).map_err(invalid_response)?;
+                        if !last.is_masterchain() || last.shard != BlockId::FULL_SHARD {
+                            return Err(Failure::Invalid(
+                                "liteserver head must belong to the masterchain".into(),
+                            ));
+                        }
+                        Ok(last)
+                    })
+                });
+                tokio::time::timeout(Duration::from_secs(3), request)
+                    .await
+                    .map_err(|_| {
+                        Failure::Retryable("masterchain metadata timed out after 3s".into())
+                    })?
+            })
+            .await
+            .map_err(source_failure)
     }
 
     /// Returns the number of messages waiting in all shard outbound queues.
@@ -246,27 +307,36 @@ impl TonutilsLiteClient {
     ///
     /// Returns an error when the `LiteAPI` request fails.
     pub async fn out_msg_queue_size(&mut self) -> Result<u64, SourceError> {
-        let sizes = self
-            .inner
-            .get_out_msg_queue_sizes(None)
+        self.pool
+            .execute_with_probes("queue_sizes", |server| async move {
+                server
+                    .request(|client| {
+                        Box::pin(async move {
+                            let sizes = client
+                                .get_out_msg_queue_sizes(None)
+                                .await
+                                .map_err(classify)?;
+                            Ok(sizes.shards.into_iter().fold(0_u64, |total, shard| {
+                                total.saturating_add(u64::from(shard.size))
+                            }))
+                        })
+                    })
+                    .await
+            })
             .await
-            .map_err(|error| SourceError::Transport(error.to_string()))?;
-
-        Ok(sizes.shards.into_iter().fold(0_u64, |total, shard| {
-            total.saturating_add(u64::from(shard.size))
-        }))
+            .map_err(source_failure)
     }
 
-    /// Returns a snapshot of the requests issued by this client.
+    /// Returns physical TL requests, including retries and speculative attempts.
     #[must_use]
-    pub const fn request_stats(&self) -> LiteRequestStats {
-        self.request_stats
+    pub fn request_stats(&self) -> LiteRequestStats {
+        self.counters.snapshot()
     }
 
-    /// Returns the maximum number of exact block downloads issued concurrently.
+    /// Returns the shared admission limit, including speculative block downloads.
     #[must_use]
     pub const fn exact_block_parallelism(&self) -> usize {
-        1 + self.exact_clients.len()
+        self.parallelism
     }
 
     fn decode_cached(&mut self, raw: &RawBlock) -> Result<&BlockData, SourceError> {
@@ -279,66 +349,61 @@ impl TonutilsLiteClient {
     }
 }
 
-async fn connect_liteserver(
-    liteserver: &ConfigLiteServer,
-    connect_timeout: Duration,
-) -> (bool, Result<LiteClient, String>) {
-    let connection = LiteClient::connect_with_timeout(
-        liteserver.socket_addr(),
-        liteserver.public_key(),
-        connect_timeout,
-    )
-    .await;
-    let mut client = match connection {
-        Ok(client) => client.with_request_timeout(TonutilsLiteClient::REQUEST_TIMEOUT),
-        Err(error) => return (false, Err(format!("connect failed: {error}"))),
-    };
-
-    match client.get_masterchain_info().await {
-        Ok(_) => (true, Ok(client)),
-        Err(error) => (true, Err(format!("probe failed: {error}"))),
-    }
-}
-
 #[async_trait]
 impl BlockGraphClient for TonutilsLiteClient {
     async fn latest_masterchain_block(&mut self) -> Result<BlockId, SourceError> {
-        self.request_stats.get_masterchain_info += 1;
-        let info = self
-            .inner
-            .get_masterchain_info()
-            .await
-            .map_err(|error| SourceError::Transport(error.to_string()))?;
-        from_lite_block_id(&info.last)
+        self.head(None).await
     }
 
     async fn load_block(&mut self, id: BlockIdShort) -> Result<RawBlock, SourceError> {
         let lite_id = to_lite_short_id(id)?;
-        self.request_stats.lookup_block += 1;
-        let header = self
-            .inner
-            .lookup_block(
-                (),
-                lite_id,
-                Some(()),
-                None,
-                None,
-                false,
-                false,
-                false,
-                false,
-                false,
-            )
+        let (raw, decoded) = self
+            .pool
+            .execute_with_probes("lookup_block", move |server| {
+                let lite_id = lite_id.clone();
+                async move {
+                    let counters = Arc::clone(&server.counters);
+                    server
+                        .request(move |client| {
+                            Box::pin(async move {
+                                counters.lookup.fetch_add(1, Ordering::Relaxed);
+                                let header = client
+                                    .lookup_block(
+                                        (),
+                                        lite_id,
+                                        Some(()),
+                                        None,
+                                        None,
+                                        false,
+                                        false,
+                                        false,
+                                        false,
+                                        false,
+                                    )
+                                    .await
+                                    .map_err(classify)?;
+                                let full_id =
+                                    from_lite_block_id(&header.id).map_err(invalid_response)?;
+                                if BlockIdShort::from(full_id) != id {
+                                    return Err(Failure::Invalid(
+                                        "lookup returned different block coordinates".into(),
+                                    ));
+                                }
+
+                                counters.block.fetch_add(1, Ordering::Relaxed);
+                                let boc = client.get_block(header.id).await.map_err(classify)?;
+                                let decoded =
+                                    BlockData::decode(full_id, &boc).map_err(invalid_response)?;
+                                Ok((RawBlock::new(full_id, boc), decoded))
+                            })
+                        })
+                        .await
+                }
+            })
             .await
-            .map_err(|error| SourceError::Transport(error.to_string()))?;
-        let full_id = from_lite_block_id(&header.id)?;
-        self.request_stats.get_block += 1;
-        let boc = self
-            .inner
-            .get_block(header.id)
-            .await
-            .map_err(|error| SourceError::Transport(error.to_string()))?;
-        Ok(RawBlock::new(full_id, boc))
+            .map_err(source_failure)?;
+        self.decoded.insert(raw.id(), decoded);
+        Ok(raw)
     }
 
     async fn load_block_exact(&mut self, id: BlockId) -> Result<RawBlock, SourceError> {
@@ -349,32 +414,40 @@ impl BlockGraphClient for TonutilsLiteClient {
     }
 
     async fn load_blocks_exact(&mut self, ids: &[BlockId]) -> Result<Vec<RawBlock>, SourceError> {
-        let request_count = u64::try_from(ids.len()).unwrap_or(u64::MAX);
-        self.request_stats.get_block = self.request_stats.get_block.saturating_add(request_count);
-
-        let mut blocks = Vec::with_capacity(ids.len());
-        let parallelism = 1 + self.exact_clients.len();
-        for ids in ids.chunks(parallelism) {
-            let Some((&first, rest)) = ids.split_first() else {
-                continue;
-            };
-            let mut requests = Vec::with_capacity(ids.len());
-            requests.push(download_exact_block(&mut self.inner, first));
-            requests.extend(
-                self.exact_clients
-                    .iter_mut()
-                    .zip(rest)
-                    .map(|(client, &id)| download_exact_block(client, id)),
-            );
-
-            for result in join_all(requests).await {
-                let (id, boc) = result?;
-                // `tonutils::get_block` returns only the response payload. Decode
-                // it now to verify both hashes and all block coordinates. Caching
-                // also prevents a second decode during traversal.
-                self.decoded.insert(id, BlockData::decode(id, &boc)?);
-                blocks.push(RawBlock::new(id, boc));
+        let requests = ids.iter().copied().map(|id| {
+            let pool = &self.pool;
+            async move {
+                let lite_id = to_lite_block_id_ext(id)?;
+                pool.execute_with_probes("block", move |server| {
+                    let lite_id = lite_id.clone();
+                    async move {
+                        let counters = Arc::clone(&server.counters);
+                        server
+                            .request(move |client| {
+                                Box::pin(async move {
+                                    counters.block.fetch_add(1, Ordering::Relaxed);
+                                    let boc = client.get_block(lite_id).await.map_err(classify)?;
+                                    let decoded =
+                                        BlockData::decode(id, &boc).map_err(invalid_response)?;
+                                    Ok((RawBlock::new(id, boc), decoded))
+                                })
+                            })
+                            .await
+                    }
+                })
+                .await
+                .map_err(source_failure)
             }
+        });
+        let results = stream::iter(requests)
+            .buffered(self.parallelism)
+            .collect::<Vec<_>>()
+            .await;
+        let mut blocks = Vec::with_capacity(ids.len());
+        for result in results {
+            let (raw, decoded) = result?;
+            self.decoded.insert(raw.id(), decoded);
+            blocks.push(raw);
         }
         Ok(blocks)
     }
@@ -416,15 +489,21 @@ fn to_lite_block_id_ext(id: BlockId) -> Result<LiteBlockIdExt, SourceError> {
     })
 }
 
-async fn download_exact_block(
-    client: &mut LiteClient,
-    id: BlockId,
-) -> Result<(BlockId, Vec<u8>), SourceError> {
-    let boc = client
-        .get_block(to_lite_block_id_ext(id)?)
-        .await
-        .map_err(|error| SourceError::Transport(error.to_string()))?;
-    Ok((id, boc))
+async fn read_config(path: &Path) -> Result<ConfigGlobal, SourceError> {
+    let source = tokio::fs::read_to_string(path).await.map_err(|error| {
+        SourceError::GlobalConfig(format!("failed to read {}: {error}", path.display()))
+    })?;
+    source.parse().map_err(|error| {
+        SourceError::GlobalConfig(format!("failed to parse {}: {error}", path.display()))
+    })
+}
+
+fn invalid_response(error: impl std::fmt::Display) -> Failure {
+    Failure::Invalid(error.to_string())
+}
+
+fn source_failure(error: Failure) -> SourceError {
+    SourceError::Transport(error.to_string())
 }
 
 fn from_lite_block_id(id: &LiteBlockIdExt) -> Result<BlockId, SourceError> {

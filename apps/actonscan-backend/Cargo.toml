@@ -12,7 +12,7 @@ license = { workspace = true }
 [workspace]
 
 # Optimize RaptorQ decoding while keeping application debug checks enabled.
-[profile.dev.package.raptorq]
+[profile.dev.package.everscale-raptorq]
 opt-level = 3
 debug-assertions = false
 

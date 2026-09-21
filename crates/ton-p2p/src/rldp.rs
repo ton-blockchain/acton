@@ -3,6 +3,9 @@
 //! Concurrent queries are routed by transfer ID. Queries fit in one systematic
 //! `RaptorQ` symbol; incoming answers can span several independently encoded parts.
 
+#[cfg(test)]
+mod tests;
+
 use std::{
     collections::{BTreeMap, HashMap},
     sync::{Arc, Mutex},
@@ -11,12 +14,15 @@ use std::{
 
 use anyhow::{Context, Result, bail, ensure};
 use everscale_network::{MessageSubscriber, SubscriberContext, adnl};
-use raptorq::{EncodingPacket, ObjectTransmissionInformation, PayloadId, SourceBlockDecoder};
+use everscale_raptorq::{
+    EncodingPacket, ObjectTransmissionInformation, PayloadId, SourceBlockDecoder,
+};
 use tokio::{
     sync::mpsc,
     task::spawn_blocking,
     time::{Instant, MissedTickBehavior, interval, sleep_until, timeout_at},
 };
+use tracing::debug;
 
 const SYMBOL_SIZE: u32 = 768;
 const MAX_PART_SIZE: u32 = 2_000_000;
@@ -61,7 +67,8 @@ impl Client {
         timeout: Duration,
         max_answer_size: usize,
     ) -> Result<Vec<u8>> {
-        let deadline = Instant::now() + timeout;
+        let started = Instant::now();
+        let deadline = started + timeout;
         let query_id = rand::random::<[u8; 32]>();
         let outgoing = rand::random::<[u8; 32]>();
         let incoming = outgoing.map(|byte| !byte);
@@ -120,11 +127,15 @@ impl Client {
         let _registration = Registration {
             client: self,
             incoming,
+            deadline,
         };
         let mut transfer = Transfer::new(max_answer_size + 64);
         let mut resend = interval(Duration::from_millis(250));
         resend.set_missed_tick_behavior(MissedTickBehavior::Delay);
         let mut query_delivered = false;
+        let mut query_sends = 0;
+        let mut first_answer_at = None;
+        let mut decoding = Duration::ZERO;
 
         loop {
             tokio::select! {
@@ -136,6 +147,7 @@ impl Client {
                 }
                 _ = resend.tick(), if !query_delivered => {
                     adnl.send_custom_message(local, peer, &packet)?;
+                    query_sends += 1;
                 }
                 packet = receiver.recv() => {
                     let packet = packet.context("RLDP2 packet queue closed")?;
@@ -147,11 +159,14 @@ impl Client {
                         Packet::Data { transfer_id, fec_type, part, total_size, seqno, data }
                             if transfer_id == incoming => {
                             query_delivered = true;
+                            first_answer_at.get_or_insert_with(Instant::now);
+                            let decode_started = Instant::now();
                             let ack = timeout_at(deadline, transfer.receive(
                                 fec_type, part, total_size, seqno, data, incoming,
                             ))
                             .await
                             .with_context(|| format!("RLDP2 decoding from {peer} timed out after {timeout:?}"))??;
+                            decoding += decode_started.elapsed();
                             adnl.send_custom_message(local, peer, &tl_proto::serialize(ack))?;
 
                             if let Some(bytes) = transfer.finish() {
@@ -163,27 +178,17 @@ impl Client {
                                 ensure!(answer_id == query_id, "RLDP2 answer query ID mismatch");
                                 ensure!(data.len() <= max_answer_size, "RLDP2 answer exceeds size limit");
 
-                                // The final completion packet can be lost. Retain a
-                                // bounded receipt cache to acknowledge late repairs
-                                // while the following block is being downloaded.
-                                let mut completed = self.completed.lock()
-                                    .map_err(|_| anyhow::anyhow!("RLDP2 receipt cache poisoned"))?;
-                                completed.retain(|_, item| item.expires > Instant::now());
-
-                                if completed.len() == 1024
-                                    && let Some(oldest) = completed.iter()
-                                        .min_by_key(|(_, item)| item.expires).map(|(id, _)| *id)
-                                {
-                                    completed.remove(&oldest);
-                                }
-
-                                completed.insert(incoming, Completed {
-                                    local: *local,
-                                    peer: *peer,
-                                    parts: transfer.parts.len() as u32,
-                                    expires: deadline,
-                                });
-                                drop(completed);
+                                debug!(
+                                    operation = "rldp_download",
+                                    node = %local,
+                                    target = %peer,
+                                    query_sends,
+                                    first_answer_ms = first_answer_at.map(|at| at.duration_since(started).as_millis()),
+                                    decode_ms = decoding.as_millis(),
+                                    duration_ms = started.elapsed().as_millis(),
+                                    outcome = "received",
+                                    "completed RLDP2 answer",
+                                );
 
                                 return Ok(data);
                             }
@@ -199,15 +204,46 @@ impl Client {
 struct Registration<'a> {
     client: &'a Client,
     incoming: [u8; 32],
+    deadline: Instant,
 }
 
 impl Drop for Registration<'_> {
     fn drop(&mut self) {
-        self.client
+        let pending = self
+            .client
             .pending
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .remove(&self.incoming);
+        let Some(pending) = pending else { return };
+
+        // RLDP2 has no query cancellation message. Acknowledge late parts of a
+        // discarded answer so a losing speculative request stops retransmitting.
+        // Receipts are bound to the original peer and expire at the query deadline;
+        // acknowledging discarded data does not make it a validated response.
+        let mut completed = self
+            .client
+            .completed
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        completed.retain(|_, item| item.expires > Instant::now());
+        if completed.len() >= 1024
+            && let Some(oldest) = completed
+                .iter()
+                .min_by_key(|(_, item)| item.expires)
+                .map(|(id, _)| *id)
+        {
+            completed.remove(&oldest);
+        }
+        completed.insert(
+            self.incoming,
+            Completed {
+                local: pending.local,
+                peer: pending.peer,
+                parts: MAX_PARTS,
+                expires: self.deadline,
+            },
+        );
     }
 }
 
@@ -382,7 +418,9 @@ impl Transfer {
                 index,
                 Part {
                     fec,
-                    decoder: Some(SourceBlockDecoder::new(
+                    // TON uses P1 > P, while RFC 6330 permits P1 == P. The
+                    // compatible codec is required to recover missing symbols.
+                    decoder: Some(SourceBlockDecoder::new2(
                         0,
                         &config,
                         u64::from(fec.data_size),

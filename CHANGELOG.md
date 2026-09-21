@@ -4,8 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Node database tools
+
+- Read TON validator database snapshots directly: inspect archive packages and
+  RocksDB records, extract blocks, and read accounts by address through lazy cell
+  access. Advance masterchain snapshots with block Merkle updates and query the
+  elector in a Localton P2P example.
+
 ### Actonscan
 
+- Store indexer statistics with SQLite write-ahead logging while flushing every
+  committed transaction to disk. Share the directory flush for each cached
+  masterchain block and proof before advancing the download checkpoint.
+- Use TON-compatible ADNL channels for P2P downloads and recheck previously fast
+  peers after cancelled requests so temporary delays do not persist in routing.
+- Recover lost P2P packets with TON-compatible FEC parameters, avoiding corrupted
+  block downloads and unnecessary retries on healthy peers.
+- Select P2P peers and LiteServers by average successful request latency and load, retry
+  unavailable data on other servers, and measure other servers in the background.
+  Spread P2P requests across fast peers with per-peer pacing, and recover slow
+  peers independently of slow discovery probes.
+  Save server statistics and P2P connection descriptors to resume without waiting
+  for peer discovery. Import a calibrated peer profile to share measured routes
+  across synchronization clients and backend instances.
 - Fix Docker image builds for the Actonscan backend.
 - Show testnet TPS from its dedicated public backend, with the latest indexed block time
   and partial-window indicators.

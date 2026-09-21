@@ -1,0 +1,30 @@
+[package]
+name = "ton-node-db"
+description = "Read-only access to TON validator database snapshots"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+base64.workspace = true
+rocksdb = "0.25.0"
+serde.workspace = true
+sha2.workspace = true
+tl-proto.workspace = true
+tycho-types = { workspace = true, features = ["serde"] }
+
+[dev-dependencies]
+clap.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+ton-p2p = { path = "../ton-p2p" }
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[lints]
+workspace = true

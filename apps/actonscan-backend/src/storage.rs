@@ -43,6 +43,11 @@ impl SqliteStorage {
 
         let connection = Connection::open(path)?;
         connection.busy_timeout(Duration::from_secs(5))?;
+
+        // Append commits to the WAL instead of recreating a rollback journal
+        // for each indexed batch. FULL still flushes every committed transaction.
+        connection.pragma_update(None, "journal_mode", "WAL")?;
+        connection.pragma_update(None, "synchronous", "FULL")?;
         initialize_schema(&connection)?;
 
         Ok(Self {

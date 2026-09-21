@@ -214,8 +214,13 @@ impl Storage {
         );
 
         let name = block_name(&id);
-        atomic_write(&self.blocks, &format!("{name}.boc"), block)?;
-        atomic_write(&self.blocks, &format!("{name}.proof.boc"), proof)?;
+        persist_file(&self.blocks, &format!("{name}.boc"), block)?;
+        persist_file(&self.blocks, &format!("{name}.proof.boc"), proof)?;
+
+        // Both renames must be durable before the checkpoint can reference
+        // them. One directory flush covers the pair; each file is already synced.
+        #[cfg(unix)]
+        File::open(&self.blocks)?.sync_all()?;
 
         let checkpoint = Checkpoint {
             version: 1,
@@ -247,15 +252,23 @@ fn block_name(id: &BlockId) -> String {
 
 /// Flushes content before rename, then flushes the containing directory on Unix.
 pub(crate) fn atomic_write(directory: &Path, name: &str, bytes: &[u8]) -> Result<()> {
+    persist_file(directory, name, bytes)?;
+
+    #[cfg(unix)]
+    File::open(directory)?.sync_all()?;
+
+    Ok(())
+}
+
+/// Flushes and renames a file. The caller must flush the directory before
+/// publishing a checkpoint that depends on this name surviving a crash.
+fn persist_file(directory: &Path, name: &str, bytes: &[u8]) -> Result<()> {
     let path = directory.join(name);
     let mut file = tempfile::NamedTempFile::new_in(directory)?;
     file.write_all(bytes)?;
     file.as_file().sync_all()?;
     file.persist(&path)
         .with_context(|| format!("cannot persist {}", path.display()))?;
-
-    #[cfg(unix)]
-    File::open(directory)?.sync_all()?;
 
     Ok(())
 }

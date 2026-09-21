@@ -1,0 +1,10 @@
+tonNode.blockIdExt workchain:int shard:long seqno:int root_hash:int256 file_hash:int256 = tonNode.BlockIdExt;
+db.celldb.value block_id:tonNode.blockIdExt prev:int256 next:int256 root_hash:int256 = db.celldb.Value;
+db.state.initBlockId block:tonNode.blockIdExt = db.state.InitBlockId;
+db.state.gcBlockId block:tonNode.blockIdExt = db.state.GcBlockId;
+db.state.shardClient block:tonNode.blockIdExt = db.state.ShardClient;
+db.state.dbVersion version:int = db.state.DbVersion;
+db.state.key.initBlockId = db.state.Key;
+db.state.key.gcBlockId = db.state.Key;
+db.state.key.shardClient = db.state.Key;
+db.state.key.dbVersion = db.state.Key;

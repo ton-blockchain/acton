@@ -80,6 +80,7 @@ async fn run_connection(
                     timeout,
                 },
                 data_dir: config.p2p.data_dir.clone(),
+                peers_file: config.p2p.peers_file.clone(),
                 parallelism: config.p2p.parallelism,
             },
         )?;
@@ -88,9 +89,10 @@ async fn run_connection(
         return run_pipeline(source, config, tps_stats, opcode_stats, storage).await;
     }
 
-    let mut client = TonutilsLiteClient::connect_path_with_parallelism(
+    let mut client = TonutilsLiteClient::connect_path_with_stats(
         &config.global_config_path,
         config.parallelism,
+        &config.peer_stats_path,
     )
     .await?;
     let tip = client.latest().await?;

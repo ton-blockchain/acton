@@ -18,6 +18,26 @@ use crate::network::{Network, Peer};
 
 pub(crate) const MAX_DOWNLOAD_SIZE: usize = 8 * 1024 * 1024;
 
+#[derive(Debug)]
+struct InvalidResponse;
+
+impl std::fmt::Display for InvalidResponse {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("invalid full-node response")
+    }
+}
+
+impl std::error::Error for InvalidResponse {}
+
+/// Keeps response validation failures distinct from interrupted transports.
+pub(crate) fn pool_failure(error: anyhow::Error) -> service_pool::Failure {
+    if error.is::<InvalidResponse>() {
+        service_pool::Failure::Invalid(format!("{error:#}"))
+    } else {
+        service_pool::Failure::Retryable(format!("{error:#}"))
+    }
+}
+
 /// Uses uncompressed block/proof downloads, avoiding codecs that require a local
 /// shard state. All synchronization RPCs use RLDP2, including metadata queries.
 pub(crate) async fn download_from_peer(
@@ -41,11 +61,13 @@ pub(crate) async fn download_from_peer(
             Answer::BlockDescription { id } => {
                 ensure!(
                     id.workchain == -1 && id.shard == 1 << 63,
-                    "peer returned a non-masterchain block"
+                    anyhow::anyhow!("peer returned a non-masterchain block")
+                        .context(InvalidResponse)
                 );
                 ensure!(
                     head.seqno.checked_add(1) == Some(id.seqno),
-                    "peer returned a nonconsecutive block"
+                    anyhow::anyhow!("peer returned a nonconsecutive block")
+                        .context(InvalidResponse)
                 );
                 BlockId {
                     shard: ShardIdent::MASTERCHAIN,
@@ -55,7 +77,11 @@ pub(crate) async fn download_from_peer(
                 }
             }
             Answer::BlockDescriptionEmpty => return Ok(None),
-            _ => bail!("unexpected next-block description"),
+            _ => {
+                return Err(
+                    anyhow::anyhow!("unexpected next-block description").context(InvalidResponse)
+                );
+            }
         }
     } else {
         *head
@@ -88,12 +114,20 @@ pub(crate) async fn download_from_peer(
         match block {
             Answer::Prepared => {}
             Answer::NotFound => return Ok(None),
-            _ => bail!("unexpected prepare-block response"),
+            _ => {
+                return Err(
+                    anyhow::anyhow!("unexpected prepare-block response").context(InvalidResponse)
+                );
+            }
         }
         match proof {
             Answer::PreparedProof => {}
             Answer::PreparedProofEmpty | Answer::PreparedProofLink => return Ok(None),
-            _ => bail!("unexpected prepare-proof response"),
+            _ => {
+                return Err(
+                    anyhow::anyhow!("unexpected prepare-proof response").context(InvalidResponse)
+                );
+            }
         }
     }
 
@@ -130,7 +164,7 @@ pub(crate) async fn download_from_peer(
         },
     )?;
 
-    validate_download(&id, previous, &block, &proof)?;
+    validate_download(&id, previous, &block, &proof).context(InvalidResponse)?;
     Ok(Some((id, block, proof)))
 }
 
@@ -140,9 +174,57 @@ pub(crate) async fn small_query(
     query: Query,
     deadline: Duration,
 ) -> Result<Answer> {
-    let response = fullnode_query(network, peer, query, deadline, 16 * 1024).await?;
+    let response = fullnode_query(
+        network,
+        peer,
+        query,
+        deadline.min(Duration::from_secs(3)),
+        16 * 1024,
+    )
+    .await?;
 
-    tl_proto::deserialize(&response).context("invalid full-node metadata response")
+    tl_proto::deserialize(&response).context(InvalidResponse)
+}
+
+/// Loads and validates the exact shard named by a masterchain commitment.
+/// Calibration and normal downloads use the same availability check and transfer.
+pub(crate) async fn download_shard_from_peer(
+    network: &Network,
+    peer: &Peer,
+    id: BlockId,
+    deadline: Duration,
+) -> Result<Vec<u8>, service_pool::Failure> {
+    use service_pool::Failure;
+
+    match small_query(
+        network,
+        peer,
+        Query::PrepareBlock {
+            block: wire_id(&id),
+        },
+        deadline,
+    )
+    .await
+    .map_err(pool_failure)?
+    {
+        Answer::NotFound => return Err(Failure::Unavailable(id.to_string())),
+        Answer::Prepared => {}
+        _ => return Err(Failure::Invalid("unexpected prepare-block response".into())),
+    }
+
+    let boc = fullnode_query(
+        network,
+        peer,
+        Query::DownloadBlock {
+            block: wire_id(&id),
+        },
+        deadline,
+        MAX_DOWNLOAD_SIZE,
+    )
+    .await
+    .map_err(pool_failure)?;
+    validate_block(&id, &boc).map_err(|error| Failure::Invalid(format!("{error:#}")))?;
+    Ok(boc)
 }
 
 /// Shares request bounds and diagnostics between metadata and raw BOC downloads.
