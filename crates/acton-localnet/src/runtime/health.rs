@@ -28,6 +28,7 @@ impl Runtime {
             Status::Stopped | Status::Stopping | Status::Deleted
         );
         let client = Client::builder()
+            .use_rustls_tls()
             .timeout(PROBE_TIMEOUT)
             .connect_timeout(Duration::from_millis(500))
             .redirect(reqwest::redirect::Policy::none())

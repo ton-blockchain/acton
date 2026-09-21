@@ -50,6 +50,7 @@ impl Client {
         }
 
         let http = reqwest::Client::builder()
+            .use_rustls_tls()
             .timeout(Duration::from_secs(30))
             .connect_timeout(Duration::from_secs(2))
             .redirect(reqwest::redirect::Policy::none())

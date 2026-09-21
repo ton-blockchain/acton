@@ -227,6 +227,7 @@ impl Context {
             .observability
             .clone();
         let client = reqwest::Client::builder()
+            .use_rustls_tls()
             .timeout(std::time::Duration::from_secs(3))
             .build()
             .map_err(|e| Error::invalid(e.to_string()))?;

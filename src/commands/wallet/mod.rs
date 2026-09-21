@@ -2448,6 +2448,7 @@ mod wallet_name_tests {
     #[test]
     fn test_send_with_retry_retries_transport_errors() {
         let client = reqwest::blocking::Client::builder()
+            .use_rustls_tls()
             .no_proxy()
             .connect_timeout(Duration::from_millis(50))
             .timeout(Duration::from_millis(100))

@@ -102,6 +102,7 @@ impl Engine {
     pub(crate) fn new(endpoints: crate::Endpoints) -> Result<Self> {
         Ok(Self {
             client: reqwest::Client::builder()
+                .use_rustls_tls()
                 .timeout(Duration::from_secs(60))
                 .connect_timeout(Duration::from_secs(3))
                 .redirect(reqwest::redirect::Policy::none())

@@ -423,6 +423,7 @@ impl DockerNetwork {
         phase(operation, "indexing").await;
         self.start_all().await?;
         let client = reqwest::Client::builder()
+            .use_rustls_tls()
             .timeout(Duration::from_secs(5))
             .build()
             .map_err(failure)?;
@@ -977,7 +978,13 @@ mod tests {
 
             let account_url =
                 format!("http://127.0.0.1:28303/api/v3/accountStates?address={address}");
-            let response: serde_json::Value = reqwest::get(&account_url)
+            let client = reqwest::Client::builder()
+                .use_rustls_tls()
+                .build()
+                .map_err(failure)?;
+            let response: serde_json::Value = client
+                .get(&account_url)
+                .send()
                 .await
                 .map_err(failure)?
                 .json()
@@ -1001,7 +1008,9 @@ mod tests {
             }))
             .unwrap();
             run_edit(&runtime, changed).await?;
-            let updated: serde_json::Value = reqwest::get(&account_url)
+            let updated: serde_json::Value = client
+                .get(&account_url)
+                .send()
                 .await
                 .map_err(failure)?
                 .json()

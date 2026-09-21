@@ -413,6 +413,7 @@ mod tests {
         });
         let client = TonCenterClient {
             client: Client::builder()
+                .use_rustls_tls()
                 .no_proxy()
                 .timeout(Duration::from_secs(5))
                 .build()
