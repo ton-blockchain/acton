@@ -36,8 +36,16 @@ pub(super) fn observe(entry: Arc<Entry>) -> (watch::Receiver<OperationProgress>,
         else {
             return;
         };
-        let ton = format!("{}/getMasterchainInfo", endpoints.api_v2);
-        let indexer = format!("{}/masterchainInfo", endpoints.api_v3);
+        let Ok(toncenter) = toncenter_client::Client::builder()
+            .v2_url(&endpoints.api_v2)
+            .v3_url(&endpoints.api_v3)
+            .user_agent(concat!("acton/", env!("CARGO_PKG_VERSION")))
+            .operation_timeout(Duration::from_millis(750))
+            .max_attempts(1)
+            .build()
+        else {
+            return;
+        };
         let health = format!(
             "{}/healthcheck",
             endpoints.api_v3.trim_end_matches("/api/v3")
@@ -45,8 +53,8 @@ pub(super) fn observe(entry: Arc<Entry>) -> (watch::Receiver<OperationProgress>,
 
         loop {
             let (ton, indexer, api) = tokio::join!(
-                seqno(&client, &ton, "/result/last/seqno"),
-                seqno(&client, &indexer, "/last/seqno"),
+                seqno(&toncenter, true),
+                seqno(&toncenter, false),
                 client.get(&health).send(),
             );
             let nodes_ready = if nodes.is_empty() {
@@ -96,19 +104,20 @@ pub(super) fn observe(entry: Arc<Entry>) -> (watch::Receiver<OperationProgress>,
     (receiver, task)
 }
 
-async fn seqno(client: &reqwest::Client, url: &str, pointer: &str) -> Option<u64> {
-    client
-        .get(url)
-        .send()
-        .await
-        .ok()?
-        .error_for_status()
-        .ok()?
-        .json::<serde_json::Value>()
-        .await
-        .ok()?
-        .pointer(pointer)?
-        .as_u64()
+async fn seqno(client: &toncenter_client::Client, v2: bool) -> Option<u64> {
+    let value: serde_json::Value = if v2 {
+        client
+            .v2_request(
+                toncenter_client::V2Transport::Get,
+                "getMasterchainInfo",
+                &(),
+            )
+            .await
+            .ok()?
+    } else {
+        client.v3_get("masterchainInfo", &()).await.ok()?
+    };
+    value.pointer("/last/seqno")?.as_u64()
 }
 
 /// Container health is insufficient for joined nodes. Require a fresh successful

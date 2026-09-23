@@ -63,6 +63,7 @@ tasm-core = { path = "crates/tasm-core" }
 dap-client = { path = "crates/dap-client" }
 ton-api = { path = "crates/ton-api" }
 toncenter = { path = "crates/toncenter", version = "2.1.15" }
+toncenter-client = { path = "crates/toncenter-client", version = "2.1.15" }
 ton-liteapi = { path = "crates/ton-liteapi" }
 ton-fullnode-master = { path = "crates/ton-fullnode-master" }
 ton-retrace = { path = "crates/ton-retrace" }
@@ -230,6 +231,7 @@ web-time = "1.1.0"
 cc = "1.2"
 
 [dependencies]
+toncenter-client = { workspace = true }
 toncenter = { workspace = true }
 # local crates
 acton-config = { workspace = true }

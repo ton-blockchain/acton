@@ -78,6 +78,7 @@ impl SnapshotStore {
                 network: network.parse()?,
                 fork_block_number,
                 fork_snapshot: None,
+                client: Default::default(),
             }),
             None => StateSource::Local,
         };

@@ -568,10 +568,12 @@ mod tests {
     async fn payment_provider_and_sqlite_details_are_hidden() {
         let secret = "internal-payment-detail";
         let errors = [
-            PaymentError::Provider {
-                status: 500,
-                body: secret.to_owned(),
-            },
+            PaymentError::Provider(
+                toncenter_client::Client::builder()
+                    .v3_url("invalid URL")
+                    .build()
+                    .expect_err("invalid endpoint"),
+            ),
             PaymentError::Sqlite(rusqlite::Error::InvalidQuery),
         ];
 

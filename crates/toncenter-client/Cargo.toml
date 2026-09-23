@@ -1,0 +1,40 @@
+[package]
+name = "toncenter-client"
+version = "2.1.15"
+edition = "2024"
+authors = ["TON Core"]
+license = "MIT"
+description = "Asynchronous TON Center v2 and v3 client with retries and request pacing"
+repository = "https://github.com/ton-blockchain/acton"
+documentation = "https://docs.rs/toncenter-client"
+readme = "README.md"
+keywords = ["ton", "toncenter", "blockchain", "async"]
+categories = ["api-bindings", "cryptography::cryptocurrencies"]
+include = ["src/**", "tests/**", "README.md", "LICENSE-MIT", "Cargo.toml"]
+
+[dependencies]
+toncenter = { path = "../toncenter", version = "2.1.15" }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-native-roots"] }
+tokio = { version = "1.41", features = ["rt", "sync", "time"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.145", features = ["unbounded_depth", "raw_value"] }
+serde_html_form = "0.4.1"
+serde_path_to_error = "0.1"
+serde_stacker = "0.1"
+httpdate = "1.0"
+rand = "0.8"
+tracing = "0.1"
+
+[dev-dependencies]
+expect-test = "1.5"
+tokio = { version = "1.41", features = ["rt-multi-thread", "macros", "net", "io-util", "test-util"] }
+
+[features]
+live-tests = []
+
+[[test]]
+name = "live"
+required-features = ["live-tests"]
+
+[lints]
+workspace = true

@@ -887,87 +887,44 @@ async fn resolve_account_imports(
     Ok(())
 }
 
-#[derive(Deserialize)]
-struct ShardAccountCellResponse {
-    ok: bool,
-    result: Option<ShardAccountCell>,
-    error: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct ShardAccountCell {
-    bytes: String,
-}
-
 async fn fetch_shard_account_boc_hex(
     state: &StudioState,
     source: &StudioEnvironment,
     address: &str,
 ) -> Result<String, StudioApiError> {
-    let mut url = reqwest::Url::parse(&environment_upstream_url(
-        source,
-        "/api/v2/getShardAccountCell",
-    )?)
-    .map_err(|error| {
-        StudioApiError(EnvironmentRuntimeError::Internal {
-            code: "full_ton_import_source_invalid",
-            message: format!("{} has an invalid V2 API endpoint: {error}", source.name),
+    let client = toncenter_client::Client::builder()
+        .v2_url(environment_upstream_url(source, "/api/v2")?)
+        .user_agent(concat!("acton/", env!("CARGO_PKG_VERSION")))
+        .api_key(
+            state
+                .toncenter_api_keys
+                .for_environment(source)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_owned),
+        )
+        .build()
+        .map_err(|error| {
+            StudioApiError(EnvironmentRuntimeError::Internal {
+                code: "full_ton_import_source_invalid",
+                message: format!(
+                    "{} has an invalid V2 API configuration: {error}",
+                    source.name
+                ),
+            })
+        })?;
+    let bytes = client
+        .v2()
+        .get_shard_account_cell(&toncenter::v2::requests::ShardAccountCellRequest {
+            address: address.to_owned(),
+            seqno: None,
         })
-    })?;
-    url.query_pairs_mut().append_pair("address", address);
-    let response = apply_environment_upstream_auth(
-        state.http_client.get(url),
-        source,
-        state.toncenter_api_keys.for_environment(source),
-    )
-    .send()
-    .await
-    .map_err(|error| {
-        StudioApiError(EnvironmentRuntimeError::Conflict {
-            code: "full_ton_import_failed",
-            message: format!("Failed to load {address} from {}: {error}", source.name),
-        })
-    })?;
-    let status = response.status();
-    let body = response.text().await.map_err(|error| {
-        StudioApiError(EnvironmentRuntimeError::Conflict {
-            code: "full_ton_import_failed",
-            message: format!("Failed to read {address} from {}: {error}", source.name),
-        })
-    })?;
-    if !status.is_success() {
-        return Err(StudioApiError(EnvironmentRuntimeError::Conflict {
-            code: "full_ton_import_failed",
-            message: format!(
-                "Failed to load {address} from {}: upstream returned {status}",
-                source.name
-            ),
-        }));
-    }
-
-    let payload = serde_json::from_str::<ShardAccountCellResponse>(&body).map_err(|error| {
-        StudioApiError(EnvironmentRuntimeError::Conflict {
-            code: "full_ton_import_failed",
-            message: format!(
-                "Failed to parse {address} from {} as a shard account: {error}",
-                source.name
-            ),
-        })
-    })?;
-    if !payload.ok {
-        return Err(StudioApiError(EnvironmentRuntimeError::Conflict {
-            code: "full_ton_import_failed",
-            message: payload
-                .error
-                .unwrap_or_else(|| format!("{} could not export account {address}", source.name)),
-        }));
-    }
-    let bytes = payload.result.ok_or_else(|| {
-        StudioApiError(EnvironmentRuntimeError::Conflict {
-            code: "full_ton_import_failed",
-            message: format!("{} returned no state for {address}", source.name),
-        })
-    })?;
+        .await
+        .map_err(|error| {
+            StudioApiError(EnvironmentRuntimeError::Conflict {
+                code: "full_ton_import_failed",
+                message: format!("Failed to load {address} from {}: {error}", source.name),
+            })
+        })?;
     let boc = base64::engine::general_purpose::STANDARD
         .decode(bytes.bytes)
         .map_err(|error| {

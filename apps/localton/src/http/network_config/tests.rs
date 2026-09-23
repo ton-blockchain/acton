@@ -70,7 +70,7 @@ async fn rpc(
         "getMasterchainInfo" => json!({"last": {"seqno": 123}}),
         _ => panic!("Unexpected V2 method {method}"),
     };
-    Json(json!({"ok": true, "result": result}))
+    Json(json!({"ok": true, "@extra": "", "result": result}))
 }
 
 async fn fixture() -> (
@@ -106,7 +106,7 @@ async fn fixture() -> (
     let task = tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();
     });
-    (temp, State::new(layout, endpoint), chain, task)
+    (temp, State::new(layout, endpoint).unwrap(), chain, task)
 }
 
 #[tokio::test]

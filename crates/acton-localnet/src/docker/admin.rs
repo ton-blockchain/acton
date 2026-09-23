@@ -422,18 +422,21 @@ impl DockerNetwork {
 
         phase(operation, "indexing").await;
         self.start_all().await?;
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(5))
+        let client = toncenter_client::Client::builder()
+            .v3_url(format!(
+                "http://127.0.0.1:{}/api/v3",
+                self.compose_config.ports().api_v3
+            ))
+            .user_agent(concat!("acton/", env!("CARGO_PKG_VERSION")))
+            .operation_timeout(Duration::from_secs(5))
+            .max_attempts(1)
             .build()
             .map_err(failure)?;
-        let url = format!(
-            "http://127.0.0.1:{}/api/v3/masterchainInfo",
-            self.compose_config.ports().api_v3
-        );
         let deadline = Instant::now() + ADMIN_TIMEOUT;
         loop {
-            if let Ok(response) = client.get(&url).send().await
-                && let Ok(value) = response.json::<serde_json::Value>().await
+            if let Ok(value) = client
+                .v3_get::<serde_json::Value>("masterchainInfo", &())
+                .await
                 && value
                     .pointer("/last/seqno")
                     .and_then(serde_json::Value::as_u64)

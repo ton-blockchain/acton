@@ -72,7 +72,7 @@ async fn readiness_rejects_future_index_and_stale_or_future_node_heads() -> anyh
                  Path(path): Path<String>| async move {
                     let samples = samples.read().await;
                     Json(if path.ends_with("getMasterchainInfo") {
-                        json!({"result": {"last": {"seqno": 100}}})
+                        json!({"ok": true, "@extra": "", "result": {"last": {"seqno": 100}}})
                     } else if path.ends_with("masterchainInfo") {
                         json!({"last": {"seqno": samples["indexer"]}})
                     } else {

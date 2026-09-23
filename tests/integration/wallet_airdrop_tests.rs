@@ -882,9 +882,9 @@ fn test_wallet_airdrop_localnet_waits_for_top_up_balance() {
     let (port, faucet_handle, captured_requests) = spawn_localnet_faucet_mock(vec![
         FaucetMockResponse {
             method: "GET",
-            path: "/api/v2/getAddressInformation*",
+            path: "/api/v2/getAddressBalance*",
             status: 200,
-            body: r#"{"ok":true,"result":{"balance":"100000000000"}}"#,
+            body: r#"{"ok":true,"@extra":"","result":"100000000000"}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -894,15 +894,15 @@ fn test_wallet_airdrop_localnet_waits_for_top_up_balance() {
         },
         FaucetMockResponse {
             method: "GET",
-            path: "/api/v2/getAddressInformation*",
+            path: "/api/v2/getAddressBalance*",
             status: 200,
-            body: r#"{"ok":true,"result":{"balance":"100000000000"}}"#,
+            body: r#"{"ok":true,"@extra":"","result":"100000000000"}"#,
         },
         FaucetMockResponse {
             method: "GET",
-            path: "/api/v2/getAddressInformation*",
+            path: "/api/v2/getAddressBalance*",
             status: 200,
-            body: r#"{"ok":true,"result":{"balance":"200000000000"}}"#,
+            body: r#"{"ok":true,"@extra":"","result":"200000000000"}"#,
         },
     ]);
     append_localnet_port(project.path(), port);
@@ -974,9 +974,9 @@ fn test_wallet_airdrop_localnet_uses_configured_studio_environment_gateway() {
     let (port, faucet_handle, captured_requests) = spawn_localnet_faucet_mock(vec![
         FaucetMockResponse {
             method: "GET",
-            path: "/api/v1/environments/localnet-1/rpc/api/v2/getAddressInformation*",
+            path: "/api/v1/environments/localnet-1/rpc/api/v2/getAddressBalance*",
             status: 200,
-            body: r#"{"ok":true,"result":{"balance":"0"}}"#,
+            body: r#"{"ok":true,"@extra":"","result":"0"}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -986,9 +986,9 @@ fn test_wallet_airdrop_localnet_uses_configured_studio_environment_gateway() {
         },
         FaucetMockResponse {
             method: "GET",
-            path: "/api/v1/environments/localnet-1/rpc/api/v2/getAddressInformation*",
+            path: "/api/v1/environments/localnet-1/rpc/api/v2/getAddressBalance*",
             status: 200,
-            body: r#"{"ok":true,"result":{"balance":"100000000000"}}"#,
+            body: r#"{"ok":true,"@extra":"","result":"100000000000"}"#,
         },
     ]);
     append_localnet_api_v2(
@@ -1085,9 +1085,9 @@ fn test_wallet_airdrop_localnet_http_error_preserves_response_body() {
     let (port, faucet_handle, _) = spawn_localnet_faucet_mock(vec![
         FaucetMockResponse {
             method: "GET",
-            path: "/api/v2/getAddressInformation*",
+            path: "/api/v2/getAddressBalance*",
             status: 200,
-            body: r#"{"ok":true,"result":{"balance":"0"}}"#,
+            body: r#"{"ok":true,"@extra":"","result":"0"}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -1135,9 +1135,9 @@ fn test_wallet_airdrop_localnet_invalid_json_response_reports_parse_error() {
     let (port, faucet_handle, _) = spawn_localnet_faucet_mock(vec![
         FaucetMockResponse {
             method: "GET",
-            path: "/api/v2/getAddressInformation*",
+            path: "/api/v2/getAddressBalance*",
             status: 200,
-            body: r#"{"ok":true,"result":{"balance":"0"}}"#,
+            body: r#"{"ok":true,"@extra":"","result":"0"}"#,
         },
         FaucetMockResponse {
             method: "POST",

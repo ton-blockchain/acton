@@ -28,9 +28,30 @@ pub struct RemoteProvider {
     pub fork_block_number: Option<u64>,
     #[serde(skip)]
     pub(crate) fork_snapshot: Option<MasterchainSnapshot>,
+    #[serde(skip)]
+    pub(crate) client: Arc<OnceLock<toncenter_client::Client>>,
 }
 
 impl RemoteProvider {
+    fn api(&self) -> anyhow::Result<&toncenter_client::Client> {
+        if self.client.get().is_none() {
+            let config = config::ActonConfig::load().unwrap_or_default();
+            let networks = config.custom_networks();
+            let proxy = std::env::var("ACTON_USE_PROXY")
+                .is_ok_and(|value| matches!(value.trim(), "1" | "true"));
+            let mut builder = toncenter_client::Client::builder()
+                .v2_url(self.network.toncenter_v2_url(&networks)?)
+                .api_key(toncenter_keys::api_key(&self.network))
+                .user_agent(concat!("acton/", env!("CARGO_PKG_VERSION")))
+                .system_proxy(proxy);
+            if let Ok(url) = self.network.toncenter_v3_url(&networks) {
+                builder = builder.v3_url(url);
+            }
+            let _ = self.client.set(builder.build()?);
+        }
+        Ok(self.client.get().expect("remote client initialized"))
+    }
+
     pub async fn pinned(network: Network, fork_block_number: Option<u64>) -> anyhow::Result<Self> {
         let request_network = network.clone();
         let fork_snapshot = tokio::task::spawn_blocking(move || {
@@ -46,6 +67,7 @@ impl RemoteProvider {
             network,
             fork_block_number: Some(fork_snapshot.seqno),
             fork_snapshot: Some(fork_snapshot),
+            client: Arc::default(),
         })
     }
 
@@ -240,100 +262,83 @@ fn with_api_client<T: Send>(
     provider: &RemoteProvider,
     request: impl FnOnce(&TonApiClient) -> anyhow::Result<T> + Send,
 ) -> anyhow::Result<T> {
-    let network = provider.network.clone();
-    std::thread::scope(|scope| {
-        scope
-            .spawn(move || request_with_api_client(network, request))
-            .join()
-            .map_err(|_| anyhow::anyhow!("Remote provider worker panicked"))?
-    })
-}
-
-async fn with_api_client_async<T: Send + 'static>(
-    provider: &RemoteProvider,
-    request: impl FnOnce(&TonApiClient) -> anyhow::Result<T> + Send + 'static,
-) -> anyhow::Result<T> {
-    let network = provider.network.clone();
-    tokio::task::spawn_blocking(move || request_with_api_client(network, request))
-        .await
-        .context("Remote provider worker failed")?
+    request_with_api_client(provider.network.clone(), request)
 }
 
 pub(crate) async fn fetch_remote_blocks_v3(
     provider: &RemoteProvider,
     raw_query: String,
 ) -> anyhow::Result<v3::BlocksResponse> {
-    with_api_client_async(provider, move |api_client| {
-        api_client.get_blocks_v3(&raw_query)
-    })
-    .await
+    let mut url = reqwest::Url::parse("http://localhost")?;
+    url.set_query(Some(&raw_query));
+    let query: Vec<_> = url.query_pairs().into_owned().collect();
+    Ok(provider.api()?.v3_get("blocks", &query).await?)
 }
 
 pub(crate) async fn fetch_remote_transactions_v3(
     provider: &RemoteProvider,
     raw_query: String,
 ) -> anyhow::Result<v3::TransactionsResponse> {
-    with_api_client_async(provider, move |api_client| {
-        api_client.get_transactions_v3(&raw_query)
-    })
-    .await
+    let mut url = reqwest::Url::parse("http://localhost")?;
+    url.set_query(Some(&raw_query));
+    let query: Vec<_> = url.query_pairs().into_owned().collect();
+    Ok(provider.api()?.v3_get("transactions", &query).await?)
 }
 
 pub(crate) async fn fetch_remote_shards_v2(
     provider: &RemoteProvider,
     seqno: u32,
 ) -> anyhow::Result<v2::responses::Shards> {
-    with_api_client_async(provider, move |api_client| api_client.get_shards(seqno)).await
+    Ok(provider
+        .api()?
+        .v2()
+        .get_shards(&v2::requests::ShardsRequest {
+            seqno: i32::try_from(seqno)?.into(),
+        })
+        .await?)
 }
 
 pub(crate) async fn fetch_remote_block_header_v2(
     provider: &RemoteProvider,
     request: v2::requests::BlockHeaderRequest,
 ) -> anyhow::Result<v2::responses::BlockHeader> {
-    with_api_client_async(provider, move |api_client| {
-        api_client.get_block_header_v2(&request)
-    })
-    .await
+    Ok(provider.api()?.v2().get_block_header(&request).await?)
 }
 
 pub(crate) async fn fetch_remote_block_v2(
     provider: &RemoteProvider,
     request: v2::requests::BlockDataRequest,
 ) -> anyhow::Result<v2::responses::BlockData> {
-    with_api_client_async(provider, move |api_client| {
-        api_client.get_block_v2(&request)
-    })
-    .await
+    Ok(provider.api()?.v2().get_block(&request).await?)
 }
 
 pub(crate) async fn fetch_remote_block_transactions_v2(
     provider: &RemoteProvider,
     request: v2::requests::BlockTransactionsRequest,
 ) -> anyhow::Result<v2::responses::BlockTransactions> {
-    with_api_client_async(provider, move |api_client| {
-        api_client.get_block_transactions_v2(&request)
-    })
-    .await
+    Ok(provider
+        .api()?
+        .v2()
+        .get_block_transactions(&request)
+        .await?)
 }
 
 pub(crate) async fn fetch_remote_block_transactions_ext_v2(
     provider: &RemoteProvider,
     request: v2::requests::BlockTransactionsRequest,
 ) -> anyhow::Result<v2::responses::BlockTransactionsExt> {
-    with_api_client_async(provider, move |api_client| {
-        api_client.get_block_transactions_ext_v2(&request)
-    })
-    .await
+    Ok(provider
+        .api()?
+        .v2()
+        .get_block_transactions_ext(&request)
+        .await?)
 }
 
 pub(crate) async fn fetch_remote_lookup_block_v2(
     provider: &RemoteProvider,
     request: v2::requests::LookupBlockRequest,
 ) -> anyhow::Result<v2::responses::TonBlockIdExt> {
-    with_api_client_async(provider, move |api_client| {
-        api_client.lookup_block_v2(&request)
-    })
-    .await
+    Ok(provider.api()?.v2().lookup_block(&request).await?)
 }
 
 pub fn fetch_remote_library(hash: &Hash256, provider: &RemoteProvider) -> anyhow::Result<Cell> {
@@ -434,6 +439,7 @@ mod tests {
             network: Network::Mainnet,
             fork_block_number: Some(81_000_000),
             fork_snapshot: None,
+            client: Default::default(),
         };
 
         with_api_client(&provider, |_| Ok(())).unwrap();

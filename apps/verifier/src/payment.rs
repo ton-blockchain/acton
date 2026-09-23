@@ -17,14 +17,13 @@ use thiserror::Error;
 use tycho_types::{boc::Boc, cell::CellSlice};
 
 use crate::{
-    blockchain::{ToncenterClient, is_valid_code_hash, is_valid_hash, normalize_hash},
+    blockchain::{client_for_network, is_valid_code_hash, is_valid_hash, normalize_hash},
     config::{Config, TonNetwork},
 };
 
 pub const PAYMENT_COMMENT_PREFIX: &str = "acton-verify:v1:";
 const HISTORY_PAGE_SIZE: usize = 1_000;
 const PROCESSING_LEASE: Duration = Duration::from_mins(5);
-const PROVIDER_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_PAYMENT_ATTEMPTS: u64 = 3;
 
 #[derive(Clone, Debug, Serialize)]
@@ -164,7 +163,7 @@ impl OnchainPaymentVerifier {
             ))?;
 
         Ok(Self::new(
-            Arc::new(ToncenterClient::for_network(config, network)),
+            Arc::new(client_for_network(config, network)?),
             PaymentLedger::open(config.payment_ledger_path())?,
             payment_address.to_owned(),
             min_amount_nano,
@@ -758,28 +757,18 @@ fn u64_to_i64(field: &'static str, value: u64) -> Result<i64, PaymentError> {
 }
 
 #[async_trait]
-impl PaymentBlockchainClient for ToncenterClient {
+impl PaymentBlockchainClient for toncenter_client::Client {
     async fn transaction_by_hash(
         &self,
         transaction_hash: &str,
     ) -> Result<Option<PaymentTransaction>, PaymentError> {
-        let response = self
-            .toncenter_request("/api/v3/transactions")
-            .query(&[("hash", transaction_hash), ("limit", "2")])
-            .timeout(PROVIDER_REQUEST_TIMEOUT)
-            .send()
-            .await
-            .map_err(PaymentError::Transport)?;
-        let status = response.status();
-        let body = response.text().await.map_err(PaymentError::Transport)?;
-        if !status.is_success() {
-            return Err(PaymentError::Provider {
-                status: status.as_u16(),
-                body,
-            });
-        }
-        let mut transactions = serde_json::from_str::<TransactionsResponse>(&body)
-            .map_err(PaymentError::MalformedProviderResponse)?
+        let response: TransactionsResponse = self
+            .v3_get(
+                "transactions",
+                &[("hash", transaction_hash), ("limit", "2")],
+            )
+            .await?;
+        let mut transactions = response
             .transactions
             .into_iter()
             .map(PaymentTransaction::try_from)
@@ -797,28 +786,18 @@ impl PaymentBlockchainClient for ToncenterClient {
         offset: usize,
         sort: HistorySort,
     ) -> Result<Vec<PaymentTransaction>, PaymentError> {
-        let response = self
-            .toncenter_request("/api/v3/transactions")
-            .query(&[
-                ("account", account.to_owned()),
-                ("limit", limit.to_string()),
-                ("offset", offset.to_string()),
-                ("sort", sort.as_str().to_owned()),
-            ])
-            .timeout(PROVIDER_REQUEST_TIMEOUT)
-            .send()
-            .await
-            .map_err(PaymentError::Transport)?;
-        let status = response.status();
-        let body = response.text().await.map_err(PaymentError::Transport)?;
-        if !status.is_success() {
-            return Err(PaymentError::Provider {
-                status: status.as_u16(),
-                body,
-            });
-        }
-        serde_json::from_str::<TransactionsResponse>(&body)
-            .map_err(PaymentError::MalformedProviderResponse)?
+        let response: TransactionsResponse = self
+            .v3_get(
+                "transactions",
+                &[
+                    ("account", account.to_owned()),
+                    ("limit", limit.to_string()),
+                    ("offset", offset.to_string()),
+                    ("sort", sort.as_str().to_owned()),
+                ],
+            )
+            .await?;
+        response
             .transactions
             .into_iter()
             .map(PaymentTransaction::try_from)
@@ -995,12 +974,8 @@ pub enum PaymentError {
     AlreadyUsed,
     #[error("payment_in_progress: transaction is already being processed")]
     InProgress,
-    #[error("payment provider transport error: {0}")]
-    Transport(reqwest::Error),
-    #[error("payment provider API error: status={status}, body={body}")]
-    Provider { status: u16, body: String },
-    #[error("payment provider returned malformed JSON: {0}")]
-    MalformedProviderResponse(serde_json::Error),
+    #[error(transparent)]
+    Provider(#[from] toncenter_client::Error),
     #[error("payment provider returned more than one transaction for a transaction hash")]
     AmbiguousTransactionHash,
     #[error("payment provider returned invalid logical time: {0}")]

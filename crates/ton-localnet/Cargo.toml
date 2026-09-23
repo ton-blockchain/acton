@@ -12,6 +12,8 @@ license = { workspace = true }
 
 [dependencies]
 toncenter = { workspace = true }
+toncenter-client = { workspace = true }
+toncenter-keys = { workspace = true }
 acton-source-trace = { workspace = true }
 ton-executor = { workspace = true }
 ton-emulator = { workspace = true }

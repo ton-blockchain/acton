@@ -61,6 +61,7 @@ cognitive_complexity = "allow"
 too_many_lines = "allow"
 
 [dependencies]
+toncenter-client = { path = "../../crates/toncenter-client" }
 async-trait = "0.1"
 axum = { version = "0.8", features = ["multipart"] }
 base64 = "0.22"

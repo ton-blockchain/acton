@@ -33,41 +33,29 @@ mod tests;
 #[derive(Clone)]
 pub(super) struct State {
     layout: Layout,
-    backend: String,
-    client: reqwest::Client,
+    client: toncenter_client::Client,
     lock: Arc<Mutex<()>>,
 }
 
 impl State {
-    pub(super) fn new(layout: Layout, backend: String) -> Self {
-        Self {
+    pub(super) fn new(layout: Layout, backend: String) -> Result<Self> {
+        Ok(Self {
             layout,
-            backend,
-            client: reqwest::Client::new(),
+            client: toncenter_client::Client::builder()
+                .v2_url(format!("{}/api/v2", backend.trim_end_matches('/')))
+                .user_agent(concat!("localton/", env!("CARGO_PKG_VERSION")))
+                .request_timeout(Duration::from_secs(10))
+                .operation_timeout(Duration::from_secs(10))
+                .build()?,
             lock: Arc::new(Mutex::new(())),
-        }
+        })
     }
 
     async fn query(&self, method: &str, payload: Value) -> Result<Value> {
-        let response: Value = self
+        Ok(self
             .client
-            .post(format!("{}/api/v2/{method}", self.backend))
-            .json(&payload)
-            .timeout(Duration::from_secs(10))
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
-        ensure!(
-            response["ok"] == true,
-            "{method} failed: {}",
-            response["error"]
-        );
-        response
-            .get("result")
-            .cloned()
-            .context("V2 response has no result")
+            .v2_request(toncenter_client::V2Transport::Post, method, &payload)
+            .await?)
     }
 
     async fn config(&self) -> Result<Dict<u32, Cell>> {

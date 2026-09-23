@@ -12,7 +12,7 @@ use serde::de::DeserializeOwned;
 use tower::ServiceExt;
 use verifier::{
     app,
-    blockchain::ToncenterClient,
+    blockchain::client,
     compilers::{CompileGeneratedSource, CompileRequest, NodeCompilerService},
     config::Config,
     payment::{
@@ -153,7 +153,7 @@ pub fn toncenter_app_state(base_url: &str, compiled_code_hash: &str) -> AppState
     let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
     let source_storage = Arc::new(mock_source_storage::MockSourceStorage::confirmed());
     app_state_from_parts(
-        Arc::new(ToncenterClient::new(base_url.to_owned(), None)),
+        Arc::new(client(base_url, None).expect("TON Center client")),
         Arc::new(compiler_service),
         source_storage,
     )
@@ -166,7 +166,7 @@ pub fn toncenter_app_state_with_source_storage(
 ) -> AppState {
     let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
     app_state_from_parts(
-        Arc::new(ToncenterClient::new(base_url.to_owned(), None)),
+        Arc::new(client(base_url, None).expect("TON Center client")),
         Arc::new(compiler_service),
         source_storage,
     )

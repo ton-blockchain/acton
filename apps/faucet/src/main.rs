@@ -27,7 +27,14 @@ use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton::ton_core::types::TonAddress;
 use ton::ton_core::types::tlb_core::TLBCoins;
-use toncenter::ToncenterClient;
+use toncenter_client::{
+    Client, V2Transport,
+    toncenter::v2::{
+        Int64Input,
+        requests::{RunGetMethodRequest, SendBocRequest},
+        stack::LegacyStackEntry,
+    },
+};
 use tower::ServiceBuilder;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -138,9 +145,7 @@ async fn main() -> anyhow::Result<()> {
         "Created faucet wallet"
     );
 
-    let client = Arc::new(
-        ToncenterClient::new(&config.toncenter).context("Failed to create Toncenter client")?,
-    );
+    let client = toncenter_client(&config.toncenter)?;
     info!("Created Toncenter client");
     let valkey = ValkeyStore::new(&config.valkey)
         .await
@@ -304,7 +309,7 @@ pub(crate) struct AppState {
     pub(crate) storage: SqliteStorage<CreateClaim, JsonCodec<CompactType>, HookCallbackListener>,
     pub(crate) database: SqlitePool,
     wallet: Arc<Wallet>,
-    client: Arc<ToncenterClient>,
+    client: Client,
     pub(crate) pow: Pow,
     pub(crate) valkey: ValkeyStore,
     pub(crate) antifraud: Antifraud,
@@ -333,7 +338,7 @@ impl AppState {
 )]
 async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<()> {
     let wallet = state.wallet.as_ref();
-    let client = state.client.as_ref();
+    let client = &state.client;
     let amount = state.config.faucet.amount;
 
     info!("Processing claim for address: {}", task.address);
@@ -809,6 +814,25 @@ async fn wait_for_sent_amount_window(
     }
 }
 
+fn user_agent() -> String {
+    let git_hash = option_env!("GIT_HASH").unwrap_or("unknown");
+    format!("faucet/{} ({git_hash})", env!("CARGO_PKG_VERSION"))
+}
+
+fn toncenter_client(config: &faucet_config::ToncenterConfig) -> anyhow::Result<Client> {
+    let retry_delay = StdDuration::from_millis(config.retry_base_delay_ms);
+    Client::builder()
+        .v2_url(format!("{}/api/v2", config.url.trim_end_matches('/')))
+        .user_agent(user_agent())
+        .request_timeout(StdDuration::from_secs(config.timeout_seconds))
+        .connect_timeout(StdDuration::from_secs(config.connect_timeout_seconds))
+        .max_attempts(config.max_retries.saturating_add(1))
+        .retry_delays(retry_delay, retry_delay.saturating_mul(256))
+        .api_key(config.api_key.clone())
+        .build()
+        .context("Failed to create Toncenter client")
+}
+
 fn exponential_backoff(base_delay_ms: u64, attempt: u32) -> StdDuration {
     let multiplier = 1u64 << attempt.min(8);
     StdDuration::from_millis(base_delay_ms.saturating_mul(multiplier))
@@ -816,7 +840,7 @@ fn exponential_backoff(base_delay_ms: u64, attempt: u32) -> StdDuration {
 
 async fn process_send_tokens(
     wallet: &Wallet,
-    client: &ToncenterClient,
+    client: &Client,
     dest: &str,
     amount: u64,
     message: &str,
@@ -825,7 +849,34 @@ async fn process_send_tokens(
 
     let message_cell = build_message(wallet, amount, dest, message)?;
 
-    let seqno = client.get_wallet_seqno(&wallet.get_address()).await?;
+    let result = client
+        .v2()
+        .transport(V2Transport::JsonRpc)
+        .run_get_method(&RunGetMethodRequest {
+            address: wallet.get_address(),
+            method: "seqno".into(),
+            stack: Vec::new(),
+            seqno: None,
+        })
+        .await?;
+
+    let seqno = result.stack.into_iter().find_map(|entry| {
+        if let LegacyStackEntry::Number((_, value)) = entry {
+            Some(value)
+        } else {
+            None
+        }
+    });
+
+    let seqno = match seqno {
+        Some(Int64Input::Number(value)) => u32::try_from(value).context("Invalid wallet seqno")?,
+        Some(Int64Input::String(value)) => match value.strip_prefix("0x") {
+            Some(hex) => u32::from_str_radix(hex, 16),
+            None => value.parse(),
+        }
+        .context("Invalid wallet seqno")?,
+        None => 0,
+    };
 
     let expire_at = (std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
@@ -836,7 +887,13 @@ async fn process_send_tokens(
         .wallet
         .create_ext_in_msg(vec![message_cell], seqno, expire_at, false)?;
 
-    client.send_boc(&external.to_boc_base64()?).await?;
+    client
+        .v2()
+        .transport(V2Transport::JsonRpc)
+        .send_boc(&SendBocRequest {
+            boc: external.to_boc_base64()?,
+        })
+        .await?;
 
     Ok(())
 }

@@ -12,7 +12,6 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail, ensure};
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tokio::{
     process::Command,
@@ -204,27 +203,24 @@ pub async fn start(
 }
 
 async fn wait_ready(port: u16, timeout: Duration, processes: &ProcessRegistry) -> Result<()> {
-    let url = format!("http://127.0.0.1:{port}/api/v2/getMasterchainInfo");
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(2))
-        .build()
-        .context("failed to build TON HTTP API V2 readiness client")?;
+    let url = format!("http://127.0.0.1:{port}/api/v2");
+    let client = toncenter_client::Client::builder()
+        .v2_url(&url)
+        .user_agent(concat!("localton/", env!("CARGO_PKG_VERSION")))
+        .request_timeout(Duration::from_secs(2))
+        .operation_timeout(Duration::from_secs(2))
+        .max_attempts(1)
+        .build()?;
     let deadline = Instant::now() + timeout;
 
     loop {
         processes.ensure_alive().await?;
-        let last_error = match client.get(&url).send().await {
-            Ok(response) if response.status().is_success() => match response.bytes().await {
-                Ok(body) => match serde_json::from_slice::<Value>(&body) {
-                    Ok(value) if value.get("ok").and_then(Value::as_bool) == Some(true) => {
-                        return Ok(());
-                    }
-                    Ok(value) => format!("API is not ready: {value}"),
-                    Err(error) => format!("invalid readiness response: {error}"),
-                },
-                Err(error) => format!("failed to read readiness response: {error}"),
-            },
-            Ok(response) => format!("readiness returned HTTP {}", response.status()),
+        let last_error = match client
+            .v2()
+            .get_masterchain_info(&toncenter::v2::requests::EmptyRequest {})
+            .await
+        {
+            Ok(_) => return Ok(()),
             Err(error) => error.to_string(),
         };
         if Instant::now() >= deadline {

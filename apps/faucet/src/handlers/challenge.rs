@@ -1,3 +1,8 @@
+use crate::AppState;
+use crate::address::{AddressValidationError, parse_testnet_address};
+use crate::antifraud_subject;
+use crate::github_auth::FaucetTier;
+use crate::handlers::auth;
 use axum::{
     Extension, Json,
     extract::State,
@@ -8,14 +13,9 @@ use faucet_valkey::{AntifraudModule, CappedEphemeralStoreDecision};
 use real::RealIp;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use toncenter_client::toncenter::v2;
 use tracing::{error, info, warn};
 use utoipa::ToSchema;
-
-use crate::AppState;
-use crate::address::{AddressValidationError, parse_testnet_address};
-use crate::antifraud_subject;
-use crate::github_auth::FaucetTier;
-use crate::handlers::auth;
 
 // The shared hash tag keeps the index and challenge values in one Redis Cluster slot.
 const POW_CHALLENGE_KEY_PREFIX: &str = "faucet:pow:{challenges}:challenge";
@@ -137,16 +137,25 @@ pub(super) async fn create_challenge(
     let max_requests = auth::effective_max_requests(&state, identity.as_ref());
 
     if state.antifraud.wallet_balance_enabled() {
-        let balance = state
-            .client
-            .get_address_balance(&address)
-            .await
-            .map_err(|_| {
-                response_error(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "Failed to check wallet balance",
-                )
-            })?;
+        let balance = async {
+            let balance = state
+                .client
+                .v2()
+                .transport(toncenter_client::V2Transport::JsonRpc)
+                .get_address_balance(&v2::requests::AddressBalanceRequest {
+                    address: address.clone(),
+                    seqno: None,
+                })
+                .await?;
+            Ok::<u64, anyhow::Error>(balance.parse()?)
+        }
+        .await
+        .map_err(|_| {
+            response_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Failed to check wallet balance",
+            )
+        })?;
 
         if let Err(err) = state.antifraud.check_wallet_balance(balance) {
             warn!(

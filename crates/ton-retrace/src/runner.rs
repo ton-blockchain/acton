@@ -3,7 +3,6 @@ use crate::methods::{
     compute_final_data, find_all_transactions_between, find_shard_block_for_tx, get_block_account,
     get_block_config, tx_opcode,
 };
-use crate::remote::TonCenterClient;
 use crate::types::{BaseTxInfo, TraceEmulatedTx, TraceInMessage, TraceResult};
 use crate::{ComputeInfo, find_base_tx_by_hash, methods};
 use anyhow::Context;
@@ -19,6 +18,7 @@ use ton_executor::{ExecutorVerbosity, MissingLibrariesContext, missing_library_c
 use ton_networks::CustomNetworkUrls;
 pub use ton_networks::Network;
 use toncenter::v3;
+use toncenter_client::Client;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::models::{AccountState, ShardAccount, TickTock, Transaction, TxInfo};
@@ -83,7 +83,7 @@ pub async fn retrace(
     custom_networks: &HashMap<String, CustomNetworkUrls>,
 ) -> anyhow::Result<TraceResult> {
     let base_tx = find_base_tx_by_hash(net.clone(), link, custom_networks).await?;
-    let client = TonCenterClient::new(net.clone(), custom_networks)?;
+    let client = crate::remote::client(net.clone(), custom_networks)?;
 
     for _ in 0..5 {
         let result = retrace_base_tx(
@@ -114,7 +114,7 @@ pub async fn retrace(
 }
 
 async fn load_missing_libraries(
-    client: &TonCenterClient,
+    client: &Client,
     missing_libraries: &[String],
     additional_libs: &mut HashMap<HashBytes, Cell>,
 ) -> anyhow::Result<bool> {
@@ -168,7 +168,7 @@ pub async fn retrace_base_tx(
     additional_libs: HashMap<HashBytes, Cell>,
     custom_networks: &HashMap<String, CustomNetworkUrls>,
 ) -> anyhow::Result<TraceResult> {
-    let client = TonCenterClient::new(net, custom_networks)?;
+    let client = crate::remote::client(net, custom_networks)?;
     let block = find_shard_block_for_tx(&client, &base_tx).await?;
 
     // master‑block sequence number that references our shard‑block
@@ -255,9 +255,12 @@ pub async fn retrace_base_tx(
                                 .is_some_and(|info| info.last_mc_blocks_100.is_none())))
                 {
                     context.prev_blocks_info = Some(
-                        client
-                            .get_prev_blocks_info(context.masterchain_ref_seqno()?, with_100)
-                            .await?,
+                        crate::remote::get_prev_blocks_info(
+                            &client,
+                            context.masterchain_ref_seqno()?,
+                            with_100,
+                        )
+                        .await?,
                     );
                 }
             }
@@ -404,7 +407,7 @@ impl ReplayBlockContext {
 /// Resolves block ownership once, using hashes from the already validated history.
 /// Contexts are shared for transactions in the same block and retained for a retry.
 async fn load_previous_block_contexts(
-    client: &TonCenterClient,
+    client: &Client,
     previous: &[Transaction],
     target: &Transaction,
     base_tx: &BaseTxInfo,
@@ -417,7 +420,10 @@ async fn load_previous_block_contexts(
     {
         let hash = general_purpose::STANDARD.encode(next.prev_trans_hash.as_slice());
         let response = client
-            .get_transactions(&[("hash", hash.clone()), ("limit", "1".to_owned())])
+            .v3_get::<v3::TransactionsResponse>(
+                "transactions",
+                &[("hash", hash.clone()), ("limit", "1".to_owned())],
+            )
             .await
             .with_context(|| {
                 format!(

@@ -37,6 +37,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json"] }
 
 [dependencies]
+toncenter-client = { path = "../../crates/toncenter-client" }
 anyhow = { workspace = true }
 apalis = "1.0.0-beta.2"
 apalis-sqlite = "1.0.0-beta.4"
@@ -61,7 +62,6 @@ sha2 = { workspace = true }
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
 ton = "0.1.4"
-toncenter = { path = "crates/toncenter" }
 tower = "0.5"
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

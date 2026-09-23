@@ -34,6 +34,7 @@ use contracts::GRAM;
 /// Shares network connections while each worker owns its signing material.
 pub(crate) struct Engine {
     client: reqwest::Client,
+    toncenter: toncenter_client::Client,
     endpoints: crate::Endpoints,
 }
 
@@ -101,6 +102,12 @@ impl Engine {
     /// to a single funding group or scenario, so seqnos cannot race.
     pub(crate) fn new(endpoints: crate::Endpoints) -> Result<Self> {
         Ok(Self {
+            toncenter: toncenter_client::Client::builder()
+                .v2_url(&endpoints.api_v2)
+                .user_agent(concat!("acton/", env!("CARGO_PKG_VERSION")))
+                .request_timeout(Duration::from_secs(60))
+                .connect_timeout(Duration::from_secs(3))
+                .build()?,
             client: reqwest::Client::builder()
                 .timeout(Duration::from_secs(60))
                 .connect_timeout(Duration::from_secs(3))
@@ -314,13 +321,14 @@ impl Engine {
     }
 
     async fn get(&self, method: &str, address: &StdAddr) -> Result<Value> {
-        let response = self
-            .client
-            .get(format!("{}/{method}", self.endpoints.api_v2))
-            .query(&[("address", address.to_string()), ("limit", "32".to_owned())])
-            .send()
-            .await?;
-        Self::response(response).await
+        Ok(self
+            .toncenter
+            .v2_request(
+                toncenter_client::V2Transport::Get,
+                method,
+                &[("address", address.to_string()), ("limit", "32".to_owned())],
+            )
+            .await?)
     }
 
     async fn response(response: reqwest::Response) -> Result<Value> {
@@ -342,9 +350,11 @@ impl Engine {
 
     async fn getter(&self, address: &StdAddr, method: &str, stack: Value) -> Result<Value> {
         let result = self
-            .post(
-                &format!("{}/runGetMethod", self.endpoints.api_v2),
-                json!({"address": address.to_string(), "method": method, "stack": stack}),
+            .toncenter
+            .v2_request::<Value>(
+                toncenter_client::V2Transport::Post,
+                "runGetMethod",
+                &json!({"address": address.to_string(), "method": method, "stack": stack}),
             )
             .await?;
         ensure!(
@@ -490,14 +500,13 @@ impl Engine {
             )?
             .to_boc()?;
         let result = self
-            .post(
-                &format!("{}/sendBocReturnHash", self.endpoints.api_v2),
-                json!({"boc": STANDARD.encode(boc)}),
-            )
+            .toncenter
+            .v2()
+            .send_boc_return_hash(&toncenter_client::toncenter::v2::requests::SendBocRequest {
+                boc: STANDARD.encode(boc),
+            })
             .await?;
-        let hash = result["hash"]
-            .as_str()
-            .context("Submission returned no message hash")?;
+        let hash = result.hash.as_str();
         let transaction = self.confirm(&sender.address, hash, true).await?;
         sender.seqno += 1;
 

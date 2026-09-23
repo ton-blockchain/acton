@@ -1,5 +1,4 @@
 use crate::Network;
-use crate::remote::TonCenterClient;
 use crate::types::{BaseTxInfo, ComputeInfo, TraceMoneyResult};
 use anyhow::Context;
 use base64::Engine;
@@ -8,7 +7,9 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use ton_executor::message::RunTransactionResultSuccess;
 use ton_networks::CustomNetworkUrls;
-use toncenter::v3;
+use toncenter::{v2, v3};
+use toncenter_client::Client;
+use toncenter_client::V2Transport;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Lazy;
 use tycho_types::dict::Dict;
@@ -38,10 +39,13 @@ pub async fn find_base_tx_by_hash(
     hash: &str,
     custom_networks: &HashMap<String, CustomNetworkUrls>,
 ) -> anyhow::Result<BaseTxInfo> {
-    let client = TonCenterClient::new(net.clone(), custom_networks)?;
+    let client = crate::remote::client(net.clone(), custom_networks)?;
 
     let resp = client
-        .get_transactions(&[("hash", hash.to_owned()), ("limit", "1".to_owned())])
+        .v3_get::<v3::TransactionsResponse>(
+            "transactions",
+            &[("hash", hash.to_owned()), ("limit", "1".to_owned())],
+        )
         .await?;
 
     let Some(raw_tx) = resp.transactions.first() else {
@@ -71,11 +75,18 @@ pub async fn find_base_tx_by_hash(
 /// The header supplies the random seed and the masterchain reference used to
 /// retrieve the configuration and the account state before replay.
 pub(crate) async fn find_shard_block_for_tx(
-    client: &TonCenterClient,
+    client: &Client,
     tx: &BaseTxInfo,
 ) -> anyhow::Result<v3::Block> {
     client
-        .get_blocks(&tx.block)
+        .v3_get::<v3::BlocksResponse>(
+            "blocks",
+            &[
+                ("workchain", tx.block.workchain.to_string()),
+                ("shard", tx.block.shard.clone()),
+                ("seqno", tx.block.seqno.to_string()),
+            ],
+        )
         .await?
         .blocks
         .into_iter()
@@ -96,12 +107,15 @@ pub(crate) async fn find_shard_block_for_tx(
 /// # Returns
 ///
 /// Returns the config cell as a base64-encoded `BoC`.
-pub(crate) async fn get_block_config(
-    client: &TonCenterClient,
-    seqno: u32,
-) -> anyhow::Result<String> {
-    let config = client.get_config_all(seqno).await?;
-    Ok(Boc::encode_base64(config))
+pub(crate) async fn get_block_config(client: &Client, seqno: u32) -> anyhow::Result<String> {
+    let config: v2::responses::ConfigInfo = client
+        .v2_request(
+            V2Transport::Get,
+            "getConfigAll",
+            &[("seqno", seqno.to_string())],
+        )
+        .await?;
+    Ok(config.config.bytes)
 }
 
 /// Retrieves all transactions of an account within a logical-time interval.
@@ -120,15 +134,26 @@ pub(crate) async fn get_block_config(
 ///
 /// Returns transactions ordered from **newest to oldest**.
 pub(crate) async fn find_all_transactions_between(
-    client: &TonCenterClient,
+    client: &Client,
     base_tx: &BaseTxInfo,
     after_lt: u64,
 ) -> anyhow::Result<Vec<tycho_types::models::Transaction>> {
     let address = base_tx.address.display_base64_url(false).to_string();
     let hash_base64 = general_purpose::STANDARD.encode(base_tx.hash);
 
-    let raw_txs = client
-        .get_account_transactions(&address, base_tx.lt, &hash_base64, after_lt, 1000)
+    let raw_txs: Vec<v2::responses::Transaction> = client
+        .v2_request(
+            V2Transport::Get,
+            "getTransactions",
+            &[
+                ("address", address),
+                ("lt", base_tx.lt.to_string()),
+                ("hash", hash_base64),
+                ("to_lt", after_lt.to_string()),
+                ("limit", "1000".to_owned()),
+                ("archival", "true".to_owned()),
+            ],
+        )
         .await?;
 
     let mut txs = Vec::with_capacity(raw_txs.len());
@@ -196,7 +221,7 @@ pub(crate) async fn find_all_transactions_between(
 ///
 /// Returns [`ShardAccount`] at N-1, or at block 1 for the first-block approximation.
 pub(crate) async fn get_block_account(
-    client: &TonCenterClient,
+    client: &Client,
     address: &StdAddr,
     mc_seqno: u32,
 ) -> anyhow::Result<ShardAccount> {
@@ -208,9 +233,18 @@ pub(crate) async fn get_block_account(
         .max(1);
     let address_str = address.to_string();
 
-    let shard_account_cell = client
-        .get_shard_account_cell(state_block_seqno, &address_str)
+    let cell: v2::stack::TvmCell = client
+        .v2_request(
+            V2Transport::Get,
+            "getShardAccountCell",
+            &[
+                ("address", address_str),
+                ("seqno", state_block_seqno.to_string()),
+            ],
+        )
         .await?;
+    let shard_account_cell =
+        Boc::decode_base64(cell.bytes).context("Failed to decode shard account cell BOC data")?;
 
     let shard_account: ShardAccount = shard_account_cell
         .parse()
@@ -370,16 +404,20 @@ pub(crate) fn compute_final_data(
 /// Loads a library cell (T‑lib) by its 256‑bit hash.
 ///
 /// Fetches the library from `TON Center`.
-pub(crate) async fn get_library_by_hash(
-    client: &TonCenterClient,
-    hash: &str,
-) -> anyhow::Result<Cell> {
-    let data = client.get_libraries(hash).await?;
-    Boc::decode_base64(data).context("Failed to decode library BOC data")
+pub(crate) async fn get_library_by_hash(client: &Client, hash: &str) -> anyhow::Result<Cell> {
+    let libraries: v2::responses::LibraryResult = client
+        .v2_request(V2Transport::Get, "getLibraries", &[("libraries", hash)])
+        .await?;
+    let library = libraries
+        .result
+        .into_iter()
+        .next()
+        .with_context(|| format!("TON Center library {hash} not found"))?;
+    Boc::decode_base64(library.data).context("Failed to decode library BOC data")
 }
 
 async fn add_maybe_exotic_library(
-    client: &TonCenterClient,
+    client: &Client,
     code: Option<Cell>,
 ) -> anyhow::Result<Option<(HashBytes, Cell)>> {
     const EXOTIC_LIBRARY_TAG: u8 = 2;
@@ -422,7 +460,7 @@ async fn add_maybe_exotic_library(
 ///
 /// Returns a tuple: (Dictionary cell with resolved libs, Actual code cell if original code was exotic).
 pub(crate) async fn collect_used_libraries(
-    client: &TonCenterClient,
+    client: &Client,
     account: &ShardAccount,
     tx: &tycho_types::models::Transaction,
     additional_libs: &HashMap<HashBytes, Cell>,

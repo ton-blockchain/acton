@@ -2,10 +2,10 @@
   "post_address_present": true,
   "post_amount": 100000000000,
   "request_sequence": [
-    "GET /api/v2/getAddressInformation",
+    "GET /api/v2/getAddressBalance",
     "POST /acton_fundAccount",
-    "GET /api/v2/getAddressInformation",
-    "GET /api/v2/getAddressInformation"
+    "GET /api/v2/getAddressBalance",
+    "GET /api/v2/getAddressBalance"
   ],
   "success_message": true
 }

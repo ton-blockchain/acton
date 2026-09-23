@@ -3783,6 +3783,7 @@ mod tests {
                 network: Network::Mainnet,
                 fork_block_number: Some(u64::from(ORIGIN_SEQNO)),
                 fork_snapshot: None,
+                client: Default::default(),
             }),
         )
         .expect("must create forked test node");

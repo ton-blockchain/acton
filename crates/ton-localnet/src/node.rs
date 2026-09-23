@@ -3396,6 +3396,7 @@ mod tests {
                 network: Network::Mainnet,
                 fork_block_number: Some(u64::from(origin_seqno)),
                 fork_snapshot: None,
+                client: Default::default(),
             }),
         )
         .expect("must create forked test node")
@@ -3461,6 +3462,7 @@ mod tests {
                     network: Network::Mainnet,
                     fork_block_number: Some(u64::from(ORIGIN_SEQNO)),
                     fork_snapshot: None,
+                    client: Default::default(),
                 }),
                 Some(&db_path),
             )
@@ -3478,6 +3480,7 @@ mod tests {
                     network: Network::Mainnet,
                     fork_block_number: Some(u64::from(ORIGIN_SEQNO + 1_000)),
                     fork_snapshot: None,
+                    client: Default::default(),
                 }),
                 Some(&db_path),
             )
@@ -3495,6 +3498,7 @@ mod tests {
                 network: Network::Mainnet,
                 fork_block_number: Some(u64::from(ORIGIN_SEQNO + 2_000)),
                 fork_snapshot: None,
+                client: Default::default(),
             }),
             Some(&db_path),
         )
@@ -3552,6 +3556,7 @@ mod tests {
                     network: Network::Mainnet,
                     fork_block_number: Some(u64::from(FORK_SEQNO)),
                     fork_snapshot: None,
+                    client: Default::default(),
                 }),
                 Some(&db_path),
             )
@@ -3574,6 +3579,7 @@ mod tests {
                 network: Network::Mainnet,
                 fork_block_number: Some(u64::from(FORK_SEQNO + 1_000)),
                 fork_snapshot: None,
+                client: Default::default(),
             }),
             Some(&db_path),
         )

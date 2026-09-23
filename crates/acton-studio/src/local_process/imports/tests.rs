@@ -81,7 +81,9 @@ async fn result(
 
 async fn source(State(state): State<Arc<Control>>) -> Json<Value> {
     state.source_reads.fetch_add(1, Ordering::AcqRel);
-    Json(json!({"ok": true, "result": {"bytes": state.source_boc.read().await.clone()}}))
+    Json(
+        json!({"ok": true, "@extra": "", "result": {"@type":"tvm.cell", "bytes": state.source_boc.read().await.clone()}}),
+    )
 }
 
 async fn request(router: &Router, path: &str, body: Option<&Value>) -> (u16, Value) {

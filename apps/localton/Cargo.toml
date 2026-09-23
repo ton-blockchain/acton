@@ -30,6 +30,7 @@ tokio = "1.47"
 tracing = "0.1"
 
 [dependencies]
+toncenter-client = { path = "../../crates/toncenter-client" }
 toncenter = { path = "../../crates/toncenter" }
 ton-hardfork = { path = "../../crates/ton-hardfork" }
 anyhow = "1.0"

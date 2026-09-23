@@ -637,8 +637,25 @@ fn perform_localnet_airdrop(
         .context("Failed to build HTTP client")?;
     let amount_nanograms = (amount_grams * 1_000_000_000.0) as u128;
     let auth_token = commands::simulator::resolve_localnet_auth_token(None);
-    let initial_balance =
-        fetch_localnet_account_balance(&client, api_v2_url, &address, auth_token.as_deref());
+    let mut options =
+        toncenter_client::Client::builder().user_agent(crate::build_info::user_agent());
+    if let Some(token) = auth_token
+        .as_deref()
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+    {
+        options = options.bearer_auth(token);
+    }
+    let networks = HashMap::from([(
+        "localnet".to_owned(),
+        ton_api::CustomNetworkUrls {
+            v2_url: api_v2_url.as_str().into(),
+            v3_url: None,
+            explorer_url: None,
+        },
+    )]);
+    let api = TonApiClient::with_options(Network::Localnet, networks, options)?;
+    let initial_balance = fetch_localnet_account_balance(&api, &address);
     let request = client.post(faucet_url.clone()).json(&serde_json::json!({
         "address": address,
         "amount": amount_nanograms,
@@ -665,13 +682,7 @@ fn perform_localnet_airdrop(
             let expected_balance = initial_balance
                 .context("Failed to read localnet balance before faucet request")?
                 .saturating_add(amount_nanograms);
-            wait_for_localnet_airdrop_balance(
-                &client,
-                api_v2_url,
-                &address,
-                expected_balance,
-                auth_token.as_deref(),
-            )?;
+            wait_for_localnet_airdrop_balance(&api, &address, expected_balance)?;
             let message = format!("Successfully airdropped {amount_grams} GRAM on localnet");
             Ok(AirdropResult {
                 address,
@@ -694,48 +705,23 @@ fn perform_localnet_airdrop(
     }
 }
 
-fn fetch_localnet_account_balance(
-    client: &reqwest::blocking::Client,
-    api_v2_url: &reqwest::Url,
-    address: &str,
-    auth_token: Option<&str>,
-) -> anyhow::Result<u128> {
-    let mut balance_url = api_v2_url.clone();
-    balance_url.set_path(&format!(
-        "{}/getAddressInformation",
-        api_v2_url.path().trim_end_matches('/')
-    ));
-    let request = client.get(balance_url).query(&[("address", address)]);
-    let response: serde_json::Value = with_localnet_blocking_auth(request, auth_token)
-        .send()
-        .context("Failed to query localnet account balance")?
-        .json()
-        .context("Failed to parse localnet account balance response")?;
-
-    response
-        .pointer("/result/balance")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("0")
-        .parse::<u128>()
+fn fetch_localnet_account_balance(client: &TonApiClient, address: &str) -> anyhow::Result<u128> {
+    client
+        .get_address_balance(address)?
+        .try_into()
         .context("Failed to parse localnet account balance")
 }
 
 fn wait_for_localnet_airdrop_balance(
-    client: &reqwest::blocking::Client,
-    api_v2_url: &reqwest::Url,
+    client: &TonApiClient,
     address: &str,
     expected_balance: u128,
-    auth_token: Option<&str>,
 ) -> anyhow::Result<()> {
     let deadline = Instant::now() + Duration::from_secs(12);
     loop {
-        if fetch_localnet_account_balance(client, api_v2_url, address, auth_token)
-            .unwrap_or_default()
-            >= expected_balance
-        {
+        if fetch_localnet_account_balance(client, address).unwrap_or_default() >= expected_balance {
             return Ok(());
         }
-
         if Instant::now() >= deadline {
             anyhow::bail!("Timed out waiting for localnet airdrop balance");
         }

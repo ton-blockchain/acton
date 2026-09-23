@@ -12,6 +12,7 @@ license = { workspace = true }
 
 [dependencies]
 toncenter = { workspace = true }
+toncenter-client = { workspace = true }
 ton-executor = { workspace = true }
 tasm-core = { workspace = true }
 tvm-logs = { workspace = true }
@@ -20,7 +21,6 @@ tycho-types = { workspace = true }
 num-bigint = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
-reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 base64 = { workspace = true }
@@ -29,6 +29,7 @@ toncenter-keys = { workspace = true }
 log = { workspace = true }
 
 [dev-dependencies]
+reqwest = { workspace = true }
 expect-test = { workspace = true }
 tolk-compiler = { workspace = true }
 

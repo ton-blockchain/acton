@@ -288,7 +288,7 @@ async fn ton_http_api_proxy_forwards_json_rpc_and_adds_cors() {
 
 #[tokio::test]
 async fn admin_faucet_route_adds_cors_to_json_rejections() {
-    let state = faucet::State::new("http://127.0.0.1:1".to_owned(), PathBuf::new());
+    let state = faucet::State::new("http://127.0.0.1:1".to_owned(), PathBuf::new()).unwrap();
     let (admin_api, admin_api_task) = serve_test_router(faucet_router(state)).await;
 
     let response = reqwest::Client::new()
@@ -314,7 +314,8 @@ async fn faucet_route_distinguishes_validation_and_infrastructure_errors_for_u12
     let state = faucet::State::new(
         "http://127.0.0.1:1".to_owned(),
         state_dir.path().to_path_buf(),
-    );
+    )
+    .unwrap();
     let (admin_api, admin_api_task) = serve_test_router(faucet_router(state)).await;
     let client = reqwest::Client::new();
 
@@ -436,7 +437,7 @@ async fn faucet_submission_returns_confirmed_internal_message_hash() {
             }),
         );
     let (backend, backend_task) = serve_test_router(backend).await;
-    let state = faucet::State::new(backend, PathBuf::new());
+    let state = faucet::State::new(backend, PathBuf::new()).unwrap();
     let message = wallets::FundAccountMessage {
         boc: vec![1, 2, 3],
         source_address: source,

@@ -1,7 +1,9 @@
+#[cfg(test)]
+mod tests;
+
 use ::toncenter::{v2, v3};
 use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
-use reqwest::blocking::Response;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::collections::HashMap;
 use std::env;
@@ -9,14 +11,15 @@ use std::ffi::OsStr;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{LazyLock, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 pub use ton_networks::{CustomNetworkUrls, Network};
+use toncenter_client::V2Transport;
 use toncenter_keys::api_key as toncenter_api_key;
 use tvm_ffi::stack::TupleItem;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
 
+mod blocking;
 mod deployment;
 mod offchain;
 pub mod toncenter;
@@ -24,34 +27,16 @@ pub mod toncenter;
 pub use deployment::{DeploymentCandidate, extract_deployment_candidates};
 pub use offchain::OffchainJsonResolver;
 
-const HTTP_RETRY_ATTEMPTS: usize = 3;
-const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [1000, 2000, 3000];
-const HTTP_CONNECT_TIMEOUT_SECS: u64 = 10;
-const HTTP_REQUEST_TIMEOUT_SECS: u64 = 30;
 const USE_PROXY_ENV: &str = "ACTON_USE_PROXY";
 const TEST_TONCENTER_RETRY_BACKOFF_MS_ENV: &str = "ACTON_TEST_TONCENTER_RETRY_BACKOFF_MS";
 const TEST_TONCENTER_MIN_REQUEST_INTERVAL_MS_ENV: &str =
     "ACTON_TEST_TONCENTER_MIN_REQUEST_INTERVAL_MS";
-const TONCENTER_MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1100);
 pub const MASTERCHAIN_SNAPSHOT_CACHE_SUBDIR: &str = "masterchain-snapshots";
 const MASTERCHAIN_SNAPSHOT_CACHE_SCHEMA_VERSION: u32 = 2;
 const MASTERCHAIN_SNAPSHOT_CACHE_TTL: Duration = Duration::from_secs(24 * 60 * 60);
-static TONCENTER_REQUEST_GATE: LazyLock<Mutex<Option<Instant>>> =
-    LazyLock::new(|| Mutex::new(None));
 
 const fn user_agent() -> &'static str {
     concat!("acton/", env!("CARGO_PKG_VERSION"))
-}
-
-fn http_client_builder() -> reqwest::blocking::ClientBuilder {
-    let builder = reqwest::blocking::Client::builder()
-        .use_rustls_tls()
-        .user_agent(user_agent());
-    if proxy_enabled() {
-        builder
-    } else {
-        builder.no_proxy()
-    }
 }
 
 fn async_http_client_builder() -> reqwest::ClientBuilder {
@@ -118,10 +103,11 @@ impl fmt::Display for SendBocError {
 
 impl std::error::Error for SendBocError {}
 
+#[derive(Clone)]
 pub struct TonApiClient {
-    client: reqwest::blocking::Client,
+    client: blocking::BlockingClient,
     network: Network,
-    api_key: Option<String>,
+    has_api_key: bool,
     custom_networks: HashMap<String, CustomNetworkUrls>,
 }
 
@@ -237,166 +223,82 @@ impl TonApiClient {
         network: Network,
         custom_networks: HashMap<String, CustomNetworkUrls>,
     ) -> anyhow::Result<TonApiClient> {
-        let client_builder = http_client_builder()
-            .connect_timeout(Duration::from_secs(HTTP_CONNECT_TIMEOUT_SECS))
-            .timeout(Duration::from_secs(HTTP_REQUEST_TIMEOUT_SECS));
+        let options = toncenter_client::Client::builder()
+            .user_agent(user_agent())
+            .api_key(toncenter_api_key(&network));
+        Self::with_options(network, custom_networks, options)
+    }
 
-        Ok(TonApiClient {
-            client: client_builder
-                .build()
-                .context("Cannot create HTTP client, please check if network is available")?,
-            api_key: toncenter_api_key(&network),
+    /// Creates an Acton client with application headers and transport options.
+    /// Network URLs and Acton's proxy preference are applied here; the caller supplies credentials.
+    pub fn with_options(
+        network: Network,
+        custom_networks: HashMap<String, CustomNetworkUrls>,
+        options: toncenter_client::ClientBuilder,
+    ) -> anyhow::Result<Self> {
+        let mut builder = options
+            .v2_url(network.toncenter_v2_url(&custom_networks)?)
+            .system_proxy(proxy_enabled());
+        if let Ok(url) = network.toncenter_v3_url(&custom_networks) {
+            builder = builder.v3_url(url);
+        }
+        if let Some(delay) = test_retry_backoff_override() {
+            builder = builder.retry_delays(delay, delay);
+        }
+        if let Ok(interval) = env::var(TEST_TONCENTER_MIN_REQUEST_INTERVAL_MS_ENV)
+            && let Ok(interval) = interval.trim().parse::<u64>()
+        {
+            builder = builder.request_interval(Duration::from_millis(interval));
+        }
+        let client = blocking::BlockingClient::new(builder)?;
+        let has_api_key = client.call(|client| async move { Ok(client.has_api_key()) })?;
+        Ok(Self {
+            client,
+            has_api_key,
             network,
             custom_networks,
         })
     }
 
     #[must_use]
-    pub fn with_network(mut self, network: Network) -> Self {
-        self.network = network;
-        self
-    }
-
-    #[must_use]
     pub const fn has_api_key(&self) -> bool {
-        self.api_key.is_some()
+        self.has_api_key
     }
 
-    fn build_request(&self, url: &str) -> reqwest::blocking::RequestBuilder {
-        let mut request = self.client.get(url);
-
-        if let Some(ref key) = self.api_key {
-            request = request.header("X-API-Key", key);
-        }
-
-        request
-    }
-
-    fn build_post_request(&self, url: &str) -> reqwest::blocking::RequestBuilder {
-        let mut request = self.client.post(url);
-
-        if let Some(ref key) = self.api_key {
-            request = request.header("X-API-Key", key);
-        }
-
-        request
-    }
-
-    fn get_json<T: DeserializeOwned>(
-        &self,
-        url: &str,
-        transport_error_context: &str,
-        response_error_context: &str,
-    ) -> anyhow::Result<T> {
-        let response = self.send_with_retry(|| self.build_request(url), transport_error_context)?;
-        if !response.status().is_success() {
-            anyhow::bail!("TON Center API returned status: {}", response.status());
-        }
-        response.json().context(response_error_context.to_owned())
-    }
-
-    fn get_v2_result<T: DeserializeOwned>(
+    fn get_v2_result<T: DeserializeOwned + Send + 'static>(
         &self,
         path: &str,
-        query: &impl Serialize,
+        query: &(impl Serialize + Clone + Send + Sync + 'static),
     ) -> anyhow::Result<T> {
-        let url = format!(
-            "{}{path}",
-            self.network.toncenter_v2_url(&self.custom_networks)?
-        );
-        let response = self.send_with_retry(
-            || self.build_request(&url).query(query),
-            "Failed to send TON Center v2 request",
-        )?;
-        if !response.status().is_success() {
-            return Err(Self::handle_fail(response));
-        }
-        let response: v2::TonlibResponse<T> = response
-            .json()
-            .context("Failed to parse TON Center v2 response")?;
-        Ok(response.result)
+        let method = path.trim_start_matches('/').to_owned();
+        let query = query.clone();
+        self.client
+            .call(move |client| async move {
+                client.v2_request(V2Transport::Get, &method, &query).await
+            })
+            .map_err(Self::handle_fail)
     }
 
-    fn send_with_retry<F>(
+    fn get_v3<T: DeserializeOwned + Send + 'static>(
         &self,
-        mut build_request: F,
-        transport_error_context: &str,
-    ) -> anyhow::Result<Response>
-    where
-        F: FnMut() -> reqwest::blocking::RequestBuilder,
-    {
-        for attempt in 0..HTTP_RETRY_ATTEMPTS {
-            self.maybe_wait_for_rate_limit();
-            let request = build_request();
-            log::info!("Send {request:?}");
-            return match request.send() {
-                Ok(response) => {
-                    if Self::should_retry_status(response.status())
-                        && attempt + 1 < HTTP_RETRY_ATTEMPTS
-                    {
-                        std::thread::sleep(Self::http_retry_backoff(attempt));
-                        continue;
-                    }
-                    Ok(response)
-                }
-                Err(err) => {
-                    if Self::should_retry_transport_error(&err) && attempt + 1 < HTTP_RETRY_ATTEMPTS
-                    {
-                        std::thread::sleep(Self::http_retry_backoff(attempt));
-                        continue;
-                    }
-                    Err(err).context(transport_error_context.to_owned())
-                }
-            };
-        }
-
-        unreachable!("retry loop must return on success or final failure");
+        path: &str,
+        query: &(impl Serialize + Clone + Send + Sync + 'static),
+    ) -> anyhow::Result<T> {
+        let path = path.to_owned();
+        let query = query.clone();
+        self.client
+            .call(move |client| async move { client.v3_get(&path, &query).await })
     }
 
-    fn maybe_wait_for_rate_limit(&self) {
-        if self.api_key.is_some() {
-            return;
-        }
-
-        if self.network == Network::Localnet {
-            // we don't have rate limit on localnet by default
-            return;
-        }
-
-        let mut last_request = TONCENTER_REQUEST_GATE
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-
-        if let Some(last) = *last_request {
-            let elapsed = last.elapsed();
-            let min_interval = toncenter_min_request_interval();
-            if elapsed < min_interval {
-                let wait_for = min_interval - elapsed;
-                log::debug!("throttle for {wait_for:?}");
-                std::thread::sleep(wait_for);
-            }
-        }
-
-        *last_request = Some(Instant::now());
-    }
-
-    fn should_retry_status(status: reqwest::StatusCode) -> bool {
-        status.is_server_error()
-            || status == reqwest::StatusCode::TOO_MANY_REQUESTS
-            || status == reqwest::StatusCode::REQUEST_TIMEOUT
-    }
-
-    fn should_retry_transport_error(err: &reqwest::Error) -> bool {
-        err.is_timeout() || err.is_connect() || err.is_request()
-    }
-
-    fn http_retry_backoff(attempt: usize) -> Duration {
-        if let Some(duration) = test_retry_backoff_override() {
-            return duration;
-        }
-
-        let index = attempt.min(HTTP_RETRY_BACKOFF_MS.len() - 1);
-        Duration::from_millis(HTTP_RETRY_BACKOFF_MS[index])
+    fn get_v3_raw<T: DeserializeOwned + Send + 'static>(
+        &self,
+        path: &str,
+        raw_query: &str,
+    ) -> anyhow::Result<T> {
+        let mut url = reqwest::Url::parse("http://localhost")?;
+        url.set_query(Some(raw_query));
+        let query: Vec<(String, String)> = url.query_pairs().into_owned().collect();
+        self.get_v3(path, &query)
     }
 
     #[must_use]
@@ -422,30 +324,11 @@ impl TonApiClient {
             return Ok(vec![]);
         }
 
-        let mut url = format!(
-            "{}/accountStates?",
-            self.network.toncenter_v3_url(&self.custom_networks)?
-        );
-        for (i, address) in addresses.iter().enumerate() {
-            if i > 0 {
-                url.push('&');
-            }
-            url.push_str("address=");
-            url.push_str(&urlencoding::encode(address));
-        }
-
-        let response = self.send_with_retry(
-            || self.build_request(&url),
-            "Failed to send request to TON Center",
-        )?;
-
-        if !response.status().is_success() {
-            anyhow::bail!("TON Center API returned status: {}", response.status());
-        }
-
-        let data: v3::AccountStatesResponse = response
-            .json()
-            .context("Failed to parse TON Center response")?;
+        let query: Vec<_> = addresses
+            .iter()
+            .map(|address| ("address", (*address).to_owned()))
+            .collect();
+        let data: v3::AccountStatesResponse = self.get_v3("accountStates", &query)?;
 
         Ok(data.accounts)
     }
@@ -481,44 +364,21 @@ impl TonApiClient {
         stack: &[serde_json::Value],
         seqno: Option<u64>,
     ) -> anyhow::Result<v2::responses::RunGetMethodResult<serde_json::Value>> {
-        let url = format!(
-            "{}/jsonRPC",
-            self.network.toncenter_v2_url(&self.custom_networks)?
-        );
-
         let seqno = seqno
             .map(i32::try_from)
             .transpose()
             .context("Masterchain seqno does not fit TON Center v2 request")?;
-        let json = v2::requests::JsonRpcRequest {
-            jsonrpc: Some(serde_json::json!("2.0")),
-            id: Some(serde_json::json!("1")),
-            call: v2::requests::JsonRpcCall::RunGetMethod(v2::requests::RunGetMethodRequest {
-                address: address.to_owned(),
-                method: method.into(),
-                stack: stack.to_vec(),
-                seqno,
-            }),
+        let request = v2::requests::RunGetMethodRequest {
+            address: address.to_owned(),
+            method: method.into(),
+            stack: stack.to_vec(),
+            seqno,
         };
-
-        let response = self.send_with_retry(
-            || self.build_post_request(&url).json(&json),
-            "Failed to send runGetMethod request",
-        )?;
-
-        if !response.status().is_success() {
-            let error_text = response
-                .text()
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            anyhow::bail!("Run get method failed: {error_text}");
-        }
-
-        let result: v2::TonlibResponse<v2::responses::RunGetMethodResult<serde_json::Value>> =
-            response
-                .json()
-                .context("Failed to parse runGetMethod response")?;
-
-        Ok(result.result)
+        self.client.call(move |client| async move {
+            client
+                .v2_request(V2Transport::JsonRpc, "runGetMethod", &request)
+                .await
+        })
     }
 
     /// Get wallet seqno
@@ -554,52 +414,28 @@ impl TonApiClient {
 
     /// Send BOC to network
     pub fn send_boc(&self, boc: &str) -> Result<(), SendBocError> {
-        let base_url = self
-            .network
-            .toncenter_v2_url(&self.custom_networks)
-            .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
-        let url = format!("{base_url}/sendBoc");
-
-        let json = v2::requests::SendBocRequest {
+        let request = v2::requests::SendBocRequest {
             boc: boc.to_owned(),
         };
-
-        let response = self
-            .send_with_retry(
-                || self.build_post_request(&url).json(&json),
-                "Failed to send BOC",
-            )
-            .map_err(|err| {
-                SendBocError::new(SendBocErrorKind::TransportFailure, format!("{err:#}"))
-            })?;
-
-        if !response.status().is_success() {
-            return Err(Self::handle_send_boc_fail(response));
-        }
-
-        Ok(())
+        self.client.call(move |client| async move {
+            client.call_v2::<v2::endpoints::SendBoc>(&request).await
+        }).map(|_| ()).map_err(Self::handle_send_boc_fail)
     }
 
     pub fn get_masterchain_info(
         &self,
     ) -> anyhow::Result<v2::TonlibResponse<v2::responses::MasterchainInfo>> {
-        let url = format!(
-            "{}/getMasterchainInfo",
-            self.network.toncenter_v2_url(&self.custom_networks)?
-        );
-
-        let response = self.send_with_retry(
-            || self.build_request(&url),
-            "Failed to send request to TON Center",
-        )?;
-
-        if !response.status().is_success() {
-            return Err(Self::handle_fail(response));
-        }
-
-        response
-            .json()
-            .context("Failed to parse TON Center response")
+        self.client
+            .call(|client| async move {
+                client
+                    .v2_response(
+                        V2Transport::Get,
+                        "getMasterchainInfo",
+                        &v2::requests::EmptyRequest {},
+                    )
+                    .await
+            })
+            .map_err(Self::handle_fail)
     }
 
     pub fn get_last_block_seqno(&self) -> anyhow::Result<u64> {
@@ -732,48 +568,15 @@ impl TonApiClient {
     }
 
     pub fn get_blocks_v3(&self, raw_query: &str) -> anyhow::Result<v3::BlocksResponse> {
-        let mut url = format!(
-            "{}/blocks",
-            self.network.toncenter_v3_url(&self.custom_networks)?
-        );
-        if !raw_query.is_empty() {
-            url.push('?');
-            url.push_str(raw_query);
-        }
-        self.get_json(
-            &url,
-            "Failed to send blocks request",
-            "Failed to parse blocks response",
-        )
+        self.get_v3_raw("blocks", raw_query)
     }
 
     pub fn get_transactions_v3(&self, raw_query: &str) -> anyhow::Result<v3::TransactionsResponse> {
-        let mut url = format!(
-            "{}/transactions",
-            self.network.toncenter_v3_url(&self.custom_networks)?
-        );
-        if !raw_query.is_empty() {
-            url.push('?');
-            url.push_str(raw_query);
-        }
-        self.get_json(
-            &url,
-            "Failed to send transactions request",
-            "Failed to parse transactions response",
-        )
+        self.get_v3_raw("transactions", raw_query)
     }
 
     pub fn get_shards(&self, seqno: u32) -> anyhow::Result<v2::responses::Shards> {
-        let url = format!(
-            "{}/getShards?seqno={seqno}",
-            self.network.toncenter_v2_url(&self.custom_networks)?
-        );
-        let response: v2::TonlibResponse<v2::responses::Shards> = self.get_json(
-            &url,
-            "Failed to send getShards request",
-            "Failed to parse getShards response",
-        )?;
-        Ok(response.result)
+        self.get_v2_result("getShards", &[("seqno", seqno)])
     }
 
     pub fn get_block_header_v2(
@@ -817,29 +620,17 @@ impl TonApiClient {
         seqno: Option<u64>,
         address: &str,
     ) -> anyhow::Result<v2::responses::AddressInformation> {
-        let url = format!(
-            "{}/getAddressInformation?address={}{}",
-            self.network.toncenter_v2_url(&self.custom_networks)?,
-            urlencoding::encode(address),
-            seqno
-                .map(|seqno| format!("&seqno={seqno}"))
-                .unwrap_or_default(),
-        );
-
-        let response = self.send_with_retry(
-            || self.build_request(&url),
-            "Failed to send request to TON Center",
-        )?;
-
-        if !response.status().is_success() {
-            return Err(Self::handle_fail(response));
-        }
-
-        let data: v2::TonlibResponse<v2::responses::AddressInformation> = response
-            .json()
-            .context("Failed to parse TON Center response")?;
-
-        Ok(data.result)
+        self.get_v2_result(
+            "getAddressInformation",
+            &v2::requests::AddressInformationRequest {
+                address: address.to_owned(),
+                seqno: seqno
+                    .map(i32::try_from)
+                    .transpose()
+                    .context("Masterchain seqno does not fit i32")?
+                    .map(Into::into),
+            },
+        )
     }
 
     pub fn get_shard_account_cell(
@@ -847,63 +638,29 @@ impl TonApiClient {
         seqno: Option<u64>,
         address: &str,
     ) -> anyhow::Result<Cell> {
-        let url = format!(
-            "{}/getShardAccountCell?address={}{}",
-            self.network.toncenter_v2_url(&self.custom_networks)?,
-            urlencoding::encode(address),
-            seqno
-                .map(|seqno| format!("&seqno={seqno}"))
-                .unwrap_or_default(),
-        );
-
-        let response = self.send_with_retry(
-            || self.build_request(&url),
-            "Failed to send getShardAccountCell request to TON Center",
+        let data: v2::stack::TvmCell = self.get_v2_result(
+            "getShardAccountCell",
+            &v2::requests::AddressInformationRequest {
+                address: address.to_owned(),
+                seqno: seqno
+                    .map(i32::try_from)
+                    .transpose()
+                    .context("Masterchain seqno does not fit i32")?
+                    .map(Into::into),
+            },
         )?;
-
-        if !response.status().is_success() {
-            return Err(Self::handle_fail(response));
-        }
-
-        let data: v2::TonlibResponse<v2::stack::TvmCell> = response
-            .json()
-            .context("Failed to parse getShardAccountCell response")?;
-
-        let cell_boc = data.result.bytes;
-
-        Boc::decode_base64(&cell_boc).context("Failed to decode shard account cell BOC data")
+        Boc::decode_base64(&data.bytes).context("Failed to decode shard account cell BOC data")
     }
 
     pub fn get_library_by_hash(&self, hash: &HashBytes) -> anyhow::Result<Cell> {
-        let url = format!(
-            "{}/getLibraries",
-            self.network.toncenter_v2_url(&self.custom_networks)?,
-        );
         let hash_hex = hash.to_string();
-
-        let response = self.send_with_retry(
-            || {
-                self.build_request(&url)
-                    .query(&[("libraries", hash_hex.as_str())])
-            },
-            "Failed to send request to TON Center for library",
-        )?;
-
-        if !response.status().is_success() {
-            return Err(Self::handle_fail(response));
-        }
-
-        let data: v2::TonlibResponse<v2::responses::LibraryResult> = response
-            .json()
-            .context("Failed to parse TON Center libraries response")?;
-
+        let data: v2::responses::LibraryResult =
+            self.get_v2_result("getLibraries", &[("libraries", hash_hex.clone())])?;
         let boc_data = data
-            .result
             .result
             .first()
             .map(|entry| entry.data.as_str())
-            .ok_or_else(|| anyhow::anyhow!("Library with hash {hash_hex} not found"))?;
-
+            .ok_or_else(|| anyhow!("Library with hash {hash_hex} not found"))?;
         Boc::decode_base64(boc_data).context("Failed to decode library BOC data")
     }
 
@@ -937,11 +694,6 @@ impl TonApiClient {
         lt: Option<String>,
         hash: Option<String>,
     ) -> anyhow::Result<Vec<v2::responses::Transaction>> {
-        let url = format!(
-            "{}/getTransactions",
-            self.network.toncenter_v2_url(&self.custom_networks)?
-        );
-
         let mut params = vec![("address", address.to_string())];
         if let Some(limit) = limit {
             params.push(("limit", limit.to_string()));
@@ -953,78 +705,49 @@ impl TonApiClient {
             params.push(("hash", hash));
         }
 
-        let response = self.send_with_retry(
-            || self.build_request(&url).query(&params),
-            "Failed to send getTransactions request",
-        )?;
-
-        if !response.status().is_success() {
-            anyhow::bail!("TON Center API returned status: {}", response.status());
-        }
-
-        let data: v2::TonlibResponse<Vec<v2::responses::Transaction>> = response
-            .json()
-            .context("Failed to parse getTransactions response")?;
-
-        Ok(data.result)
+        self.get_v2_result("getTransactions", &params)
     }
 
     pub fn get_address_balance(&self, address: &str) -> anyhow::Result<BigInt> {
-        let url = format!(
-            "{}/getAddressBalance?address={}",
-            self.network.toncenter_v2_url(&self.custom_networks)?,
-            urlencoding::encode(address)
-        );
-
-        let response = self.send_with_retry(
-            || self.build_request(&url),
-            "Failed to send getAddressBalance request",
+        let balance: String = self.get_v2_result(
+            "getAddressBalance",
+            &v2::requests::AddressBalanceRequest {
+                address: address.to_owned(),
+                seqno: None,
+            },
         )?;
-
-        if !response.status().is_success() {
-            return Err(Self::handle_fail(response));
-        }
-
-        let data: v2::TonlibResponse<String> = response
-            .json()
-            .context("Failed to parse getAddressBalance response")?;
-
-        data.result.parse().context("Invalid account balance")
+        balance.parse().context("Invalid account balance")
     }
 
-    fn handle_fail(response: Response) -> anyhow::Error {
-        let status = response.status();
-        let Ok(data) = response.json::<v2::TonlibErrorResponse>() else {
-            return anyhow!("TON Center API returned status: {status}");
+    fn handle_fail(error: anyhow::Error) -> anyhow::Error {
+        let Some(api) = error
+            .downcast_ref::<toncenter_client::Error>()
+            .and_then(toncenter_client::Error::api_error)
+        else {
+            return error;
         };
-
-        let raw_msg = data
-            .error
-            .trim_start_matches("LITE_SERVER_UNKNOWN: ")
-            .to_owned();
-
-        if let Some(message) = normalize_toncenter_error_message(&raw_msg) {
-            return anyhow!(message);
-        }
-
-        anyhow!(raw_msg)
+        let message = api.message.trim_start_matches("LITE_SERVER_UNKNOWN: ");
+        anyhow!(
+            normalize_toncenter_error_message(message)
+                .unwrap_or(message)
+                .to_owned()
+        )
     }
 
-    fn handle_send_boc_fail(response: Response) -> SendBocError {
-        let status = response.status();
-        let Ok(data) = response.json::<v2::TonlibErrorResponse>() else {
-            return SendBocError::new(
-                SendBocErrorKind::Other,
-                format!("TON Center API returned status: {status}"),
-            );
-        };
-
-        let raw_msg = data
-            .error
-            .trim_start_matches("LITE_SERVER_UNKNOWN: ")
-            .to_owned();
-
-        SendBocError::new(classify_toncenter_send_boc_error(&raw_msg), raw_msg)
+    fn handle_send_boc_fail(error: anyhow::Error) -> SendBocError {
+        if let Some(error) = error.downcast_ref::<toncenter_client::Error>() {
+            if let Some(api) = error.api_error() {
+                let message = api.message.trim_start_matches("LITE_SERVER_UNKNOWN: ");
+                return SendBocError::new(classify_toncenter_send_boc_error(message), message);
+            }
+            if matches!(
+                error.kind(),
+                toncenter_client::ErrorKind::Transport | toncenter_client::ErrorKind::Timeout
+            ) {
+                return SendBocError::new(SendBocErrorKind::TransportFailure, error.to_string());
+            }
+        }
+        SendBocError::new(SendBocErrorKind::Other, error.to_string())
     }
 }
 
@@ -1035,13 +758,6 @@ fn test_retry_backoff_override() -> Option<Duration> {
         return None;
     }
     value.parse::<u64>().ok().map(Duration::from_millis)
-}
-
-fn toncenter_min_request_interval() -> Duration {
-    env::var(TEST_TONCENTER_MIN_REQUEST_INTERVAL_MS_ENV)
-        .ok()
-        .and_then(|value| value.trim().parse::<u64>().ok())
-        .map_or(TONCENTER_MIN_REQUEST_INTERVAL, Duration::from_millis)
 }
 
 fn classify_toncenter_send_boc_error(raw_msg: &str) -> SendBocErrorKind {
@@ -1112,16 +828,11 @@ impl TonApiClient {
 
     fn get_traces_by_hash_param(
         &self,
-        hash_param: &str,
+        hash_param: &'static str,
         hash: &str,
         limit: u32,
         start_utime: Option<i64>,
     ) -> anyhow::Result<Vec<v3::Trace>> {
-        let url = format!(
-            "{}/traces",
-            self.network.toncenter_v3_url(&self.custom_networks)?
-        );
-
         let mut params: Vec<(&str, String)> =
             vec![(hash_param, hash.to_owned()), ("limit", limit.to_string())];
         if let Some(start_utime) = start_utime {
@@ -1129,157 +840,7 @@ impl TonApiClient {
             params.push(("sort", "desc".to_owned()));
         }
 
-        let response = self.send_with_retry(
-            || self.build_request(&url).query(&params),
-            "Failed to send traces request",
-        )?;
-
-        if !response.status().is_success() {
-            anyhow::bail!(
-                "TON Center v3 traces returned status: {}",
-                response.status()
-            );
-        }
-
-        let data: v3::TracesResponse =
-            response.json().context("Failed to parse traces response")?;
+        let data: v3::TracesResponse = self.get_v3("traces", &params)?;
         Ok(data.traces)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::ffi::OsStr;
-    use std::sync::Arc;
-
-    #[test]
-    fn acton_use_proxy_is_disabled_by_default() {
-        assert!(!proxy_enabled_from_value(None));
-    }
-
-    #[test]
-    fn acton_use_proxy_accepts_1_or_true() {
-        for value in ["1", "true"] {
-            assert!(proxy_enabled_from_value(Some(OsStr::new(value))));
-        }
-    }
-
-    #[test]
-    fn acton_use_proxy_rejects_other_values() {
-        for value in ["", "0", "false", "TRUE", "yes"] {
-            assert!(!proxy_enabled_from_value(Some(OsStr::new(value))));
-        }
-    }
-
-    #[test]
-    fn normalize_toncenter_error_message_maps_missing_account_state() {
-        assert_eq!(
-            normalize_toncenter_error_message(
-                "cannot apply external message to current state : Failed to unpack account state",
-            ),
-            Some(
-                "external message not accepted because account has no state; check if wallet/contract is deployed",
-            ),
-        );
-    }
-
-    #[test]
-    fn normalize_toncenter_error_message_maps_pre_execution_wallet_rejection() {
-        assert_eq!(
-            normalize_toncenter_error_message(
-                "cannot apply external message to current state : External message was not accepted: cannot run message on account: inbound external message rejected by account 3029B3EAEDA86A5381D86100F2A8B761C38DE45642EDB6E4BB1CCA2E6DD7FFED before smart-contract execution",
-            ),
-            Some(
-                r"wallet/contract rejected the external message before contract execution; likely causes:
-- not enough balance
-- wallet/contract is not deployed
-- seqno is stale
-- message expired",
-            ),
-        );
-    }
-
-    #[test]
-    fn normalize_toncenter_error_message_preserves_other_errors() {
-        assert_eq!(
-            normalize_toncenter_error_message("mock toncenter failure"),
-            None,
-        );
-    }
-
-    #[test]
-    fn masterchain_snapshot_cache_round_trips() {
-        let temp_dir = tempfile::tempdir().expect("temporary cache directory");
-        let network = Network::Custom(Arc::from("snapshot-test"));
-        let snapshot = MasterchainSnapshot {
-            seqno: 123_456,
-            gen_utime: 1_700_000_000,
-            config: Cell::default(),
-        };
-        let entry = MasterchainSnapshotCacheEntry::new(
-            &network,
-            "http://127.0.0.1:8080/api/v2".to_owned(),
-            &snapshot,
-            Some(snapshot.gen_utime),
-            100,
-        );
-        let path = masterchain_snapshot_cache_path(temp_dir.path(), &network, snapshot.seqno);
-
-        write_masterchain_snapshot_cache(&path, &entry).expect("write snapshot cache");
-        let cached = read_masterchain_snapshot_cache(
-            &path,
-            &network,
-            "http://127.0.0.1:8080/api/v2",
-            snapshot.seqno,
-        )
-        .expect("read snapshot cache");
-
-        assert_eq!(cached.gen_utime, Some(snapshot.gen_utime));
-        assert_eq!(cached.config.repr_hash(), snapshot.config.repr_hash());
-        let latest_cached = MasterchainSnapshotCacheEntry::new(
-            &network,
-            "http://127.0.0.1:8080/api/v2".to_owned(),
-            &snapshot,
-            None,
-            100,
-        )
-        .into_cached_snapshot()
-        .expect("decode latest snapshot cache");
-        assert_eq!(latest_cached.gen_utime, None);
-        assert!(
-            read_masterchain_snapshot_cache(
-                &path,
-                &network,
-                "http://127.0.0.1:8081/api/v2",
-                snapshot.seqno,
-            )
-            .is_none(),
-            "cache from another endpoint must not be reused"
-        );
-    }
-
-    #[test]
-    fn masterchain_snapshot_cache_expires_after_ttl() {
-        assert!(masterchain_snapshot_cache_entry_is_fresh(
-            100,
-            100 + MASTERCHAIN_SNAPSHOT_CACHE_TTL.as_secs() - 1
-        ));
-        assert!(!masterchain_snapshot_cache_entry_is_fresh(
-            100,
-            100 + MASTERCHAIN_SNAPSHOT_CACHE_TTL.as_secs()
-        ));
-    }
-
-    #[test]
-    fn masterchain_snapshot_cache_separates_builtin_and_custom_networks() {
-        let root = Path::new("/tmp/acton-project/build/cache/masterchain-snapshots");
-        let builtin = masterchain_snapshot_cache_path(root, &Network::Mainnet, 42);
-        let custom =
-            masterchain_snapshot_cache_path(root, &Network::Custom(Arc::from("mainnet")), 42);
-
-        assert_ne!(builtin, custom);
-        assert_eq!(builtin, root.join("mainnet").join("42.json"));
-        assert_eq!(custom, root.join("custom-mainnet").join("42.json"));
     }
 }

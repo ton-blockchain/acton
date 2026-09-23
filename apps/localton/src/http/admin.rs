@@ -91,10 +91,10 @@ pub(super) async fn start(
     );
     let state_dir = layout.root.clone();
     let state = AdminState {
-        network_config: network_config::State::new(layout.clone(), backend.clone()),
+        network_config: network_config::State::new(layout.clone(), backend.clone())?,
         layout,
         processes,
-        faucet: faucet::State::new(backend, state_dir),
+        faucet: faucet::State::new(backend, state_dir)?,
     };
     let mut app = Router::new()
         .route("/openapi.json", get(openapi_handler))

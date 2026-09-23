@@ -49,7 +49,7 @@ impl AppState {
         let payment_verifier = Arc::new(OnchainPaymentVerifier::from_config(config)?);
 
         Ok(Self::new(
-            Arc::new(MultiNetworkToncenterClient::from_config(config)),
+            Arc::new(MultiNetworkToncenterClient::from_config(config)?),
             Arc::new(NodeCompilerService::from_config(config)),
             verification_registry,
             payment_verifier,
@@ -236,6 +236,8 @@ impl AppState {
 
 #[derive(Debug, Error)]
 pub enum StateError {
+    #[error(transparent)]
+    Toncenter(#[from] toncenter_client::Error),
     #[error(transparent)]
     Registry(#[from] crate::registry::RegistryError),
     #[error(transparent)]

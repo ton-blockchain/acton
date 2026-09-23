@@ -37,6 +37,19 @@ impl Runtime {
                 message: format!("Failed to create localnet health client: {error}"),
             })?;
 
+        let toncenter = toncenter_client::Client::builder()
+            .v2_url(&network.endpoints.api_v2)
+            .v3_url(&network.endpoints.api_v3)
+            .user_agent(concat!("acton/", env!("CARGO_PKG_VERSION")))
+            .operation_timeout(PROBE_TIMEOUT)
+            .connect_timeout(Duration::from_millis(500))
+            .max_attempts(1)
+            .build()
+            .map_err(|error| crate::Error::Internal {
+                code: "health_client_failed",
+                message: format!("Failed to create localnet API client: {error}"),
+            })?;
+
         let docker = DockerNetwork::load(&entry.data_dir, &network).await;
         let services = async {
             match docker {
@@ -57,8 +70,8 @@ impl Runtime {
             }
 
             tokio::join!(
-                probe_v2(&client, &network.endpoints.api_v2, observed_at_ms),
-                probe_v3(&client, &network.endpoints.api_v3),
+                probe_v2(&toncenter, &network.endpoints.api_v2, observed_at_ms),
+                probe_v3(&client, &toncenter, &network.endpoints.api_v3),
             )
         };
         let (services, (api_v2, mut api_v3)) = tokio::join!(services, probes);
@@ -161,37 +174,44 @@ impl ApiHealth {
     }
 }
 
-async fn probe_v2(client: &Client, endpoint: &str, observed_at_ms: u64) -> ApiHealth {
-    let url = format!("{}/getMasterchainInfo", endpoint.trim_end_matches('/'));
+async fn probe_v2(
+    client: &toncenter_client::Client,
+    endpoint: &str,
+    observed_at_ms: u64,
+) -> ApiHealth {
     let started = Instant::now();
-    let response = request_json(client, &url).await;
+    let response = client
+        .v2_response::<Value>(
+            toncenter_client::V2Transport::Get,
+            "getMasterchainInfo",
+            &(),
+        )
+        .await;
     let latency_ms = started.elapsed().as_millis() as u64;
     let value = match response {
-        Ok(value) if value.pointer("/ok").and_then(Value::as_bool) == Some(true) => value,
-        Ok(_) => {
-            return ApiHealth::unavailable(
-                endpoint,
-                latency_ms,
-                "API v2 returned an unsuccessful response",
-            );
-        }
-        Err(error) => return ApiHealth::unavailable(endpoint, latency_ms, error),
+        Ok(value) => value.result,
+        Err(error) => return ApiHealth::unavailable(endpoint, latency_ms, error.to_string()),
     };
-    let Some(seqno) = json_u32(&value, "/result/last/seqno") else {
+    let Some(seqno) = json_u32(&value, "/last/seqno") else {
         return ApiHealth::unavailable(
             endpoint,
             latency_ms,
             "API v2 response did not contain a masterchain seqno",
         );
     };
-    let header_url = format!(
-        "{}/getBlockHeader?workchain=-1&shard=-9223372036854775808&seqno={seqno}",
-        endpoint.trim_end_matches('/')
-    );
-    let block_time_unix = request_json(client, &header_url)
+    let block_time_unix = client
+        .v2_request::<Value>(
+            toncenter_client::V2Transport::Get,
+            "getBlockHeader",
+            &[
+                ("workchain", "-1".to_owned()),
+                ("shard", "-9223372036854775808".to_owned()),
+                ("seqno", seqno.to_string()),
+            ],
+        )
         .await
         .ok()
-        .and_then(|header| json_u64(&header, "/result/gen_utime"));
+        .and_then(|header| json_u64(&header, "/gen_utime"));
     let block_age_ms = block_time_unix.map(|time| observed_at_ms.saturating_sub(time * 1_000));
 
     ApiHealth {
@@ -205,14 +225,17 @@ async fn probe_v2(client: &Client, endpoint: &str, observed_at_ms: u64) -> ApiHe
     }
 }
 
-async fn probe_v3(client: &Client, endpoint: &str) -> ApiHealth {
+async fn probe_v3(
+    client: &Client,
+    toncenter: &toncenter_client::Client,
+    endpoint: &str,
+) -> ApiHealth {
     let root = endpoint.trim_end_matches("/api/v3").trim_end_matches('/');
     let health_url = format!("{root}/healthcheck");
-    let head_url = format!("{}/masterchainInfo", endpoint.trim_end_matches('/'));
     let started = Instant::now();
     let (health, head) = tokio::join!(
         request_ok(client, &health_url),
-        request_json(client, &head_url)
+        toncenter.v3_get::<Value>("masterchainInfo", &())
     );
     let latency_ms = started.elapsed().as_millis() as u64;
 
@@ -222,7 +245,7 @@ async fn probe_v3(client: &Client, endpoint: &str) -> ApiHealth {
 
     let value = match head {
         Ok(value) => value,
-        Err(error) => return ApiHealth::unavailable(endpoint, latency_ms, error),
+        Err(error) => return ApiHealth::unavailable(endpoint, latency_ms, error.to_string()),
     };
     let Some(seqno) = json_u32(&value, "/last/seqno") else {
         return ApiHealth::unavailable(
@@ -269,25 +292,6 @@ async fn request_ok(client: &Client, url: &str) -> Result<(), String> {
     } else {
         Err(format!("{url} returned HTTP {}", response.status()))
     }
-}
-
-async fn request_json(client: &Client, url: &str) -> Result<Value, String> {
-    let response = client
-        .get(url)
-        .header(reqwest::header::ACCEPT, "application/json")
-        .send()
-        .await
-        .map_err(|error| error.to_string())?;
-    let status = response.status();
-
-    if !status.is_success() {
-        return Err(format!("{url} returned HTTP {status}"));
-    }
-
-    response
-        .json()
-        .await
-        .map_err(|error| format!("{url} returned invalid JSON: {error}"))
 }
 
 fn json_u32(value: &Value, pointer: &str) -> Option<u32> {
