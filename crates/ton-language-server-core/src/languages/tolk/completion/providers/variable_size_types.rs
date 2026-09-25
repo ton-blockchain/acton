@@ -5,7 +5,7 @@ use crate::completion::{
 };
 use crate::{CompletionItem, CompletionItemKind};
 
-/// Completes variable-width integer, byte, and bit type spellings.
+/// Completes variable-width integer and bit type spellings.
 ///
 /// Each item inserts a width placeholder, allowing the user to choose the size
 /// without manually rebuilding the type name.
@@ -37,5 +37,5 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for VariableSizeTypeC
 
 const VARIABLE_SIZE_TYPES: &[&str] = &[
     "uint8", "uint16", "uint32", "uint64", "uint128", "uint256", "int8", "int16", "int32", "int64",
-    "int128", "int256", "int257", "int{X}", "uint{X}", "bytes32", "bytes{X}", "bits256", "bits{X}",
+    "int128", "int256", "int257", "int{X}", "uint{X}", "bits256", "bits{X}",
 ];

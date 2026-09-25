@@ -1,12 +1,12 @@
 Basic Information
   Network:           localnet
-  Raw Address:       0:8d32dec20975c75304a43b10706e936493752be687b8e2f0f7048669851d87c0
+  Raw Address:       0:fbc156fec7561688e475444cf9fda438ebccd7a9107d8d1b35a7a35caf00dac5
   Status:            active
   Contract:          JettonMinter
   Balance:           [TON_BALANCE] GRAM
   Last Tx LT:        10
   Last Tx Hash:      [TX_HASH]
-  Code Hash:         0x6bf8f48ca97d3fd9c8e553344efe7af030c322459e2ee2197a052162f1961bfb
+  Code Hash:         0x37fb274466a01db790720de6ea3e5b2797aadaa517cad7f9dc6e35d49b189c4f
   Data Hash:         0xf9b9a2eb10e4944277bcc0022ca221459455a953dad9feb016c814319c221e87
 
 Jetton Master

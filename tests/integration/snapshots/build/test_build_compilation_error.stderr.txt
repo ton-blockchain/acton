@@ -1,8 +1,9 @@
 Error: In broken:
 
-[ROOT]/contracts/broken[LINE]: error: undefined symbol `nonexistent`
-
-    // in function `onInternalMessage`
+error: undefined symbol `nonexistent`
+    --> [ROOT]/contracts/broken[LINE]
+     |  in function onInternalMessage
+     | 
    3 |                 val x = nonexistent; // This will cause compilation error
      |                         ^^^^^^^^^^^
 

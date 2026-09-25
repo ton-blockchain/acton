@@ -2,6 +2,8 @@ Script finished with [EXIT_STATUS] 7
   Description: Type check error
   Phase: Compute phase
   Re-run with --backtrace full to get more information
-Failed to build 'leaf' required by 'parent': Compilation failed: [ROOT]/contracts/leaf.tolk:1: error: expected top-level declaration, got `invalid`
+Failed to build 'leaf' required by 'parent': Compilation failed: error: expected top-level declaration, got `invalid`
+    --> [ROOT]/contracts/leaf.tolk:1
+     | 
    1 | invalid tolk
      | ^^^^^^^

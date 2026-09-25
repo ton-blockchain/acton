@@ -28,7 +28,7 @@ off │ instruction
 112 │         PUSHCONT { // 6F7AF2ED8B0B84F321FC02C7729BE99A9DB9D94DF3940C9C80E274319E5C9FEF offset 119
     │             // contracts/counter[LINE]
     │             //  9 |         IncreaseCounter => {
-    │             //    |                            ^
+    │             //    |         ^^^^^^^^^^^^^^^^^^^^
     │             // .. | ... 3 lines omitted ...
     │             // 13 |         }
     │             //    |         ^
@@ -82,7 +82,7 @@ off │ instruction
 392 │         PUSHCONT { // 6F7AF2ED8B0B84F321FC02C7729BE99A9DB9D94DF3940C9C80E274319E5C9FEF offset 399
     │             // contracts/counter[LINE]
     │             // 14 |         ResetCounter => {
-    │             //    |                         ^
+    │             //    |         ^^^^^^^^^^^^^^^^^
     │             // .. | ... 3 lines omitted ...
     │             // 18 |         }
     │             //    |         ^

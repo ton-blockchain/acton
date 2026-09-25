@@ -750,10 +750,16 @@ fn is_top_level_string_ty_idx(source_map: &SourceMap, ty_idx: TyIdx) -> bool {
 fn is_send_result_list_type(source_map: &SourceMap, ty_idx: TyIdx) -> bool {
     match source_map.ty_by_idx(ty_idx) {
         Some(Ty::AliasRef { alias_name, .. }) if alias_name == "SendResultList" => true,
-        Some(Ty::AliasRef {
-            alias_name,
-            type_args_ty_idx: Some(type_args),
-        }) if alias_name == "BigArray" => type_args
+        Some(
+            Ty::AliasRef {
+                alias_name,
+                type_args_ty_idx: Some(type_args),
+            }
+            | Ty::StructRef {
+                struct_name: alias_name,
+                type_args_ty_idx: Some(type_args),
+            },
+        ) if alias_name == "BigArray" => type_args
             .first()
             .is_some_and(|&item_ty_idx| is_send_result_type(source_map, item_ty_idx)),
         Some(Ty::Nullable { inner_ty_idx, .. }) => {

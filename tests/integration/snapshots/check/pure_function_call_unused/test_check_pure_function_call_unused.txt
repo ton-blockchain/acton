@@ -1,8 +1,8 @@
 warning[E006]: result of pure function is not used
   --> [ROOT]/contracts/main[LINE]
   |
-8 |                 add(1, 2);
-  |                 ^^^^^^^^^ result of pure function `add` is not used
+3 |                 createEmptyCell();
+  |                 ^^^^^^^^^^^^^^^^^ result of pure function `createEmptyCell` is not used
   |
   = functions marked with `@pure` have no side effects. Calling them without using the result does nothing and may indicate a bug
 

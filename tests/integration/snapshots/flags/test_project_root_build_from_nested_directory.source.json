@@ -3,15 +3,15 @@
     "compiler": {
       "language": "tolk",
       "params": {
-        "compiler_version": "1.4.2"
+        "compiler_version": "1.5.0"
       },
-      "version": "1.4.2"
+      "version": "1.5.0"
     },
     "compiler_abi": {
       "abi_schema_version": "1.0",
       "alias_instantiations": [],
       "compiler_name": "tolk",
-      "compiler_version": "1.4.2",
+      "compiler_version": "1.5.0",
       "contract_name": "",
       "declarations": [],
       "emitted_events": [],
@@ -76,15 +76,15 @@
         "path": "contracts/simple.tolk"
       },
       {
-        "content": "{\"abi_schema_version\":\"1.0\",\"contract_name\":\"\",\"unique_types\":[{\"kind\":\"void\"},{\"kind\":\"int\"},{\"kind\":\"slice\"},{\"kind\":\"cell\"},{\"kind\":\"builder\"},{\"kind\":\"bool\"},{\"kind\":\"coins\"},{\"kind\":\"address\"},{\"kind\":\"intN\",\"n\":32},{\"kind\":\"uintN\",\"n\":32},{\"kind\":\"intN\",\"n\":64},{\"kind\":\"uintN\",\"n\":64}],\"struct_instantiations\":[],\"alias_instantiations\":[],\"declarations\":[],\"incoming_messages\":[],\"incoming_external\":[],\"outgoing_messages\":[],\"emitted_events\":[],\"storage\":{},\"get_methods\":[],\"thrown_errors\":[],\"compiler_name\":\"tolk\",\"compiler_version\":\"1.4.2\"}\n",
-        "content_hash": "e5c984dceabf492c794b993ce4a9f1f74948891e6eff569d4b5c2a7d05ade124",
+        "content": "{\"abi_schema_version\":\"1.0\",\"contract_name\":\"\",\"unique_types\":[{\"kind\":\"void\"},{\"kind\":\"int\"},{\"kind\":\"slice\"},{\"kind\":\"cell\"},{\"kind\":\"builder\"},{\"kind\":\"bool\"},{\"kind\":\"coins\"},{\"kind\":\"address\"},{\"kind\":\"intN\",\"n\":32},{\"kind\":\"uintN\",\"n\":32},{\"kind\":\"intN\",\"n\":64},{\"kind\":\"uintN\",\"n\":64}],\"struct_instantiations\":[],\"alias_instantiations\":[],\"declarations\":[],\"incoming_messages\":[],\"incoming_external\":[],\"outgoing_messages\":[],\"emitted_events\":[],\"storage\":{},\"get_methods\":[],\"thrown_errors\":[],\"compiler_name\":\"tolk\",\"compiler_version\":\"1.5.0\"}\n",
+        "content_hash": "afa9e5a2bcffbab2bee454b886e4be0950b3e57e014704c6e97c55d000f53f88",
         "has_include_directives": null,
         "include_in_command": null,
         "is_stdlib": null,
         "path": "output/simple.abi.json"
       }
     ],
-    "source_bundle_hash": "f2f64f07b291e34027854b171c8924ee0166e76068b91c9ea1691b487cbe1424",
+    "source_bundle_hash": "4d06b046fad823695f658beda629a0a4d3ac6d119acbefe6dfa06df0cc718368",
     "source_map": {
       "code_boc64": "te6ccgEBAgEAFAABFP8A9KQT9LzyyAsBAArTMPiR3A==",
       "debug_marks_base64": "te6ccgEBFwEAqgACASABAgFDv9DqPnecvp53Ip1be9RbjsFl8qyckXeCPUJds3mi5hRAsAMBQ7/LUUtpEnlC4z33SeGHxRhIq/htUa7i3D8ghbwxhQTn4/ARAgPOQAQFAgEgBgcCAWoPDwIBIBQIAgEgCQoCASAVCwIBIAsMAQFIDgEBIA0BASAOAASoCAAEqBgBASAQAASoIAIDzkASEwEB/BYCAUgUFAIBIBUVAQEgFgAB1Q==",
@@ -244,7 +244,7 @@
             "file_id": 0,
             "file_name": "@stdlib/common.tolk",
             "imports": [],
-            "size_chars": 75306
+            "size_chars": 77804
           },
           {
             "file_id": 1,

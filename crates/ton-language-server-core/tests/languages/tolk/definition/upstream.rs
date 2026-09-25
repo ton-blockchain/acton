@@ -945,7 +945,7 @@ fun test() {
     foo.<caret>toCell();
 }"#,
         |_| {},
-        expect![[r#"4:8 -> file:///__tolk_stdlib__/common.tolk 473:6 resolved"#]],
+        expect![[r#"4:8 -> file:///__tolk_stdlib__/common.tolk 470:6 resolved"#]],
     );
 }
 
