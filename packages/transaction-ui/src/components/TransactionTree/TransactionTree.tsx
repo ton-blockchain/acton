@@ -163,26 +163,15 @@ const TREE_ACCOUNT_LABEL_MAX_LENGTH = 20
 const TREE_SCALE_EXTENT = {min: 1, max: 1} as const
 
 const getTreeLinkPath = ({source, target}: TreeLinkDatum): string => {
-  const attributes = target.data.attributes ?? {}
-  if (attributes.isFirst) {
-    return "M"
-      .concat(source.y.toString(), ",")
-      .concat(source.x.toString(), "V")
-      .concat((target.x + 10).toString(), "a10 10 0 0 1 10 -10H")
-      .concat((target.y - 18).toString())
-  }
-  if (attributes.isLast) {
-    return "M"
-      .concat(source.y.toString(), ",")
-      .concat(source.x.toString(), "V")
-      .concat((target.x - 10).toString(), "a10 10 0 0 0 10 10H")
-      .concat((target.y - 18).toString())
-  }
-  return "M"
-    .concat(source.y.toString(), ",")
-    .concat(source.x.toString(), "V")
-    .concat(target.x.toString(), "H")
-    .concat((target.y - 18).toString())
+  // Horizontal trees use D3's x coordinate for screen y and y for screen x.
+  const endX = target.y - 18
+  const verticalOffset = target.x - source.x
+  const start = `M${source.y},${source.x}`
+  if (verticalOffset === 0) return `${start}H${endX}`
+
+  const direction = Math.sign(verticalOffset)
+  const radius = Math.min(10, Math.abs(verticalOffset), Math.max(0, endX - source.y))
+  return `${start}V${target.x - direction * radius}a${radius} ${radius} 0 0 ${direction < 0 ? 1 : 0} ${radius} ${direction * radius}H${endX}`
 }
 
 const getTreeLinkClass = ({source, target}: TreeLinkDatum): string => {
