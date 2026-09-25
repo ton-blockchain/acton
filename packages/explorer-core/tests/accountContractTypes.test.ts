@@ -1,10 +1,30 @@
 import {describe, expect, test} from "bun:test"
 
 import {
+  getAccountContractTypeByCodeHash,
   hasAccountContractHint,
   hasAccountInterface,
   hasTokenInfoType,
 } from "../src/pages/accountContractTypes"
+import bundledAbiCatalog from "../../../crates/acton-abi-catalog/data/data-abis.json"
+
+describe("Wallet V5 code hash detection", () => {
+  test("recognizes every bundled Wallet V5r1 implementation without indexed interfaces", () => {
+    const wallet = bundledAbiCatalog.contracts.find(
+      contract => contract.id === "wallets.WalletV5r1",
+    )
+    if (!wallet) throw new Error("Wallet V5r1 is missing from the ABI catalog")
+    expect(wallet.hashes.length).toBeGreaterThan(0)
+    for (const hash of wallet.hashes) {
+      expect(getAccountContractTypeByCodeHash(hash)).toBe("wallet_v5r1")
+    }
+  })
+
+  test("does not infer Wallet V5 from missing or unknown code", () => {
+    expect(getAccountContractTypeByCodeHash(undefined)).toBeUndefined()
+    expect(getAccountContractTypeByCodeHash("0".repeat(64))).toBeUndefined()
+  })
+})
 
 describe("account interface detection", () => {
   test("normalizes whitespace and letter case", () => {

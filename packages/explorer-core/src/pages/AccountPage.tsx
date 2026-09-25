@@ -4,7 +4,7 @@ import type {FC, SetStateAction} from "react"
 
 import {codeLookupHashHex} from "@acton/transaction-ui"
 import {Dialog, HighlightedCode, RawDataBlock, TokenAmount} from "@acton/ui"
-import {ListChecks, ScrollText, UsersRound} from "lucide-react"
+import {ListChecks, Puzzle, ScrollText, UsersRound} from "lucide-react"
 import {Cell} from "@ton/core"
 
 import type {AccountHistorySortOrder, TonClient} from "../api/client"
@@ -51,6 +51,7 @@ import {NftImage} from "../components/NftImage"
 import {NftOverview} from "../components/NftOverview"
 import {SuspendedAccountOverview} from "../components/SuspendedAccountOverview"
 import {VestingOverview} from "../components/VestingOverview"
+import {WalletV5PluginsTab} from "../components/WalletV5PluginsTab"
 import {
   NominatorPoolNominatorsTab,
   NominatorPoolOverview,
@@ -114,6 +115,7 @@ type AccountTab =
   | "history"
   | "contract"
   | "get-methods"
+  | "plugins"
   | "tokens"
   | "nfts"
   | "items"
@@ -1789,7 +1791,7 @@ export const AccountPage: FC<AccountPageProps> = ({
 
     const hash = tab === "contract" ? "contract-storage" : tab
     if (location.hash === `#${hash}`) return
-    void navigate(`${location.pathname}#${hash}`)
+    void navigate(`${location.pathname}${location.search}#${hash}`)
   }
 
   useEffect(() => {
@@ -1907,6 +1909,10 @@ export const AccountPage: FC<AccountPageProps> = ({
 
   const isLockerAccount = codeHashContractType === "locker"
   const isVestingAccount = codeHashContractType === "vesting"
+  const isWalletV5Account =
+    accountState?.status === "active" &&
+    (codeHashContractType === "wallet_v5r1" ||
+      hasAccountInterface(accountInterfaces, "wallet_v5r1"))
   const isScheduleAccount = isLockerAccount || isVestingAccount
   const accountSuspended = accountSuspendedUntil !== undefined
 
@@ -2114,6 +2120,24 @@ export const AccountPage: FC<AccountPageProps> = ({
   const customTabs = useMemo<readonly AccountDetailsTab[]>(
     () => [
       ...multisigTabs,
+      ...(isWalletV5Account
+        ? [
+            {
+              id: "plugins",
+              label: "Plugins",
+              placement: "after-methods" as const,
+              icon: <Puzzle size={18} />,
+              content: (
+                <WalletV5PluginsTab
+                  address={formattedAddress}
+                  data={accountState?.data}
+                  client={client}
+                  onAddressClick={handleSearch}
+                />
+              ),
+            },
+          ]
+        : []),
       ...(isNominatorPoolAccount
         ? [
             {
@@ -2130,7 +2154,16 @@ export const AccountPage: FC<AccountPageProps> = ({
           ]
         : []),
     ],
-    [handleSearch, isNominatorPoolAccount, multisigTabs, nominatorPoolDetails],
+    [
+      accountState?.data,
+      client,
+      formattedAddress,
+      handleSearch,
+      isNominatorPoolAccount,
+      isWalletV5Account,
+      multisigTabs,
+      nominatorPoolDetails,
+    ],
   )
 
   return (
@@ -2664,6 +2697,7 @@ function isAccountTab(value: string): value is AccountTab {
     value === "history" ||
     value === "contract" ||
     value === "get-methods" ||
+    value === "plugins" ||
     value === "tokens" ||
     value === "nfts" ||
     value === "items" ||

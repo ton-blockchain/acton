@@ -3,6 +3,7 @@ import type {VerificationSourceResponse} from "../api/types"
 import {normalizeCodeHash} from "./codeHash"
 import {NullMetadataRegistry, unverifiedSourceResponse} from "./nullRegistry"
 import type {
+  CompilerAbiLookupOptions,
   CompilerAbiRegistration,
   ExplorerMetadataRegistry,
   RegisteredAddressName,
@@ -73,9 +74,11 @@ export class CompositeMetadataRegistry implements ExplorerMetadataRegistry {
 
   async getCompilerAbis(
     codeHashes: readonly string[],
+    options?: CompilerAbiLookupOptions,
   ): Promise<Record<string, ExtendedContractABI | null>> {
     const uniqueCodeHashes = [...new Set(codeHashes.filter(Boolean))]
     const result: Record<string, ExtendedContractABI | null> = {}
+    const failures = new Map<string, unknown>()
     let unresolved = uniqueCodeHashes
 
     for (const registry of this.registries) {
@@ -83,8 +86,11 @@ export class CompositeMetadataRegistry implements ExplorerMetadataRegistry {
         break
       }
       const abis = await registry
-        .getCompilerAbis(unresolved)
-        .catch((): Record<string, ExtendedContractABI | null> => ({}))
+        .getCompilerAbis(unresolved, options)
+        .catch((error): Record<string, ExtendedContractABI | null> => {
+          for (const codeHash of unresolved) failures.set(codeHash, error)
+          return {}
+        })
       unresolved = unresolved.filter(codeHash => {
         const abi = abis[codeHash] ?? null
         if (abi) {
@@ -101,6 +107,10 @@ export class CompositeMetadataRegistry implements ExplorerMetadataRegistry {
       })
     }
 
+    if (options?.throwOnError) {
+      const failedHash = unresolved.find(codeHash => failures.has(codeHash))
+      if (failedHash) throw failures.get(failedHash)
+    }
     for (const codeHash of unresolved) {
       result[codeHash] = null
     }

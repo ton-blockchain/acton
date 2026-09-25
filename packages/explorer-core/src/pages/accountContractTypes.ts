@@ -1,12 +1,14 @@
 import type {AccountStateTokenInfo} from "../api/types"
 
 /** A contract type that the explorer can identify from a known code hash. */
-export type AccountCodeHashContractType = "locker" | "vesting"
+export type AccountCodeHashContractType = "locker" | "vesting" | "wallet_v5r1"
 
 const ACCOUNT_CONTRACT_TYPES_BY_CODE_HASH: Readonly<Record<string, AccountCodeHashContractType>> = {
   "830c99a447d0974db6d86ed7d89fe4f2d2ec22358cb64287e2d31e563ebde547": "locker",
   "6a05d82d45c933dd2ddf7b338db7f6fbce6d5e2ec3b142e5fc53a94395dca252": "locker",
   b48b531abec3b714638291f7d77ed6dc9f6a2729efca20477137374d4ae8b590: "vesting",
+  "20834b7b72b112147e1b2fb457b84e74d1a30f04f737d4f62a668e9552d2b72f": "wallet_v5r1",
+  "6398c607b11b539775a583f7bacb80c1d22087100c4f40df5fb502d2b726aed2": "wallet_v5r1",
 }
 
 const ACCOUNT_CONTRACT_HINTS = {

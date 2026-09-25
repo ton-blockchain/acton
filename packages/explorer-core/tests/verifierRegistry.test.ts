@@ -1,5 +1,8 @@
 import {expect, mock, spyOn, test} from "bun:test"
 
+import type {ExtendedContractABI} from "../src/api/compilerAbi"
+import {CompositeMetadataRegistry} from "../src/metadata/compositeRegistry"
+import {NullMetadataRegistry} from "../src/metadata/nullRegistry"
 import {VerifierMetadataRegistry} from "../src/metadata/verifierRegistry"
 
 const mockFetch = (
@@ -164,6 +167,133 @@ test.each([429, 500])("HTTP %s verifier failures do not become cached misses", a
       contract_name: "RecoveredContract",
     })
     expect(fetch).toHaveBeenCalledTimes(2)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test.each([
+  429, 500,
+])("strict composite lookups propagate HTTP %s failures and recover without caching them", async status => {
+  const originalFetch = globalThis.fetch
+  const fetch = mockFetch(async () => Response.json({error: "unavailable"}, {status}))
+  globalThis.fetch = fetch
+  try {
+    const registry = new CompositeMetadataRegistry([
+      new NullMetadataRegistry(),
+      new VerifierMetadataRegistry(),
+      new NullMetadataRegistry(),
+    ])
+    await expect(registry.getCompilerAbis([CODE_HASH], {throwOnError: true})).rejects.toThrow(
+      `Verifier ABI request failed with HTTP ${status}`,
+    )
+
+    fetch.mockImplementation(async () =>
+      Response.json({items: [{code_hash: CODE_HASH, abi: {contract_name: "RecoveredContract"}}]}),
+    )
+    const recovered = await registry.getCompilerAbis([CODE_HASH], {throwOnError: true})
+    expect(recovered[CODE_HASH]?.compiler_abi.contract_name).toBe("RecoveredContract")
+    expect(await registry.getCompilerAbis([CODE_HASH], {throwOnError: true})).toEqual(recovered)
+    expect(fetch).toHaveBeenCalledTimes(2)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test.each([
+  404, 200,
+])("strict composite lookups preserve genuine HTTP %s misses as cached nulls", async status => {
+  const originalFetch = globalThis.fetch
+  const fetch = mockFetch(async () => Response.json({items: []}, {status}))
+  globalThis.fetch = fetch
+  try {
+    const registry = new CompositeMetadataRegistry([
+      new NullMetadataRegistry(),
+      new VerifierMetadataRegistry(),
+    ])
+    expect(await registry.getCompilerAbis([CODE_HASH], {throwOnError: true})).toEqual({
+      [CODE_HASH]: null,
+    })
+    expect(await registry.getCompilerAbis([CODE_HASH])).toEqual({[CODE_HASH]: null})
+    expect(fetch).toHaveBeenCalledTimes(1)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("strict composite lookups propagate verifier timeouts", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = mockFetch((_input, init) => rejectWhenAborted(init?.signal))
+  try {
+    const registry = new CompositeMetadataRegistry([
+      new VerifierMetadataRegistry({requestTimeoutMs: 5}),
+    ])
+    await expect(registry.getCompilerAbis([CODE_HASH], {throwOnError: true})).rejects.toThrow()
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("a successful fallback suppresses a strict verifier failure for the resolved hash", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = mockFetch(async () => Response.json({error: "unavailable"}, {status: 503}))
+  const fallbackAbi = {
+    compiler_abi: {contract_name: "FallbackContract"},
+    code_hashes: [CODE_HASH],
+    links: [],
+  } as unknown as ExtendedContractABI
+  const fallback = new NullMetadataRegistry()
+  const fallbackLookup = spyOn(fallback, "getCompilerAbis").mockResolvedValue({
+    [CODE_HASH]: fallbackAbi,
+  })
+  try {
+    const registry = new CompositeMetadataRegistry([new VerifierMetadataRegistry(), fallback])
+    expect(await registry.getCompilerAbis([CODE_HASH], {throwOnError: true})).toEqual({
+      [CODE_HASH]: fallbackAbi,
+    })
+    expect(fallbackLookup).toHaveBeenCalledWith([CODE_HASH], {throwOnError: true})
+  } finally {
+    fallbackLookup.mockRestore()
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("default composite lookups still hide transport failures", async () => {
+  const originalFetch = globalThis.fetch
+  const fetch = mockFetch(async () => {
+    throw new Error("Connection reset")
+  })
+  globalThis.fetch = fetch
+  try {
+    const registry = new CompositeMetadataRegistry([new VerifierMetadataRegistry()])
+    expect(await registry.getCompilerAbis([CODE_HASH])).toEqual({[CODE_HASH]: null})
+    await expect(registry.getCompilerAbis([CODE_HASH], {throwOnError: true})).rejects.toThrow(
+      "Connection reset",
+    )
+    expect(fetch).toHaveBeenCalledTimes(2)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("strict and default callers can share a failed verifier request with different error handling", async () => {
+  const originalFetch = globalThis.fetch
+  const response = Promise.withResolvers<Response>()
+  const fetch = mockFetch(() => response.promise)
+  globalThis.fetch = fetch
+  try {
+    const registry = new VerifierMetadataRegistry()
+    const strict = registry.getCompilerAbis([CODE_HASH], {throwOnError: true})
+    const defaultLookup = registry.getCompilerAbis([CODE_HASH])
+    const results = Promise.allSettled([strict, defaultLookup])
+    response.reject(new Error("Connection reset"))
+    const [strictResult, defaultResult] = await results
+    expect(strictResult.status).toBe("rejected")
+    if (strictResult.status === "rejected") {
+      expect(strictResult.reason.message).toBe("Connection reset")
+    }
+    expect(defaultResult).toEqual({status: "fulfilled", value: {[CODE_HASH]: null}})
+    expect(fetch).toHaveBeenCalledTimes(1)
   } finally {
     globalThis.fetch = originalFetch
   }

@@ -134,6 +134,7 @@ export interface AccountDetailsTab {
   readonly label: string
   readonly icon: ReactNode
   readonly content: ReactNode
+  readonly placement?: "after-history" | "after-methods"
 }
 
 export interface ActionTraceLoadMoreState {
@@ -461,7 +462,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
 
   useLayoutEffect(() => {
     activeTabRef.current?.scrollIntoView({block: "nearest", inline: "nearest"})
-  }, [activeTab])
+  }, [activeTab, activeCustomTab?.id, compilerAbi])
 
   const [currentPage, setCurrentPage] = useState(1)
   const [hoveredAddress, setHoveredAddress] = useState<string | undefined>()
@@ -875,6 +876,21 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
       } as CSSProperties)
     : undefined
 
+  const renderCustomTab = (tab: AccountDetailsTab) => (
+    <button
+      key={tab.id}
+      type="button"
+      ref={activeTab === tab.id ? activeTabRef : undefined}
+      className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ""}`}
+      onClick={() => handleTabClick(tab.id)}
+    >
+      <span className={styles.tabIcon} aria-hidden="true">
+        {tab.icon}
+      </span>
+      {tab.label}
+    </button>
+  )
+
   return (
     <section className={styles.tableCard}>
       <div className={styles.tabs}>
@@ -890,20 +906,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
             </span>
             History
           </button>
-          {customTabs.map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              ref={activeTab === tab.id ? activeTabRef : undefined}
-              className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ""}`}
-              onClick={() => handleTabClick(tab.id)}
-            >
-              <span className={styles.tabIcon} aria-hidden="true">
-                {tab.icon}
-              </span>
-              {tab.label}
-            </button>
-          ))}
+          {customTabs.filter(tab => tab.placement !== "after-methods").map(renderCustomTab)}
           <button
             type="button"
             ref={activeTab === "tokens" ? activeTabRef : undefined}
@@ -978,6 +981,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
               Methods
             </button>
           )}
+          {customTabs.filter(tab => tab.placement === "after-methods").map(renderCustomTab)}
         </div>
         {activeTab === "history" && (
           <div className={styles.tabActions}>

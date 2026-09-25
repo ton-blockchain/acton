@@ -5,6 +5,11 @@ export interface CompilerAbiRegistration {
   readonly abi: ExtendedContractABI
 }
 
+export interface CompilerAbiLookupOptions {
+  /** Reject failed lookups so callers can retry; genuinely missing ABIs remain null. */
+  readonly throwOnError?: boolean
+}
+
 export interface SourceRegistration {
   readonly codeHash: string
   readonly source: VerificationSourceResponse
@@ -39,6 +44,7 @@ export interface ExplorerMetadataRegistry {
 
   getCompilerAbis(
     codeHashes: readonly string[],
+    options?: CompilerAbiLookupOptions,
   ): Promise<Record<string, ExtendedContractABI | null>>
   registerCompilerAbis(entries: readonly CompilerAbiRegistration[]): Promise<void>
   listCompilerAbis(): Promise<readonly RegisteredCompilerAbi[]>

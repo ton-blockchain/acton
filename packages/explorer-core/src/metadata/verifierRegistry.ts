@@ -2,6 +2,7 @@ import type {ExtendedContractABI} from "../api/compilerAbi"
 import type {VerificationSourceResponse} from "../api/types"
 import {normalizeCodeHash} from "./codeHash"
 import {NullMetadataRegistry, unverifiedSourceResponse} from "./nullRegistry"
+import type {CompilerAbiLookupOptions} from "./types"
 
 interface VerifierAbiResponse {
   readonly items?: readonly VerifierAbiItem[]
@@ -48,6 +49,7 @@ export class VerifierMetadataRegistry extends NullMetadataRegistry {
 
   override async getCompilerAbis(
     codeHashes: readonly string[],
+    options?: CompilerAbiLookupOptions,
   ): Promise<Record<string, ExtendedContractABI | null>> {
     const result: Record<string, ExtendedContractABI | null> = {}
     await Promise.all(
@@ -79,6 +81,7 @@ export class VerifierMetadataRegistry extends NullMetadataRegistry {
           }
           result[codeHash] = await request
         } catch (error) {
+          if (options?.throwOnError) throw error
           console.debug(`Failed to fetch verifier ABI for ${normalized}`, error)
           result[codeHash] = null
         }

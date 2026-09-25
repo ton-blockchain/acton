@@ -2,6 +2,7 @@ import type {ExtendedContractABI} from "../api/compilerAbi"
 import type {VerificationSourceResponse} from "../api/types"
 import {normalizeCodeHash} from "./codeHash"
 import type {
+  CompilerAbiLookupOptions,
   CompilerAbiRegistration,
   ExplorerMetadataRegistry,
   RegisteredCompilerAbi,
@@ -35,6 +36,7 @@ export class NullMetadataRegistry implements ExplorerMetadataRegistry {
 
   async getCompilerAbis(
     codeHashes: readonly string[],
+    _options?: CompilerAbiLookupOptions,
   ): Promise<Record<string, ExtendedContractABI | null>> {
     return Object.fromEntries(codeHashes.map(codeHash => [codeHash, null]))
   }
