@@ -10,7 +10,7 @@ Annotated Code:
  4   |             }                                       |
  5   |                                                     |
  6   |             fun isPositive(x: int): bool {          |
- 7 ✓ |                 if (x > 0) {                        | hits:2 branches:true=1 false=1
+ 7 ✓ |                 if (x > 0) {                        | hits:2
  8 ✓ |                     return true;                    | hits:1
  9   |                 } else {                            |
 10 ✓ |                     return false;                   | hits:1

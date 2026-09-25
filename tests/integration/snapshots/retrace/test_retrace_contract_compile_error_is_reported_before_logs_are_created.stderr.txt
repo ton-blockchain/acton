@@ -1,3 +1,5 @@
-Error: Failed to compile contract broken for source-level retrace: [ROOT]/contracts/broken[LINE]: error: expected <expression>, got `;`
+Error: Failed to compile contract broken for source-level retrace: error: expected <expression>, got `;`
+    --> [ROOT]/contracts/broken[LINE]
+     | 
    3 |     val broken = ;
      |                  ^

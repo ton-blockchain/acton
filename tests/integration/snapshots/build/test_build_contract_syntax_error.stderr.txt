@@ -1,6 +1,8 @@
 Error: In broken:
 
-[ROOT]/contracts/broken[LINE]: error: expected <expression>, got `;`
+error: expected <expression>, got `;`
+    --> [ROOT]/contracts/broken[LINE]
+     | 
    3 |                 val x = ;
      |                         ^
 

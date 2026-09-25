@@ -56,8 +56,6 @@ fn completes_statement_and_contextual_catch_snippets() {
         match                              Snippet                       1:27-1:30  match (${1:condition}) {\n\t$0\n}
         bits256                            TypeParameter                 1:27-1:30  bits256
         bits{X}                            TypeParameter                 1:27-1:30  bits${1:32}
-        bytes32                            TypeParameter                 1:27-1:30  bytes32
-        bytes{X}                           TypeParameter                 1:27-1:30  bytes${1:32}
         int128                             TypeParameter                 1:27-1:30  int128
         int16                              TypeParameter                 1:27-1:30  int16
         int256                             TypeParameter                 1:27-1:30  int256

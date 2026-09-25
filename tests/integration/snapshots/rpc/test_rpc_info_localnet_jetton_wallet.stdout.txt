@@ -1,13 +1,13 @@
 Basic Information
   Network:           localnet
-  Raw Address:       0:51df56f242f58abd2cd6ba689723e86fc5159cdc340bbd92788034f219d5cf04
+  Raw Address:       0:519659f3c31bb363916db3cd1a8874970c5ee1cfdd1fd610daface106d4b8bc9
   Status:            active
   Contract:          JettonWallet
   Balance:           [TON_BALANCE] GRAM
   Last Tx LT:        8
   Last Tx Hash:      [TX_HASH]
-  Code Hash:         0x7bfa53bce90ce26cd368ec2989eba2bd15d286104742f0e04659f485a03012ba
-  Data Hash:         0x2b38f60246fffa2ba1ee616f4bdb1ab7bf7525d4d445dab6a178f61e5cee7006
+  Code Hash:         0xfdd0e33b685ba04a6a5b6beb6b103b76312b5649ac0c55a1ebe680e08d83efee
+  Data Hash:         0x1afde2bca66d1ca6d8dfb9c2912b50b1624f9dba5c164b64d021641e9e472cfd
 
 Jetton Wallet
   Token:             Acton Sample Jetton (ACTON)

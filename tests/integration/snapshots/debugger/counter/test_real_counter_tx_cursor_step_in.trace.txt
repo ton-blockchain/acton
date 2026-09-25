@@ -699,7 +699,7 @@ Step 40 (step_in):
      38|
      39|     match (msg) {
      40|         IncreaseCounter => {
-                                    ^
+                 ^
      41|             handleIncreaseCounter(msg.increaseBy);
   Variables:
     in: InMessage

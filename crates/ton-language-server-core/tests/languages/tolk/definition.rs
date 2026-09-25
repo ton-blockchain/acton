@@ -78,7 +78,7 @@ fn resolves_stdlib_method_on_string_literal() {
         "#,
         |_| {},
         expect![[r"
-            1:31 -> file:///__tolk_stdlib__/common.tolk 1079:11 resolved"]],
+            1:31 -> file:///__tolk_stdlib__/common.tolk 1071:11 resolved"]],
     );
 }
 
@@ -517,8 +517,8 @@ fn resolves_stdlib_static_and_generic_methods() {
         ",
         |_| {},
         expect![[r"
-            4:12 -> file:///__tolk_stdlib__/common.tolk 483:6 resolved
-            5:13 -> file:///__tolk_stdlib__/common.tolk 378:13 resolved"]],
+            4:12 -> file:///__tolk_stdlib__/common.tolk 480:6 resolved
+            5:13 -> file:///__tolk_stdlib__/common.tolk 375:13 resolved"]],
     );
 }
 
@@ -540,11 +540,11 @@ fn resolves_chained_generic_stdlib_methods() {
         ",
         |_| {},
         expect![[r"
-            6:9 -> file:///__tolk_stdlib__/common.tolk 1320:12 resolved
-            7:9 -> file:///__tolk_stdlib__/common.tolk 1325:12 resolved
-            7:25 -> file:///__tolk_stdlib__/common.tolk 473:6 resolved
-            7:34 -> file:///__tolk_stdlib__/common.tolk 562:12 resolved
-            8:9 -> file:///__tolk_stdlib__/common.tolk 1299:12 resolved"]],
+            6:9 -> file:///__tolk_stdlib__/common.tolk 1312:12 resolved
+            7:9 -> file:///__tolk_stdlib__/common.tolk 1317:12 resolved
+            7:25 -> file:///__tolk_stdlib__/common.tolk 470:6 resolved
+            7:34 -> file:///__tolk_stdlib__/common.tolk 559:12 resolved
+            8:9 -> file:///__tolk_stdlib__/common.tolk 1291:12 resolved"]],
     );
 }
 

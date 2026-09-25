@@ -1,3 +1,5 @@
-[ROOT]/tests/test.test[LINE]: error: expected `;`, got `a`
+error: expected `;`, got `a`
+    --> [ROOT]/tests/test.test[LINE]
+     | 
    3 |                 let a = 10;
      |                     ^

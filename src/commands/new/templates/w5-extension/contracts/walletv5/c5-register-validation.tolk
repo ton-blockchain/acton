@@ -38,7 +38,7 @@ fun OutActionsCell.verifyC5Actions(self, isExternal: bool): self {
             ) throw Errors.ExternalSendMessageMustHaveIgnoreErrorsSendMode;
         }
 
-        cs = outAction.prev.beginParseAllowExotic();
+        cs = (outAction.prev as OutActionsCell).beginParseAllowExotic();
         count += 1;
     } while (!cs.isEmpty());
 

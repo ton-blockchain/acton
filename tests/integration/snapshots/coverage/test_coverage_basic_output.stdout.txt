@@ -17,7 +17,7 @@
 ───────────────────────────────────────────────────────────────────────────────────────────────────
  File             Covered   Total Lines   % Lines   Covered   Total Branches   % Branches   Score  
 ───────────────────────────────────────────────────────────────────────────────────────────────────
- All files              4             4    100.0%         2                2       100.0%   100.0% 
- code/math.tolk         4             4    100.0%         2                2       100.0%   100.0% 
+ All files              4             4    100.0%         0                0          n/a   100.0% 
+ code/math.tolk         4             4    100.0%         0                0          n/a   100.0% 
 
 Text coverage file saved in coverage.txt

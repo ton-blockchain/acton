@@ -13,7 +13,6 @@ import { SourceCodeLink } from '@/components/SourceCodeLink';
 ## `lisp_list<T>.isEmpty`
 
 ```tolk
-@pure
 fun lisp_list<T>.isEmpty(self): bool
 ```
 
@@ -22,7 +21,6 @@ fun lisp_list<T>.isEmpty(self): bool
 ## `lisp_list<T>.prependHead`
 
 ```tolk
-@pure
 fun lisp_list<T>.prependHead(mutate self, value: T): void
 ```
 
@@ -30,12 +28,11 @@ Inserts an element an the front.
 Before: `[a b c]`.
 After: `[new a b c]`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L32" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L31" />
 
 ## `lisp_list<T>.popHead`
 
 ```tolk
-@pure
 fun lisp_list<T>.popHead(mutate self): T
 ```
 
@@ -44,67 +41,62 @@ Before: `[a b c]`.
 After: `[b c]`, returns `a`.
 Throws an exceptions if a list is empty.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L41" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L39" />
 
 ## `lisp_list<T>.getHead`
 
 ```tolk
-@pure
 fun lisp_list<T>.getHead(self): T
 ```
 
 Returns an element from the front: `a` for `[a b c]`.
 Throws an exceptions if a list is empty.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L50" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L47" />
 
 ## `lisp_list<T>.getTail`
 
 ```tolk
-@pure
 fun lisp_list<T>.getTail(self): lisp_list<T>
 ```
 
 Returns all but the frontmost element: `[b c]` for `[a b c]`.
 Throws an exceptions if a list is empty.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L57" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L53" />
 
 ## `lisp_list<T>.calculateSize`
 
 ```tolk
-@pure
 fun lisp_list<T>.calculateSize(self): int
 ```
 
 Calculates the size of a list by looping all the elements (there is no other way to do it).
 The longer the list — the more gas consumption (O(N) complexity).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L64" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L59" />
 
 ## `lisp_list<T>.calculateReversed`
 
 ```tolk
-@pure
 fun lisp_list<T>.calculateReversed(self): lisp_list<T>
 ```
 
 Returns the list with elements in reversed order.
 Given `[a b c]` returns `[c b a]`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L77" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L71" />
 
 ## `lisp_list<T>.calculateConcatenation`
 
 ```tolk
-@pure
 fun lisp_list<T>.calculateConcatenation(self, other: lisp_list<T>): lisp_list<T>
 ```
 
 Returns the concatenation of two lists.
 Given `[a b]` and `[c d]`, returns `[a b c d]`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L89" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L82" />
 
 ## `createEmptyList`
 
@@ -124,11 +116,12 @@ var list = createEmptyList<int>();
 var t = lisp_list<int> [];
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L112" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L104" />
 
 ## `lisp_list<T>.packToBuilder`
 
 ```tolk
+@inline
 fun lisp_list<T>.packToBuilder(self, mutate b: builder): void
 ```
 
@@ -136,16 +129,17 @@ fun lisp_list<T>.packToBuilder(self, mutate b: builder): void
 A list `[1 2 3]` (on a stack: `[1 [2 [3 null]]]`) is "3.ref(2.ref(1.ref(empty cell)))".
 An empty list `[]` (on a stack: `null`) is "empty cell"
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L121" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L113" />
 
 ## `lisp_list<T>.unpackFromSlice`
 
 ```tolk
+@inline
 fun lisp_list<T>.unpackFromSlice(mutate s: slice): lisp_list<T>
 ```
 
 Unserialize `lisp_list<T>` from snake refs:
 From "3.ref(2.ref(1.ref(empty cell)))" get a list `[1 2 3]` (on a stack: `[1 [2 [3 null]]]`).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L132" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/lisp-lists.tolk#L125" />
 

@@ -30,7 +30,7 @@ get fun `test bc stdlib config storage prices multi entry roundtrip`() {
     val extraTs: uint32 = 1000000;
     var config = testing.getConfig();
 
-    var prices = createEmptyMap<uint32, StoragePrices>();
+    var prices = StoragePricesDict [];
     prices.setInitial(StoragePrices {
         initialUnixTime: 0,
         bitPrice: 11,
@@ -83,7 +83,7 @@ get fun `test bc stdlib config storage prices set initial overwrites index zero`
     val extraTs: uint32 = 2000000;
     var config = testing.getConfig();
 
-    var prices = createEmptyMap<uint32, StoragePrices>();
+    var prices = StoragePricesDict [];
     prices.setInitial(StoragePrices {
         initialUnixTime: 0,
         bitPrice: 101,

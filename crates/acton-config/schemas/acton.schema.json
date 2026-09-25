@@ -874,7 +874,7 @@
         },
         "pure-function-call-unused": {
           "title": "E006: pure-function-call-unused",
-          "description": "### What it does\nChecks for calls to `@pure` functions where the result is not used.\n\n### Why is this bad?\n`@pure` functions have no side effects, so calling them without using the result is a no-op and likely a bug.\n\n### Example\n```tolk twoslash\n@pure\nfun add(a: int, b: int): int { return a + b; }\n\nfun main() {\n    add(1, 2);\n//  ^^^^^^^^^ E006: result of pure function is not used\n}\n```",
+          "description": "### What it does\nChecks for calls to `@pure` functions where the result is not used.\n\n### Why is this bad?\n`@pure` functions have no side effects, so calling them without using the result is a no-op and likely a bug.\n\n### Example\n```tolk twoslash\nfun main() {\n    createEmptyCell();\n//  ^^^^^^^^^^^^^^^^^ E006: result of pure function is not used\n}\n```",
           "anyOf": [
             {
               "$ref": "#/definitions/LintRuleLevel"

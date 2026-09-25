@@ -16,12 +16,9 @@ use tolk_ty::InferenceResult;
 ///
 /// ### Example
 /// ```tolk twoslash
-/// @pure
-/// fun add(a: int, b: int): int { return a + b; }
-///
 /// fun main() {
-///     add(1, 2);
-/// //  ^^^^^^^^^ E006: result of pure function is not used
+///     createEmptyCell();
+/// //  ^^^^^^^^^^^^^^^^^ E006: result of pure function is not used
 /// }
 /// ```
 #[derive(ViolationMetadata)]

@@ -28,7 +28,7 @@ off │ instruction
 112 │         PUSHCONT {
     │             // contracts/counter[LINE]
     │             //  9 |         IncreaseCounter => {
-    │             //    |                            ^
+    │             //    |         ^^^^^^^^^^^^^^^^^^^^
     │             // .. | ... 3 lines omitted ...
     │             // 13 |         }
     │             //    |         ^
@@ -82,7 +82,7 @@ off │ instruction
 392 │         PUSHCONT {
     │             // contracts/counter[LINE]
     │             // 14 |         ResetCounter => {
-    │             //    |                         ^
+    │             //    |         ^^^^^^^^^^^^^^^^^
     │             // .. | ... 3 lines omitted ...
     │             // 18 |         }
     │             //    |         ^

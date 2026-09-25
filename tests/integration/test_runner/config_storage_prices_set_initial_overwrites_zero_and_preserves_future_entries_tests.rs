@@ -31,7 +31,7 @@ get fun `test dq stdlib config storage prices set initial overwrite preserves fu
     val futureTsB: uint32 = 2000000;
     var config = testing.getConfig();
 
-    var prices = createEmptyMap<uint32, StoragePrices>();
+    var prices = StoragePricesDict [];
     prices.setInitial(StoragePrices {
         initialUnixTime: 0,
         bitPrice: 11,

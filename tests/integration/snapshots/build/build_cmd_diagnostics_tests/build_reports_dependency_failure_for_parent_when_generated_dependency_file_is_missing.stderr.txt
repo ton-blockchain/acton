@@ -1,12 +1,16 @@
 Error: In child:
 
-[ROOT]/contracts/child[LINE]: error: expected <expression>, got `;`
+error: expected <expression>, got `;`
+    --> [ROOT]/contracts/child[LINE]
+     | 
    2 |     val childValue = ;
      |                      ^
 
 In parent:
 
-[ROOT]/contracts/parent[LINE]: error: Failed to import: [NOT_FOUND]
+error: Failed to import: [NOT_FOUND]
+    --> [ROOT]/contracts/parent[LINE]
+     | 
    1 | import "../gen/child.code.tolk"
      |        ^^^^^^^^^^^^^^^^^^^^^^^^
 

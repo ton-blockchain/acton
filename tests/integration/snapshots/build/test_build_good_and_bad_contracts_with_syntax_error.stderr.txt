@@ -1,6 +1,8 @@
 Error: In ok2:
 
-[ROOT]/contracts/ok2[LINE]: error: expected <expression>, got `;`
+error: expected <expression>, got `;`
+    --> [ROOT]/contracts/ok2[LINE]
+     | 
    3 |                 val x =;
      |                        ^
 

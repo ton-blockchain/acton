@@ -31,7 +31,7 @@ get fun `test dr stdlib config storage prices multi entry roundtrip`() {
     val tsA: uint32 = 1700000000;
     val tsB: uint32 = 1700003600;
 
-    var prices = createEmptyMap<uint32, StoragePrices>();
+    var prices = StoragePricesDict [];
     prices.set(0, StoragePrices {
         initialUnixTime: 0,
         bitPrice: 11,
@@ -101,7 +101,7 @@ get fun `test dr stdlib config storage prices second write replacement`() {
     val oldTsB: uint32 = 1800003600;
     val newTs: uint32 = 1900000000;
 
-    var first = createEmptyMap<uint32, StoragePrices>();
+    var first = StoragePricesDict [];
     first.set(0, StoragePrices {
         initialUnixTime: 0,
         bitPrice: 9,
@@ -128,7 +128,7 @@ get fun `test dr stdlib config storage prices second write replacement`() {
     config.setStoragePrices(first);
     expect(testing.setConfig(config)).toBeTrue();
 
-    var second = map<uint32, StoragePrices> [];
+    var second = StoragePricesDict [];
     second.set(0, StoragePrices {
         initialUnixTime: 0,
         bitPrice: 901,

@@ -1,4 +1,6 @@
-Error: [ROOT]/contracts/broken[LINE]: error: expected <expression>, got `;`
+Error: error: expected <expression>, got `;`
+    --> [ROOT]/contracts/broken[LINE]
+     | 
    1 | fun main() { return 1 +; }
      |                        ^
 

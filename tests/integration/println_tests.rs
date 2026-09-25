@@ -30,7 +30,7 @@ fn test_println_big_array() {
                 println("values={}", numbers);
                 println(Collection { values: numbers, next: 42 });
                 println(Collection { values: null, next: 43 });
-                println([numbers, BigArray<int>.createEmpty()]);
+                println([numbers as BigArray<int>, BigArray<int>.createEmpty()]);
                 println(BigArray<Point>.createFromArray([
                     Point { x: 1, y: 2 }, Point { x: 3, y: 4 }
                 ]));
