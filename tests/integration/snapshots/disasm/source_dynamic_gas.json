@@ -1,0 +1,257 @@
+[
+  {
+    "assembly": "NEWC/nSTI 32/nENDC/n",
+    "blocks": [
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 0,
+            "start_line": 0
+          }
+        ],
+        "source": {
+          "column": 38,
+          "end_column": 49,
+          "end_line": 2,
+          "file": "[ROOT]/functions.tolk",
+          "line": 2
+        }
+      },
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 1,
+            "start_line": 1
+          }
+        ],
+        "source": {
+          "column": 50,
+          "end_column": 58,
+          "end_line": 2,
+          "file": "[ROOT]/functions.tolk",
+          "line": 2
+        }
+      },
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 2,
+            "start_line": 2
+          }
+        ],
+        "source": {
+          "column": 70,
+          "end_column": 77,
+          "end_line": 2,
+          "file": "[ROOT]/functions.tolk",
+          "line": 2
+        }
+      }
+    ],
+    "gas_estimate": {
+      "has_control_flow": false,
+      "has_dynamic_cost": false,
+      "unknown_instructions": 0,
+      "value": 562
+    },
+    "method_id": 262143,
+    "name": "build"
+  },
+  {
+    "assembly": "HASHCU/n",
+    "blocks": [
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 0,
+            "start_line": 0
+          }
+        ],
+        "source": {
+          "column": 41,
+          "end_column": 45,
+          "end_line": 3,
+          "file": "[ROOT]/functions.tolk",
+          "line": 3
+        }
+      }
+    ],
+    "gas_estimate": {
+      "has_control_flow": false,
+      "has_dynamic_cost": true,
+      "unknown_instructions": 0,
+      "value": 26
+    },
+    "method_id": 262142,
+    "name": "hash"
+  },
+  {
+    "assembly": "SWAP/nPUSHCONT_SHORT {/n    MULINT 3/n}/nIFJMP/nADDINT 7/n",
+    "blocks": [
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 0,
+            "start_line": 0
+          }
+        ],
+        "source": {
+          "column": 5,
+          "end_column": 7,
+          "end_line": 5,
+          "file": "[ROOT]/functions.tolk",
+          "line": 5
+        }
+      },
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 1,
+            "start_line": 1
+          },
+          {
+            "end_line": 3,
+            "start_line": 3
+          }
+        ],
+        "source": {
+          "column": 5,
+          "end_column": 36,
+          "end_line": 5,
+          "file": "[ROOT]/functions.tolk",
+          "line": 5
+        }
+      },
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 2,
+            "start_line": 2
+          }
+        ],
+        "source": {
+          "column": 24,
+          "end_column": 33,
+          "end_line": 5,
+          "file": "[ROOT]/functions.tolk",
+          "line": 5
+        }
+      },
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 4,
+            "start_line": 4
+          }
+        ],
+        "source": {
+          "column": 17,
+          "end_column": 33,
+          "end_line": 5,
+          "file": "[ROOT]/functions.tolk",
+          "line": 5
+        }
+      },
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 5,
+            "start_line": 5
+          }
+        ],
+        "source": {
+          "column": 12,
+          "end_column": 21,
+          "end_line": 6,
+          "file": "[ROOT]/functions.tolk",
+          "line": 6
+        }
+      }
+    ],
+    "gas_estimate": {
+      "has_control_flow": true,
+      "has_dynamic_cost": false,
+      "unknown_instructions": 0,
+      "value": 106
+    },
+    "method_id": 262141,
+    "name": "branch"
+  },
+  {
+    "assembly": "SWAP/nPUSHCONT_SHORT {/n    INC/n}/nREPEAT/n",
+    "blocks": [
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 0,
+            "start_line": 0
+          }
+        ],
+        "source": {
+          "column": 5,
+          "end_column": 11,
+          "end_line": 9,
+          "file": "[ROOT]/functions.tolk",
+          "line": 9
+        }
+      },
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 1,
+            "start_line": 1
+          },
+          {
+            "end_line": 3,
+            "start_line": 3
+          }
+        ],
+        "source": {
+          "column": 5,
+          "end_column": 35,
+          "end_line": 9,
+          "file": "[ROOT]/functions.tolk",
+          "line": 9
+        }
+      },
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 2,
+            "start_line": 2
+          }
+        ],
+        "source": {
+          "column": 22,
+          "end_column": 32,
+          "end_line": 9,
+          "file": "[ROOT]/functions.tolk",
+          "line": 9
+        }
+      },
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 4,
+            "start_line": 4
+          }
+        ],
+        "source": {
+          "column": 22,
+          "end_column": 27,
+          "end_line": 9,
+          "file": "[ROOT]/functions.tolk",
+          "line": 9
+        }
+      }
+    ],
+    "gas_estimate": {
+      "has_control_flow": true,
+      "has_dynamic_cost": false,
+      "unknown_instructions": 0,
+      "value": 72
+    },
+    "method_id": 262140,
+    "name": "loop"
+  }
+]

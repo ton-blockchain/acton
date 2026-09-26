@@ -7,12 +7,13 @@ use acton::context::{
 use acton::ffi;
 use acton::file_build_cache::FileBuildCache;
 use acton_config::config::{ActonConfig, LibrariesConfig, WalletsConfig, normalize_mappings};
+use acton_debug::EvaluateRuntimeConfig;
 use acton_debug::ReplayerDebugSession;
 use acton_debug::replayer::TolkReplayer;
 use acton_debug::{start_dap_server, start_dap_server_with_listener};
 use anyhow::Context as AnyhowContext;
 use dap::events::Event;
-use dap::responses::ContinueResponse;
+use dap::responses::{ContinueResponse, EvaluateResponse};
 use dap::types::StackFrame;
 use dap_client::DapClient;
 use owo_colors::OwoColorize;
@@ -171,6 +172,14 @@ impl DebuggerClient {
     ) -> anyhow::Result<Vec<dap::types::Variable>> {
         let variables = self.client.variables(variables_reference)?;
         Ok(variables.variables)
+    }
+
+    pub(crate) fn evaluate(
+        &mut self,
+        expression: &str,
+        frame_id: Option<i64>,
+    ) -> anyhow::Result<EvaluateResponse> {
+        self.client.evaluate(expression, frame_id)
     }
 
     #[allow(dead_code)]
@@ -391,6 +400,11 @@ fn execute_script(
     replayer.set_abi(abi);
     let mut dbg_session = ReplayerDebugSession::new(transport, replayer, method_name.into())
         .with_outer_frame_local_snapshots(capture_outer_frame_locals);
+    dbg_session.set_root_evaluate_runtime(EvaluateRuntimeConfig {
+        run_args: params.clone(),
+        config_b64: Some(DEFAULT_CONFIG.to_owned()),
+        mappings: ctx.env.config.mappings(),
+    });
     ctx.debug = DebugCtx::new(&mut dbg_session);
 
     if ctx.debug.process_incoming_requests(true)? {

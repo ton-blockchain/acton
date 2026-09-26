@@ -37,9 +37,60 @@ Binary, hex, or base64 BoC file to disassemble.
 
 Use `--string` to pass the code directly instead of reading a file.
 
+<AvailabilityBadge since="trunk" />
+
+A `.tolk` file is compiled as an entrypoint before disassembly. Imports use the
+project mappings from `Acton.toml`. Files without an entrypoint are also accepted.
+Use `--function` to select individual functions from these sources.
+
 <CommandOptionMeta label="Conflicts with">
 
 `--string`, `--address`
+
+</CommandOptionMeta>
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
+`--function` _name_
+
+</CommandOptionTitle>
+
+<AvailabilityBadge since="trunk" />
+
+Disassemble only the named function from a `.tolk` input. Repeat this option to
+select multiple functions, including functions declared in imported files.
+Functions are printed in the requested order; repeated names are printed once.
+All names in one invocation share the same compilation passes.
+
+Selected functions keep separate bytecode bodies, even if normally inlined or
+unused. This inspection build leaves source files and build artifacts
+unchanged. Its bytecode can differ from a normal optimized build.
+
+Supports non-generic functions with block bodies and no receiver or `mutate`
+parameters, get-methods, and external entrypoints. Get-methods and functions with
+an explicit `@method_id` keep their IDs. Generic functions, receiver methods,
+`asm` functions, and `onBouncedMessage` cannot be selected.
+
+<CommandOptionMeta label="Requires">
+
+a `.tolk` file. Cannot be used with `--source-map`, `--string`,
+`--address`, or `--follow-libraries`.
+
+</CommandOptionMeta>
+
+<CommandOptionMeta label="Conflicts with">
+
+`--string`, `--address`, `--source-map`, `--follow-libraries`
+
+</CommandOptionMeta>
+
+<CommandOptionMeta label="Repeatable">
+
+May be passed multiple times.
 
 </CommandOptionMeta>
 
@@ -57,7 +108,7 @@ BoC value in hex or base64 format.
 
 <CommandOptionMeta label="Conflicts with">
 
-_boc-file_, `--address`
+_boc-file_, `--address`, `--function`
 
 </CommandOptionMeta>
 
@@ -117,8 +168,8 @@ Show instruction bit offsets in the left column.
 Print machine-readable disassembly JSON to stdout.
 
 Successful output includes `success`, the plain disassembly in `assembly`, and
-`blocks` derived from `--source-map`. Without `--source-map`, `blocks` is
-empty.
+`blocks` derived from `--source-map` or the compiled Tolk source.
+For BoC input without `--source-map`, `blocks` is empty.
 
 </CommandOption>
 
@@ -132,6 +183,17 @@ empty.
 
 Use a source map to show original Tolk source locations together with
 disassembly output.
+
+<AvailabilityBadge since="trunk" />
+
+This option applies to BoC input. Recompiled `.tolk` input does not accept an
+external source map.
+
+<CommandOptionMeta label="Conflicts with">
+
+`--function`
+
+</CommandOptionMeta>
 
 </CommandOption>
 
@@ -147,7 +209,7 @@ Fetch contract code from the blockchain by address and disassemble it.
 
 <CommandOptionMeta label="Conflicts with">
 
-_boc-file_, `--string`
+_boc-file_, `--string`, `--function`
 
 </CommandOptionMeta>
 
@@ -189,6 +251,12 @@ cell, fetch and disassemble the actual library code instead of showing only the
 library hash reference.
 
 This is not a general recursive library-follow mode.
+
+<CommandOptionMeta label="Conflicts with">
+
+`--function`
+
+</CommandOptionMeta>
 
 </CommandOption>
 
@@ -331,10 +399,61 @@ Each item in `blocks` contains a `source` location and `assembly_ranges`.
 `assembly_ranges` stores inclusive zero-based `start_line`/`end_line` pairs
 into the `assembly` string.
 
-If `--source-map` is not provided, `blocks` is empty.
+For BoC input, `blocks` is empty without `--source-map`.
+Tolk source input includes mappings from its inspection compilation automatically.
 
 If `--output` is also provided, the output file contains the same plain
 `assembly` text while stdout remains JSON.
+
+<AvailabilityBadge since="trunk" />
+
+With `--function`, the response also includes a `functions` array in the requested
+order. Each item contains `name`, `method_id`, `assembly`, `blocks`, and `gas_estimate`.
+The per-function `assembly` contains only that function's instructions.
+Its `blocks` use line offsets into that function's `assembly`; top-level `blocks`
+use offsets into the combined `assembly`, including function headers.
+Source locations refer to the original files, before annotation overrides.
+Identical bytecode may share a cell whose source marks were retained for only one
+function. Functions without matching marks have empty `blocks`; Acton does not
+attribute another function's source locations to them.
+
+`gas_estimate` contains:
+
+- `value`: sum of the lowest listed opcode costs from the bundled TVM specification
+- `has_dynamic_cost`: costs depend on runtime data or include a formula
+- `has_control_flow`: the body contains control flow or nested continuations
+- `unknown_instructions`: instructions whose cost could not be included
+
+The estimate counts each instruction and nested continuation once. It does not
+predict the path taken through branches or the number of loop iterations.
+It excludes callees, implicit returns, dispatcher overhead, stack-copy charges,
+and additional data-dependent fees. It is neither a lower nor an upper bound on
+runtime gas. Use execution profiling when inputs and actual gas costs matter.
+
+For example, `fun increment(value: int): int { return value + 1; }` has this entry:
+
+```json
+{
+  "name": "increment",
+  "method_id": 262143,
+  "assembly": "INC\n",
+  "blocks": [
+    {
+      "source": {"file": "example.tolk", "line": 1, "column": 41, "end_line": 1, "end_column": 50},
+      "assembly_ranges": [{"start_line": 0, "end_line": 0}]
+    }
+  ],
+  "gas_estimate": {
+    "value": 18,
+    "has_dynamic_cost": false,
+    "has_control_flow": false,
+    "unknown_instructions": 0
+  }
+}
+```
+
+Generated method IDs are local to the inspection build. Identify functions by
+`name` when matching results to an editor document.
 
 ## Exit Status
 
@@ -344,6 +463,14 @@ If `--output` is also provided, the output file contains the same plain
   failed, or the output file could not be written.
 
 ## Examples
+
+<AvailabilityBadge since="trunk" />
+
+Disassemble selected functions from a Tolk entrypoint:
+
+```bash
+acton disasm contracts/jetton-wallet.tolk --function transfer --function get_wallet_data
+```
 
 1. Disassemble a local BoC file:
 

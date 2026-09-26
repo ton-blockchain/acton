@@ -7,6 +7,7 @@ use crate::support::toncenter::{
     spawn_toncenter_v3_mock, toncenter_v2_error_response, toncenter_v2_get_libraries_ok_response,
     toncenter_v3_account_states_ok_response, toncenter_v3_error_response,
 };
+use std::fmt::Write;
 use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 use std::{fs, path::Path, thread};
@@ -23,7 +24,259 @@ const TEST_API_KEY: &str = "test-toncenter-api-key";
 const TEST_TONCENTER_MAINNET_V3_URL_ENV: &str = "ACTON_TEST_TONCENTER_MAINNET_V3_URL";
 const TEST_TONCENTER_TESTNET_V3_URL_ENV: &str = "ACTON_TEST_TONCENTER_TESTNET_V3_URL";
 
+#[test]
+fn test_disasm_source_selected_functions() {
+    let helpers = r"
+@inline
+fun increment(value: int): int { return value + 1; }
+@inline_ref
+fun double(value: int): int { return value * 2; }
+@method_id(0x3ffff)
+fun reserved(): int { return 9; }
+fun unused(value: int): int { return value + 5; }
+";
+    let main = r#"
+import "@helpers/math"
+get fun getValue(): int { return 42; }
+fun main(value: int): int { return double(increment(value)); }
+"#;
+    let project = ProjectBuilder::new("disasm-selected-source")
+        .raw_file("helpers/math.tolk", helpers)
+        .raw_file("main.tolk", main)
+        .mapping("@helpers", "helpers")
+        .build();
+
+    project
+        .acton()
+        .disasm_file("main.tolk")
+        .args([
+            "--function",
+            "unused",
+            "--function",
+            "increment",
+            "--function",
+            "double",
+            "--function",
+            "getValue",
+            "--function",
+            "reserved",
+            "--function",
+            "increment",
+        ])
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/disasm/selected_source_functions.txt");
+
+    snapbox::assert_data_eq!(
+        fs::read_to_string(project.path().join("main.tolk")).unwrap(),
+        main
+    );
+    snapbox::assert_data_eq!(
+        fs::read_to_string(project.path().join("helpers/math.tolk")).unwrap(),
+        helpers
+    );
+}
+
+#[test]
+fn test_disasm_source_original_columns() {
+    let source = "@inline fun first(x: int): int { return x + 1; } @inline_ref fun second(x: int): int { return x + 1; }";
+    let project = ProjectBuilder::new("disasm-source-columns")
+        .raw_file("functions.tolk", source)
+        .build();
+    project
+        .acton()
+        .disasm_file("functions.tolk")
+        .args(["--function", "first", "--function", "second"])
+        .with_json()
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/disasm/source_original_columns.txt");
+    snapbox::assert_data_eq!(
+        fs::read_to_string(project.path().join("functions.tolk")).unwrap(),
+        source
+    );
+}
+
+#[test]
+fn test_disasm_source_json_output() {
+    let project = ProjectBuilder::new("disasm-source-json")
+        .raw_file("library.tolk", "@noinline fun answer(): int { return 42; }")
+        .build();
+
+    let output = project
+        .acton()
+        .disasm_file("library.tolk")
+        .args(["--function", "answer"])
+        .show_offsets()
+        .with_json()
+        .with_output("out/answer.tasm")
+        .run()
+        .success();
+    output.assert_snapshot_matches("integration/snapshots/disasm/source_function_json.txt");
+    output.assert_file_snapshot_matches(
+        "out/answer.tasm",
+        "integration/snapshots/disasm/source_function_offsets.tasm.gen",
+    );
+}
+
+#[test]
+fn test_disasm_source_entrypoints() {
+    let project = ProjectBuilder::new("disasm-source-entrypoints")
+        .raw_file(
+            "main.tolk",
+            r"
+fun onInternalMessage(in: InMessage) { throw 111; }
+fun onExternalMessage(in: slice) { throw 222; }
+",
+        )
+        .build();
+
+    project
+        .acton()
+        .disasm_file("main.tolk")
+        .args([
+            "--function",
+            "onExternalMessage",
+            "--function",
+            "onInternalMessage",
+        ])
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/disasm/source_entrypoints.txt");
+}
+
+#[test]
+fn test_disasm_source_without_function_filter() {
+    let project = ProjectBuilder::new("disasm-tolk-whole")
+        .raw_file("main.tolk", "fun main(): int { return 42; }")
+        .build();
+
+    project
+        .acton()
+        .disasm_file("main.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/disasm/source_whole_contract.txt");
+}
+
+#[test]
+fn test_disasm_source_selection_errors() {
+    let project = ProjectBuilder::new("disasm-source-errors")
+        .raw_file(
+            "main.tolk",
+            r#"
+fun identity<T>(value: T): T { return value; }
+fun change(mutate value: int) { value += 1; }
+fun asmFunction(): int asm "42 PUSHINT"
+fun main(): int { return 42; }
+"#,
+        )
+        .raw_file("code.boc", "not a BoC")
+        .build();
+
+    let mut errors = String::new();
+    for name in ["missing", "identity", "change", "asmFunction"] {
+        let output = project
+            .acton()
+            .disasm_file("main.tolk")
+            .args(["--function", name])
+            .with_json()
+            .run()
+            .success();
+        errors.push_str(&output.get_normalized_stdout());
+    }
+    let output = project
+        .acton()
+        .disasm_file("code.boc")
+        .args(["--function", "main"])
+        .with_json()
+        .run()
+        .success();
+    errors.push_str(&output.get_normalized_stdout());
+    assertion().eq(
+        errors,
+        snapbox::file!["snapshots/disasm/source_selection_errors.txt"],
+    );
+}
+
 static REMOTE_MOCK_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+
+#[test]
+fn test_disasm_source_batch_gas_estimates() {
+    let mut source = String::new();
+    let names = (0..10)
+        .map(|index| format!("function{index}"))
+        .collect::<Vec<_>>();
+    for (index, name) in names.iter().enumerate() {
+        writeln!(
+            source,
+            "fun {name}(value: int): int {{ return value + {}; }}",
+            index + 1
+        )
+        .unwrap();
+    }
+    let project = ProjectBuilder::new("disasm-batch-gas")
+        .raw_file("functions.tolk", &source)
+        .build();
+    let mut command = project.acton().disasm_file("functions.tolk").with_json();
+    for name in &names {
+        command = command.args(["--function", name]);
+    }
+    let output = command.run().success();
+    let result: serde_json::Value = serde_json::from_str(&output.get_stdout()).unwrap();
+    assertion().eq(
+        normalize_output(
+            &serde_json::to_string_pretty(&result["functions"]).unwrap(),
+            project.path(),
+        ),
+        snapbox::file!["snapshots/disasm/source_batch_gas.json"],
+    );
+}
+
+#[test]
+fn test_disasm_source_gas_with_dynamic_costs_and_control_flow() {
+    let project = ProjectBuilder::new("disasm-dynamic-gas")
+        .raw_file(
+            "functions.tolk",
+            r"
+fun build(value: int): cell { return beginCell().storeInt(value, 32).endCell(); }
+fun hash(data: cell): int { return data.hash(); }
+fun branch(flag: bool, value: int): int {
+    if (flag) { return value * 3; }
+    return value + 7;
+}
+fun loop(count: int, value: int): int {
+    repeat (count) { value += 1; }
+    return value;
+}
+",
+        )
+        .build();
+    let output = project
+        .acton()
+        .disasm_file("functions.tolk")
+        .args([
+            "--function",
+            "build",
+            "--function",
+            "hash",
+            "--function",
+            "branch",
+            "--function",
+            "loop",
+        ])
+        .with_json()
+        .run()
+        .success();
+    let result: serde_json::Value = serde_json::from_str(&output.get_stdout()).unwrap();
+    assertion().eq(
+        normalize_output(
+            &serde_json::to_string_pretty(&result["functions"]).unwrap(),
+            project.path(),
+        ),
+        snapbox::file!["snapshots/disasm/source_dynamic_gas.json"],
+    );
+}
 
 fn build_simple_contract_project(name: &str) -> crate::support::project::Project {
     let project = ProjectBuilder::new(name)

@@ -72,6 +72,15 @@ pub struct LocalVarRendered {
     pub value: RenderedValue,
 }
 
+/// Observed IR slots retain source types for arguments passed to an isolated evaluate VM.
+#[cfg(feature = "dap-server")]
+#[derive(Debug, Clone)]
+pub(crate) struct LocalVarRuntime {
+    pub var_name: String,
+    pub ty_idx: Option<TyIdx>,
+    pub ir_slot_values: Vec<Option<VmStackValue>>,
+}
+
 impl LocalVarRendered {
     #[must_use]
     pub fn in_sender_address(sender_address: impl Into<String>) -> Self {
@@ -132,6 +141,13 @@ pub trait RuntimeEventSource {
     fn is_exhausted(&self) -> bool;
     fn backend_kind(&self) -> RuntimeBackendKind;
     fn runtime_debug_snapshot(&self) -> Option<RuntimeDebugSnapshot> {
+        None
+    }
+
+    /// Returns one register as a serialized TVM stack value for isolated evaluation.
+    /// Live backends must preserve slices and continuation state; log replay has no snapshot.
+    #[cfg(feature = "dap-server")]
+    fn runtime_control_register(&self, _index: usize) -> Option<String> {
         None
     }
 }
@@ -471,6 +487,15 @@ impl RuntimeEventSource for LiveVmRuntimeEventSource {
 
     fn runtime_debug_snapshot(&self) -> Option<RuntimeDebugSnapshot> {
         Some(self.executor.runtime_snapshot())
+    }
+
+    #[cfg(feature = "dap-server")]
+    fn runtime_control_register(&self, index: usize) -> Option<String> {
+        Some(if index == 7 {
+            self.executor.get_c7()
+        } else {
+            self.executor.get_control_register(index)
+        })
     }
 }
 
@@ -831,6 +856,15 @@ impl TolkReplayer {
         values
     }
 
+    #[cfg(feature = "dap-server")]
+    pub(crate) fn runtime_evaluate_registers(&self) -> Option<[String; 3]> {
+        Some([
+            self.runtime_source.runtime_control_register(4)?,
+            self.runtime_source.runtime_control_register(5)?,
+            self.runtime_source.runtime_control_register(7)?,
+        ])
+    }
+
     #[must_use]
     pub fn is_finished(&self) -> bool {
         if self.last_exception.is_some() {
@@ -917,6 +951,27 @@ impl TolkReplayer {
             }
             None => Vec::new(),
         }
+    }
+
+    /// Uses the selected frame's IR namespace, including values optimized off the live stack.
+    #[cfg(feature = "dap-server")]
+    pub(crate) fn runtime_locals_for_frame(&self, depth: usize) -> Vec<LocalVarRuntime> {
+        let Some(index) = self.call_stack.len().checked_sub(1 + depth) else {
+            return Vec::new();
+        };
+        let exec = &self.exec_stack[self.exec_idx_for_frame(index)];
+        self.call_stack[index]
+            .all_visible_vars()
+            .map(|var| LocalVarRuntime {
+                var_name: var.name.clone(),
+                ty_idx: self.source_map.ty_by_idx(var.ty_idx).map(|_| var.ty_idx),
+                ir_slot_values: var
+                    .ir_slots
+                    .iter()
+                    .map(|ir| exec.last_seen_values.get(ir).cloned())
+                    .collect(),
+            })
+            .collect()
     }
 
     /// Map a `call_stack` frame index to the corresponding `exec_stack` index.

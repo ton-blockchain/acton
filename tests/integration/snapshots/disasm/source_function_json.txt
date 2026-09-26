@@ -1,0 +1,51 @@
+{
+  "success": true,
+  "assembly": "// answer (method_id 262143, gas ~26)/noff │ instruction/n────┼───────────────────────────────────────/n8   │ PUSHINT_8 42/n",
+  "blocks": [
+    {
+      "source": {
+        "file": "[ROOT]/library.tolk",
+        "line": 1,
+        "column": 38,
+        "end_line": 1,
+        "end_column": 40
+      },
+      "assembly_ranges": [
+        {
+          "start_line": 3,
+          "end_line": 3
+        }
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "name": "answer",
+      "method_id": 262143,
+      "assembly": "off │ instruction/n────┼───────────────────────────────────────/n8   │ PUSHINT_8 42/n",
+      "blocks": [
+        {
+          "source": {
+            "file": "[ROOT]/library.tolk",
+            "line": 1,
+            "column": 38,
+            "end_line": 1,
+            "end_column": 40
+          },
+          "assembly_ranges": [
+            {
+              "start_line": 2,
+              "end_line": 2
+            }
+          ]
+        }
+      ],
+      "gas_estimate": {
+        "value": 26,
+        "has_dynamic_cost": false,
+        "has_control_flow": false,
+        "unknown_instructions": 0
+      }
+    }
+  ]
+}

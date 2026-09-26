@@ -22,6 +22,8 @@ pub mod replayer {
 #[cfg(feature = "live-vm")]
 pub use core::DebugExecutorHandle;
 #[cfg(feature = "dap-server")]
+pub use core::evaluate::EvaluateRuntimeConfig;
+#[cfg(feature = "dap-server")]
 pub use multi::{ChildDebugContextSpec, ReplayerDebugSession};
 #[cfg(feature = "dap-server")]
 pub use multi::{

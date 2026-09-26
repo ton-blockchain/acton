@@ -1,0 +1,9 @@
+SETCP 0
+DICTPUSHCONST 19 [
+    0 => {
+        PUSHINT_8 42
+    }
+]
+DICTIGETJMPZ
+THROWARG 11
+

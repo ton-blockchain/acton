@@ -8,6 +8,11 @@ use tolk_syntax::{
 };
 use tvm_logs::parser::CellLike;
 
+mod function_call;
+
+pub use function_call::EvaluateRuntimeConfig;
+pub(crate) use function_call::{evaluate_function_call, is_function_call_expression};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum PathSegment {
     Field(String),

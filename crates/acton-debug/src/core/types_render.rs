@@ -1340,7 +1340,7 @@ fn cell_like_meta(cell: &CellLike) -> (Option<usize>, Option<usize>, Option<Stri
     )
 }
 
-fn exact_slice_cell(cs: &CellSlice) -> Option<Cell> {
+pub(crate) fn exact_slice_cell(cs: &CellSlice) -> Option<Cell> {
     let cell = Boc::decode_hex(&cs.value).ok()?;
     match (&cs.bits, &cs.refs) {
         (Some((start_bits, end_bits)), Some((start_refs, end_refs))) => {
@@ -2779,19 +2779,24 @@ fn debug_format(
             if let Some(sw) = stack_width {
                 // read wide nullable: [null, null, ... 0] or [smth, smth, ... type_id]
                 let nullable_slots = r.read_n_slots(*sw);
-                let tag_slot = &nullable_slots[sw - 1];
+                let Some((tag_slot, value_slots)) = nullable_slots
+                    .split_last()
+                    .filter(|_| nullable_slots.len() == *sw)
+                else {
+                    return typed_leaf_for_ty(symbols, ty_idx, "corrupted stack for nullable");
+                };
                 match tag_slot {
                     SlotValue::Live(VmStackValue::Integer(type_id))
                     | SlotValue::LastSeen(VmStackValue::Integer(type_id)) => {
                         if type_id == "0" {
                             typed_leaf(ty_name, "null")
                         } else {
-                            let mut sub = StackReader::new(&nullable_slots[..sw - 1]);
+                            let mut sub = StackReader::new(value_slots);
                             debug_format(symbols, &mut sub, *inner_ty_idx, false)
                         }
                     }
                     SlotValue::OptimizedOut => {
-                        let mut sub = StackReader::new(&nullable_slots[..sw - 1]);
+                        let mut sub = StackReader::new(value_slots);
                         debug_format(symbols, &mut sub, *inner_ty_idx, false)
                     }
                     _ => typed_leaf_for_ty(symbols, ty_idx, "corrupted stack for nullable"),
@@ -2886,7 +2891,12 @@ fn debug_format(
             // read tagged union: [smth, smth, ... type_id]
             let stack_width = *stack_width;
             let union_slots = r.read_n_slots(stack_width);
-            let tag_slot = &union_slots[stack_width - 1];
+            let Some((tag_slot, value_slots)) = union_slots
+                .split_last()
+                .filter(|_| union_slots.len() == stack_width)
+            else {
+                return typed_leaf_for_ty(symbols, ty_idx, "corrupted stack for union");
+            };
             match tag_slot {
                 SlotValue::Live(VmStackValue::Integer(type_id))
                 | SlotValue::LastSeen(VmStackValue::Integer(type_id)) => {
@@ -2895,14 +2905,14 @@ fn debug_format(
                         variants.iter().find(|v| v.stack_type_id == Some(type_id))
                     {
                         let variant_width = variant.stack_width.unwrap_or(0);
-                        let Some(variant_start) = stack_width.checked_sub(1 + variant_width) else {
+                        let Some(variant_start) = value_slots.len().checked_sub(variant_width)
+                        else {
                             return typed_leaf_for_ty(symbols, ty_idx, "corrupted stack for union");
                         };
                         let value = if variant_width == 0 {
                             None
                         } else {
-                            let mut sub =
-                                StackReader::new(&union_slots[variant_start..stack_width - 1]);
+                            let mut sub = StackReader::new(&value_slots[variant_start..]);
                             Some(debug_format(
                                 symbols,
                                 &mut sub,
@@ -5096,6 +5106,41 @@ mod tests {
 
         assert_eq!(rendered.dap_parts().0, "NaN");
         assert_eq!(rendered.dap_parts().1.as_deref(), Some("int"));
+    }
+
+    #[test]
+    fn render_truncated_tagged_values_without_panicking() {
+        for stack_width in [0, 2, 3] {
+            let symbols = source_map_with_types(vec![
+                Ty::Int,
+                Ty::Nullable {
+                    inner_ty_idx: 0,
+                    stack_type_id: Some(1),
+                    stack_width: Some(stack_width),
+                },
+                Ty::Union {
+                    variants: vec![UnionVariant {
+                        variant_ty_idx: 0,
+                        prefix_num: 0,
+                        prefix_len: 0,
+                        is_prefix_implicit: None,
+                        stack_type_id: Some(1),
+                        stack_width: Some(1),
+                    }],
+                    stack_width: Some(stack_width),
+                },
+            ]);
+            let truncated = Tuple(vec![TupleItem::Int(42.into())]);
+
+            assert_eq!(
+                render_tuple_as_tolk_type(&symbols, &truncated, 1).dap_value(),
+                "corrupted stack for nullable",
+            );
+            assert_eq!(
+                render_tuple_as_tolk_type(&symbols, &truncated, 2).dap_value(),
+                "corrupted stack for union",
+            );
+        }
     }
 
     #[test]

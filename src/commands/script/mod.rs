@@ -16,6 +16,7 @@ use crate::{ffi, stdlib};
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, Explorer, project_root};
 use acton_config::test::BacktraceMode;
+use acton_debug::EvaluateRuntimeConfig;
 use acton_debug::exit_codes;
 use acton_debug::replayer::TolkReplayer;
 use acton_debug::{ReplayerDebugSession, reserve_dap_listener, start_dap_server_with_listener};
@@ -407,6 +408,11 @@ fn execute_script(
         replayer.set_abi(abi.clone());
 
         let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
+        dbg_session.set_root_evaluate_runtime(EvaluateRuntimeConfig {
+            run_args: params.clone(),
+            config_b64: Some(config_b64.to_owned()),
+            mappings: ctx.env.config.mappings(),
+        });
         ctx.debug = DebugCtx::new(&mut dbg_session);
         if ctx.debug.process_incoming_requests(true)? {
             return Ok(());

@@ -3,7 +3,10 @@
 //! (`send_message`, `run_get_method`) temporarily push child contexts backed by
 //! live executors and later pop back to the parent.
 
-use crate::core::evaluate::{evaluate_condition_expression, evaluate_expression};
+use crate::core::evaluate::{
+    EvaluateRuntimeConfig, evaluate_condition_expression, evaluate_expression,
+    evaluate_function_call, is_function_call_expression,
+};
 use crate::is_internal_function_name;
 use crate::multi::dap_transport::{DapMessage, DapTransport};
 use crate::multi::session::ChildDebugContextSpec;
@@ -35,6 +38,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Instant;
 
 const THREAD_ID: i64 = 1;
 
@@ -97,6 +101,7 @@ struct ReplayerContext {
     /// Snapshot of the parent-visible frames captured when this child context starts.
     /// Appended after child frames so stack traces preserve the runtime call chain.
     outer_frames: Vec<CollectedFrame>,
+    evaluate_runtime: Option<EvaluateRuntimeConfig>,
 }
 
 impl ReplayerContext {
@@ -106,6 +111,7 @@ impl ReplayerContext {
             replayer,
             resolved_breakpoints: HashMap::new(),
             outer_frames: Vec::new(),
+            evaluate_runtime: None,
         }
     }
 
@@ -113,12 +119,14 @@ impl ReplayerContext {
         label: Arc<str>,
         replayer: TolkReplayer,
         outer_frames: Vec<CollectedFrame>,
+        evaluate_runtime: Option<EvaluateRuntimeConfig>,
     ) -> Self {
         Self {
             label,
             replayer,
             resolved_breakpoints: HashMap::new(),
             outer_frames,
+            evaluate_runtime,
         }
     }
 }
@@ -308,8 +316,7 @@ impl ReplayerDebugSession {
             let Ok(ctx) = ctx.try_borrow() else {
                 return evaluate_expression(&[], expression);
             };
-            let locals = ctx.replayer.locals_for_frame(locator.depth_from_top);
-            evaluate_expression(&locals, expression)
+            self.evaluate_with_optional_function_call(&ctx, locator.depth_from_top, expression)
         } else {
             let Some(ctx) = self.active_context() else {
                 return evaluate_expression(&[], expression);
@@ -317,9 +324,70 @@ impl ReplayerDebugSession {
             let Ok(ctx) = ctx.try_borrow() else {
                 return evaluate_expression(&[], expression);
             };
-            let locals = ctx.replayer.locals_for_frame(0);
-            evaluate_expression(&locals, expression)
+            self.evaluate_with_optional_function_call(&ctx, 0, expression)
         }
+    }
+
+    fn evaluate_with_optional_function_call(
+        &self,
+        ctx: &ReplayerContext,
+        depth_from_top: usize,
+        expression: &str,
+    ) -> anyhow::Result<RenderedValue> {
+        if !is_function_call_expression(expression)? {
+            return evaluate_expression(&ctx.replayer.locals_for_frame(depth_from_top), expression);
+        }
+
+        let runtime = ctx.evaluate_runtime.as_ref().ok_or_else(|| {
+            anyhow!("Function-call evaluate is not available in this debugger context")
+        })?;
+        let source_path = self
+            .evaluate_source_path_for_frame(ctx, depth_from_top)
+            .ok_or_else(|| anyhow!("Cannot resolve source file for function-call evaluate"))?;
+        let registers = ctx
+            .replayer
+            .runtime_evaluate_registers()
+            .ok_or_else(|| anyhow!("Function-call evaluate requires a stopped live VM"))?;
+
+        let started = Instant::now();
+        log::debug!(
+            "operation=debugger_evaluate target={} outcome=started",
+            source_path.display()
+        );
+        let result = evaluate_function_call(
+            &source_path,
+            ctx.replayer.source_map(),
+            runtime,
+            registers,
+            &ctx.replayer.runtime_locals_for_frame(depth_from_top),
+            expression,
+        );
+        log::debug!(
+            "operation=debugger_evaluate target={} duration_ms={} outcome={}",
+            source_path.display(),
+            started.elapsed().as_millis(),
+            if result.is_ok() { "success" } else { "error" },
+        );
+        result
+    }
+
+    fn evaluate_source_path_for_frame(
+        &self,
+        ctx: &ReplayerContext,
+        depth_from_top: usize,
+    ) -> Option<PathBuf> {
+        let file_id = if depth_from_top == 0 {
+            ctx.replayer.current_file_id()
+        } else {
+            let call_stack = ctx.replayer.call_stack();
+            let frame_idx = call_stack.len().checked_sub(1 + depth_from_top)?;
+            call_stack[frame_idx].definition_loc.as_ref().map_or_else(
+                || ctx.replayer.current_file_id(),
+                tolk_source_map::source_map::SrcRange::file_id,
+            )
+        };
+
+        ctx.replayer.file_full_path(file_id).map(PathBuf::from)
     }
 
     fn alloc_frame_id(&mut self, locator: FrameLocator) -> i64 {
@@ -960,7 +1028,7 @@ impl ReplayerDebugSession {
                     Ok(value) => req.success(ResponseBody::Evaluate(
                         self.evaluate_response_from_value(value),
                     )),
-                    Err(err) => req.error(&err.to_string()),
+                    Err(err) => req.error(&format!("{err:#}")),
                 };
                 self.send_response(response)?;
             }
@@ -1198,6 +1266,14 @@ impl ReplayerDebugSession {
         Ok(self.stop_requested)
     }
 
+    /// Enables isolated function calls using the root script or test's initial environment.
+    /// Set this before serving DAP requests; later VM mutations are not captured by this template.
+    pub fn set_root_evaluate_runtime(&mut self, runtime: EvaluateRuntimeConfig) {
+        if let Some(root) = self.contexts.first() {
+            root.borrow_mut().evaluate_runtime = Some(runtime);
+        }
+    }
+
     pub const fn need_to_stop_child_thread_on_start(&self) -> bool {
         matches!(
             self.performing_step,
@@ -1224,6 +1300,7 @@ impl ReplayerDebugSession {
                 label,
                 replayer,
                 outer_frames,
+                spec.evaluate_runtime,
             ))));
         let new_idx = self.contexts.len() - 1;
         self.apply_breakpoints_to_context(new_idx);

@@ -3,9 +3,11 @@ use acton_config::color::OwoColorize;
 use anyhow::anyhow;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
+use std::time::Instant;
 use tasm_core::decompile::Disassembler;
 use tasm_core::printer::FormatOptions;
 use tasm_core::types::{ArgValue, Code, Instruction};
@@ -13,21 +15,33 @@ use tolk_compiler::SourceMap;
 use tolk_source_map::SourceLocation;
 use ton_api::{Network, TonApiClient};
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, HashBytes};
+use tycho_types::cell::HashBytes;
 
+mod gas;
 mod remote;
+mod source;
 
+/// Disassembles supplied bytecode or an isolated compilation of a Tolk entrypoint.
+/// Function selection applies only to source input; it never changes files or build artifacts.
 #[allow(clippy::too_many_arguments)]
 pub fn disasm_cmd(
     boc_file: Option<String>,
     boc_string: Option<String>,
     output_file: Option<String>,
-    opts: FormatOptions,
+    mut opts: FormatOptions,
     address: Option<String>,
     net: Option<String>,
     follow_libraries: bool,
     json: bool,
+    functions: &[String],
 ) -> anyhow::Result<()> {
+    if !functions.is_empty()
+        && !boc_file
+            .as_deref()
+            .is_some_and(|path| path.ends_with(".tolk"))
+    {
+        anyhow::bail!("--function requires a .tolk entrypoint file");
+    }
     if boc_file.is_some() && boc_string.is_some() {
         anyhow::bail!(
             "Cannot provide both {}/{} and {} argument",
@@ -40,6 +54,9 @@ pub fn disasm_cmd(
     let network = net.as_deref().map(Network::from_str).transpose()?;
 
     let mut resolved_network = network.clone();
+    let mut selected_functions = Vec::new();
+    let mut column_shifts = source::SourceColumnShifts::default();
+    let disassembler = Disassembler::new();
 
     let boc_data = if let Some(string) = boc_string {
         if string.trim().is_empty() {
@@ -58,15 +75,38 @@ pub fn disasm_cmd(
             anyhow::bail!("{} is not a file", path.yellow());
         }
 
-        // BoC file can be binary file or file with hex/base64 encoded data
-        let binary_data =
-            fs::read(&path).map_err(|err| anyhow!("Cannot access {}: {err}", path.yellow()))?;
-        if let Ok(cell) = Boc::decode_base64(binary_data.trim_ascii()) {
-            Boc::encode_hex(cell)
-        } else if let Ok(cell) = Boc::decode_hex(binary_data.trim_ascii()) {
-            Boc::encode_hex(cell)
+        if path.ends_with(".tolk") {
+            if opts.source_map.is_some() {
+                anyhow::bail!(
+                    "--source-map applies to BoC input, not recompilation of Tolk sources"
+                );
+            }
+            let started = Instant::now();
+            log::debug!("operation=disasm_compile target={path} outcome=started");
+            let result = source::compile(Path::new(&path), functions, &disassembler);
+            log::debug!(
+                "operation=disasm_compile target={path} duration_ms={} outcome={}",
+                started.elapsed().as_millis(),
+                if result.is_ok() { "success" } else { "error" },
+            );
+            let compiled = result?;
+            selected_functions = compiled.functions;
+            column_shifts = compiled.column_shifts;
+            if json {
+                opts.source_map = compiled.output.source_map.map(Box::new);
+            }
+            compiled.output.code_boc64
         } else {
-            hex::encode(binary_data)
+            // BoC file can be binary file or file with hex/base64 encoded data
+            let binary_data =
+                fs::read(&path).map_err(|err| anyhow!("Cannot access {}: {err}", path.yellow()))?;
+            if let Ok(cell) = Boc::decode_base64(binary_data.trim_ascii()) {
+                Boc::encode_hex(cell)
+            } else if let Ok(cell) = Boc::decode_hex(binary_data.trim_ascii()) {
+                Boc::encode_hex(cell)
+            } else {
+                hex::encode(binary_data)
+            }
         }
     } else if let Some(addr) = address {
         if addr.trim().is_empty() {
@@ -97,7 +137,6 @@ pub fn disasm_cmd(
         ));
     };
 
-    let disassembler = Disassembler::new();
     let mut final_cell = cell;
 
     // In --follow-libraries mode for code like
@@ -129,19 +168,94 @@ pub fn disasm_cmd(
     }
 
     let code = disassembler.decompile_cell(&final_cell)?;
+    let result = if selected_functions.is_empty() {
+        if json {
+            build_json_output(&code, &opts, None)
+        } else {
+            DisasmJsonOutput {
+                success: true,
+                assembly: code.print(&opts),
+                blocks: Vec::new(),
+                functions: Vec::new(),
+            }
+        }
+    } else {
+        let mut assembly = String::new();
+        let mut functions = Vec::with_capacity(selected_functions.len());
+        let mut blocks = Vec::new();
+        let mut assembly_line = 0;
+        for function in selected_functions {
+            let method = code.find_method(function.method_id).ok_or_else(|| {
+                anyhow!(
+                    "Compiled function `{}` is missing from the method dictionary",
+                    function.name
+                )
+            })?;
+            let body = Code {
+                instructions: method.instructions.clone(),
+                offsets: method.offsets.clone(),
+            };
+            let gas_estimate = gas::GasEstimate::for_code(&body);
+            writeln!(
+                assembly,
+                "// {} (method_id {}, gas ~{})",
+                function.name, function.method_id, gas_estimate.value
+            )?;
+            assembly_line += 1;
+            if gas_estimate.has_dynamic_cost
+                || gas_estimate.has_control_flow
+                || gas_estimate.unknown_instructions != 0
+            {
+                assembly.push_str(
+                    "// Static estimate: runtime costs depend on data and control flow\n",
+                );
+                assembly_line += 1;
+            }
+            let mut rendered = build_json_output(&body, &opts, Some(&function.name));
+            for block in &mut rendered.blocks {
+                let location = &mut block.source;
+                location.column =
+                    column_shifts.original_column(&location.file, location.line, location.column);
+                location.end_column = column_shifts.original_column(
+                    &location.file,
+                    location.end_line,
+                    location.end_column,
+                );
+                let mut combined = block.clone();
+                for range in &mut combined.assembly_ranges {
+                    range.start_line += assembly_line;
+                    range.end_line += assembly_line;
+                }
+                blocks.push(combined);
+            }
+            assembly_line += rendered.assembly.lines().count();
+            assembly.push_str(&rendered.assembly);
+            functions.push(DisasmFunction {
+                name: function.name,
+                method_id: function.method_id,
+                assembly: rendered.assembly,
+                blocks: rendered.blocks,
+                gas_estimate,
+            });
+        }
+        DisasmJsonOutput {
+            success: true,
+            assembly,
+            blocks,
+            functions,
+        }
+    };
     if json {
-        let result = build_json_output(&code, &opts);
         if let Some(output_path) = output_file {
             write_output_file(&output_path, &result.assembly)?;
         }
         println!("{}", serde_json::to_string_pretty(&result)?);
     } else {
-        let output = code.print(&opts);
         if let Some(output_path) = output_file {
-            write_output_file(&output_path, &output)?;
+            write_output_file(&output_path, &result.assembly)?;
             println!("Disassembled code written to {output_path}");
         } else {
-            println!("{output}");
+            println!("{}", result.assembly);
         }
     }
 
@@ -174,15 +288,26 @@ struct DisasmJsonOutput {
     success: bool,
     assembly: String,
     blocks: Vec<DisasmSourceBlock>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    functions: Vec<DisasmFunction>,
 }
 
 #[derive(Serialize)]
+struct DisasmFunction {
+    name: String,
+    method_id: u64,
+    assembly: String,
+    blocks: Vec<DisasmSourceBlock>,
+    gas_estimate: gas::GasEstimate,
+}
+
+#[derive(Clone, Serialize)]
 struct DisasmSourceBlock {
     source: DisasmSourceLocation,
     assembly_ranges: Vec<DisasmAssemblyRange>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct DisasmSourceLocation {
     file: String,
     line: i64,
@@ -203,7 +328,7 @@ impl From<&SourceLocation> for DisasmSourceLocation {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct DisasmAssemblyRange {
     start_line: usize,
     end_line: usize,
@@ -246,15 +371,17 @@ impl DisasmSourceBlockBuilder {
 
 struct DisasmBlockCollector<'a> {
     source_map: &'a SourceMap,
+    function_name: Option<&'a str>,
     block_indexes: HashMap<SourceLocationKey, usize>,
     blocks: Vec<DisasmSourceBlockBuilder>,
     current_line: usize,
 }
 
 impl<'a> DisasmBlockCollector<'a> {
-    fn new(source_map: &'a SourceMap) -> Self {
+    fn new(source_map: &'a SourceMap, function_name: Option<&'a str>) -> Self {
         Self {
             source_map,
+            function_name,
             block_indexes: HashMap::new(),
             blocks: Vec::new(),
             current_line: 0,
@@ -283,7 +410,8 @@ impl<'a> DisasmBlockCollector<'a> {
     }
 
     fn collect_instruction(&mut self, instruction: &Instruction, offset: Option<u16>) {
-        let location = instruction_source_location(self.source_map, instruction, offset);
+        let location =
+            instruction_source_location(self.source_map, instruction, offset, self.function_name);
         self.push_line(location.as_ref());
 
         match instruction {
@@ -309,6 +437,7 @@ impl<'a> DisasmBlockCollector<'a> {
                         self.source_map,
                         &method.instructions,
                         method.offsets.as_deref(),
+                        self.function_name,
                     )
                     .or_else(|| container_location.cloned());
                     self.push_line(method_location.as_ref());
@@ -343,7 +472,11 @@ impl<'a> DisasmBlockCollector<'a> {
     }
 }
 
-fn build_json_output(code: &Code, opts: &FormatOptions) -> DisasmJsonOutput {
+fn build_json_output(
+    code: &Code,
+    opts: &FormatOptions,
+    function_name: Option<&str>,
+) -> DisasmJsonOutput {
     let render_opts = FormatOptions {
         source_map: None,
         ..opts.clone()
@@ -353,13 +486,14 @@ fn build_json_output(code: &Code, opts: &FormatOptions) -> DisasmJsonOutput {
         .source_map
         .as_deref()
         .map_or_else(Vec::new, |source_map| {
-            DisasmBlockCollector::new(source_map).collect(code, opts.show_offsets)
+            DisasmBlockCollector::new(source_map, function_name).collect(code, opts.show_offsets)
         });
 
     DisasmJsonOutput {
         success: true,
         assembly,
         blocks,
+        functions: Vec::new(),
     }
 }
 
@@ -382,42 +516,34 @@ fn instruction_source_location(
     source_map: &SourceMap,
     instruction: &Instruction,
     offset: Option<u16>,
+    function_name: Option<&str>,
 ) -> Option<SourceLocation> {
     let offset = offset?;
-    match instruction {
-        Instruction::Plain(instr) => {
-            cell_source_location(source_map, instr.source_cell.as_ref(), offset)
-        }
-        Instruction::Ref(instr) => {
-            cell_source_location(source_map, instr.source_cell.as_ref(), offset)
-        }
-        Instruction::ExoticCell(instr) => {
-            cell_source_location(source_map, instr.source_cell.as_ref(), offset)
-        }
-        Instruction::Slice(instr) => {
-            cell_source_location(source_map, instr.source_cell.as_ref(), offset)
-        }
-    }
-}
-
-fn cell_source_location(
-    source_map: &SourceMap,
-    cell: Option<&Cell>,
-    offset: u16,
-) -> Option<SourceLocation> {
-    let cell = cell?;
+    let cell = match instruction {
+        Instruction::Plain(instr) => instr.source_cell.as_ref(),
+        Instruction::Ref(instr) => instr.source_cell.as_ref(),
+        Instruction::ExoticCell(instr) => instr.source_cell.as_ref(),
+        Instruction::Slice(instr) => instr.source_cell.as_ref(),
+    }?;
     let hash = cell.repr_hash().to_string().to_uppercase();
-    source_map.find_source_loc(&hash, offset)
+    if let Some(name) = function_name {
+        source_map.find_source_loc_in_function(&hash, offset, name)
+    } else {
+        source_map.find_source_loc(&hash, offset)
+    }
 }
 
 fn first_instruction_location(
     source_map: &SourceMap,
     instructions: &[Instruction],
     offsets: Option<&[u16]>,
+    function_name: Option<&str>,
 ) -> Option<SourceLocation> {
     for (index, instruction) in instructions.iter().enumerate() {
         let offset = offsets.and_then(|values| values.get(index).copied());
-        if let Some(location) = instruction_source_location(source_map, instruction, offset) {
+        if let Some(location) =
+            instruction_source_location(source_map, instruction, offset, function_name)
+        {
             return Some(location);
         }
     }

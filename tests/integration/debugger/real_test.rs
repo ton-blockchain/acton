@@ -467,6 +467,21 @@ fn test_real_counter_contract_tests() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_evaluate_in_nested_contract_contexts() -> anyhow::Result<()> {
+    let session = setup_counter_project("test should run counter script");
+    session.start().execute(|executor| {
+        executor.step_in_until_function("onInternalMessage")?;
+        snapbox::assert_data_eq!(executor.evaluate("double(21)")?.result, snapbox::str!["42"]);
+        executor.step_in_until_function("currentCounter")?;
+        snapbox::assert_data_eq!(executor.evaluate("double(20)")?.result, snapbox::str!["40"]);
+        executor.step_in_until_terminated(2_000)?;
+        Ok(())
+    })?;
+    Ok(())
+}
+
 #[test]
 fn test_real_counter_contract_step_in() -> anyhow::Result<()> {
     let session = setup_counter_project("test should run counter script");

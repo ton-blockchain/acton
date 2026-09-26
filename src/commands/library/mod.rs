@@ -607,6 +607,7 @@ pub fn fetch_cmd(
             // Preserve the established fetch contract: `--json --disasm`
             // prints disassembly text on success and keeps JSON for errors.
             false,
+            &[],
         )?;
     } else {
         let boc_base64 = Boc::encode_base64(&library_cell);

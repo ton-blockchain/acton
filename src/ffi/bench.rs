@@ -9,7 +9,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use tasm_core::decompile::Disassembler;
 use tasm_core::printer::FormatOptions;
-use tasm_core::types::{ArgValue, Code, Instruction, Method};
+use tasm_core::types::{ArgValue, Code, Instruction};
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::get::DEFAULT_GET_METHOD_GAS_LIMIT;
 use ton_executor::{BaseExecutor, ExecutorVerbosity};
@@ -167,9 +167,7 @@ fn disassemble_bench_function(ctx: &mut Context, function: &TupleItem) -> anyhow
         Ok(code) => code,
         Err(err) => return Ok(format!("{err:#}")),
     };
-    let Some(method) =
-        find_code_dictionary_method_in_instructions(&contract_code.instructions, method_id)
-    else {
+    let Some(method) = contract_code.find_method(method_id) else {
         return Ok(continuation_code.print(&FormatOptions::default()));
     };
 
@@ -194,55 +192,6 @@ fn called_method_id(code: &Code) -> Option<u64> {
     };
 
     id.to_u64()
-}
-
-fn find_code_dictionary_method_in_instructions(
-    instructions: &[Instruction],
-    method_id: u64,
-) -> Option<&Method> {
-    for instruction in instructions {
-        match instruction {
-            Instruction::Plain(instruction) => {
-                for arg in &instruction.args {
-                    if let Some(method) = find_code_dictionary_method_in_arg(arg, method_id) {
-                        return Some(method);
-                    }
-                }
-            }
-            Instruction::Ref(instruction) => {
-                if let Some(method) =
-                    find_code_dictionary_method_in_arg(&instruction.code, method_id)
-                {
-                    return Some(method);
-                }
-            }
-            Instruction::ExoticCell(_) | Instruction::Slice(_) => {}
-        }
-    }
-
-    None
-}
-
-fn find_code_dictionary_method_in_arg(arg: &ArgValue, method_id: u64) -> Option<&Method> {
-    match arg {
-        ArgValue::Code { code, .. } => {
-            find_code_dictionary_method_in_instructions(&code.instructions, method_id)
-        }
-        ArgValue::CodeDictionary(dict) => dict
-            .methods
-            .iter()
-            .find(|method| method.id == method_id)
-            .or_else(|| {
-                dict.methods.iter().find_map(|method| {
-                    find_code_dictionary_method_in_instructions(&method.instructions, method_id)
-                })
-            }),
-        ArgValue::Int(_)
-        | ArgValue::UInt(_)
-        | ArgValue::Control(_)
-        | ArgValue::StackRegister(_)
-        | ArgValue::Cell(_) => None,
-    }
 }
 
 fn build_instruction_dict(

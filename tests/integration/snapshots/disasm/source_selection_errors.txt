@@ -1,0 +1,5 @@
+{"error":"Function `missing` was not found in this entrypoint's sources","success":false}
+{"error":"Cannot select `identity`: named disassembly supports non-generic functions with a block body and no receiver or mutate parameters, get-methods, and external entrypoints","success":false}
+{"error":"Cannot select `change`: named disassembly supports non-generic functions with a block body and no receiver or mutate parameters, get-methods, and external entrypoints","success":false}
+{"error":"Cannot select `asmFunction`: named disassembly supports non-generic functions with a block body and no receiver or mutate parameters, get-methods, and external entrypoints","success":false}
+{"error":"--function requires a .tolk entrypoint file","success":false}

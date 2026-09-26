@@ -22,6 +22,7 @@ num-bigint = { workspace = true }
 owo-colors = { workspace = true }
 serde_json = { workspace = true }
 tolk-syntax = { workspace = true, optional = true }
+tolk-compiler = { workspace = true, optional = true }
 tolk-source-map = { workspace = true }
 ton-executor = { workspace = true, optional = true }
 tvm-ffi = { workspace = true }
@@ -30,7 +31,7 @@ tvm-logs = { workspace = true }
 
 [features]
 default = ["dap-server", "live-vm"]
-dap-server = ["dep:crossbeam-channel", "dep:dap", "dep:tolk-syntax", "live-vm"]
+dap-server = ["dep:crossbeam-channel", "dep:dap", "dep:tolk-syntax", "dep:tolk-compiler", "live-vm"]
 live-vm = ["dep:ton-executor"]
 
 [lints]

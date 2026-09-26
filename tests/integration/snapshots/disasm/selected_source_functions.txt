@@ -1,0 +1,11 @@
+// unused (method_id 262140, gas ~26)
+ADDINT 5
+// increment (method_id 262142, gas ~18)
+INC
+// double (method_id 262141, gas ~26)
+LSHIFT 1
+// getValue (method_id 69972, gas ~26)
+PUSHINT_8 42
+// reserved (method_id 262143, gas ~18)
+PUSHINT_4 9
+

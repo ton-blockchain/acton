@@ -1,7 +1,7 @@
 // Child debug contexts splice nested live executors into the current DAP session,
 // e.g. when runtime helpers step into `net.send*` or `net.runGetMethod`.
 
-use crate::DebugExecutorHandle;
+use crate::{DebugExecutorHandle, EvaluateRuntimeConfig};
 use std::sync::Arc;
 use tolk_source_map::SourceMap;
 use tolk_source_map::abi::ContractABI;
@@ -19,6 +19,8 @@ pub struct ChildDebugContextSpec {
     pub source_map: Option<Arc<SourceMap>>,
     /// Optional ABI used to render runtime storage / messages in "Registers".
     pub abi: Option<Arc<ContractABI>>,
+    /// Initial environment for isolated function calls, owned by this child context.
+    pub evaluate_runtime: Option<EvaluateRuntimeConfig>,
     /// True when parent Step Into should land on the first user-visible child location.
     pub stop_on_entry: bool,
 }

@@ -1,0 +1,282 @@
+[
+  {
+    "assembly": "INC/n",
+    "blocks": [
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 0,
+            "start_line": 0
+          }
+        ],
+        "source": {
+          "column": 41,
+          "end_column": 50,
+          "end_line": 1,
+          "file": "[ROOT]/functions.tolk",
+          "line": 1
+        }
+      }
+    ],
+    "gas_estimate": {
+      "has_control_flow": false,
+      "has_dynamic_cost": false,
+      "unknown_instructions": 0,
+      "value": 18
+    },
+    "method_id": 262143,
+    "name": "function0"
+  },
+  {
+    "assembly": "ADDINT 2/n",
+    "blocks": [
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 0,
+            "start_line": 0
+          }
+        ],
+        "source": {
+          "column": 41,
+          "end_column": 50,
+          "end_line": 2,
+          "file": "[ROOT]/functions.tolk",
+          "line": 2
+        }
+      }
+    ],
+    "gas_estimate": {
+      "has_control_flow": false,
+      "has_dynamic_cost": false,
+      "unknown_instructions": 0,
+      "value": 26
+    },
+    "method_id": 262142,
+    "name": "function1"
+  },
+  {
+    "assembly": "ADDINT 3/n",
+    "blocks": [
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 0,
+            "start_line": 0
+          }
+        ],
+        "source": {
+          "column": 41,
+          "end_column": 50,
+          "end_line": 3,
+          "file": "[ROOT]/functions.tolk",
+          "line": 3
+        }
+      }
+    ],
+    "gas_estimate": {
+      "has_control_flow": false,
+      "has_dynamic_cost": false,
+      "unknown_instructions": 0,
+      "value": 26
+    },
+    "method_id": 262141,
+    "name": "function2"
+  },
+  {
+    "assembly": "ADDINT 4/n",
+    "blocks": [
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 0,
+            "start_line": 0
+          }
+        ],
+        "source": {
+          "column": 41,
+          "end_column": 50,
+          "end_line": 4,
+          "file": "[ROOT]/functions.tolk",
+          "line": 4
+        }
+      }
+    ],
+    "gas_estimate": {
+      "has_control_flow": false,
+      "has_dynamic_cost": false,
+      "unknown_instructions": 0,
+      "value": 26
+    },
+    "method_id": 262140,
+    "name": "function3"
+  },
+  {
+    "assembly": "ADDINT 5/n",
+    "blocks": [
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 0,
+            "start_line": 0
+          }
+        ],
+        "source": {
+          "column": 41,
+          "end_column": 50,
+          "end_line": 5,
+          "file": "[ROOT]/functions.tolk",
+          "line": 5
+        }
+      }
+    ],
+    "gas_estimate": {
+      "has_control_flow": false,
+      "has_dynamic_cost": false,
+      "unknown_instructions": 0,
+      "value": 26
+    },
+    "method_id": 262139,
+    "name": "function4"
+  },
+  {
+    "assembly": "ADDINT 6/n",
+    "blocks": [
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 0,
+            "start_line": 0
+          }
+        ],
+        "source": {
+          "column": 41,
+          "end_column": 50,
+          "end_line": 6,
+          "file": "[ROOT]/functions.tolk",
+          "line": 6
+        }
+      }
+    ],
+    "gas_estimate": {
+      "has_control_flow": false,
+      "has_dynamic_cost": false,
+      "unknown_instructions": 0,
+      "value": 26
+    },
+    "method_id": 262138,
+    "name": "function5"
+  },
+  {
+    "assembly": "ADDINT 7/n",
+    "blocks": [
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 0,
+            "start_line": 0
+          }
+        ],
+        "source": {
+          "column": 41,
+          "end_column": 50,
+          "end_line": 7,
+          "file": "[ROOT]/functions.tolk",
+          "line": 7
+        }
+      }
+    ],
+    "gas_estimate": {
+      "has_control_flow": false,
+      "has_dynamic_cost": false,
+      "unknown_instructions": 0,
+      "value": 26
+    },
+    "method_id": 262137,
+    "name": "function6"
+  },
+  {
+    "assembly": "ADDINT 8/n",
+    "blocks": [
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 0,
+            "start_line": 0
+          }
+        ],
+        "source": {
+          "column": 41,
+          "end_column": 50,
+          "end_line": 8,
+          "file": "[ROOT]/functions.tolk",
+          "line": 8
+        }
+      }
+    ],
+    "gas_estimate": {
+      "has_control_flow": false,
+      "has_dynamic_cost": false,
+      "unknown_instructions": 0,
+      "value": 26
+    },
+    "method_id": 262136,
+    "name": "function7"
+  },
+  {
+    "assembly": "ADDINT 9/n",
+    "blocks": [
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 0,
+            "start_line": 0
+          }
+        ],
+        "source": {
+          "column": 41,
+          "end_column": 50,
+          "end_line": 9,
+          "file": "[ROOT]/functions.tolk",
+          "line": 9
+        }
+      }
+    ],
+    "gas_estimate": {
+      "has_control_flow": false,
+      "has_dynamic_cost": false,
+      "unknown_instructions": 0,
+      "value": 26
+    },
+    "method_id": 262135,
+    "name": "function8"
+  },
+  {
+    "assembly": "ADDINT 10/n",
+    "blocks": [
+      {
+        "assembly_ranges": [
+          {
+            "end_line": 0,
+            "start_line": 0
+          }
+        ],
+        "source": {
+          "column": 41,
+          "end_column": 51,
+          "end_line": 10,
+          "file": "[ROOT]/functions.tolk",
+          "line": 10
+        }
+      }
+    ],
+    "gas_estimate": {
+      "has_control_flow": false,
+      "has_dynamic_cost": false,
+      "unknown_instructions": 0,
+      "value": 26
+    },
+    "method_id": 262134,
+    "name": "function9"
+  }
+]

@@ -3,13 +3,13 @@ use crossbeam_channel::{Receiver, Sender};
 use dap::events::Event;
 use dap::prelude::{Command, Request, Response, ResponseBody};
 use dap::requests::{
-    ContinueArguments, ExceptionInfoArguments, InitializeArguments, LaunchRequestArguments,
-    NextArguments, ScopesArguments, SetBreakpointsArguments, StackTraceArguments, StepInArguments,
-    StepOutArguments, TerminateArguments, VariablesArguments,
+    ContinueArguments, EvaluateArguments, ExceptionInfoArguments, InitializeArguments,
+    LaunchRequestArguments, NextArguments, ScopesArguments, SetBreakpointsArguments,
+    StackTraceArguments, StepInArguments, StepOutArguments, TerminateArguments, VariablesArguments,
 };
 use dap::responses::{
-    ContinueResponse, ExceptionInfoResponse, ScopesResponse, SetBreakpointsResponse,
-    StackTraceResponse, ThreadsResponse, VariablesResponse,
+    ContinueResponse, EvaluateResponse, ExceptionInfoResponse, ScopesResponse,
+    SetBreakpointsResponse, StackTraceResponse, ThreadsResponse, VariablesResponse,
 };
 use dap::types::{Capabilities, Source, SourceBreakpoint};
 use log::{debug, info};
@@ -369,6 +369,41 @@ impl DapClient {
             _ => Ok(VariablesResponse {
                 variables: Vec::new(),
             }),
+        }
+    }
+
+    /// Evaluates an expression in a stopped frame and returns its display value and children handle.
+    /// A missing frame selects the active frame; protocol and evaluation failures remain errors.
+    pub fn evaluate(
+        &mut self,
+        expression: &str,
+        frame_id: Option<i64>,
+    ) -> Result<EvaluateResponse> {
+        let seq = self.send_request(Command::Evaluate(EvaluateArguments {
+            expression: expression.to_owned(),
+            frame_id,
+            context: None,
+            format: None,
+        }))?;
+
+        let response = self.wait_for_response(seq, Duration::from_secs(10))?;
+        if !response.success {
+            let message = match response.message {
+                Some(dap::responses::ResponseMessage::Error(message)) => message,
+                Some(dap::responses::ResponseMessage::Cancelled) => {
+                    "evaluate request was cancelled".to_string()
+                }
+                Some(dap::responses::ResponseMessage::NotStopped) => {
+                    "evaluate request requires a stopped debugger".to_string()
+                }
+                None => "evaluate request failed".to_string(),
+            };
+            return Err(anyhow!(message));
+        }
+
+        match response.body {
+            Some(ResponseBody::Evaluate(result)) => Ok(result),
+            _ => Err(anyhow!("evaluate response has no result body")),
         }
     }
 

@@ -764,6 +764,65 @@ impl DebugActionExecutor<'_> {
         Ok(self.variables_with_fields(vec![c4])?.pop())
     }
 
+    pub(crate) fn evaluate(
+        &mut self,
+        expression: &str,
+    ) -> anyhow::Result<dap::responses::EvaluateResponse> {
+        if *self.terminated {
+            anyhow::bail!("debug session already terminated");
+        }
+        self.client.evaluate(expression, None)
+    }
+
+    pub(crate) fn evaluate_fields(&mut self, expression: &str) -> anyhow::Result<String> {
+        let value = self.evaluate(expression)?;
+        let mut rendered = format!("{}: {}", value.type_field.unwrap_or_default(), value.result)
+            .trim_end()
+            .to_owned();
+        if value.variables_reference != 0 {
+            for field in self.client.variables(value.variables_reference)? {
+                write!(
+                    rendered,
+                    "\n{}: {} = {}",
+                    field.name,
+                    field.type_field.unwrap_or_default(),
+                    field.value
+                )?;
+            }
+        }
+        Ok(rendered)
+    }
+
+    pub(crate) fn evaluate_in_frame(
+        &mut self,
+        expression: &str,
+        depth: usize,
+    ) -> anyhow::Result<dap::responses::EvaluateResponse> {
+        let frames = self.client.stack_trace(1)?;
+        let frame = frames
+            .get(depth)
+            .ok_or_else(|| anyhow::anyhow!("Missing frame {depth}"))?;
+        self.client.evaluate(expression, Some(frame.id))
+    }
+
+    pub(crate) fn step_in_until_function(&mut self, name: &str) -> anyhow::Result<()> {
+        for _ in 0..300 {
+            if self
+                .client
+                .stack_trace(1)?
+                .first()
+                .is_some_and(|frame| frame.name == name)
+            {
+                return Ok(());
+            }
+            if *self.terminated {
+                break;
+            }
+            self.step_in()?;
+        }
+        anyhow::bail!("Debugger did not enter {name}")
+    }
+
     pub(crate) fn step_in(&mut self) -> anyhow::Result<()> {
         self.run_step("step_in".to_string(), |client| client.step_in(1))
     }

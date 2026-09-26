@@ -1,0 +1,4 @@
+// answer (method_id 262143, gas ~26)
+off │ instruction
+────┼───────────────────────────────────────
+8   │ PUSHINT_8 42

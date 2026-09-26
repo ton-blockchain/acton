@@ -22,6 +22,34 @@ source maps.
 Binary, hex, or base64 BoC file to disassemble.
 .sp
 Use \fB\-\-string\fR to pass the code directly instead of reading a file.
+.sp
+Available since trunk.
+.sp
+A \fB\&.tolk\fR file is compiled as an entrypoint before disassembly. Imports use the
+project mappings from \fBActon.toml\fR\&. Files without an entrypoint are also accepted.
+Use \fB\-\-function\fR to select individual functions from these sources.
+.RE
+.sp
+\fB\-\-function\fR \fIname\fR
+.RS 4
+Available since trunk.
+.sp
+Disassemble only the named function from a \fB\&.tolk\fR input. Repeat this option to
+select multiple functions, including functions declared in imported files.
+Functions are printed in the requested order; repeated names are printed once.
+All names in one invocation share the same compilation passes.
+.sp
+Selected functions keep separate bytecode bodies, even if normally inlined or
+unused. This inspection build leaves source files and build artifacts
+unchanged. Its bytecode can differ from a normal optimized build.
+.sp
+Supports non\-generic functions with block bodies and no receiver or \fBmutate\fR
+parameters, get\-methods, and external entrypoints. Get\-methods and functions with
+an explicit \fB@method_id\fR keep their IDs. Generic functions, receiver methods,
+\fBasm\fR functions, and \fBonBouncedMessage\fR cannot be selected.
+.sp
+Requires a \fB\&.tolk\fR file. Cannot be used with \fB\-\-source\-map\fR, \fB\-\-string\fR,
+\fB\-\-address\fR, or \fB\-\-follow\-libraries\fR\&.
 .RE
 .sp
 \fB\-s\fR, \fB\-\-string\fR \fIstring\fR
@@ -56,14 +84,19 @@ Show instruction bit offsets in the left column.
 Print machine\-readable disassembly JSON to stdout.
 .sp
 Successful output includes \fBsuccess\fR, the plain disassembly in \fBassembly\fR, and
-\fBblocks\fR derived from \fB\-\-source\-map\fR\&. Without \fB\-\-source\-map\fR, \fBblocks\fR is
-empty.
+\fBblocks\fR derived from \fB\-\-source\-map\fR or the compiled Tolk source.
+For BoC input without \fB\-\-source\-map\fR, \fBblocks\fR is empty.
 .RE
 .sp
 \fB\-\-source\-map\fR \fIpath\fR
 .RS 4
 Use a source map to show original Tolk source locations together with
 disassembly output.
+.sp
+Available since trunk.
+.sp
+This option applies to BoC input. Recompiled \fB\&.tolk\fR input does not accept an
+external source map.
 .RE
 .sp
 \fB\-\-address\fR \fIaddress\fR
@@ -199,10 +232,74 @@ Each item in \fBblocks\fR contains a \fBsource\fR location and \fBassembly_range
 \fBassembly_ranges\fR stores inclusive zero\-based \fBstart_line\fR/\fBend_line\fR pairs
 into the \fBassembly\fR string.
 .sp
-If \fB\-\-source\-map\fR is not provided, \fBblocks\fR is empty.
+For BoC input, \fBblocks\fR is empty without \fB\-\-source\-map\fR\&.
+Tolk source input includes mappings from its inspection compilation automatically.
 .sp
 If \fB\-\-output\fR is also provided, the output file contains the same plain
 \fBassembly\fR text while stdout remains JSON.
+.sp
+Available since trunk.
+.sp
+With \fB\-\-function\fR, the response also includes a \fBfunctions\fR array in the requested
+order. Each item contains \fBname\fR, \fBmethod_id\fR, \fBassembly\fR, \fBblocks\fR, and \fBgas_estimate\fR\&.
+The per\-function \fBassembly\fR contains only that function\[cq]s instructions.
+Its \fBblocks\fR use line offsets into that function\[cq]s \fBassembly\fR; top\-level \fBblocks\fR
+use offsets into the combined \fBassembly\fR, including function headers.
+Source locations refer to the original files, before annotation overrides.
+Identical bytecode may share a cell whose source marks were retained for only one
+function. Functions without matching marks have empty \fBblocks\fR; Acton does not
+attribute another function\[cq]s source locations to them.
+.sp
+\fBgas_estimate\fR contains:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBvalue\fR: sum of the lowest listed opcode costs from the bundled TVM specification
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBhas_dynamic_cost\fR: costs depend on runtime data or include a formula
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBhas_control_flow\fR: the body contains control flow or nested continuations
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBunknown_instructions\fR: instructions whose cost could not be included
+.RE
+.sp
+The estimate counts each instruction and nested continuation once. It does not
+predict the path taken through branches or the number of loop iterations.
+It excludes callees, implicit returns, dispatcher overhead, stack\-copy charges,
+and additional data\-dependent fees. It is neither a lower nor an upper bound on
+runtime gas. Use execution profiling when inputs and actual gas costs matter.
+.sp
+For example, \fBfun increment(value: int): int { return value + 1; }\fR has this entry:
+.sp
+.RS 4
+.nf
+{
+  "name": "increment",
+  "method_id": 262143,
+  "assembly": "INC\(rsn",
+  "blocks": [
+    {
+      "source": {"file": "example.tolk", "line": 1, "column": 41, "end_line": 1, "end_column": 50},
+      "assembly_ranges": [{"start_line": 0, "end_line": 0}]
+    }
+  ],
+  "gas_estimate": {
+    "value": 18,
+    "has_dynamic_cost": false,
+    "has_control_flow": false,
+    "unknown_instructions": 0
+  }
+}
+.fi
+.RE
+.sp
+Generated method IDs are local to the inspection build. Identify functions by
+\fBname\fR when matching results to an editor document.
 .SH "EXIT STATUS"
 .sp
 .RS 4
@@ -215,6 +312,15 @@ library references that were left as warnings.
 failed, or the output file could not be written.
 .RE
 .SH "EXAMPLES"
+Available since trunk.
+.sp
+Disassemble selected functions from a Tolk entrypoint:
+.sp
+.RS 4
+.nf
+acton disasm contracts/jetton\-wallet.tolk \-\-function transfer \-\-function get_wallet_data
+.fi
+.RE
 .sp
 .RS 4
 \h'-04' 1.\h'+01'Disassemble a local BoC file:

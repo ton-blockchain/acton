@@ -1,0 +1,10 @@
+// onExternalMessage (method_id 524287, gas ~84)
+// Static estimate: runtime costs depend on data and control flow
+THROW 222
+// onInternalMessage (method_id 0, gas ~154)
+// Static estimate: runtime costs depend on data and control flow
+DROP
+INMSG_BOUNCED
+THROWIF_SHORT 0
+THROW 111
+

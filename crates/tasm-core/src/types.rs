@@ -67,6 +67,15 @@ pub struct Code {
 }
 
 impl Code {
+    /// Finds the first method with this dictionary key, searching nested code as needed.
+    ///
+    /// IDs use the unsigned representation stored in the disassembly's code dictionary.
+    /// If separate nested dictionaries reuse a key, the first match is returned.
+    #[must_use]
+    pub fn find_method(&self, method_id: u64) -> Option<&Method> {
+        find_code_dictionary_method_in_instructions(&self.instructions, method_id)
+    }
+
     #[must_use]
     pub fn print(&self, options: &FormatOptions) -> String {
         let mut s = String::new();
@@ -123,4 +132,53 @@ pub enum ArgValue {
         offset: u16,
     },
     CodeDictionary(CodeDictionary),
+}
+
+fn find_code_dictionary_method_in_instructions(
+    instructions: &[Instruction],
+    method_id: u64,
+) -> Option<&Method> {
+    for instruction in instructions {
+        match instruction {
+            Instruction::Plain(instruction) => {
+                for arg in &instruction.args {
+                    if let Some(method) = find_code_dictionary_method_in_arg(arg, method_id) {
+                        return Some(method);
+                    }
+                }
+            }
+            Instruction::Ref(instruction) => {
+                if let Some(method) =
+                    find_code_dictionary_method_in_arg(&instruction.code, method_id)
+                {
+                    return Some(method);
+                }
+            }
+            Instruction::ExoticCell(_) | Instruction::Slice(_) => {}
+        }
+    }
+
+    None
+}
+
+fn find_code_dictionary_method_in_arg(arg: &ArgValue, method_id: u64) -> Option<&Method> {
+    match arg {
+        ArgValue::Code { code, .. } => {
+            find_code_dictionary_method_in_instructions(&code.instructions, method_id)
+        }
+        ArgValue::CodeDictionary(dict) => dict
+            .methods
+            .iter()
+            .find(|method| method.id == method_id)
+            .or_else(|| {
+                dict.methods.iter().find_map(|method| {
+                    find_code_dictionary_method_in_instructions(&method.instructions, method_id)
+                })
+            }),
+        ArgValue::Int(_)
+        | ArgValue::UInt(_)
+        | ArgValue::Control(_)
+        | ArgValue::StackRegister(_)
+        | ArgValue::Cell(_) => None,
+    }
 }

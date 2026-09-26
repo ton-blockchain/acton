@@ -804,10 +804,18 @@ enum Commands {
     )]
     Disasm {
         #[arg(
-            help = "BoC file to disassemble, either binary or text with hex/base64 data (use -s for inline data)",
+            help = "BoC file (binary, hex or base64) or Tolk entrypoint to disassemble",
             conflicts_with_all = ["string", "address"]
         )]
         boc_file: Option<String>,
+        #[arg(
+            long = "function",
+            value_name = "NAME",
+            help = "Disassemble a named function from a Tolk entrypoint (repeat for multiple functions)",
+            requires = "boc_file",
+            conflicts_with_all = ["string", "address", "source_map", "follow_libraries"]
+        )]
+        functions: Vec<String>,
         #[arg(
             short,
             long,
@@ -2382,6 +2390,7 @@ fn main() {
         }
         Commands::Disasm {
             boc_file,
+            functions,
             string,
             output,
             show_hashes,
@@ -2406,6 +2415,7 @@ fn main() {
                     net,
                     follow_libraries,
                     json,
+                    &functions,
                 ),
                 Err(err) => Err(err),
             };

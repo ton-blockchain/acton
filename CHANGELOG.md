@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Disassembly
+
+- Disassemble Tolk entrypoints directly and select individual functions with repeated
+  `--function` options. Selected functions remain separate even when normally inlined
+  or unused, including functions in imported files. Source files are left unchanged,
+  and get-method IDs are preserved. Batch selection compiles all requested functions
+  together and reports approximate static gas costs, with per-function assembly and
+  gas metadata and source-to-assembly mappings in JSON output for IDE integrations.
+
+### Debugger
+
+- Evaluate Tolk function and method calls, including chained calls, nested calls,
+  and expressions using literals, local variables, and available struct fields in
+  test, script, and nested contract debug sessions. Calls use the stopped VM's storage,
+  globals, and environment without changing its state. Results retain their runtime
+  Tolk types, including fields with `@abi.clientType`, and can be expanded in the debugger.
+  Syntax errors and execution failures are reported without ending the debug session.
+
 ### Dependencies
 
 - Replace yanked `chacha20` versions in Faucet and Localton with version `0.10.2`.

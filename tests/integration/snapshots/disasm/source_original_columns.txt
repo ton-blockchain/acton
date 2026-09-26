@@ -1,0 +1,63 @@
+{
+  "success": true,
+  "assembly": "// first (method_id 262143, gas ~18)/nINC/n// second (method_id 262142, gas ~18)/nINC/n",
+  "blocks": [
+    {
+      "source": {
+        "file": "[ROOT]/functions.tolk",
+        "line": 1,
+        "column": 95,
+        "end_line": 1,
+        "end_column": 100
+      },
+      "assembly_ranges": [
+        {
+          "start_line": 3,
+          "end_line": 3
+        }
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "name": "first",
+      "method_id": 262143,
+      "assembly": "INC/n",
+      "blocks": [],
+      "gas_estimate": {
+        "value": 18,
+        "has_dynamic_cost": false,
+        "has_control_flow": false,
+        "unknown_instructions": 0
+      }
+    },
+    {
+      "name": "second",
+      "method_id": 262142,
+      "assembly": "INC/n",
+      "blocks": [
+        {
+          "source": {
+            "file": "[ROOT]/functions.tolk",
+            "line": 1,
+            "column": 95,
+            "end_line": 1,
+            "end_column": 100
+          },
+          "assembly_ranges": [
+            {
+              "start_line": 0,
+              "end_line": 0
+            }
+          ]
+        }
+      ],
+      "gas_estimate": {
+        "value": 18,
+        "has_dynamic_cost": false,
+        "has_control_flow": false,
+        "unknown_instructions": 0
+      }
+    }
+  ]
+}

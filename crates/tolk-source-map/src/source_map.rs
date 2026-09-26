@@ -71,6 +71,47 @@ impl SourceMap {
 
     #[must_use]
     pub fn find_source_loc(&self, hash: &str, offset: u16) -> Option<SourceLocation> {
+        self.find_source_loc_matching(hash, offset, |_| true)
+    }
+
+    /// Resolves a bytecode position within the selected function's source range.
+    /// Identical function bodies can share a cell hash and offset; the function name
+    /// prevents their marks from pointing at another declaration. Inlined code uses
+    /// the enclosing function's call-site marks when available.
+    /// Returns `None` when the compiler retained marks only for another identical body.
+    #[must_use]
+    pub fn find_source_loc_in_function(
+        &self,
+        hash: &str,
+        offset: u16,
+        name: &str,
+    ) -> Option<SourceLocation> {
+        let function = self.get_function_by_name(name)?;
+        let file_id = function.ident_loc.file_id();
+        let file = self
+            .resolve_file_full_path(file_id)
+            .unwrap_or_else(|| self.resolve_file_name(file_id));
+        let start = (
+            function.ident_loc.start_line() as i64,
+            function.ident_loc.start_col() as i64,
+        );
+        let end = (
+            function.end_loc.end_line() as i64,
+            function.end_loc.end_col() as i64,
+        );
+        self.find_source_loc_matching(hash, offset, |location| {
+            location.file == file
+                && (location.line, location.column) >= start
+                && (location.line, location.column) <= end
+        })
+    }
+
+    fn find_source_loc_matching(
+        &self,
+        hash: &str,
+        offset: u16,
+        accepts: impl Fn(&SourceLocation) -> bool,
+    ) -> Option<SourceLocation> {
         let marks = self.marks_dict.get(hash)?;
         let target_offset = i32::from(offset);
 
@@ -81,6 +122,9 @@ impl SourceMap {
             let Some(loc) = self.source_location_for_mark(mark_id as usize) else {
                 continue;
             };
+            if !accepts(&loc) {
+                continue;
+            }
 
             if mark_offset < target_offset {
                 approx_loc = Some(loc);
@@ -101,6 +145,13 @@ impl SourceMap {
     #[must_use]
     pub fn get_function_by_idx(&self, f_idx: usize) -> Option<&FunctionInfo> {
         self.functions.get(f_idx)
+    }
+
+    /// Finds metadata by the compiler's exact function name, including generic arguments.
+    /// The returned type indices belong to this source map, not to the contract ABI.
+    #[must_use]
+    pub fn get_function_by_name(&self, name: &str) -> Option<&FunctionInfo> {
+        self.functions.iter().find(|function| function.name == name)
     }
 
     #[must_use]

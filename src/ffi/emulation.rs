@@ -22,7 +22,7 @@ use crate::wallets::wallet_message_expire_at;
 use acton_config::color::OwoColorize;
 use acton_config::config::Explorer;
 use acton_debug::replayer::StepMode;
-use acton_debug::{ChildDebugContextSpec, exit_codes};
+use acton_debug::{ChildDebugContextSpec, EvaluateRuntimeConfig, exit_codes};
 use anyhow::{Context as AnyhowContext, anyhow};
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
@@ -1066,31 +1066,7 @@ pub(crate) fn v3_message_hash(message: &v3::Message) -> Option<&str> {
 /// re-serializations and is the value both sides of a lookup compute locally — so a client
 /// that polled for it can match a transaction whose `inMessage` toncenter may have rebuilt.
 fn compute_normalized_ext_in_hash(msg: &Message<'_>) -> anyhow::Result<HashBytes> {
-    let MsgInfo::ExtIn(info) = &msg.info else {
-        anyhow::bail!("TEP-467 normalization only applies to external-in messages");
-    };
-
-    // Promote the body slice (inline or ref) to a standalone cell so it can be stored as ref.
-    let body_cell = {
-        let mut b = CellBuilder::new();
-        b.store_slice(msg.body)?;
-        b.build()?
-    };
-
-    let normalized_info = ExtInMsgInfo {
-        src: None,
-        dst: info.dst.clone(),
-        import_fee: Tokens::ZERO,
-    };
-
-    let ctx = Cell::empty_context();
-    let mut b = CellBuilder::new();
-    b.store_small_uint(0b10, 2)?; // MsgInfo::ExtIn tag
-    normalized_info.store_into(&mut b, ctx)?;
-    b.store_bit_zero()?; // init = nothing$0
-    b.store_bit_one()?; // body = right$1 (stored in a ref)
-    b.store_reference(body_cell)?;
-    Ok(*b.build()?.repr_hash())
+    Ok(ton_indexer_core::normalized_external_message_hash(msg)?)
 }
 
 /// Extract the destination address from an external-in message cell.
@@ -1624,6 +1600,15 @@ fn send_transaction_debug(
             executor: step_executor.clone().into(),
             source_map,
             abi,
+            evaluate_runtime: Some(EvaluateRuntimeConfig {
+                run_args: RunGetMethodArgs {
+                    verbosity: ctx.env.default_log_level,
+                    libs: prepared.run_args.libs.clone().unwrap_or_default(),
+                    ..RunGetMethodArgs::default()
+                },
+                config_b64: Some(config_b64.to_string()),
+                mappings: ctx.env.config.mappings(),
+            }),
             stop_on_entry: need_to_stop_on_entry,
         })
         .context("Cannot start nested debug context")?;
@@ -2674,6 +2659,11 @@ fn run_get_method_impl(
                 executor: step_executor.clone().into(),
                 source_map: Some(source_map.clone()),
                 abi: abi.clone(),
+                evaluate_runtime: Some(EvaluateRuntimeConfig {
+                    run_args: params.clone(),
+                    config_b64: Some(config_b64.to_string()),
+                    mappings: ctx.env.config.mappings(),
+                }),
                 stop_on_entry: need_to_stop_on_entry,
             })
             .context("Cannot send response")?;
