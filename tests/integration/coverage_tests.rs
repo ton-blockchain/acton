@@ -121,7 +121,7 @@ fn build_partial_coverage_project(name: &str) -> ProjectBuilder {
         .contract("simple", SIMPLE_CONTRACT)
         .file(
             "code/math",
-            r"
+            r"@noinline
             fun classify(x: int): int {
                 if (x > 0) {
                     return 1;
@@ -812,7 +812,7 @@ fn test_coverage_runtime_branch_opcodes_text_snapshot() {
         .contract("simple", SIMPLE_CONTRACT)
         .file(
             "code/branches",
-            r"
+            r"@noinline
             fun choose(x: int): int {
                 if (x > 0) {
                     return 1;

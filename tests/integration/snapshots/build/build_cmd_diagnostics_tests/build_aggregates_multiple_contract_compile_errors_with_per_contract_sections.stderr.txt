@@ -1,14 +1,17 @@
 Error: In broken_syntax:
 
-[ROOT]/contracts/broken_syntax[LINE]: error: expected <expression>, got `;`
+error: expected <expression>, got `;`
+    --> [ROOT]/contracts/broken_syntax[LINE]
+     | 
    2 |     val broken = ;
      |                  ^
 
 In missing_symbol:
 
-[ROOT]/contracts/missing_symbol[LINE]: error: undefined symbol `missing_identifier`
-
-    // in function `onInternalMessage`
+error: undefined symbol `missing_identifier`
+    --> [ROOT]/contracts/missing_symbol[LINE]
+     |  in function onInternalMessage
+     | 
    2 |     val x = missing_identifier;
      |             ^^^^^^^^^^^^^^^^^^
 

@@ -594,7 +594,7 @@ fn shows_tlb_documentation_for_small_large_and_variable_integers() {
 
             `uint32`, `uint64`, `uint111`, etc. is "a fixed-width unsigned integer with N bits", N <= 256.
             Note: it's still `int` at runtime, you can assign "100500" to "uint8":
-            overflow will happen at serialization to a cell/builder, NOT at assignment.
+            overflow will happen at serialization to a cell/builder, NOT at assignment. 
             ```tolk
             type int8 = builtin
             ```
@@ -605,7 +605,7 @@ fn shows_tlb_documentation_for_small_large_and_variable_integers() {
 
             `int8`, `int32`, `int222`, etc. is "a fixed-width signed integer with N bits", N <= 257.
             Note: it's still `int` at runtime, you can assign "100500" to "int8":
-            overflow will happen at serialization to a cell/builder, NOT at assignment.
+            overflow will happen at serialization to a cell/builder, NOT at assignment. 
             ```tolk
             type int257 = builtin
             ```
@@ -616,7 +616,7 @@ fn shows_tlb_documentation_for_small_large_and_variable_integers() {
 
             `int8`, `int32`, `int222`, etc. is "a fixed-width signed integer with N bits", N <= 257.
             Note: it's still `int` at runtime, you can assign "100500" to "int8":
-            overflow will happen at serialization to a cell/builder, NOT at assignment.
+            overflow will happen at serialization to a cell/builder, NOT at assignment. 
             ```tolk
             type varuint16 = builtin
             ```
@@ -625,7 +625,7 @@ fn shows_tlb_documentation_for_small_large_and_variable_integers() {
             - **Size**: 4 to 124 bits
             - **TL-B**: varuint16
 
-            `varuint16` is `int` at runtime, but serialized as "variadic unsigned int", 0 <= X < 2^120.
+            `varuint16` is `int` at runtime, but serialized as "variadic unsigned int", 0 <= X < 2^120. 
             ```tolk
             type varint32 = builtin
             ```
@@ -634,7 +634,7 @@ fn shows_tlb_documentation_for_small_large_and_variable_integers() {
             - **Size**: 5 to 253 bits
             - **TL-B**: varint32
 
-            `varint32` is `int` at runtime, but serialized as "variadic signed int", -2^247 <= X < 2^247."#]],
+            `varint32` is `int` at runtime, but serialized as "variadic signed int", -2^247 <= X < 2^247. "#]],
     );
 }
 

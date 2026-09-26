@@ -167,7 +167,7 @@ fun WalletV5.sendExtensionActionRaw(
 
 struct SignedBody {
     payload: InternalSignedRequest
-    signature: bytes64
+    signature: bits512
 }
 
 fun WalletV5.sendSignedBody(
@@ -206,7 +206,7 @@ fun createSignedBody(
     validUntil: int? = null,
 ): SignedBody {
     val payload = buildSignedPayload(walletId, seqno, actions, validUntil);
-    val signature = crypto.sign(keyPair.privateKey, payload.toCell()) as bytes64;
+    val signature = crypto.sign(keyPair.privateKey, payload.toCell()) as bits512;
     return SignedBody { payload, signature };
 }
 
@@ -234,7 +234,7 @@ fun deployWalletWithKey(keyPair: KeyPair): (WalletV5, Treasury) {
 
 struct ExternalSignedBody {
     payload: ExternalSignedRequest
-    signature: bytes64
+    signature: bits512
 }
 
 fun buildExternalSignedPayload(
@@ -264,7 +264,7 @@ fun createExternalSignedBody(
     validUntil: int? = null,
 ): ExternalSignedBody {
     val payload = buildExternalSignedPayload(walletId, seqno, actions, validUntil);
-    val signature = crypto.sign(keyPair.privateKey, payload.toCell()) as bytes64;
+    val signature = crypto.sign(keyPair.privateKey, payload.toCell()) as bits512;
     return ExternalSignedBody { payload, signature };
 }
 

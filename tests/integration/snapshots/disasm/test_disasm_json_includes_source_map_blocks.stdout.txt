@@ -94,7 +94,7 @@
       "source": {
         "file": "[ROOT]/contracts/counter.tolk",
         "line": 9,
-        "column": 28,
+        "column": 9,
         "end_line": 13,
         "end_column": 10
       },
@@ -207,7 +207,7 @@
       "source": {
         "file": "[ROOT]/contracts/counter.tolk",
         "line": 14,
-        "column": 25,
+        "column": 9,
         "end_line": 18,
         "end_column": 10
       },

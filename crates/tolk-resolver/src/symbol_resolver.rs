@@ -839,9 +839,6 @@ fn parse_builtin_type_base_name(name: &str) -> Option<&'static str> {
     if parse_numeric_suffix(name, "bits") {
         return Some("bitsN");
     }
-    if parse_numeric_suffix(name, "bytes") {
-        return Some("bytesN");
-    }
 
     None
 }

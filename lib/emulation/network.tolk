@@ -580,6 +580,7 @@ fun impl.unwrapScalar<T>(field: (T -> bool) | T | null): T? {
 ///   [0, null] = absent
 ///   [1, cont] = user predicate
 ///   [2, cont, original_value] = value converted to predicate (original kept for display)
+@noinline
 fun impl.toPredicate<T>(field: (T -> bool) | T | null): tuple {
     match (field) {
         (T -> bool) => {

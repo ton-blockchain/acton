@@ -2,7 +2,7 @@ warning[E003]: usage of deprecated symbol
   --> [ROOT]/contracts/main[LINE]
   |
 2 |                 fun main(): coins { return ton("0.1"); }
-  |                                            ^^^ ton is deprecated and should not be used. use grams instead
+  |                                            ^^^ ton is deprecated and should not be used. use `grams("0.05")` instead of `ton("0.05")`
   |
   = deprecated symbols may be removed in future versions
 
@@ -10,7 +10,7 @@ warning[E003]: usage of deprecated symbol
   --> [ROOT]/contracts/main[LINE]
   |
 3 |                 fun shadowed(grams: int): coins { return ton("0.2"); }
-  |                                                          ^^^ ton is deprecated and should not be used. use grams instead
+  |                                                          ^^^ ton is deprecated and should not be used. use `grams("0.05")` instead of `ton("0.05")`
   |
   = deprecated symbols may be removed in future versions
 

@@ -228,7 +228,7 @@ enum FmAbiMegaMode {
 struct FmAbiMegaLeaf {
     amount: coins
     owner: address?
-    tag: bytes4
+    tag: bits32
 }
 
 type FmAbiMegaLeafAlias = FmAbiMegaLeaf
@@ -257,7 +257,7 @@ struct FmAbiMegaScalarValues {
     varAmount: varuint32
     varDebt: varint16
     nibble: bits12
-    bytesTag: bytes4
+    bytesTag: bits32
     rawCell: cell
     mode: FmAbiMegaMode
 }
@@ -1712,7 +1712,7 @@ fn formatter_decoded_body_renders_supported_compiler_abi_types() {
 get fun `test formatter decoded body supported compiler abi types`() {
     val (sender, friend, sinkAddress) = deployFmAbiMegaHarness();
     val nibble = beginCell().storeUint(0xABC, 12).endCell().beginParse() as bits12;
-    val bytesTag = "CAFEBABE".hexToSlice() as bytes4;
+    val bytesTag = "CAFEBABE".hexToSlice() as bits32;
     val rawCell = beginCell()
         .storeUint(0xCA, 8)
         .storeRef(beginCell().storeUint(0xFE, 8).endCell())
@@ -1731,24 +1731,24 @@ get fun `test formatter decoded body supported compiler abi types`() {
     items.set(1 as uint16, FmAbiMegaLeaf {
         amount: grams("0.01"),
         owner: sender.address,
-        tag: "01020304".hexToSlice() as bytes4,
+        tag: "01020304".hexToSlice() as bits32,
     });
     items.set(2 as uint16, FmAbiMegaLeaf {
         amount: grams("0.02"),
         owner: null,
-        tag: "0A0B0C0D".hexToSlice() as bytes4,
+        tag: "0A0B0C0D".hexToSlice() as bits32,
     });
 
     var boxedItems = createEmptyMap<uint8, Cell<FmAbiMegaLeaf>>();
     boxedItems.set(1 as uint8, FmAbiMegaLeaf {
         amount: grams("0.2"),
         owner: sender.address,
-        tag: "A1B2C3D4".hexToSlice() as bytes4,
+        tag: "A1B2C3D4".hexToSlice() as bits32,
     }.toCell() as Cell<FmAbiMegaLeaf>);
     boxedItems.set(2 as uint8, FmAbiMegaLeaf {
         amount: grams("0.3"),
         owner: friend.address,
-        tag: "0BADF00D".hexToSlice() as bytes4,
+        tag: "0BADF00D".hexToSlice() as bits32,
     }.toCell() as Cell<FmAbiMegaLeaf>);
 
     val scalarAddressesCell = FmAbiMegaScalarAddresses {
@@ -1781,17 +1781,17 @@ get fun `test formatter decoded body supported compiler abi types`() {
         maybeLeaf: FmAbiMegaLeaf {
             amount: grams("0.05"),
             owner: friend.address,
-            tag: "11223344".hexToSlice() as bytes4,
+            tag: "11223344".hexToSlice() as bits32,
         },
         aliasLeaf: FmAbiMegaLeaf {
             amount: grams("0.06"),
             owner: null,
-            tag: "55667788".hexToSlice() as bytes4,
+            tag: "55667788".hexToSlice() as bits32,
         },
         boxedLeaf: FmAbiMegaLeaf {
             amount: grams("0.07"),
             owner: sender.address,
-            tag: "99AABBCC".hexToSlice() as bytes4,
+            tag: "99AABBCC".hexToSlice() as bits32,
         }.toCell() as Cell<FmAbiMegaLeaf>,
         nested: FmAbiMegaInner {
             nonce: 77 as uint32,
@@ -1800,7 +1800,7 @@ get fun `test formatter decoded body supported compiler abi types`() {
             meta: FmAbiMegaLeaf {
                 amount: grams("0.08"),
                 owner: sender.address,
-                tag: "DDEEFF00".hexToSlice() as bytes4,
+                tag: "DDEEFF00".hexToSlice() as bits32,
             },
         }.toCell() as Cell<FmAbiMegaInner>,
     }.toCell() as Cell<FmAbiMegaObjects>;
@@ -1876,7 +1876,7 @@ get fun `test formatter decoded body supported compiler abi types`() {
     expect(objects.maybeLeaf!.amount).toEqual(grams("0.05"));
     expect(objects.aliasLeaf.owner).toEqual(null);
     expect(objects.boxedLeaf.load().amount).toEqual(grams("0.07"));
-    expect(objects.nested.load().meta!.tag).toEqual("DDEEFF00".hexToSlice() as bytes4);
+    expect(objects.nested.load().meta!.tag).toEqual("DDEEFF00".hexToSlice() as bits32);
     expect(collections.items).toHaveLength(2);
     expect(collections.boxedItems).toHaveLength(2);
     expect(collections.items.get(1 as uint16).loadValue().amount).toEqual(grams("0.01"));

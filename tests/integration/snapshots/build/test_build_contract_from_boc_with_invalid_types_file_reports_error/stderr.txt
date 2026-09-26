@@ -1,6 +1,8 @@
 Error: In precompiled:
 
-Failed to compile types file [ROOT]/contracts/precompiled.types.tolk for precompiled: [ROOT]/contracts/precompiled.types[LINE]: error: unknown type name `MissingMessage`
+Failed to compile types file [ROOT]/contracts/precompiled.types.tolk for precompiled: error: unknown type name `MissingMessage`
+    --> [ROOT]/contracts/precompiled.types[LINE]
+     | 
    3 |     incomingMessages: MissingMessage
      |                       ^^^^^^^^^^^^^^
 Build failed with 1 error

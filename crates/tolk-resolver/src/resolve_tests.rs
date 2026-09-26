@@ -268,7 +268,7 @@ mod tests {
                 }
             ",
             expect![[r"
-                int -> Global(int at common.tolk:352-355)
+                int -> Global(int at common.tolk:350-353)
                 x -> Local(x at 63-64)
             "]],
         );
@@ -1127,14 +1127,12 @@ mod tests {
                     val a: <caret>uint128? = 0;
                     val b: <caret>int32? = 0;
                     val c: <caret>bits256? = null;
-                    val d: <caret>bytes32? = null;
                 }
             ",
             expect![[r"
                 uint128 -> Global(uintN at common.tolk:3511-3516)
-                int32 -> Global(intN at common.tolk:3236-3240)
-                bits256 -> Global(bitsN at common.tolk:5108-5113)
-                bytes32 -> Global(bytesN at common.tolk:5198-5204)
+                int32 -> Global(intN at common.tolk:3235-3239)
+                bits256 -> Global(bitsN at common.tolk:5112-5117)
             "]],
         );
     }
@@ -1470,7 +1468,7 @@ mod tests {
                 "#,
             )
             .check_definition(expect![[r"
-                getGasConsumedAtTheMoment -> Global(getGasConsumedAtTheMoment at gas-payments.tolk:182-207)
+                getGasConsumedAtTheMoment -> Global(getGasConsumedAtTheMoment at gas-payments.tolk:180-205)
             "]]);
     }
 
