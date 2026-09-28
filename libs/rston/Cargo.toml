@@ -90,7 +90,6 @@ smallvec = { version = "1.9", features = ["union"] }
 thiserror = "2.0"
 tl-proto = { version = "0.5.3", optional = true }
 tycho-crypto = { version = "0.4", features = ["tl-proto"], optional = true }
-typeid = "1.0"
 
 rston-proc = { version = "=0.3.0", path = "proc" }
 
