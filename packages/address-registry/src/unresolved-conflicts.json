@@ -1,5 +1,18 @@
 [
   {
+    "address": "0:18aa8e2eed51747dae033c079b93883d941cad8f65459f2ee9cd7474b6b8ed5d",
+    "candidates": [
+      {
+        "source": "ton-assets",
+        "name": "DeDust USDT vault"
+      },
+      {
+        "source": "address-book",
+        "name": "DeDust Vault"
+      }
+    ]
+  },
+  {
     "address": "0:a9bc094e3b3a9c23f354c7007476ac3fcddd12af6aed4b4168337e47692c5323",
     "candidates": [
       {
