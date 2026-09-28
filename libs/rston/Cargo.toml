@@ -1,0 +1,142 @@
+[package]
+name = "rston"
+description = "TON cells, BoC encoding, dictionaries, Merkle proofs, and blockchain models."
+authors = ["Ivan Kalinin <i.kalinin@dexpa.io>"]
+repository = "https://github.com/ton-blockchain/acton"
+version = "0.3.5"
+edition = "2024"
+rust-version = "1.88"
+include = ["src/**/*.rs", "benches/**/*.rs", "LICENSE-*", "README.md", "CONTRIBUTING.md"]
+license = "MIT OR Apache-2.0"
+
+[[bench]]
+name = "boc"
+harness = false
+
+[[bench]]
+name = "mine"
+harness = false
+
+[[bench]]
+name = "dict_from_slice"
+harness = false
+
+[[bench]]
+name = "dict_modify"
+harness = false
+
+[[bench]]
+name = "dict_modify_aug"
+harness = false
+
+[[bench]]
+name = "dict"
+harness = false
+
+[[bench]]
+name = "slice_uniform"
+harness = false
+
+[[bench]]
+name = "usage_cell"
+harness = false
+
+# callgrind benchmarks
+
+[[bench]]
+name = "callgrind_boc"
+harness = false
+
+[[bench]]
+name = "callgrind_dict_from_slice"
+harness = false
+
+[[bench]]
+name = "callgrind_dict"
+harness = false
+
+[[bench]]
+name = "callgrind_slice_uniform"
+harness = false
+
+[[bench]]
+name = "callgrind_usage_cell"
+harness = false
+
+[[bench]]
+name = "big_cell"
+harness = false
+
+[workspace]
+members = ["proc", "fuzz"]
+
+[dependencies]
+ahash = "0.8.11"
+arbitrary = { version = "1", features = ["derive"], optional = true }
+base64 = { version = "0.22", optional = true }
+bitflags = "2.3"
+crc32c = "0.6.8"
+dashmap = { version = "6.1.0", optional = true }
+hex = "0.4"
+num-bigint = { version = "0.4", optional = true }
+num-traits = { version = "0.2", optional = true }
+rand8 = { package = "rand", version = "0.8", optional = true }
+rand9 = { package = "rand", version = "0.9", optional = true }
+rayon = { version = "1.10", optional = true }
+scc = { version = "2.1", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+sha2 = "0.10"
+smallvec = { version = "1.9", features = ["union"] }
+thiserror = "2.0"
+tl-proto = { version = "0.5.3", optional = true }
+tycho-crypto = { version = "0.4", features = ["tl-proto"], optional = true }
+typeid = "1.0"
+
+rston-proc = { version = "=0.3.0", path = "proc" }
+
+[dev-dependencies]
+anyhow = "1.0"
+base64 = "0.22"
+criterion = "0.7"
+rand_xorshift = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+iai-callgrind = "0.16.1"
+paste = "1.0.15"
+
+rston = { path = "./", features = ["rand9"] }
+
+[features]
+default = ["base64", "serde", "models", "sync"]
+sync = ["dep:scc"]
+serde = ["dep:serde", "base64"]
+rand8 = ["dep:rand8"]
+rand9 = ["dep:rand9"]
+models = ["dep:tycho-crypto", "dep:tl-proto"]
+rayon = ["sync", "dep:rayon", "dep:dashmap"]
+arbitrary = ["dep:arbitrary"]
+bigint = ["dep:num-bigint", "dep:num-traits"]
+
+[profile.release]
+debug = true
+
+[profile.dev.package.hex]
+opt-level = 3
+[profile.dev.package.base64]
+opt-level = 3
+[profile.dev.package.rand]
+opt-level = 3
+[profile.dev.package.sha2]
+opt-level = 3
+[profile.dev.package.tycho-crypto]
+opt-level = 3
+[profile.dev.package.curve25519-dalek]
+opt-level = 3
+[profile.dev.package."*"]
+opt-level = 1
+
+[package.metadata.docs.rs]
+features = ["base64", "serde", "models", "sync", "bigint"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }

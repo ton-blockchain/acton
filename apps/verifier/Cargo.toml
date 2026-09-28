@@ -70,6 +70,7 @@ httpdate = "1"
 include_dir = "0.7"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 ring = "0.17.14"
+rston = { path = "../../libs/rston" }
 rustls-pki-types = "1.14"
 rusqlite = { version = "0.37", features = ["bundled"] }
 semver = "1"
@@ -84,7 +85,6 @@ toml = "0.9"
 tower-http = { version = "0.6", features = ["compression-br", "compression-gzip"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
-tycho-types = { path = "../../libs/tycho-types" }
 utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
 zeroize = "1.9"
 

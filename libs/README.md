@@ -6,18 +6,18 @@ from the library directory or pass its manifest with `--manifest-path`.
 
 | Library | Purpose |
 | --- | --- |
-| [tycho-types](tycho-types/) | Cells, BoC encoding, dictionaries, Merkle proofs, and TON models |
+| [rston](rston/) | Cells, BoC encoding, dictionaries, Merkle proofs, and TON models |
 
 The root Acton workspace keeps its registry dependencies. Verifier is the first
-application that uses the local `tycho-types` library:
+application that uses the local `rston` library:
 
 ```toml
 [dependencies]
-tycho-types = { path = "../../libs/tycho-types" }
+rston = { path = "../../libs/rston" }
 ```
 
 Run the library tests from the repository root:
 
 ```sh
-cargo test --manifest-path libs/tycho-types/Cargo.toml --workspace --all-features
+cargo test --manifest-path libs/rston/Cargo.toml --workspace --all-features
 ```

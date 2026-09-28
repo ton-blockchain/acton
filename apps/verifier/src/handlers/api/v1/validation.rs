@@ -1,4 +1,4 @@
-use tycho_types::models::{StdAddr, StdAddrFormat};
+use rston::models::{StdAddr, StdAddrFormat};
 
 use crate::{
     blockchain::{is_valid_code_hash, normalize_code_hash},

@@ -1301,6 +1301,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "rston"
+version = "0.3.5"
+dependencies = [
+ "ahash",
+ "base64",
+ "bitflags",
+ "crc32c",
+ "hex",
+ "rston-proc",
+ "scc",
+ "serde",
+ "sha2",
+ "smallvec",
+ "thiserror",
+ "tl-proto",
+ "tycho-crypto",
+ "typeid",
+]
+
+[[package]]
+name = "rston-proc"
+version = "0.3.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "rusqlite"
 version = "0.37.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1927,35 +1956,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tycho-types"
-version = "0.3.5"
-dependencies = [
- "ahash",
- "base64",
- "bitflags",
- "crc32c",
- "hex",
- "scc",
- "serde",
- "sha2",
- "smallvec",
- "thiserror",
- "tl-proto",
- "tycho-crypto",
- "tycho-types-proc",
- "typeid",
-]
-
-[[package]]
-name = "tycho-types-proc"
-version = "0.3.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "typeid"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2059,6 +2059,7 @@ dependencies = [
  "include_dir",
  "reqwest",
  "ring",
+ "rston",
  "rusqlite",
  "rustls-pki-types",
  "semver",
@@ -2074,7 +2075,6 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
- "tycho-types",
  "utoipa",
  "zeroize",
 ]

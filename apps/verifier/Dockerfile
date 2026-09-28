@@ -25,7 +25,7 @@ COPY apps/verifier/Cargo.toml apps/verifier/Cargo.lock apps/verifier/rust-toolch
 COPY apps/verifier/assets ./assets
 COPY apps/verifier/src ./src
 COPY apps/verifier/github-app-credential ./github-app-credential
-COPY libs/tycho-types /build/libs/tycho-types
+COPY libs/rston /build/libs/rston
 COPY --from=frontend-builder /workspace/packages/verifier-ui/dist /build/packages/verifier-ui/dist
 
 RUN VERIFIER_GIT_HASH="${VCS_REF}" cargo build --release --locked --bins

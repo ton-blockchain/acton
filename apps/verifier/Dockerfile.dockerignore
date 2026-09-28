@@ -5,8 +5,8 @@
 
 !libs/
 libs/*
-!libs/tycho-types/
-libs/tycho-types/target/
+!libs/rston/
+libs/rston/target/
 
 !apps/
 apps/*

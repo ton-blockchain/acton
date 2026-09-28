@@ -7,14 +7,14 @@ on:
     paths:
       - ".github/workflows/check-verifier.yml"
       - "apps/verifier/**"
-      - "libs/tycho-types/**"
+      - "libs/rston/**"
   push:
     branches:
       - master
     paths:
       - ".github/workflows/check-verifier.yml"
       - "apps/verifier/**"
-      - "libs/tycho-types/**"
+      - "libs/rston/**"
   workflow_dispatch:
 
 concurrency:

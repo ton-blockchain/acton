@@ -9,10 +9,10 @@ build-dev:
 build-ci: build
 
 fmt:
-    cargo fmt --all
+    cargo fmt --package verifier
 
 fmt-check:
-    cargo fmt --all --check
+    cargo fmt --package verifier --check
 
 check-deps:
     cargo shear --deny-warnings

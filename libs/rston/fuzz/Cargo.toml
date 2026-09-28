@@ -1,0 +1,77 @@
+[package]
+name = "rston-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+arbitrary = { version = "1.4", features = ["derive"] }
+libfuzzer-sys = "0.4"
+
+[dependencies.rston]
+path = ".."
+features = ["base64", "arbitrary"]
+
+[[bin]]
+name = "base64_addr"
+path = "fuzz_targets/base64_addr.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "boc_decode"
+path = "fuzz_targets/boc_decode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "boc_encode"
+path = "fuzz_targets/boc_encode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "boc_decode_pair"
+path = "fuzz_targets/boc_decode_pair.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "boc_decode_encode"
+path = "fuzz_targets/boc_decode_encode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "boc_dict"
+path = "fuzz_targets/boc_dict.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "boc_message"
+path = "fuzz_targets/boc_message.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "dict_modify"
+path = "fuzz_targets/dict_modify.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "dict_modify_aug"
+path = "fuzz_targets/dict_modify_aug.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "dict_modify_aug_with_cells"
+path = "fuzz_targets/dict_modify_aug_with_cells.rs"
+test = false
+doc = false

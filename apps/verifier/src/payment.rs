@@ -10,11 +10,11 @@ use std::{
 };
 
 use async_trait::async_trait;
+use rston::{boc::Boc, cell::CellSlice};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
-use tycho_types::{boc::Boc, cell::CellSlice};
 
 use crate::{
     blockchain::{ToncenterClient, is_valid_code_hash, is_valid_hash, normalize_hash},
@@ -1247,7 +1247,7 @@ mod tests {
     #[test]
     fn payment_comment_decodes_from_a_text_comment_boc() {
         let comment = payment_comment(CODE_HASH);
-        let mut builder = tycho_types::cell::CellBuilder::new();
+        let mut builder = rston::cell::CellBuilder::new();
         builder
             .store_u32(0)
             .expect("text comment opcode should store");
@@ -1257,7 +1257,7 @@ mod tests {
         let body = builder.build().expect("text comment cell should build");
 
         assert_eq!(
-            super::parse_comment_boc(&tycho_types::boc::Boc::encode_base64(body)),
+            super::parse_comment_boc(&rston::boc::Boc::encode_base64(body)),
             Some(comment)
         );
     }
