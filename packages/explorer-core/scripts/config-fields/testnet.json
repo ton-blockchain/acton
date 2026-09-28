@@ -205,6 +205,20 @@
       "cur_validators.utime_since",
       "cur_validators.utime_until"
     ],
+    "36": [
+      "next_validators",
+      "next_validators.list",
+      "next_validators.list{}",
+      "next_validators.list{}.adnl_addr",
+      "next_validators.list{}.public_key",
+      "next_validators.list{}.public_key.pubkey",
+      "next_validators.list{}.weight",
+      "next_validators.main",
+      "next_validators.total",
+      "next_validators.total_weight",
+      "next_validators.utime_since",
+      "next_validators.utime_until"
+    ],
     "43": [
       "acc_state_cells_for_storage_dict",
       "defer_out_queue_size_limit",
