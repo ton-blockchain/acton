@@ -5,6 +5,7 @@
 ### Changed
 
 - Rename `tycho-types` to `rston` and `tycho-types-proc` to `rston-proc`.
+- Use stable rustfmt with the shared Acton formatting configuration.
 
 ### Removed
 

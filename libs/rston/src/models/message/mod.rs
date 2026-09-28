@@ -450,10 +450,13 @@ impl MessageLayout {
                 init_to_cell: false,
                 body_to_cell: false,
             };
-            return (layout, Size {
-                bits: total_bits,
-                refs: total_refs,
-            });
+            return (
+                layout,
+                Size {
+                    bits: total_bits,
+                    refs: total_refs,
+                },
+            );
         }
 
         // Try body to ref
@@ -464,10 +467,13 @@ impl MessageLayout {
                 init_to_cell: false,
                 body_to_cell: true,
             };
-            return (layout, Size {
-                bits: total_bits,
-                refs: total_refs + 1,
-            });
+            return (
+                layout,
+                Size {
+                    bits: total_bits,
+                    refs: total_refs + 1,
+                },
+            );
         }
 
         // Try init to ref
@@ -478,10 +484,13 @@ impl MessageLayout {
                 init_to_cell: true,
                 body_to_cell: false,
             };
-            return (layout, Size {
-                bits: total_bits,
-                refs: total_refs + 1,
-            });
+            return (
+                layout,
+                Size {
+                    bits: total_bits,
+                    refs: total_refs + 1,
+                },
+            );
         }
 
         // Fallback to init and body to ref
@@ -489,10 +498,13 @@ impl MessageLayout {
             init_to_cell: true,
             body_to_cell: true,
         };
-        (layout, Size {
-            bits: l.info.bits,
-            refs: l.info.refs + 2,
-        })
+        (
+            layout,
+            Size {
+                bits: l.info.bits,
+                refs: l.info.refs + 2,
+            },
+        )
     }
 }
 

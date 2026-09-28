@@ -43,10 +43,13 @@ fn create_proof_for_deep_cell() {
     }
 
     let stats = cell.compute_unique_stats(1 << 22).unwrap();
-    assert_eq!(stats, CellTreeStats {
-        bit_count: 65000 * 32,
-        cell_count: 65001
-    });
+    assert_eq!(
+        stats,
+        CellTreeStats {
+            bit_count: 65000 * 32,
+            cell_count: 65001
+        }
+    );
 
     {
         let encoded = Boc::encode_base64(cell.as_ref());

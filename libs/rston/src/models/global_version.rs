@@ -515,15 +515,18 @@ mod tests {
             | GlobalCapability::CapFixTupleIndexBug;
 
         let capabilities = capabilities.into_iter().collect::<Vec<_>>();
-        assert_eq!(capabilities, [
-            GlobalCapability::CapCreateStatsEnabled,
-            GlobalCapability::CapBounceMsgBody,
-            GlobalCapability::CapReportVersion,
-            GlobalCapability::CapShortDequeue,
-            GlobalCapability::CapFastStorageStat,
-            GlobalCapability::CapOffHypercube,
-            GlobalCapability::CapMyCode,
-            GlobalCapability::CapFixTupleIndexBug
-        ]);
+        assert_eq!(
+            capabilities,
+            [
+                GlobalCapability::CapCreateStatsEnabled,
+                GlobalCapability::CapBounceMsgBody,
+                GlobalCapability::CapReportVersion,
+                GlobalCapability::CapShortDequeue,
+                GlobalCapability::CapFastStorageStat,
+                GlobalCapability::CapOffHypercube,
+                GlobalCapability::CapMyCode,
+                GlobalCapability::CapFixTupleIndexBug
+            ]
+        );
     }
 }

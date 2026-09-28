@@ -1793,60 +1793,72 @@ mod tests {
         }
 
         // Unsigned
-        compare_iter_values(left.iter_union(&right), &[
-            (0, Some(0), Some(100)),
-            (1, Some(1), Some(101)),
-            (2, Some(2), Some(102)),
-            (3, Some(3), Some(103)),
-            (4, None, Some(104)),
-            (5, None, Some(105)),
-            (-4, Some(-4), None),
-            (-3, Some(-3), None),
-            (-2, Some(-2), Some(98)),
-            (-1, Some(-1), Some(99)),
-        ]);
+        compare_iter_values(
+            left.iter_union(&right),
+            &[
+                (0, Some(0), Some(100)),
+                (1, Some(1), Some(101)),
+                (2, Some(2), Some(102)),
+                (3, Some(3), Some(103)),
+                (4, None, Some(104)),
+                (5, None, Some(105)),
+                (-4, Some(-4), None),
+                (-3, Some(-3), None),
+                (-2, Some(-2), Some(98)),
+                (-1, Some(-1), Some(99)),
+            ],
+        );
 
         // Unsigned reversed
-        compare_iter_values(left.iter_union(&right).reversed(), &[
-            (-1, Some(-1), Some(99)),
-            (-2, Some(-2), Some(98)),
-            (-3, Some(-3), None),
-            (-4, Some(-4), None),
-            (5, None, Some(105)),
-            (4, None, Some(104)),
-            (3, Some(3), Some(103)),
-            (2, Some(2), Some(102)),
-            (1, Some(1), Some(101)),
-            (0, Some(0), Some(100)),
-        ]);
+        compare_iter_values(
+            left.iter_union(&right).reversed(),
+            &[
+                (-1, Some(-1), Some(99)),
+                (-2, Some(-2), Some(98)),
+                (-3, Some(-3), None),
+                (-4, Some(-4), None),
+                (5, None, Some(105)),
+                (4, None, Some(104)),
+                (3, Some(3), Some(103)),
+                (2, Some(2), Some(102)),
+                (1, Some(1), Some(101)),
+                (0, Some(0), Some(100)),
+            ],
+        );
 
         // Signed
-        compare_iter_values(left.iter_union(&right).signed(), &[
-            (-4, Some(-4), None),
-            (-3, Some(-3), None),
-            (-2, Some(-2), Some(98)),
-            (-1, Some(-1), Some(99)),
-            (0, Some(0), Some(100)),
-            (1, Some(1), Some(101)),
-            (2, Some(2), Some(102)),
-            (3, Some(3), Some(103)),
-            (4, None, Some(104)),
-            (5, None, Some(105)),
-        ]);
+        compare_iter_values(
+            left.iter_union(&right).signed(),
+            &[
+                (-4, Some(-4), None),
+                (-3, Some(-3), None),
+                (-2, Some(-2), Some(98)),
+                (-1, Some(-1), Some(99)),
+                (0, Some(0), Some(100)),
+                (1, Some(1), Some(101)),
+                (2, Some(2), Some(102)),
+                (3, Some(3), Some(103)),
+                (4, None, Some(104)),
+                (5, None, Some(105)),
+            ],
+        );
 
         // Signed reversed
-        compare_iter_values(left.iter_union(&right).signed().reversed(), &[
-            (5, None, Some(105)),
-            (4, None, Some(104)),
-            (3, Some(3), Some(103)),
-            (2, Some(2), Some(102)),
-            (1, Some(1), Some(101)),
-            (0, Some(0), Some(100)),
-            (-1, Some(-1), Some(99)),
-            (-2, Some(-2), Some(98)),
-            (-3, Some(-3), None),
-            (-4, Some(-4), None),
-        ]);
+        compare_iter_values(
+            left.iter_union(&right).signed().reversed(),
+            &[
+                (5, None, Some(105)),
+                (4, None, Some(104)),
+                (3, Some(3), Some(103)),
+                (2, Some(2), Some(102)),
+                (1, Some(1), Some(101)),
+                (0, Some(0), Some(100)),
+                (-1, Some(-1), Some(99)),
+                (-2, Some(-2), Some(98)),
+                (-3, Some(-3), None),
+                (-4, Some(-4), None),
+            ],
+        );
 
         Ok(())
     }

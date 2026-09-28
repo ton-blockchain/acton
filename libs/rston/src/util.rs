@@ -613,38 +613,53 @@ mod tests {
     #[test]
     fn bitstring_zero_char_with_completion_tag() {
         assert_eq!(
-            format!("{}", Bitstring {
-                bytes: &[0b_0011_0000],
-                bit_len: 4
-            }),
+            format!(
+                "{}",
+                Bitstring {
+                    bytes: &[0b_0011_0000],
+                    bit_len: 4
+                }
+            ),
             format!("{:x}", 0b_0011)
         );
         assert_eq!(
-            format!("{}", Bitstring {
-                bytes: &[0b_0100_0000],
-                bit_len: 2
-            }),
+            format!(
+                "{}",
+                Bitstring {
+                    bytes: &[0b_0100_0000],
+                    bit_len: 2
+                }
+            ),
             format!("{:x}_", 0b_0110)
         );
         assert_eq!(
-            format!("{}", Bitstring {
-                bytes: &[0b_0000_1000],
-                bit_len: 5
-            }),
+            format!(
+                "{}",
+                Bitstring {
+                    bytes: &[0b_0000_1000],
+                    bit_len: 5
+                }
+            ),
             format!("{:x}{:x}_", 0b_0000, 0b_1100)
         );
         assert_eq!(
-            format!("{}", Bitstring {
-                bytes: &[0b_0000_1000, 0b_0100_0000],
-                bit_len: 8 + 2
-            }),
+            format!(
+                "{}",
+                Bitstring {
+                    bytes: &[0b_0000_1000, 0b_0100_0000],
+                    bit_len: 8 + 2
+                }
+            ),
             format!("{:x}{:x}{:x}_", 0b_0000, 0b_1000, 0b_0110)
         );
         assert_eq!(
-            format!("{}", Bitstring {
-                bytes: &[0b_0100_0000, 0b_0000_1000],
-                bit_len: 8 + 5
-            }),
+            format!(
+                "{}",
+                Bitstring {
+                    bytes: &[0b_0100_0000, 0b_0000_1000],
+                    bit_len: 8 + 5
+                }
+            ),
             format!("{:x}{:x}{:x}{:x}_", 0b_0100, 0b_0000, 0b_0000, 0b_1100)
         );
     }

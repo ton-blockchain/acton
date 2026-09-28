@@ -8,6 +8,7 @@ on:
       - ".github/workflows/check-rston.yml"
       - "libs/rston/**"
       - "rust-toolchain.toml"
+      - "rustfmt.toml"
   push:
     branches:
       - master
@@ -15,6 +16,7 @@ on:
       - ".github/workflows/check-rston.yml"
       - "libs/rston/**"
       - "rust-toolchain.toml"
+      - "rustfmt.toml"
   workflow_dispatch:
 
 concurrency:
@@ -48,11 +50,8 @@ jobs:
       - name: Install Rust
         run: rustup toolchain install
 
-      - name: Install nightly rustfmt
-        run: rustup toolchain install nightly --profile minimal --component rustfmt
-
       - name: Check formatting
-        run: cargo +nightly fmt --all -- --check
+        run: cargo fmt --all -- --check
 
       - name: Test library
         run: cargo test --workspace --all-features

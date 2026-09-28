@@ -1697,13 +1697,15 @@ mod tests {
 
         builder.store_u32(0xdeafbeaf).unwrap();
         assert_eq!(builder.size_bits(), 32 + 27);
-        assert_eq!(builder.data[..8], [
-            0xde, 0xaf, 0xbe, 0xbb, 0xd5, 0xf7, 0xd5, 0xe0
-        ]);
+        assert_eq!(
+            builder.data[..8],
+            [0xde, 0xaf, 0xbe, 0xbb, 0xd5, 0xf7, 0xd5, 0xe0]
+        );
         builder.rewind_bits(32).unwrap();
-        assert_eq!(builder.data[..8], [
-            0xde, 0xaf, 0xbe, 0xa0, 0x00, 0x00, 0x00, 0x00
-        ]);
+        assert_eq!(
+            builder.data[..8],
+            [0xde, 0xaf, 0xbe, 0xa0, 0x00, 0x00, 0x00, 0x00]
+        );
 
         assert_eq!(builder.rewind_bits(32), Err(Error::CellUnderflow));
 

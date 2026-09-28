@@ -59,27 +59,36 @@ fn simple_config() {
     println!("{reward:#?}");
 
     let timings = blockchain_config.get::<ConfigParam15>().unwrap().unwrap();
-    assert_eq!(timings, ElectionTimings {
-        validators_elected_for: 900,
-        elections_start_before: 450,
-        elections_end_before: 50,
-        stake_held_for: 450,
-    });
+    assert_eq!(
+        timings,
+        ElectionTimings {
+            validators_elected_for: 900,
+            elections_start_before: 450,
+            elections_end_before: 50,
+            stake_held_for: 450,
+        }
+    );
 
     let validator_count = blockchain_config.get::<ConfigParam16>().unwrap().unwrap();
-    assert_eq!(validator_count, ValidatorCountParams {
-        max_validators: 1000,
-        max_main_validators: 100,
-        min_validators: 13,
-    });
+    assert_eq!(
+        validator_count,
+        ValidatorCountParams {
+            max_validators: 1000,
+            max_main_validators: 100,
+            min_validators: 13,
+        }
+    );
 
     let validator_stakes = blockchain_config.get::<ConfigParam17>().unwrap().unwrap();
-    assert_eq!(validator_stakes, ValidatorStakeParams {
-        min_stake: Tokens::new(10000000000000),
-        max_stake: Tokens::new(10000000000000000),
-        min_total_stake: Tokens::new(100000000000000),
-        max_stake_factor: 3 << 16,
-    });
+    assert_eq!(
+        validator_stakes,
+        ValidatorStakeParams {
+            min_stake: Tokens::new(10000000000000),
+            max_stake: Tokens::new(10000000000000000),
+            min_total_stake: Tokens::new(100000000000000),
+            max_stake_factor: 3 << 16,
+        }
+    );
 
     let storage_prices = blockchain_config.get::<ConfigParam18>().unwrap().unwrap();
     for entry in storage_prices.iter() {
@@ -88,95 +97,116 @@ fn simple_config() {
     }
 
     let mc_prices = blockchain_config.get::<ConfigParam20>().unwrap().unwrap();
-    assert_eq!(mc_prices, GasLimitsPrices {
-        gas_price: 655360000,
-        gas_limit: 1000000,
-        special_gas_limit: 100000000,
-        gas_credit: 10000,
-        block_gas_limit: 10000000,
-        freeze_due_limit: 100000000,
-        delete_due_limit: 1000000000,
-        flat_gas_limit: 1000,
-        flat_gas_price: 10000000,
-    });
+    assert_eq!(
+        mc_prices,
+        GasLimitsPrices {
+            gas_price: 655360000,
+            gas_limit: 1000000,
+            special_gas_limit: 100000000,
+            gas_credit: 10000,
+            block_gas_limit: 10000000,
+            freeze_due_limit: 100000000,
+            delete_due_limit: 1000000000,
+            flat_gas_limit: 1000,
+            flat_gas_price: 10000000,
+        }
+    );
 
     let sc_prices = blockchain_config.get::<ConfigParam21>().unwrap().unwrap();
-    assert_eq!(sc_prices, GasLimitsPrices {
-        gas_price: 6553600,
-        gas_limit: 1000000,
-        special_gas_limit: 100000000,
-        gas_credit: 10000,
-        block_gas_limit: 10000000,
-        freeze_due_limit: 100000000,
-        delete_due_limit: 1000000000,
-        flat_gas_limit: 1000,
-        flat_gas_price: 1000000,
-    });
+    assert_eq!(
+        sc_prices,
+        GasLimitsPrices {
+            gas_price: 6553600,
+            gas_limit: 1000000,
+            special_gas_limit: 100000000,
+            gas_credit: 10000,
+            block_gas_limit: 10000000,
+            freeze_due_limit: 100000000,
+            delete_due_limit: 1000000000,
+            flat_gas_limit: 1000,
+            flat_gas_price: 1000000,
+        }
+    );
 
     let mc_limits = blockchain_config.get::<ConfigParam22>().unwrap().unwrap();
-    assert_eq!(mc_limits, BlockLimits {
-        bytes: BlockParamLimits {
-            underload: 131072,
-            soft_limit: 524288,
-            hard_limit: 1048576,
-        },
-        gas: BlockParamLimits {
-            underload: 900000,
-            soft_limit: 1200000,
-            hard_limit: 2000000,
-        },
-        lt_delta: BlockParamLimits {
-            underload: 1000,
-            soft_limit: 5000,
-            hard_limit: 10000,
-        },
-    });
+    assert_eq!(
+        mc_limits,
+        BlockLimits {
+            bytes: BlockParamLimits {
+                underload: 131072,
+                soft_limit: 524288,
+                hard_limit: 1048576,
+            },
+            gas: BlockParamLimits {
+                underload: 900000,
+                soft_limit: 1200000,
+                hard_limit: 2000000,
+            },
+            lt_delta: BlockParamLimits {
+                underload: 1000,
+                soft_limit: 5000,
+                hard_limit: 10000,
+            },
+        }
+    );
 
     let sc_limits = blockchain_config.get::<ConfigParam23>().unwrap().unwrap();
     assert_eq!(sc_limits, mc_limits);
 
     let mc_msg_fwd_prices = blockchain_config.get::<ConfigParam24>().unwrap().unwrap();
-    assert_eq!(mc_msg_fwd_prices, MsgForwardPrices {
-        lump_price: 10000000,
-        bit_price: 655360000,
-        cell_price: 65536000000,
-        ihr_price_factor: 98304,
-        first_frac: 21845,
-        next_frac: 21845,
-    });
+    assert_eq!(
+        mc_msg_fwd_prices,
+        MsgForwardPrices {
+            lump_price: 10000000,
+            bit_price: 655360000,
+            cell_price: 65536000000,
+            ihr_price_factor: 98304,
+            first_frac: 21845,
+            next_frac: 21845,
+        }
+    );
 
     let sc_msg_fwd_prices = blockchain_config.get::<ConfigParam25>().unwrap().unwrap();
-    assert_eq!(sc_msg_fwd_prices, MsgForwardPrices {
-        lump_price: 100000,
-        bit_price: 6553600,
-        cell_price: 655360000,
-        ihr_price_factor: 98304,
-        first_frac: 21845,
-        next_frac: 21845,
-    });
+    assert_eq!(
+        sc_msg_fwd_prices,
+        MsgForwardPrices {
+            lump_price: 100000,
+            bit_price: 6553600,
+            cell_price: 655360000,
+            ihr_price_factor: 98304,
+            first_frac: 21845,
+            next_frac: 21845,
+        }
+    );
 
     let catchain_config = blockchain_config.get::<ConfigParam28>().unwrap().unwrap();
-    assert_eq!(catchain_config, CatchainConfig {
-        isolate_mc_validators: false,
-        shuffle_mc_validators: true,
-        mc_catchain_lifetime: 250,
-        shard_catchain_lifetime: 250,
-        shard_validators_lifetime: 1000,
-        shard_validators_num: 11,
-    });
+    assert_eq!(
+        catchain_config,
+        CatchainConfig {
+            isolate_mc_validators: false,
+            shuffle_mc_validators: true,
+            mc_catchain_lifetime: 250,
+            shard_catchain_lifetime: 250,
+            shard_validators_lifetime: 1000,
+            shard_validators_num: 11,
+        }
+    );
 
     let consensus_config = blockchain_config.get::<ConfigParam29>().unwrap().unwrap();
-    assert_eq!(consensus_config, ConsensusConfig {
-        new_catchain_ids: true,
-        round_candidates: NonZeroU32::new(3).unwrap(),
-        next_candidate_delay_ms: 2000,
-        consensus_timeout_ms: 16000,
-        fast_attempts: 3,
-        attempt_duration: 8,
-        catchain_max_deps: 4,
-        max_block_bytes: 2097152,
-        max_collated_bytes: 2097152,
-    });
+    assert_eq!(
+        consensus_config,
+        ConsensusConfig {
+            new_catchain_ids: true,
+            round_candidates: NonZeroU32::new(3).unwrap(),
+            next_candidate_delay_ms: 2000,
+            consensus_timeout_ms: 16000,
+            fast_attempts: 3,
+            attempt_duration: 8,
+            catchain_max_deps: 4,
+            max_block_bytes: 2097152,
+            max_collated_bytes: 2097152,
+        }
+    );
 
     assert!(blockchain_config.get::<ConfigParam30>().unwrap().is_none());
 
@@ -213,18 +243,24 @@ fn prod_config() {
             .keys()
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
-        assert_eq!(mandatory_params, [
-            0, 1, 9, 10, 12, 14, 15, 16, 17, 18, 20, 21, 22, 23, 24, 25, 28, 34
-        ]);
+        assert_eq!(
+            mandatory_params,
+            [
+                0, 1, 9, 10, 12, 14, 15, 16, 17, 18, 20, 21, 22, 23, 24, 25, 28, 34
+            ]
+        );
 
         let critical_params = config.get_critical_params().unwrap();
         let critical_params = critical_params
             .keys()
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
-        assert_eq!(critical_params, [
-            0, 1, 9, 10, 12, 14, 15, 16, 17, 32, 34, 36, 4294966295, 4294966296, 4294966297
-        ]);
+        assert_eq!(
+            critical_params,
+            [
+                0, 1, 9, 10, 12, 14, 15, 16, 17, 32, 34, 36, 4294966295, 4294966296, 4294966297
+            ]
+        );
 
         let workchains = config.get_workchains().unwrap();
         for entry in workchains.iter() {

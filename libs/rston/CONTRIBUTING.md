@@ -32,23 +32,18 @@ The `callgrind_*` targets require Valgrind with Callgrind.
 
 ## Formatting and Clippy
 
-The formatter configuration requires nightly Rust.
-Install nightly Rust with rustfmt:
-
-```sh
-rustup toolchain install nightly --profile minimal --component rustfmt
-```
+The workspace uses stable rustfmt with the shared [Acton configuration](../../rustfmt.toml).
 
 Format the workspace:
 
 ```sh
-cargo +nightly fmt --all
+cargo fmt --all
 ```
 
 Run the formatting and Clippy checks:
 
 ```sh
-cargo +nightly fmt --all -- --check
+cargo fmt --all -- --check
 cargo clippy --workspace --all-features -- -D warnings
 ```
 
@@ -57,7 +52,7 @@ cargo clippy --workspace --all-features -- -D warnings
 Install Miri for nightly Rust:
 
 ```sh
-rustup +nightly component add miri
+rustup toolchain install nightly --profile minimal --component miri
 ```
 
 Run the library tests under Miri:

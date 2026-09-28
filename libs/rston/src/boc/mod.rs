@@ -231,10 +231,13 @@ impl Boc {
     pub fn decode_ext(data: &[u8], context: &dyn CellContext) -> Result<Cell, de::Error> {
         use self::de::*;
 
-        let header = ok!(de::BocHeader::decode(data, &Options {
-            max_roots: Some(1),
-            min_roots: Some(1),
-        },));
+        let header = ok!(de::BocHeader::decode(
+            data,
+            &Options {
+                max_roots: Some(1),
+                min_roots: Some(1),
+            },
+        ));
 
         if let Some(&root) = header.roots().first() {
             let cells = ok!(header.finalize(context));
@@ -253,10 +256,13 @@ impl Boc {
     ) -> Result<(Cell, Cell), de::Error> {
         use self::de::*;
 
-        let header = ok!(de::BocHeader::decode(data, &Options {
-            max_roots: Some(2),
-            min_roots: Some(2),
-        },));
+        let header = ok!(de::BocHeader::decode(
+            data,
+            &Options {
+                max_roots: Some(2),
+                min_roots: Some(2),
+            },
+        ));
 
         let mut roots = header.roots().iter();
         if let (Some(&root1), Some(&root2)) = (roots.next(), roots.next()) {
