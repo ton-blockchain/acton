@@ -1,0 +1,197 @@
+{
+  "highload_v2r2-current": {
+    "wallet_id": 698983191,
+    "last_cleaned_time": 7143863305542239298,
+    "queries": [
+      7144058407128550094,
+      7144059013121273458,
+      7144059050982709089,
+      14255172016518706365
+    ],
+    "public_key": "c99fb5cf4fecda28862a1ef5d0313a70234fe2e1aeaa29daf0d6e560c9bb1c81",
+    "data_hash": "0d24d1f691af309bfd149f2a53a2bd1a7741456a0454fb0f50d186cb70fde976"
+  },
+  "highload_v2r2-deployment": {
+    "wallet_id": 698983191,
+    "last_cleaned_time": 0,
+    "queries": [],
+    "public_key": "c99fb5cf4fecda28862a1ef5d0313a70234fe2e1aeaa29daf0d6e560c9bb1c81",
+    "data_hash": "a6f6e44f972a042646bc0851f2359759c103cfa5842655f805771ef86351c879"
+  },
+  "w1r1-current": {
+    "seqno": 21,
+    "public_key": "c1c91c27ad38127cc124653d9a393a31cdca115ed6239ec9939c87e00420d4fe",
+    "data_hash": "31d0b9d3eaa79161e057a8f27af4f091c9aeb237e85330e6ea75faa7babaf193"
+  },
+  "w1r1-deployment": {
+    "seqno": 0,
+    "public_key": "c1c91c27ad38127cc124653d9a393a31cdca115ed6239ec9939c87e00420d4fe",
+    "data_hash": "b443a133bf4ab8808c8bc98d5260d14bcc2bbec28bce9aa0e5ec420bdfeaf7d2"
+  },
+  "w1r2-current": {
+    "seqno": 5785,
+    "public_key": "dc6c1109e1ab9c43efe60a6e1fd37f14155b424af9f5a2cbba500a5f1add5704",
+    "data_hash": "b4e345019c4463763db9fbc73f5a4ebff8f6fd47780a47b7a6ee42be0716c899"
+  },
+  "w1r2-deployment": {
+    "seqno": 0,
+    "public_key": "dc6c1109e1ab9c43efe60a6e1fd37f14155b424af9f5a2cbba500a5f1add5704",
+    "data_hash": "c9309f5b2e1195b46862ecb70ffcc3a8e4cd08153eadd92b1b6fb46c37acd82f"
+  },
+  "w1r3-current": {
+    "seqno": 1,
+    "public_key": "5b42d3404fae5e06c0b3970faeac28f80646cb024364743d4542b49e8f0f85d6",
+    "data_hash": "0963ae35e40883fa21fecbde6bd7a67479061733995622cd5c2fad073084477a"
+  },
+  "w1r3-deployment": {
+    "seqno": 0,
+    "public_key": "5b42d3404fae5e06c0b3970faeac28f80646cb024364743d4542b49e8f0f85d6",
+    "data_hash": "8ac0439fd3c807077c5087a65d369a7c50470388e25c6315e51b20f9c4ffc6f8"
+  },
+  "w2r1-current": {
+    "seqno": 8627,
+    "public_key": "e32c5b925e5a3ba5064d52ee15315a74b832ba89a2d30383dc1d12363563c2f2",
+    "data_hash": "6d431b43b5f58157b57cf3dd8c437a5d9e466750f27b0a112a9a7ce31bb63f15"
+  },
+  "w2r1-deployment": {
+    "seqno": 0,
+    "public_key": "e32c5b925e5a3ba5064d52ee15315a74b832ba89a2d30383dc1d12363563c2f2",
+    "data_hash": "5d43f841740bbdc1596e08430ac81f0a4e46c994aed9506e8d7b87c6c7235244"
+  },
+  "w2r2-current": {
+    "seqno": 58,
+    "public_key": "ae334aa3a95180afcb7560d7dba9e63ca53b429e21a4ee5c06165974a1966deb",
+    "data_hash": "09c4743eece5d8be39bbd39e64473fa0a25bfb13125907ad70c12b4c9c4eebe3"
+  },
+  "w2r2-deployment": {
+    "seqno": 0,
+    "public_key": "ae334aa3a95180afcb7560d7dba9e63ca53b429e21a4ee5c06165974a1966deb",
+    "data_hash": "5382973f3f888446c7e242518e5788c7a9d7debb4cffbf610710b2da071f3840"
+  },
+  "w3r1-current": {
+    "seqno": 48,
+    "wallet_id": 698983191,
+    "public_key": "28413eafbd14cd74a0359df5c3b72acd06a376a9bff91c51325d92ea4db8d20a",
+    "data_hash": "39bb71149c09f47bcc1bc6cf4e7ffe743ad46fc82339623420f08ecde62d4dfe"
+  },
+  "w3r1-deployment": {
+    "seqno": 0,
+    "wallet_id": 698983191,
+    "public_key": "28413eafbd14cd74a0359df5c3b72acd06a376a9bff91c51325d92ea4db8d20a",
+    "data_hash": "b894b8c507b06369cd6620cc5e9e195cbc220da5bcbf5fd7b078594f2ca6b7c3"
+  },
+  "w3r2-current": {
+    "seqno": 3,
+    "wallet_id": 698983191,
+    "public_key": "5d82f075d2ba27d9542dac309d9cf4d86c46699ef5fbdb4ae84277bb3b96797b",
+    "data_hash": "aca5f4487a9610c97fefe06efe07c4a1adfbaca6d1ac13dde3d9d13b92375f82"
+  },
+  "w3r2-deployment": {
+    "seqno": 0,
+    "wallet_id": 698983191,
+    "public_key": "5d82f075d2ba27d9542dac309d9cf4d86c46699ef5fbdb4ae84277bb3b96797b",
+    "data_hash": "5f7f42924e0637f76a3d26bbd9401feb75a5bec2f0353c680fb7e84622350cd4"
+  },
+  "w4r1-current": {
+    "seqno": 10,
+    "wallet_id": 698983191,
+    "plugins": [
+      "0:d2144333d1610c245997e8d9d28e0e1a531c5aa31db89ff2d79472e967d8604e"
+    ],
+    "public_key": "d9b59a3ae9e88ab67590c3b382a8ea037f9cdb8dd55822136920ceb0a6c84b4e",
+    "data_hash": "7be0110d82bac51467f89f72b73dadf797643d624c4fb9fd8e4e6ddc173fe91f"
+  },
+  "w4r1-deployment": {
+    "seqno": 0,
+    "wallet_id": 698983191,
+    "plugins": [],
+    "public_key": "d9b59a3ae9e88ab67590c3b382a8ea037f9cdb8dd55822136920ceb0a6c84b4e",
+    "data_hash": "c89ddec06f60b471ae8c95a9415e64dbabd0d6dffcd73cd74b4fac11b871ce6b"
+  },
+  "w4r2-current": {
+    "seqno": 40,
+    "wallet_id": 698983191,
+    "plugins": [],
+    "public_key": "22a85a05bd7628f6633c7a47a83153fc6809ab34b9caa017e876ce44ea79bd93",
+    "data_hash": "0d12ef4f92e6bde4498ce0b067150c711c2a8ba452abebf1368729487dabb701"
+  },
+  "w4r2-deployment": {
+    "seqno": 0,
+    "wallet_id": 698983191,
+    "plugins": [],
+    "public_key": "22a85a05bd7628f6633c7a47a83153fc6809ab34b9caa017e876ce44ea79bd93",
+    "data_hash": "7bfaf846fef7ed58aec7c2aa7e710df42f868d69a705ff93f9f0a03da09a7473"
+  },
+  "w5r1-current": {
+    "seqno": 39,
+    "wallet_id": 2147483409,
+    "sign_allowed": true,
+    "extensions": {},
+    "public_key": "bea0669c621c90fd38c5ad37417693b491414a7e2e62f555bc508d7671045cf6",
+    "data_hash": "2cdca8b1108494ddebd0625d9e04388ca6192c93be138a97f646b07b9f272769"
+  },
+  "w5r1-deployment": {
+    "seqno": 0,
+    "wallet_id": 2147483409,
+    "sign_allowed": true,
+    "extensions": {},
+    "public_key": "bea0669c621c90fd38c5ad37417693b491414a7e2e62f555bc508d7671045cf6",
+    "data_hash": "0fb43dddcc91203bf125817a3d1de8c206c7c3793add97c8ee52c3acb56a843c"
+  },
+  "w5r1-five-extensions": {
+    "seqno": 164,
+    "wallet_id": 2147483409,
+    "sign_allowed": true,
+    "extensions": {
+      "29de6f2e63a467c5c32c2d35c6d4be5e0f192a6464ae288686eeba6a0f5c2340": true,
+      "7f6f01a69cf973c0dc6cd8971ffe0a64518c9fd1aba05c68b32a4043afe207ca": true,
+      "9cfc8de952b0b9f8e51bd44cc9d4e79427b1ebc6f22dbf9415e94f3382a674b0": true,
+      "ce86d9b78d7905c985814cbc5c7a6000b814afac075b920258d49bd372e888d5": true,
+      "dd8800b6e135791cb775b02bc0f564156591dfc40dd4633cd7f42002360f7a8e": true
+    },
+    "public_key": "e322f2ac82a04e75e9cd45a5c465d76af6b4544bef7102c1f563e017b94589ca",
+    "data_hash": "6ff8f454125e95285ac7d4bdefb90f1f3dd368654bfddcff4131ad8c3fa5c013"
+  },
+  "w5r1-four-transfers-account": {
+    "seqno": 415954,
+    "wallet_id": 2147483409,
+    "sign_allowed": true,
+    "extensions": {},
+    "public_key": "aca93a747118f257d4d09eab1719dde44bf0b642156ac4a0afde3aadb09dc300",
+    "data_hash": "d7353c08e67fc3a36a88470f083599f7c6aee6856c1ba0e9590c2b45c52bd008"
+  },
+  "w5r1-hundred-transfers-account": {
+    "seqno": 6326,
+    "wallet_id": 2147483409,
+    "sign_allowed": true,
+    "extensions": {},
+    "public_key": "6303b64d7967ed6670c29ea1f58d2c054559ea246f0bf5d7f0f642ad1d677b15",
+    "data_hash": "b69b29965a81f2833f234b2ba40e4930cac37ec35412d4d8afc74a1201a4fb41"
+  },
+  "w5r1-mixed-modes-account": {
+    "seqno": 1,
+    "wallet_id": 2147483409,
+    "sign_allowed": true,
+    "extensions": {},
+    "public_key": "dff2b6559b9c6d6bcec455e5d48810d1db67da9907b78f7488ba2cf2358c73e0",
+    "data_hash": "3287cbbe91f2aa360914253ece9c58e8c329dc3225925b9d5031f5e0a41befb1"
+  },
+  "w5r1-send-all-account": {
+    "seqno": 6,
+    "wallet_id": 2147483409,
+    "sign_allowed": true,
+    "extensions": {},
+    "public_key": "ece93672211ec6d5fcdd5b784ff92f107c2bab459a8a78b95c77afb127fe05a2",
+    "data_hash": "a3a4d4f93565cdf86cf2b7930fc4ac7cb0d6274d14d81a6fda31e3ccba8682d7"
+  },
+  "w5r1-signatures-disabled": {
+    "seqno": 9,
+    "wallet_id": 2147483409,
+    "sign_allowed": false,
+    "extensions": {
+      "97ecf01df52124906e4cbed02c1859bfda81a8cb7e9203f8e738236b4dcc011b": true
+    },
+    "public_key": "4122d885addc71d96ebda6b387daff4a4c04bf3b5b8b2d80947ab22da5e2e864",
+    "data_hash": "67c3d473896474dd8feebdb6d7dabb4270b9f73330888ee4e6d4a34ff3920ec1"
+  }
+}

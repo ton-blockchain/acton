@@ -1,5 +1,8 @@
 //! Common error types.
 
+#[cfg(feature = "wallet")]
+use crate::{cell::HashBytes, wallet::WalletVersion};
+
 /// Errors reported while deriving a wallet or preparing its external message.
 #[cfg(feature = "wallet")]
 #[derive(Debug, thiserror::Error)]
@@ -10,9 +13,24 @@ pub enum WalletError {
     /// The supplied mnemonic could not produce a wallet key pair.
     #[error(transparent)]
     Mnemonic(#[from] MnemonicError),
-    /// The requested operation or key pair is not supported by this wallet.
-    #[error("{0}")]
-    Custom(String),
+    /// Initial storage construction is not supported for the requested wallet version.
+    #[error("initial data is not supported for wallet {0:?}")]
+    UnsupportedInitialData(WalletVersion),
+    /// External-message construction is not supported for the requested wallet version.
+    #[error("external messages are not supported for wallet {0:?}")]
+    UnsupportedExternalMessage(WalletVersion),
+    /// No embedded contract code is available for the requested wallet version.
+    #[error("no code found for wallet {0:?}")]
+    CodeNotFound(WalletVersion),
+    /// The supplied code hash does not identify a known wallet contract.
+    #[error("unknown wallet code hash: {0}")]
+    UnknownCodeHash(HashBytes),
+    /// The secret-key bytes do not contain a valid Ed25519 key pair.
+    #[error("invalid Ed25519 key pair: {0}")]
+    InvalidKeyPair(#[from] ed25519_dalek::SignatureError),
+    /// The public key does not match the signing key derived from the secret-key bytes.
+    #[error("public key does not match the signing key")]
+    PublicKeyMismatch,
 }
 
 /// Errors reported by TON mnemonic validation and key derivation.
@@ -64,6 +82,14 @@ pub enum Error {
     /// Data does not satisfy some constraints.
     #[error("invalid data")]
     InvalidData,
+    /// A wallet request exceeds the message limit of its contract version.
+    #[error("too many messages: got {actual}, maximum is {max}")]
+    TooManyMessages {
+        /// Number of outgoing messages supplied by the caller.
+        actual: usize,
+        /// Maximum number supported by this wallet version.
+        max: usize,
+    },
     /// Unknown TLB tag.
     #[error("invalid tag")]
     InvalidTag,

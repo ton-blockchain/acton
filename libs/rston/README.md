@@ -69,8 +69,11 @@ The `mnemonic` module validates 24-word TON mnemonics and derives Ed25519 key pa
 It exposes `Mnemonic`, `KeyPair`, and the English `WORDLIST_EN_SET`.
 
 The `wallet` module derives wallet addresses and prepares signed external messages
-using `rston` cells. It exposes `TonWallet`, `WalletVersion`, wallet data types,
+using `rston` cells. It exposes `Wallet`, `WalletVersion`, wallet data types,
 and contract code. Message signing supports V2, V3, V4, and V5R1.
+Pass outgoing messages as `Vec<WalletMessage>`. Each entry contains the complete
+message cell in `msg` and a `SendMsgFlags` bitmask in `mode`.
+Combine flags with `|`, such as `SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR`.
 
 ## Features
 

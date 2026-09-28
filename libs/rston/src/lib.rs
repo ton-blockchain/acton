@@ -1,7 +1,7 @@
 #![warn(missing_docs)]
 #![allow(clippy::question_mark)]
 
-//! TON cells, serialization, and blockchain models.
+//! TON cells, serialization, blockchain models, and wallets.
 //!
 //! This crate is a collection of basic structures and models for the
 //! TON blockchain. The [`Cell`] represents the core
@@ -80,6 +80,19 @@
 //!   access a subtotal of values for each subtree.
 //!   NOTE: this type is partially implemented due to its complexity.
 //!
+//! ## Wallets
+//!
+//! The [`wallet`] module derives wallet addresses, reads contract storage, and builds
+//! signed external messages for V2, V3, V4, and V5R1 wallets.
+//! [`wallet::WalletMessage`] pairs an outgoing message with its send-mode flags.
+//! The module also provides embedded contract code and code-hash lookup by revision.
+//! See the [wallet examples](wallet#derive-a-wallet-address) for address derivation,
+//! transfer signing, and storage decoding.
+//!
+//! Wallet support requires the `wallet` feature, which is enabled by default.
+//! The caller fetches account state, supplies the sequence number, and sends the resulting BoC.
+//! The [`mnemonic`] module validates TON mnemonic phrases and derives Ed25519 keys.
+//!
 //! ## Supported Rust Versions
 //!
 //! This crate is built against the latest stable release. The minimum supported
@@ -140,7 +153,6 @@ pub mod num;
 pub mod prelude;
 pub mod util;
 #[cfg(feature = "wallet")]
-#[allow(missing_docs)]
 pub mod wallet;
 
 #[cfg(feature = "models")]

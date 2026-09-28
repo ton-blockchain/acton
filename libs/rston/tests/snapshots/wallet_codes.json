@@ -1,0 +1,62 @@
+{
+  "highload_v1r1": {
+    "version": "HLV1R1",
+    "code_hash": "d8cdbbb79f2c5caa677ac450770be0351be21e1250486de85cc52aa33dd16484"
+  },
+  "highload_v1r2": {
+    "version": "HLV1R2",
+    "code_hash": "0dceed21269d66013e95b19fbb5c55a6f01adad40837baa8e521cde3a02aa46c"
+  },
+  "highload_v2": {
+    "version": "HLV2",
+    "code_hash": "9494d1cc8edf12f05671a1a9ba09921096eb50811e1924ec65c3c629fbb80812"
+  },
+  "highload_v2r1": {
+    "version": "HLV2R1",
+    "code_hash": "8ceb45b3cd4b5cc60eaae1c13b9c092392677fe536b2e9b2d801b62eff931fe1"
+  },
+  "highload_v2r2": {
+    "version": "HLV2R2",
+    "code_hash": "203dd4f358adb49993129aa925cac39916b68a0e4f78d26e8f2c2b69eafa5679"
+  },
+  "w1r1": {
+    "version": "V1R1",
+    "code_hash": "a0cfc2c48aee16a271f2cfc0b7382d81756cecb1017d077faaab3bb602f6868c"
+  },
+  "w1r2": {
+    "version": "V1R2",
+    "code_hash": "d4902fcc9fad74698fa8e353220a68da0dcf72e32bcb2eb9ee04217c17d3062c"
+  },
+  "w1r3": {
+    "version": "V1R3",
+    "code_hash": "587cc789eff1c84f46ec3797e45fc809a14ff5ae24f1e0c7a6a99cc9dc9061ff"
+  },
+  "w2r1": {
+    "version": "V2R1",
+    "code_hash": "5c9a5e68c108e18721a07c42f9956bfb39ad77ec6d624b60c576ec88eee65329"
+  },
+  "w2r2": {
+    "version": "V2R2",
+    "code_hash": "fe9530d3243853083ef2ef0b4c2908c0abf6fa1c31ea243aacaa5bf8c7d753f1"
+  },
+  "w3r1": {
+    "version": "V3R1",
+    "code_hash": "b61041a58a7980b946e8fb9e198e3c904d24799ffa36574ea4251c41a566f581"
+  },
+  "w3r2": {
+    "version": "V3R2",
+    "code_hash": "84dafa449f98a6987789ba232358072bc0f76dc4524002a5d0918b9a75d2d599"
+  },
+  "w4r1": {
+    "version": "V4R1",
+    "code_hash": "64dd54805522c5be8a9db59cea0105ccf0d08786ca79beb8cb79e880a8d7322d"
+  },
+  "w4r2": {
+    "version": "V4R2",
+    "code_hash": "feb5ff6820e2ff0d9483e7e0d62c817d846789fb4ae580c878866d959dabd5c0"
+  },
+  "w5r1": {
+    "version": "V5R1",
+    "code_hash": "20834b7b72b112147e1b2fb457b84e74d1a30f04f737d4f62a668e9552d2b72f"
+  }
+}

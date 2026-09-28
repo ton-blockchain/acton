@@ -101,6 +101,7 @@ rston-proc = { version = "=0.3.0", path = "proc" }
 anyhow = "1.0"
 base64 = "0.22"
 criterion = "0.7"
+expect-test = "1.5.0"
 rand_xorshift = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
