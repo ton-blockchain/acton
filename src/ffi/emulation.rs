@@ -38,7 +38,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use tolk_compiler::SourceMap;
-use tolk_compiler::abi::ContractABI;
 use tolk_syntax::ast::expressions::parse_tolk_int_literal;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
@@ -2878,11 +2877,11 @@ fn crc16_impl(_ctx: &mut Context, stack: &mut Tuple, data: String) -> anyhow::Re
 extension!(type_name_by_opcode in (Context) with (id: BigInt) using type_name_by_opcode_impl);
 fn type_name_by_opcode_impl(ctx: &mut Context, stk: &mut Tuple, id: BigInt) -> anyhow::Result<()> {
     let id = u32::try_from(&id).context("ID is too big for uint32 opcode")?;
-    let Some(type_name) = ContractABI::find_message_name_by_opcode_with_symbols(
-        &ctx.env.source_map,
-        ctx.env.abi.as_deref(),
-        id,
-    ) else {
+    let Some(type_name) = ctx
+        .env
+        .source_map
+        .find_message_name_by_opcode_with_abi(ctx.env.abi.as_deref(), id)
+    else {
         stk.push(TupleItem::Null);
         return Ok(());
     };

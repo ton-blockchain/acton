@@ -393,12 +393,9 @@ pub struct CompilationResult {
 impl CompilationResult {
     #[must_use]
     pub(crate) fn message_name_by_opcode(&self, opcode: u32) -> Option<String> {
-        ContractABI::find_message_name_by_opcode_with_symbols(
-            self.source_map.as_ref(),
-            self.abi.as_deref(),
-            opcode,
-        )
-        .map(str::to_owned)
+        self.source_map
+            .find_message_name_by_opcode_with_abi(self.abi.as_deref(), opcode)
+            .map(str::to_owned)
     }
 }
 

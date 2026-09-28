@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, OnceLock};
-use tolk_compiler::abi::{ABIDeclaration, ContractABI};
+use tolk_abi::abi::{ABIDeclaration, ContractABI};
 
 const CATALOG_SCHEMA_VERSION: u32 = 1;
 const DATA_ABIS_ZST: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/data-abis.json.zst"));

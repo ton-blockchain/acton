@@ -1,5 +1,6 @@
+//! Decode TON cell data using a runtime ABI or another [`UnpackSchema`].
+
 use crate::abi::{ABICustomPackUnpack, ABIDeclaration, ContractABI, Ty, UnionVariant};
-use crate::source_map::{Declaration, SourceMap};
 use crate::types_kernel::{TyIdx, TyResolver, render_ty};
 use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
@@ -75,74 +76,6 @@ pub trait UnpackSchema: TyResolver {
     fn enum_decl_info(&self, target_name: &str) -> Option<SchemaEnumDecl<'_>>;
     fn struct_fields_for(&self, ty_idx: TyIdx) -> Option<Vec<SchemaField>>;
     fn alias_target_for(&self, ty_idx: TyIdx) -> Option<SchemaAliasTarget>;
-}
-
-impl UnpackSchema for SourceMap {
-    fn struct_decl_info(&self, target_name: &str) -> Option<SchemaStructDecl<'_>> {
-        self.declarations().iter().find_map(|decl| match decl {
-            Declaration::Struct(struct_decl) if struct_decl.name == target_name => {
-                Some(SchemaStructDecl {
-                    prefix: struct_decl.prefix.as_ref().map(|prefix| SchemaPrefix {
-                        prefix_num: prefix.prefix_num,
-                        prefix_len: prefix.prefix_len,
-                    }),
-                    custom_pack_unpack: struct_decl.custom_pack_unpack.as_ref(),
-                })
-            }
-            _ => None,
-        })
-    }
-
-    fn alias_decl_info(&self, target_name: &str) -> Option<SchemaAliasDecl<'_>> {
-        self.declarations().iter().find_map(|decl| match decl {
-            Declaration::Alias(alias_decl) if alias_decl.name == target_name => {
-                Some(SchemaAliasDecl {
-                    custom_pack_unpack: alias_decl.custom_pack_unpack.as_ref(),
-                })
-            }
-            _ => None,
-        })
-    }
-
-    fn enum_decl_info(&self, target_name: &str) -> Option<SchemaEnumDecl<'_>> {
-        self.declarations().iter().find_map(|decl| match decl {
-            Declaration::Enum(enum_decl) if enum_decl.name == target_name => Some(SchemaEnumDecl {
-                name: enum_decl.name.clone(),
-                encoded_as_ty_idx: enum_decl.encoded_as_ty_idx,
-                members: enum_decl
-                    .members
-                    .iter()
-                    .map(|member| SchemaEnumMember {
-                        name: member.name.clone(),
-                        value: member.value.clone(),
-                    })
-                    .collect(),
-                custom_pack_unpack: enum_decl.custom_pack_unpack.as_ref(),
-            }),
-            _ => None,
-        })
-    }
-
-    fn struct_fields_for(&self, ty_idx: TyIdx) -> Option<Vec<SchemaField>> {
-        self.struct_fields_of(ty_idx).map(|fields| {
-            fields
-                .into_iter()
-                .map(|field| SchemaField {
-                    name: field.name,
-                    ty_idx: field.ty_idx,
-                    u_label_ty_idx: None,
-                })
-                .collect()
-        })
-    }
-
-    fn alias_target_for(&self, ty_idx: TyIdx) -> Option<SchemaAliasTarget> {
-        self.alias_target_of(ty_idx)
-            .map(|ty_idx| SchemaAliasTarget {
-                ty_idx,
-                u_label_ty_idx: None,
-            })
-    }
 }
 
 impl UnpackSchema for ContractABI {
@@ -283,6 +216,13 @@ impl UnpackSchema for ContractABI {
     }
 }
 
+/// Decode the type at `ty_idx` using its runtime schema, advancing `data`.
+///
+/// The schema can be a [`ContractABI`] loaded from JSON. The result contains
+/// dynamic values, so no generated Rust contract types are needed. Remaining
+/// bits and references are left in the slice; callers decoding a complete body
+/// can check [`CellSlice::is_empty`] afterward. On error the slice may have
+/// already advanced.
 pub fn unpack_from_slice<S: UnpackSchema + ?Sized>(
     data: &mut CellSlice<'_>,
     symbols: &S,

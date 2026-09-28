@@ -1,4 +1,3 @@
-use crate::source_map::SourceMap;
 pub use crate::types_kernel::{AliasInstantiation, StructInstantiation, Ty, TyIdx, UnionVariant};
 use crate::types_kernel::{TyResolver, render_param_ty, render_ty};
 use anyhow::anyhow;
@@ -391,17 +390,6 @@ impl ContractABI {
             });
             matches_opcode.then_some(name.as_str())
         })
-    }
-
-    #[must_use]
-    pub fn find_message_name_by_opcode_with_symbols<'a>(
-        symbols: &'a SourceMap,
-        abi: Option<&'a Self>,
-        opcode: u32,
-    ) -> Option<&'a str> {
-        symbols
-            .find_message_name_by_opcode(opcode)
-            .or_else(|| abi.and_then(|abi| abi.find_message_name_by_opcode(opcode)))
     }
 
     pub fn resolve_incoming_message_structs(&self) -> anyhow::Result<Vec<ABIResolvedStruct>> {

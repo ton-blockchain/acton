@@ -40,6 +40,7 @@ acton-localnet = { path = "crates/acton-localnet" }
 acton-mdman = { path = "crates/acton-mdman" }
 ton-objs = { path = "crates/ton-objs" }
 tolk-compiler = { path = "crates/tolk-compiler" }
+tolk-abi = { path = "crates/tolk-abi" }
 tolk-source-map = { path = "crates/tolk-source-map" }
 ton-emulator = { path = "crates/ton-emulator" }
 ton-executor = { path = "crates/ton-executor" }

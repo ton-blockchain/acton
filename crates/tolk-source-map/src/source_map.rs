@@ -2,7 +2,7 @@
 // Symbol types contain type declarations and function metadata; debug marks map
 // IR variables and stack positions back to the original Tolk source.
 
-use crate::abi::ABICustomPackUnpack;
+use crate::abi::{ABICustomPackUnpack, ContractABI};
 use crate::debug_marks_dict::DebugMarksDict;
 use crate::source_location::SourceLocation;
 use crate::types_kernel::{AliasInstantiation, StructInstantiation, Ty, TyIdx, TyResolver};
@@ -137,6 +137,17 @@ impl SourceMap {
     #[must_use]
     pub fn declarations(&self) -> &[Declaration] {
         &self.declarations
+    }
+
+    /// Resolve an opcode using debug symbols first, then the optional contract ABI.
+    #[must_use]
+    pub fn find_message_name_by_opcode_with_abi<'a>(
+        &'a self,
+        abi: Option<&'a ContractABI>,
+        opcode: u32,
+    ) -> Option<&'a str> {
+        self.find_message_name_by_opcode(opcode)
+            .or_else(|| abi.and_then(|abi| abi.find_message_name_by_opcode(opcode)))
     }
 
     #[must_use]

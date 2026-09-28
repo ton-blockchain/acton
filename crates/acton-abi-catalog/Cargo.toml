@@ -13,7 +13,7 @@ license = { workspace = true }
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
-tolk-compiler = { workspace = true }
+tolk-abi = { workspace = true }
 zstd = { workspace = true }
 
 [build-dependencies]
