@@ -4,6 +4,8 @@
 
 ### Added
 
+- TON wallet code, initial data, address derivation, and signed external messages
+  for V2, V3, V4, and V5R1.
 - TON mnemonic validation, English word list, and Ed25519 key derivation, with
   typed `MnemonicError` results and automatic clearing of owned secret data on drop.
 

@@ -1,5 +1,20 @@
 //! Common error types.
 
+/// Errors reported while deriving a wallet or preparing its external message.
+#[cfg(feature = "wallet")]
+#[derive(Debug, thiserror::Error)]
+pub enum WalletError {
+    /// Wallet data or its message could not be represented as a cell.
+    #[error(transparent)]
+    Cell(#[from] Error),
+    /// The supplied mnemonic could not produce a wallet key pair.
+    #[error(transparent)]
+    Mnemonic(#[from] MnemonicError),
+    /// The requested operation or key pair is not supported by this wallet.
+    #[error("{0}")]
+    Custom(String),
+}
+
 /// Errors reported by TON mnemonic validation and key derivation.
 #[derive(Debug, thiserror::Error)]
 pub enum MnemonicError {

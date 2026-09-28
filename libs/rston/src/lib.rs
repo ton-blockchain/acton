@@ -139,6 +139,9 @@ pub mod mnemonic;
 pub mod num;
 pub mod prelude;
 pub mod util;
+#[cfg(feature = "wallet")]
+#[allow(missing_docs)]
+pub mod wallet;
 
 #[cfg(feature = "models")]
 pub mod models;

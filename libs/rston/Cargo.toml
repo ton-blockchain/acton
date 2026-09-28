@@ -6,7 +6,7 @@ repository = "https://github.com/ton-blockchain/acton"
 version = "0.3.5"
 edition = "2024"
 rust-version = "1.88"
-include = ["src/**/*.rs", "resources/mnemonics/*.txt", "benches/**/*.rs", "LICENSE-*", "README.md", "CONTRIBUTING.md"]
+include = ["src/**/*.rs", "resources/mnemonics/*.txt", "resources/ton_wallet_code/*.code", "benches/**/*.rs", "LICENSE-*", "README.md", "CONTRIBUTING.md"]
 license = "MIT OR Apache-2.0"
 
 [[bench]]
@@ -110,12 +110,13 @@ paste = "1.0.15"
 rston = { path = "./", features = ["rand9"] }
 
 [features]
-default = ["base64", "serde", "models", "sync"]
+default = ["base64", "serde", "models", "sync", "wallet"]
 sync = ["dep:scc"]
 serde = ["dep:serde", "base64"]
 rand8 = ["dep:rand8"]
 rand9 = ["dep:rand9"]
 models = ["dep:tycho-crypto", "dep:tl-proto"]
+wallet = ["models", "base64", "sync"]
 rayon = ["sync", "dep:rayon", "dep:dashmap"]
 arbitrary = ["dep:arbitrary"]
 bigint = ["dep:num-bigint", "dep:num-traits"]
