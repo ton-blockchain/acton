@@ -16,7 +16,7 @@ dist = true
 [workspace]
 members = ["crates/*", "xtask"]
 
-exclude = ["apps/"]
+exclude = ["apps/", "libs/"]
 
 [workspace.package]
 version = "1.2.0"

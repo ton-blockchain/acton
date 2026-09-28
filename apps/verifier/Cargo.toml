@@ -84,7 +84,7 @@ toml = "0.9"
 tower-http = { version = "0.6", features = ["compression-br", "compression-gzip"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
-tycho-types = "0.3.0"
+tycho-types = { path = "../../libs/tycho-types" }
 utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
 zeroize = "1.9"
 

@@ -3,6 +3,11 @@
 !package.json
 !bun.lock
 
+!libs/
+libs/*
+!libs/tycho-types/
+libs/tycho-types/target/
+
 !apps/
 apps/*
 !apps/verifier/

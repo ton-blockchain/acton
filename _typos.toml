@@ -45,4 +45,5 @@ extend-ignore-re = [
   "ba",
   "lazer",
   "\\b(?:vart|fo|FO|Fo|tou|overfl|bui|tru|TNam)\\b", # completion prefixes
+  "\\b(?:CapDelections|CapGroth16|Groth16|entires|ded_)\\b", # tycho-types identifiers and hex fixtures
 ]
