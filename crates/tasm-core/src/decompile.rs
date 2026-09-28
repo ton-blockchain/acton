@@ -6,8 +6,8 @@ use crate::types::{
 use anyhow::{Context, anyhow};
 use num_bigint::{BigInt, BigUint};
 use num_traits::ToPrimitive;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSlice, DynCell, Store};
-use tycho_types::dict::RawDict;
+use rston::cell::{Cell, CellBuilder, CellFamily, CellSlice, DynCell, Store};
+use rston::dict::RawDict;
 
 #[derive(Debug)]
 pub struct Disassembler {
@@ -486,7 +486,7 @@ fn cell_from_slice(slice: &CellSlice<'_>) -> anyhow::Result<Cell> {
 mod tests {
     use super::*;
     use crate::printer::FormatOptions;
-    use tycho_types::boc::Boc;
+    use rston::boc::Boc;
 
     #[test]
     pub(super) fn test_disassemble_jetton_minter() {

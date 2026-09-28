@@ -4,12 +4,12 @@
 //! `send_message` or `run_get_method`.
 
 use super::replayer::RuntimeDebugSnapshot;
+use rston::boc::Boc;
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::message::step::StepExecutor;
 use tvm_ffi::serde::parse_tuple_item;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tvm_logs::parser::{CellLike, CellSlice, VmStackValue};
-use tycho_types::boc::Boc;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DebugCodePosition {

@@ -9,6 +9,14 @@ use anyhow::{Context, Result, bail, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use ed25519_dalek::SigningKey;
 use rand::Rng;
+use rston::{
+    boc::{Boc, BocRepr},
+    cell::Cell,
+    models::{
+        CurrencyCollection, IntAddr, OwnedRelaxedMessage, RelaxedIntMsgInfo, RelaxedMsgInfo,
+        StateInit, StdAddr, Transaction, TxInfo,
+    },
+};
 use serde_json::{Value, json};
 use std::{
     str::FromStr,
@@ -18,14 +26,6 @@ use tokio::sync::watch;
 use ton::{
     ton_core::{cell::TonCell, traits::tlb::TLB},
     ton_wallet::{KeyPair, TonWallet, WalletVersion},
-};
-use tycho_types::{
-    boc::{Boc, BocRepr},
-    cell::Cell,
-    models::{
-        CurrencyCollection, IntAddr, OwnedRelaxedMessage, RelaxedIntMsgInfo, RelaxedMsgInfo,
-        StateInit, StdAddr, Transaction, TxInfo,
-    },
 };
 
 use contracts::GRAM;

@@ -1,6 +1,6 @@
+use rston::dict::Dict;
 use tolk_source_map::abi::{ABIDeclaration, ABIStorage, ABIStructField};
 use tolk_source_map::types_kernel::Ty;
-use tycho_types::dict::Dict;
 
 use super::accounts::{event, snapshot};
 use super::*;

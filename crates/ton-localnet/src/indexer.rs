@@ -2,11 +2,11 @@ use crate::localnet::{LocalnetAddressInfo, LocalnetContractData};
 use crate::node::{Node, StateSource};
 use crate::storage::{self, AccountMeta, AccountStatus, JettonMasterMeta, NftItemMeta};
 use crate::types::{Addr, BocBytes, Hash256};
+use rston::boc::Boc;
+use rston::cell::Cell;
+use rston::models::StdAddr;
 use ton_indexer_contracts::{contracts, jettons, multisigs, nfts};
 use ton_networks::Network;
-use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
-use tycho_types::models::StdAddr;
 
 struct ActiveContractState {
     code_hash: Hash256,

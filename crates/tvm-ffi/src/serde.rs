@@ -2,8 +2,8 @@ use crate::stack::{ContData, Tuple, TupleItem};
 use anyhow::anyhow;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSlice};
-use tycho_types::dict::RawDict;
+use rston::cell::{Cell, CellBuilder, CellFamily, CellSlice};
+use rston::dict::RawDict;
 
 impl Tuple {
     /// Serialize a tuple to a cell.

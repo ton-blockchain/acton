@@ -39,14 +39,14 @@
 //! ```
 
 use num_bigint::BigInt;
+use rston::boc::Boc;
+use rston::cell::Cell;
+use rston::models::RelaxedMessage;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use tvm_logs::executor_parser::{ExecutorLine, parse_executor_lines};
 use tvm_logs::parser::{CellLike, VmLine, VmStack, VmStackValue};
-use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
-use tycho_types::models::RelaxedMessage;
 
 /// A single step or event in the TVM execution trace.
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -9,6 +9,7 @@ use axum::{
     extract::{Query, RawQuery, State},
     response::{IntoResponse, Response},
 };
+use rston::models::{ShardIdent, StdAddr, StdAddrFormat};
 use std::sync::Arc;
 use toncenter::v2 as wire;
 use toncenter::v2::requests::{
@@ -19,7 +20,6 @@ use toncenter::v2::requests::{
 };
 use toncenter::v2::requests::{BlockHeaderRequest, BlockTransactionsRequest};
 use toncenter::v2::{BoolInput, Int32Input, Int64Input};
-use tycho_types::models::{ShardIdent, StdAddr, StdAddrFormat};
 
 macro_rules! parse {
     ($expression:expr) => {
@@ -487,9 +487,7 @@ fn v2_unprocessable_entity(error: impl std::fmt::Display) -> Response {
         .into_response()
 }
 
-fn parse_std_addr(
-    address: &str,
-) -> anyhow::Result<(StdAddr, tycho_types::models::Base64StdAddrFlags)> {
+fn parse_std_addr(address: &str) -> anyhow::Result<(StdAddr, rston::models::Base64StdAddrFlags)> {
     StdAddr::from_str_ext(address, StdAddrFormat::any()).map_err(|error| {
         ToncenterHttpError::unprocessable_entity(format!("Invalid address format: {error}"))
     })

@@ -4,20 +4,20 @@ use crate::types::{BaseTxInfo, ComputeInfo, TraceMoneyResult};
 use anyhow::Context;
 use base64::Engine;
 use base64::engine::general_purpose;
+use rston::boc::Boc;
+use rston::cell::Lazy;
+use rston::dict::Dict;
+use rston::models::{
+    Account, AccountState, CurrencyCollection, IntAddr, MsgInfo, OptionalAccount, OutAction,
+    OutActionsRevIter, ShardAccount, StdAddr, StorageInfo, TxInfo,
+};
+use rston::num::Tokens;
+use rston::prelude::{Cell, HashBytes};
 use std::collections::HashMap;
 use std::str::FromStr;
 use ton_executor::message::RunTransactionResultSuccess;
 use ton_networks::CustomNetworkUrls;
 use toncenter::v3;
-use tycho_types::boc::Boc;
-use tycho_types::cell::Lazy;
-use tycho_types::dict::Dict;
-use tycho_types::models::{
-    Account, AccountState, CurrencyCollection, IntAddr, MsgInfo, OptionalAccount, OutAction,
-    OutActionsRevIter, ShardAccount, StdAddr, StorageInfo, TxInfo,
-};
-use tycho_types::num::Tokens;
-use tycho_types::prelude::{Cell, HashBytes};
 
 /// Returns base transaction information by its hash.
 ///
@@ -123,7 +123,7 @@ pub(crate) async fn find_all_transactions_between(
     client: &TonCenterClient,
     base_tx: &BaseTxInfo,
     after_lt: u64,
-) -> anyhow::Result<Vec<tycho_types::models::Transaction>> {
+) -> anyhow::Result<Vec<rston::models::Transaction>> {
     let address = base_tx.address.display_base64_url(false).to_string();
     let hash_base64 = general_purpose::STANDARD.encode(base_tx.hash);
 
@@ -141,7 +141,7 @@ pub(crate) async fn find_all_transactions_between(
                 raw_tx.transaction_id.lt
             )
         })?;
-        let tx: tycho_types::models::Transaction = cell.parse().with_context(|| {
+        let tx: rston::models::Transaction = cell.parse().with_context(|| {
             format!(
                 "Failed to parse TON Center transaction at LT {}",
                 raw_tx.transaction_id.lt
@@ -267,7 +267,7 @@ pub(crate) fn find_final_actions(
 /// Sums the value of all *internal* outgoing messages in a transaction.
 ///
 /// External messages are excluded as they carry no value.
-pub(crate) fn calculate_sent_total(tx: &tycho_types::models::Transaction) -> Tokens {
+pub(crate) fn calculate_sent_total(tx: &rston::models::Transaction) -> Tokens {
     let mut total = 0u128;
     for msg in tx.iter_out_msgs() {
         let Ok(msg) = msg else { continue };
@@ -281,7 +281,7 @@ pub(crate) fn calculate_sent_total(tx: &tycho_types::models::Transaction) -> Tok
 /// Extracts the operation opcode from the incoming message of a transaction.
 ///
 /// Uses the original payload for both legacy and rich bounced messages.
-pub(crate) fn tx_opcode(tx: &tycho_types::models::Transaction) -> Option<u32> {
+pub(crate) fn tx_opcode(tx: &rston::models::Transaction) -> Option<u32> {
     let in_msg = tx.load_in_msg().ok()??;
     let bounced = matches!(&in_msg.info, MsgInfo::Int(info) if info.bounced);
     tvm_ffi::message::original_message_body(in_msg.body, bounced)?
@@ -309,7 +309,7 @@ pub(crate) fn compute_final_data(
     IntAddr,
     Option<Tokens>,
     TraceMoneyResult,
-    tycho_types::models::Transaction,
+    rston::models::Transaction,
     ComputeInfo,
 )> {
     let shard_account_cell = Boc::decode_base64(res.shard_account.as_ref())?;
@@ -319,7 +319,7 @@ pub(crate) fn compute_final_data(
         .map_or(Tokens::ZERO, |a| a.balance.tokens);
 
     let emulated_tx_cell = Boc::decode_base64(res.transaction.as_ref())?;
-    let emulated_tx: tycho_types::models::Transaction = emulated_tx_cell.parse()?;
+    let emulated_tx: rston::models::Transaction = emulated_tx_cell.parse()?;
 
     let (src, dest, amount, compute_phase) = match emulated_tx.load_info()? {
         TxInfo::Ordinary(info) => {
@@ -347,8 +347,8 @@ pub(crate) fn compute_final_data(
     let total_fees = emulated_tx.total_fees.tokens;
 
     let compute_info = match compute_phase {
-        tycho_types::models::ComputePhase::Skipped(_) => ComputeInfo::Skipped,
-        tycho_types::models::ComputePhase::Executed(exec) => ComputeInfo::Success {
+        rston::models::ComputePhase::Skipped(_) => ComputeInfo::Skipped,
+        rston::models::ComputePhase::Executed(exec) => ComputeInfo::Success {
             success: exec.success,
             exit_code: exec.exit_code,
             vm_steps: exec.vm_steps,
@@ -424,7 +424,7 @@ async fn add_maybe_exotic_library(
 pub(crate) async fn collect_used_libraries(
     client: &TonCenterClient,
     account: &ShardAccount,
-    tx: &tycho_types::models::Transaction,
+    tx: &rston::models::Transaction,
     additional_libs: &HashMap<HashBytes, Cell>,
 ) -> anyhow::Result<(Option<Cell>, Option<Cell>)> {
     let mut libs = HashMap::new();

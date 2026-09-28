@@ -3,13 +3,13 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, ensure};
 use rocksdb::DB;
-use sha2::{Digest, Sha256};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, Lazy, Load};
-use tycho_types::models::{
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, Lazy, Load};
+use rston::models::{
     Block, BlockId, BlockInfo, BlockchainConfig, PrevBlockRef, ShardAccount, ShardDescription,
     ShardIdent, ShardStateSplit, ShardStateUnsplit, StdAddr,
 };
+use sha2::{Digest, Sha256};
 
 use crate::lazy::Reader;
 use crate::{ReadStats, StateRecord};
@@ -58,7 +58,7 @@ impl StateView {
     pub(crate) fn load(
         reader: Arc<Reader>,
         id: BlockId,
-        hash: tycho_types::cell::HashBytes,
+        hash: rston::cell::HashBytes,
     ) -> Result<Self> {
         let root = reader.load(hash)?;
         reader.run(|| validate_state(&root, &id))?;
@@ -74,7 +74,7 @@ impl StateView {
 
     /// Hash of this state root, distinct from the block's root hash.
     #[must_use]
-    pub fn root_hash(&self) -> tycho_types::cell::HashBytes {
+    pub fn root_hash(&self) -> rston::cell::HashBytes {
         *self.root.repr_hash()
     }
 
@@ -179,7 +179,7 @@ impl StateView {
 
     /// Resolves a published library at this checkpoint and returns owned cells.
     /// An unpublished hash returns `None`; database failures remain errors.
-    pub fn get_library(&self, hash: &tycho_types::cell::HashBytes) -> Result<Option<Cell>> {
+    pub fn get_library(&self, hash: &rston::cell::HashBytes) -> Result<Option<Cell>> {
         self.reader.run(|| {
             ensure!(
                 self.id.shard.is_masterchain(),
@@ -481,7 +481,7 @@ impl StateUpdate {
             let root = if let Some(workers) = workers {
                 // Partition the proof near its root, without reading the old
                 // database tree. Independent branches can then load cells in
-                // parallel while tycho-types checks the full Merkle update.
+                // parallel while rston checks the full Merkle update.
                 let mut frontier = vec![update.old.as_ref()];
                 for _ in 0..6 {
                     let next = frontier

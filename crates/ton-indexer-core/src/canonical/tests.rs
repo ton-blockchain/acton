@@ -199,7 +199,7 @@ async fn walks_normal_chain_predecessor_first() {
 async fn handles_split_without_duplicating_parent() {
     let (mut graph, previous_mc, current_mc) = graph_with_masterchain();
     let parent = id(0, BlockId::FULL_SHARD, 1, 1);
-    let (left_shard, right_shard) = tycho_types::models::ShardIdent::new(0, BlockId::FULL_SHARD)
+    let (left_shard, right_shard) = rston::models::ShardIdent::new(0, BlockId::FULL_SHARD)
         .unwrap()
         .split()
         .unwrap();
@@ -227,7 +227,7 @@ async fn handles_split_without_duplicating_parent() {
 #[tokio::test]
 async fn handles_merge_from_two_frontier_blocks() {
     let (mut graph, previous_mc, current_mc) = graph_with_masterchain();
-    let parent_shard = tycho_types::models::ShardIdent::new(0, BlockId::FULL_SHARD).unwrap();
+    let parent_shard = rston::models::ShardIdent::new(0, BlockId::FULL_SHARD).unwrap();
     let (left_shard, right_shard) = parent_shard.split().unwrap();
     let left = id(0, left_shard.prefix(), 2, 2);
     let right = id(0, right_shard.prefix(), 2, 3);

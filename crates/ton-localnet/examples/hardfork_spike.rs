@@ -23,6 +23,13 @@
 use anyhow::{Context, bail};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
+use rston::boc::Boc;
+use rston::cell::Cell;
+use rston::models::account::AccountState;
+use rston::models::block::{BlockId, ShardIdent};
+use rston::models::shard::ShardStateUnsplit;
+use rston::num::Tokens;
+use rston::prelude::HashBytes;
 use std::{
     fs,
     io::Read,
@@ -35,13 +42,6 @@ use ton_hardfork::{
     request::{AccountChange, AccountEdit, account_batch},
 };
 use ton_liteapi::adnl::crypto::{KeyPair, SecretKey};
-use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
-use tycho_types::models::account::AccountState;
-use tycho_types::models::block::{BlockId, ShardIdent};
-use tycho_types::models::shard::ShardStateUnsplit;
-use tycho_types::num::Tokens;
-use tycho_types::prelude::HashBytes;
 
 fn main() -> anyhow::Result<()> {
     let mut args = std::env::args().skip(1);
@@ -172,7 +172,7 @@ impl Flags {
 
 /// Reports which configuration parameters this tycho build can type-check.
 fn config_params(flags: &Flags) -> anyhow::Result<()> {
-    use tycho_types::models::config::{
+    use rston::models::config::{
         ConfigParam0, ConfigParam1, ConfigParam2, ConfigParam7, ConfigParam8, ConfigParam9,
         ConfigParam10, ConfigParam11, ConfigParam12, ConfigParam13, ConfigParam14, ConfigParam15,
         ConfigParam16, ConfigParam17, ConfigParam18, ConfigParam20, ConfigParam21, ConfigParam22,

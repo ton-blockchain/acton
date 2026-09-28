@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use serde::Serialize;
 use tokio::sync::RwLock;
 use ton_indexer_core::{Batch, Hash256};
-use tycho_types::{
+use rston::{
     cell::CellSlice,
     models::{Message, MsgInfo},
 };
@@ -259,7 +259,7 @@ fn opcode_from_body(body: CellSlice<'_>, bounced: bool) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
-    use tycho_types::cell::CellBuilder;
+    use rston::cell::CellBuilder;
 
     use super::*;
 
@@ -286,7 +286,7 @@ mod tests {
         let mut rich = CellBuilder::new();
         rich.store_u32(0xffff_fffe).unwrap();
         rich.store_reference(regular).unwrap();
-        rich.store_reference(tycho_types::cell::Cell::default())
+        rich.store_reference(rston::cell::Cell::default())
             .unwrap();
         rich.store_u8(0).unwrap();
         rich.store_u32((-14_i32) as u32).unwrap();

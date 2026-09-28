@@ -6,20 +6,20 @@ use axum::http::Request;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use http_body_util::BodyExt;
 use rocksdb::DB;
-use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
-use tokio::sync::{Semaphore, watch};
-use ton_node_db::{BlockIndex, StateStore};
-use tower::ServiceExt;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, HashBytes, Lazy};
-use tycho_types::dict::Dict;
-use tycho_types::models::{
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, HashBytes, Lazy};
+use rston::dict::Dict;
+use rston::models::{
     Account, AccountState, BlockId, BlockRef, BlockchainConfig, CurrencyCollection,
     DepthBalanceInfo, IntAddr, KeyBlockRef, KeyMaxLt, LibDescr, McStateExtra, OptionalAccount,
     ShardAccount, ShardAccounts, ShardDescription, ShardHashes, ShardIdent, ShardStateUnsplit,
     StdAddr, ValidatorInfo,
 };
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
+use tokio::sync::{Semaphore, watch};
+use ton_node_db::{BlockIndex, StateStore};
+use tower::ServiceExt;
 
 use crate::api::{Api, get_method::run_get_method};
 
@@ -46,7 +46,7 @@ impl Fixture {
         balance
             .other
             .as_dict_mut()
-            .set(42, tycho_types::num::VarUint248::from(123_u32))?;
+            .set(42, rston::num::VarUint248::from(123_u32))?;
         let mut accounts = ShardAccounts::new();
         accounts.set(
             address.address,
@@ -77,7 +77,7 @@ impl Fixture {
         let shard_id = state_id(&shard)?;
         let config = BlockchainConfig {
             address: HashBytes::ZERO,
-            params: tycho_types::models::BlockchainConfigParams::from_raw(Boc::decode_base64(
+            params: rston::models::BlockchainConfigParams::from_raw(Boc::decode_base64(
                 include_str!("../../../../ton-executor/src/default_config.boc64"),
             )?),
         };

@@ -1,7 +1,7 @@
 use expect_test::expect_file;
+use rston::cell::CellBuilder;
+use rston::models::{LibDescr, StateInit};
 use serde_json::{Value, json};
-use tycho_types::cell::CellBuilder;
-use tycho_types::models::{LibDescr, StateInit};
 
 use super::*;
 use crate::api::tests::fixture::{Fixture, NATIVE};

@@ -31,7 +31,7 @@
 //! ```rust
 //! # use ton_emulator::{Emulator, WorldState, AccountsState, LocalAccountsState};
 //! # use ton_executor::ExecutorVerbosity;
-//! # use tycho_types::cell::Cell;
+//! # use rston::cell::Cell;
 //! #
 //! # fn example(msg: Cell) -> anyhow::Result<()> {
 //! // 1. Setup the state

@@ -5,6 +5,8 @@ use anyhow::Context;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use reqwest::Client;
+use rston::boc::Boc;
+use rston::prelude::Cell;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::env;
@@ -16,8 +18,6 @@ use ton_executor::message::{PrevBlockId, PrevBlocksInfo};
 use ton_networks::CustomNetworkUrls;
 use toncenter::{v2, v3};
 use toncenter_keys::api_key as toncenter_api_key;
-use tycho_types::boc::Boc;
-use tycho_types::prelude::Cell;
 
 const USE_PROXY_ENV: &str = "ACTON_USE_PROXY";
 const TONCENTER_MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1200);
@@ -376,16 +376,16 @@ mod tests {
     use base64::Engine;
     use base64::engine::general_purpose::STANDARD;
     use expect_test::expect;
+    use rston::cell::{CellBuilder, CellFamily, HashBytes, Lazy};
+    use rston::models::{
+        AccountStatus, ComputePhase, ComputePhaseSkipReason, HashUpdate, OrdinaryTxInfo,
+        SkippedComputePhase, StdAddr, Transaction, TxInfo,
+    };
     use serde_json::{Value, json};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
     use tokio::task::JoinHandle;
     use toncenter::v3;
-    use tycho_types::cell::{CellBuilder, CellFamily, HashBytes, Lazy};
-    use tycho_types::models::{
-        AccountStatus, ComputePhase, ComputePhaseSkipReason, HashUpdate, OrdinaryTxInfo,
-        SkippedComputePhase, StdAddr, Transaction, TxInfo,
-    };
 
     async fn serve_response(
         status: &str,

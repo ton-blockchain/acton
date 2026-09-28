@@ -1,5 +1,5 @@
 use super::original_message_body;
-use tycho_types::cell::{Cell, CellBuilder};
+use rston::cell::{Cell, CellBuilder};
 
 #[test]
 fn unwraps_only_the_selected_bounce_envelope_and_preserves_payload_refs() {

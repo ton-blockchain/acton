@@ -4,11 +4,11 @@
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use rand::{Rng, seq::SliceRandom};
-use sha2::{Digest, Sha256};
-use tycho_types::{
+use rston::{
     cell::{Cell, CellBuilder, HashBytes},
     dict::Dict,
 };
+use sha2::{Digest, Sha256};
 
 const ADJECTIVES: &[&str] = &[
     "Amber", "Arctic", "Astral", "Azure", "Coral", "Crimson", "Crystal", "Golden", "Indigo",

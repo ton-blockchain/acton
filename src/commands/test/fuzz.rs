@@ -5,13 +5,13 @@ use acton_config::test::TestConfig;
 use num_bigint::{BigInt, Sign};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
+use rston::cell::{Cell, HashBytes};
+use rston::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
 use std::sync::Arc;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::{ABIFunctionParameter, ContractABI, Ty};
 use tolk_compiler::types_kernel::TyIdx;
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::cell::{Cell, HashBytes};
-use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
 
 const DEFAULT_FUZZ_RUNS: usize = 256;
 const DEFAULT_FUZZ_REJECT_BUDGET_MULTIPLIER: usize = 256;

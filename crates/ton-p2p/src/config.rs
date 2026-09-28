@@ -5,11 +5,11 @@ use std::{fs, path::Path};
 use anyhow::{Context, Result, ensure};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use everscale_network::{crypto, overlay, proto};
-use serde::{Deserialize, Deserializer, de::Error};
-use tycho_types::{
+use rston::{
     cell::HashBytes,
     models::{BlockId, ShardIdent},
 };
+use serde::{Deserialize, Deserializer, de::Error};
 
 /// Network identity and DHT entry points from an operator-supplied global config.
 ///

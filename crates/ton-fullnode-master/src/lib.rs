@@ -26,12 +26,12 @@ use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
 use futures::{SinkExt, StreamExt};
+use rston::models::block::BlockId;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::RwLock;
 use tokio_util::bytes::Bytes;
 use ton_liteapi::adnl::AdnlPeer;
 use ton_liteapi::adnl::crypto::{KeyPair, SecretKey};
-use tycho_types::models::block::BlockId;
 
 use self::tl::{Answer, BlockIdExt, Query, TON_NODE_QUERY_PREFIX};
 
@@ -252,8 +252,8 @@ const fn block_id_to_tl(id: &BlockId) -> BlockIdExt {
 
 #[cfg(test)]
 mod tests {
-    use tycho_types::models::block::ShardIdent;
-    use tycho_types::prelude::HashBytes;
+    use rston::models::block::ShardIdent;
+    use rston::prelude::HashBytes;
 
     use super::*;
 

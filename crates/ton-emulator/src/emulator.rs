@@ -26,8 +26,8 @@
 //! # use ton_emulator::emulator::{Emulator, SendMessageResult};
 //! # use ton_emulator::world_state::WorldState;
 //! # use ton_executor::ExecutorVerbosity;
-//! # use tycho_types::cell::Cell;
-//! # use tycho_types::dict::Dict;
+//! # use rston::cell::Cell;
+//! # use rston::dict::Dict;
 //! #
 //! # fn example(state: &mut WorldState, msg: Cell) -> anyhow::Result<()> {
 //! let emulator = Emulator::new(ExecutorVerbosity::FullLocationStackVerbose, None)?;
@@ -48,6 +48,16 @@
 
 use crate::world_state::WorldState;
 use anyhow::Context;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellFamily, Store};
+use rston::dict::Dict;
+use rston::models::config::BlockchainConfigParams;
+use rston::models::{
+    AccountState, BaseMessage, ComputePhase, IntAddr, LibDescr, Message, MsgInfo, RelaxedMessage,
+    RelaxedMsgInfo, ShardAccount, StdAddr, Transaction, TxInfo,
+};
+use rston::num::Tokens;
+use rston::prelude::HashBytes;
 use rustc_hash::FxHashSet;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -55,16 +65,6 @@ use ton_executor::message::{
     EmulationResult, Executor, RunTransactionArgs, RunTransactionResultError,
 };
 use ton_executor::{ExecutorVerbosity, MissingLibrariesContext, missing_library_callback};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
-use tycho_types::dict::Dict;
-use tycho_types::models::config::BlockchainConfigParams;
-use tycho_types::models::{
-    AccountState, BaseMessage, ComputePhase, IntAddr, LibDescr, Message, MsgInfo, RelaxedMessage,
-    RelaxedMsgInfo, ShardAccount, StdAddr, Transaction, TxInfo,
-};
-use tycho_types::num::Tokens;
-use tycho_types::prelude::HashBytes;
 
 /// Prepared input for a single transaction execution.
 ///

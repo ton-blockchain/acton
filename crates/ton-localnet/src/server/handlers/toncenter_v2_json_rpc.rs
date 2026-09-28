@@ -14,6 +14,7 @@ use crate::localnet::{Localnet, TransactionLookupKind};
 use crate::types::Hash256;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, extract::State, http::StatusCode};
+use rston::models::{StdAddr, StdAddrFormat};
 use serde::Serialize;
 use serde_json::Value;
 use std::sync::Arc;
@@ -24,7 +25,6 @@ use toncenter::v2::requests::{
     LibrariesRequest, LookupBlockRequest, RunGetMethodRequest, RunGetMethodStdRequest,
     SendBocRequest, SeqnoRequest, TransactionsRequest, TryLocateTxRequest,
 };
-use tycho_types::models::{StdAddr, StdAddrFormat};
 
 macro_rules! validate {
     ($expression:expr) => {
@@ -365,9 +365,7 @@ fn json_rpc_error(status: StatusCode, error: impl Into<String>) -> Response {
         .into_response()
 }
 
-fn parse_std_addr(
-    address: &str,
-) -> anyhow::Result<(StdAddr, tycho_types::models::Base64StdAddrFlags)> {
+fn parse_std_addr(address: &str) -> anyhow::Result<(StdAddr, rston::models::Base64StdAddrFlags)> {
     StdAddr::from_str_ext(address, StdAddrFormat::any())
         .map_err(|e| anyhow::anyhow!("Invalid address format: {e}"))
 }

@@ -1,9 +1,9 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use rston::boc::{Boc, ser::BocHeader};
+use rston::cell::{Cell, CellBuilder};
 use serde_json::json;
 use std::fs;
-use tycho_types::boc::{Boc, ser::BocHeader};
-use tycho_types::cell::{Cell, CellBuilder};
 
 const BOC_IMPORTS: &str = r#"
 import "../../lib/boc"

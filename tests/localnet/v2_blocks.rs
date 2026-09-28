@@ -3,9 +3,9 @@ use crate::support::localnet::pretty_json_for_snapshot;
 use crate::support::toncenter::{
     find_v2_transaction_block, jetton_v1_action_project, run_localnet_action_project,
 };
+use rston::boc::Boc;
 use serde_json::{Value, json};
 use toncenter::v2::{Int32Input, Int64Input, requests, responses};
-use tycho_types::boc::Boc;
 
 const SHARD: i64 = i64::MIN;
 const ZERO_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";

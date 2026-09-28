@@ -4,6 +4,8 @@ use crate::context::{
     BuildCache, CompilationResult, Emulations, FailedSendMessageResult, KnownAddresses, to_cell,
 };
 use crate::retrace::{self, InstalledActions};
+use rston::boc::Boc;
+use rston::models::AccountStatus;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
@@ -14,8 +16,6 @@ use tolk_compiler::abi::ContractABI;
 use tolk_source_map::SourceLocation;
 use ton_emulator::SendMessageResultSuccess;
 use ton_retrace::trace::{ExecutedAction, ExecutedActionFailureReason, ExecutedActions};
-use tycho_types::boc::Boc;
-use tycho_types::models::AccountStatus;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(super) struct TestTrace {

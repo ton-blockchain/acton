@@ -7,11 +7,11 @@ use std::{
 };
 
 use anyhow::{Context, Result, ensure};
+use rston::models::BlockId;
 use serde::{Deserialize, Serialize};
 use service_pool::{Endpoint, Options, Pool, Snapshot};
 use tokio::time::{Instant, sleep, timeout};
 use tracing::{info, warn};
-use tycho_types::models::BlockId;
 
 use crate::{
     ClientOptions,

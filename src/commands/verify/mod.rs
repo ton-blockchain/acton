@@ -8,6 +8,12 @@ use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellSliceParts, HashBytes};
+use rston::models::{
+    Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, MsgInfo, OwnedMessage,
+    StdAddr,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -20,12 +26,6 @@ use ton::ton_core::types::TonAddress;
 use ton_api::{Network, TonApiClient};
 use toncenter::v3;
 use tvm_ffi::stack::Tuple;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellSliceParts, HashBytes};
-use tycho_types::models::{
-    Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, MsgInfo, OwnedMessage,
-    StdAddr,
-};
 
 const VERIFIER_BACKEND: &str = "https://verifier.ton.org";
 const VERIFY_BACKEND_ENV: &str = "ACTON_VERIFY_BACKEND";
@@ -831,7 +831,7 @@ fn build_verifier_payment_message(
     let body = body.build()?;
 
     let message = OwnedMessage {
-        info: MsgInfo::Int(tycho_types::models::IntMsgInfo {
+        info: MsgInfo::Int(rston::models::IntMsgInfo {
             ihr_disabled: true,
             bounce: true,
             bounced: false,
@@ -1294,8 +1294,8 @@ fn validate_verifier_address_code_hash(
 
 #[cfg(test)]
 mod tests {
+    use rston::cell::CellSlice;
     use serde_json::json;
-    use tycho_types::cell::CellSlice;
 
     use super::*;
 

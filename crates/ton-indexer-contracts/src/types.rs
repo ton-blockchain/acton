@@ -1,7 +1,7 @@
+use rston::cell::{Cell, Load};
+use rston::dict::{Dict, DictKey, LoadDictKey};
 use tvm_ffi::from_stack::{ArgError, FromStack};
 use tvm_ffi::stack::TupleItem;
-use tycho_types::cell::{Cell, Load};
-use tycho_types::dict::{Dict, DictKey, LoadDictKey};
 
 #[derive(Debug, Clone)]
 pub struct Map<K, V> {

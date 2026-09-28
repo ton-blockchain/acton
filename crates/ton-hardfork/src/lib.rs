@@ -31,22 +31,22 @@ pub mod proof;
 pub mod request;
 
 use anyhow::{Context, bail, ensure};
-use rustc_hash::FxHashSet;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, Lazy, LazyExotic};
-use tycho_types::dict::Dict;
-use tycho_types::merkle::{FilterAction, MerkleFilter, MerkleUpdate};
-use tycho_types::models::account::ShardAccount;
-use tycho_types::models::block::{
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, Lazy, LazyExotic};
+use rston::dict::Dict;
+use rston::merkle::{FilterAction, MerkleFilter, MerkleUpdate};
+use rston::models::account::ShardAccount;
+use rston::models::block::{
     Block, BlockExtra, BlockId, BlockInfo, BlockRef, McBlockExtra, PrevBlockRef, ShardHashes,
     ShardIdent, ValueFlow,
 };
-use tycho_types::models::currency::CurrencyCollection;
-use tycho_types::models::shard::{
+use rston::models::currency::CurrencyCollection;
+use rston::models::shard::{
     DepthBalanceInfo, KeyBlockRef, KeyMaxLt, McStateExtra, ShardAccounts, ShardStateUnsplit,
 };
-use tycho_types::models::{AccountState, IntAddr, LibDescr};
-use tycho_types::prelude::HashBytes;
+use rston::models::{AccountState, IntAddr, LibDescr};
+use rston::prelude::HashBytes;
+use rustc_hash::FxHashSet;
 
 /// Logical time granularity every TON block start time is aligned to.
 ///
@@ -801,7 +801,6 @@ fn finish_block(
         info: Lazy::new(&info).context("Failed to wrap block info")?,
         value_flow: Lazy::new(&value_flow).context("Failed to wrap value flow")?,
         state_update: LazyExotic::new(&state_update).context("Failed to wrap state update")?,
-        out_msg_queue_updates: None,
         extra: Lazy::new(&extra).context("Failed to wrap block extra")?,
     };
 
@@ -954,16 +953,16 @@ impl MerkleFilter for CellsOf {
 
 #[cfg(test)]
 mod tests {
-    use tycho_types::dict::{AugDict, Dict};
-    use tycho_types::merkle::MerkleProof;
-    use tycho_types::models::account::{
+    use rston::dict::{AugDict, Dict};
+    use rston::merkle::MerkleProof;
+    use rston::models::account::{
         Account, AccountState, OptionalAccount, StorageExtra, StorageInfo, StorageUsed,
     };
-    use tycho_types::models::block::BlockProof;
-    use tycho_types::models::config::BlockchainConfig;
-    use tycho_types::models::message::{IntAddr, StdAddr};
-    use tycho_types::models::shard::ValidatorInfo;
-    use tycho_types::num::Tokens;
+    use rston::models::block::BlockProof;
+    use rston::models::config::BlockchainConfig;
+    use rston::models::message::{IntAddr, StdAddr};
+    use rston::models::shard::ValidatorInfo;
+    use rston::num::Tokens;
 
     use super::*;
 
@@ -1040,7 +1039,7 @@ mod tests {
     }
 
     fn two_chain_sources() -> HardforkSources {
-        use tycho_types::models::block::ShardDescription;
+        use rston::models::block::ShardDescription;
         let mut sources = sources();
         let mut mc = sources
             .masterchain_state
@@ -1076,7 +1075,7 @@ mod tests {
             .global_balance
             .other
             .as_dict_mut()
-            .set(7, tycho_types::num::VarUint248::new(500))
+            .set(7, rston::num::VarUint248::new(500))
             .unwrap();
         mc.custom = Some(Lazy::new(&extra).unwrap());
         sources.masterchain_state = CellBuilder::build_from(&mc).unwrap();
@@ -1104,7 +1103,7 @@ mod tests {
                     .balance
                     .other
                     .as_dict_mut()
-                    .set(7, tycho_types::num::VarUint248::new(balance * 2))
+                    .set(7, rston::num::VarUint248::new(balance * 2))
                     .unwrap();
                 record.account = Lazy::new(&OptionalAccount(Some(value))).unwrap();
                 AccountWrite::set(address, record)
@@ -1133,7 +1132,7 @@ mod tests {
                     .get(7)
                     .unwrap()
                     .unwrap(),
-                tycho_types::num::VarUint248::new(500 + (mc_balance + shard_balance) * 2)
+                rston::num::VarUint248::new(500 + (mc_balance + shard_balance) * 2)
             );
             let shard = plan.basechain.unwrap();
             let shard_cell = Boc::decode(&shard.state_boc).unwrap();

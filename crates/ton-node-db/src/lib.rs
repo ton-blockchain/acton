@@ -21,11 +21,11 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, bail, ensure};
 use rocksdb::{DB, Direction, IteratorMode};
+use rston::boc::Boc;
+use rston::cell::{Cell, HashBytes};
+use rston::models::{Block, BlockId, ShardStateUnsplit, StdAddr};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, HashBytes};
-use tycho_types::models::{Block, BlockId, ShardStateUnsplit, StdAddr};
 
 use package::PackageReader;
 

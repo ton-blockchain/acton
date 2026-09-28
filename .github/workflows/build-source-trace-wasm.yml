@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - ".github/workflows/build-source-trace-wasm.yml"
+      - "libs/rston/**"
       - "crates/acton-source-trace/**"
       - "crates/acton-source-trace-wasm/**"
   push:
@@ -13,6 +14,7 @@ on:
       - master
     paths:
       - ".github/workflows/build-source-trace-wasm.yml"
+      - "libs/rston/**"
       - "crates/acton-source-trace/**"
       - "crates/acton-source-trace-wasm/**"
   workflow_dispatch:

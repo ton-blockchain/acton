@@ -3,6 +3,12 @@ use anyhow::Context as AnyhowContext;
 use inquire::Select;
 use qrcode::{EcLevel, QrCode, render::unicode};
 use reqwest::blocking::Client;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, ExactSize};
+use rston::models::{
+    Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, OwnedRelaxedMessage, RelaxedMsgInfo,
+    StdAddr, StdAddrFormat,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt;
@@ -19,12 +25,6 @@ use ton_connect_core::{
     HttpsUrl, KnownAppRequest, NetworkId, NonEmptyVec, PersistedSessionKeyPair, RawMessage,
     RawTransactionPayload, ReturnStrategy, SendTransactionRequest, SessionCrypto, TonAddressItem,
     TransactionPayload, WalletMessage, WalletResponse, WalletResult,
-};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, ExactSize};
-use tycho_types::models::{
-    Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, OwnedRelaxedMessage, RelaxedMsgInfo,
-    StdAddr, StdAddrFormat,
 };
 
 const TONCONNECT_MAINNET_CHAIN: &str = "-239";
@@ -526,7 +526,7 @@ fn message_from_cell(message: &Cell, network: &Network) -> anyhow::Result<RawMes
     })
 }
 
-fn body_to_cell(body: tycho_types::cell::CellSliceParts) -> anyhow::Result<Option<Cell>> {
+fn body_to_cell(body: rston::cell::CellSliceParts) -> anyhow::Result<Option<Cell>> {
     if body.exact_size().bits == 0 && body.exact_size().refs == 0 {
         return Ok(None);
     }
@@ -763,8 +763,8 @@ fn set_storage_permissions(_path: &Path) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tycho_types::cell::HashBytes;
-    use tycho_types::models::{CurrencyCollection, RelaxedIntMsgInfo};
+    use rston::cell::HashBytes;
+    use rston::models::{CurrencyCollection, RelaxedIntMsgInfo};
 
     #[test]
     fn tonconnect_rejects_localnet_and_custom_networks() {
@@ -786,7 +786,7 @@ mod tests {
                 ..Default::default()
             }),
             init: None,
-            body: (tycho_types::cell::CellSliceRange::full(&body), body),
+            body: (rston::cell::CellSliceRange::full(&body), body),
             layout: None,
         })
         .unwrap();

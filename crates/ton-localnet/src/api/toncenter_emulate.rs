@@ -2,18 +2,18 @@ use crate::api::toncenter_wallet;
 use crate::localnet::LocalnetAccountState;
 use crate::types::{Addr, BocBytes};
 use anyhow::Context;
+use rston::boc::{Boc, BocRepr};
+use rston::cell::{Cell, CellSliceParts};
+use rston::models::{
+    CurrencyCollection, ExtInMsgInfo, IntAddr, IntMsgInfo, MessageLayout, MsgInfo, OwnedMessage,
+    StateInit, StdAddr, StdAddrFormat,
+};
+use rston::num::Tokens;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton::ton_wallet::WalletVersion;
 use ton_api::toncenter::emulate::v1::{TonConnectEmulateRequest, TonConnectMessage};
 use toncenter::v3::EstimateFeeRequest;
-use tycho_types::boc::{Boc, BocRepr};
-use tycho_types::cell::{Cell, CellSliceParts};
-use tycho_types::models::{
-    CurrencyCollection, ExtInMsgInfo, IntAddr, IntMsgInfo, MessageLayout, MsgInfo, OwnedMessage,
-    StateInit, StdAddr, StdAddrFormat,
-};
-use tycho_types::num::Tokens;
 
 const MAX_TON_CONNECT_MESSAGES: usize = 4;
 const DEFAULT_VALID_UNTIL_SECONDS: u32 = 300;
@@ -253,13 +253,13 @@ mod tests {
     use crate::localnet::{LocalnetBlockId, LocalnetTransactionId};
     use crate::storage::AccountStatus;
     use crate::types::{Addr, Hash256};
+    use rston::cell::CellBuilder;
+    use rston::models::Message;
     use ton::ton_core::cell::TonHash;
     use ton::ton_wallet::{
         WalletV1V2Data, WalletV3Data, WalletV3ExtMsgBody, WalletV4Data, WalletV4ExtMsgBody,
         WalletV5Data, WalletV5ExtMsgBody,
     };
-    use tycho_types::cell::CellBuilder;
-    use tycho_types::models::Message;
 
     const NOW: u32 = 1_700_000_000;
     const WALLET_ID: i32 = 0x1122_3344;

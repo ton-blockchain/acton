@@ -14,7 +14,8 @@ All notable changes to this project will be documented in this file.
 ### Rust libraries
 
 - Add the shared TON types library `rston` in `libs/rston`, with its own workspace,
-  tests, benchmarks, and fuzz targets. Verifier uses this local library.
+  tests, benchmarks, and fuzz targets. Acton, its Rust crates, Localton, Actonscan,
+  and Verifier use this local library.
 - Add the MIT-licensed `toncenter` crate with typed TON Center v2 and v3 requests and
   responses, field documentation, generated OpenAPI, and opt-in live contract tests.
 - Use the shared `toncenter` v2 and v3 types across Rust clients and simulator endpoints.

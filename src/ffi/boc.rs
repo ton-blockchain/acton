@@ -1,8 +1,8 @@
 use crate::context::Context;
+use rston::boc::{Boc, ser::BocHeader};
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::boc::{Boc, ser::BocHeader};
 
 extension!(encode in (Context) with (crc32: bool, value: TupleItem) using encode_impl);
 fn encode_impl(

@@ -1,11 +1,11 @@
 //! This module defines a simple DSL for defining extension functions for the emulator.
 #![allow(unsafe_code)]
+use rston::boc::Boc;
+use rston::cell::Cell;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use tvm_ffi::from_stack::{ArgError, FromStack};
 use tvm_ffi::stack::Tuple;
-use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
 
 pub fn pop_arg<T: FromStack>(t: &mut Tuple) -> Result<T, ArgError> {
     let item = t.pop().ok_or(ArgError::StackUnderflow)?;

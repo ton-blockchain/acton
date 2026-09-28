@@ -29,27 +29,27 @@ use crate::virtual_clock::VirtualClock;
 use anyhow::Context;
 use core::cmp;
 use num_bigint::BigUint;
+use rston::boc::Boc;
+use rston::boc::BocRepr;
+use rston::cell::{Cell, CellBuilder, CellFamily, Lazy, Store};
+use rston::dict::Dict;
+use rston::models::config::BlockchainConfigParams;
+use rston::models::transaction::{
+    ComputePhase, ComputePhaseSkipReason, HashUpdate, OrdinaryTxInfo, SkippedComputePhase,
+    Transaction,
+};
+use rston::models::{
+    Account, AccountState, AccountStatusChange, CurrencyCollection, IntAddr, IntMsgInfo, LibDescr,
+    Message, MsgInfo, OptionalAccount, OutAction, OutActionsRevIter, OwnedMessage, RelaxedMsgInfo,
+    ShardAccount, StdAddr, StoragePhase, TxInfo,
+};
+use rston::prelude::HashBytes;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use ton_emulator::Emulator;
 use ton_executor::message::{PrevBlockId, PrevBlocksInfo};
-use tycho_types::boc::Boc;
-use tycho_types::boc::BocRepr;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, Lazy, Store};
-use tycho_types::dict::Dict;
-use tycho_types::models::config::BlockchainConfigParams;
-use tycho_types::models::transaction::{
-    ComputePhase, ComputePhaseSkipReason, HashUpdate, OrdinaryTxInfo, SkippedComputePhase,
-    Transaction,
-};
-use tycho_types::models::{
-    Account, AccountState, AccountStatusChange, CurrencyCollection, IntAddr, IntMsgInfo, LibDescr,
-    Message, MsgInfo, OptionalAccount, OutAction, OutActionsRevIter, OwnedMessage, RelaxedMsgInfo,
-    ShardAccount, StdAddr, StoragePhase, TxInfo,
-};
-use tycho_types::prelude::HashBytes;
 
 pub use crate::virtual_clock::NodeClockInfo;
 
@@ -2321,13 +2321,13 @@ impl Node {
                 .as_ref()
                 .map_or(old_shard_account.last_trans_lt, |tx| tx.1),
             now: gen_utime,
-            out_msg_count: tycho_types::num::Uint15::ZERO,
+            out_msg_count: rston::num::Uint15::ZERO,
             orig_status: old_meta
                 .as_ref()
-                .map_or(tycho_types::models::AccountStatus::NotExists, |meta| {
+                .map_or(rston::models::AccountStatus::NotExists, |meta| {
                     tycho_account_status(meta.status.clone())
                 }),
-            end_status: tycho_types::models::AccountStatus::Frozen,
+            end_status: rston::models::AccountStatus::Frozen,
             in_msg: Some(in_msg_cell),
             out_msgs: Default::default(),
             total_fees: CurrencyCollection::ZERO,
@@ -3107,12 +3107,12 @@ fn account_state_snapshot_from_optional_account(
     }
 }
 
-const fn tycho_account_status(status: AccountStatus) -> tycho_types::models::AccountStatus {
+const fn tycho_account_status(status: AccountStatus) -> rston::models::AccountStatus {
     match status {
-        AccountStatus::Active => tycho_types::models::AccountStatus::Active,
-        AccountStatus::Uninit => tycho_types::models::AccountStatus::Uninit,
-        AccountStatus::Frozen => tycho_types::models::AccountStatus::Frozen,
-        AccountStatus::Nonexist => tycho_types::models::AccountStatus::NotExists,
+        AccountStatus::Active => rston::models::AccountStatus::Active,
+        AccountStatus::Uninit => rston::models::AccountStatus::Uninit,
+        AccountStatus::Frozen => rston::models::AccountStatus::Frozen,
+        AccountStatus::Nonexist => rston::models::AccountStatus::NotExists,
     }
 }
 
@@ -3255,23 +3255,23 @@ mod tests {
     use crate::executor::{ExecContext, ExecResult, TvmExecutor};
     use crate::node::StateSource;
     use crate::remote::RemoteProvider;
+    use rston::cell::{Cell, CellBuilder, Lazy, Store};
+    use rston::dict::Dict;
+    use rston::models::block::Block;
+    use rston::models::transaction::{
+        ComputePhase, ComputePhaseSkipReason, HashUpdate, OrdinaryTxInfo, SkippedComputePhase,
+        Transaction, TxInfo,
+    };
+    use rston::models::{
+        Account, BlockchainConfigParams, CurrencyCollection, IntAddr, OptionalAccount, SimpleLib,
+        StateInit, StdAddr, StdAddrFormat,
+    };
     use serde_json::{Value, json};
     use std::sync::{Arc, Mutex};
     use std::time::{SystemTime, UNIX_EPOCH};
     use ton_executor::DEFAULT_CONFIG;
     use ton_indexer_contracts::jettons;
     use ton_networks::Network;
-    use tycho_types::cell::{Cell, CellBuilder, Lazy, Store};
-    use tycho_types::dict::Dict;
-    use tycho_types::models::block::Block;
-    use tycho_types::models::transaction::{
-        ComputePhase, ComputePhaseSkipReason, HashUpdate, OrdinaryTxInfo, SkippedComputePhase,
-        Transaction, TxInfo,
-    };
-    use tycho_types::models::{
-        Account, BlockchainConfigParams, CurrencyCollection, IntAddr, OptionalAccount, SimpleLib,
-        StateInit, StdAddr, StdAddrFormat,
-    };
 
     struct NoopExecutor;
 
@@ -3321,9 +3321,9 @@ mod tests {
                 prev_trans_hash: HashBytes::ZERO,
                 prev_trans_lt: 0,
                 now: ctx.gen_utime,
-                out_msg_count: tycho_types::num::Uint15::ZERO,
-                orig_status: tycho_types::models::AccountStatus::NotExists,
-                end_status: tycho_types::models::AccountStatus::Active,
+                out_msg_count: rston::num::Uint15::ZERO,
+                orig_status: rston::models::AccountStatus::NotExists,
+                end_status: rston::models::AccountStatus::Active,
                 in_msg: Some(in_msg_cell),
                 out_msgs: Dict::new(),
                 total_fees: CurrencyCollection::ZERO,

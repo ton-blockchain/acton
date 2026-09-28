@@ -1,14 +1,14 @@
 use anyhow::Context;
-use ton_emulator::{
-    AccountsState, LocalAccountsState, WorldState, WorldStateAccountSnapshot, WorldStateSnapshot,
-};
-use tycho_types::cell::Lazy;
-use tycho_types::cell::{Cell, CellBuilder};
-use tycho_types::models::{
+use rston::cell::Lazy;
+use rston::cell::{Cell, CellBuilder};
+use rston::models::{
     Account, AccountState, CurrencyCollection, IntAddr, OptionalAccount, ShardAccount, StateInit,
     StdAddr, StorageInfo,
 };
-use tycho_types::prelude::HashBytes;
+use rston::prelude::HashBytes;
+use ton_emulator::{
+    AccountsState, LocalAccountsState, WorldState, WorldStateAccountSnapshot, WorldStateSnapshot,
+};
 
 fn new_world_state() -> anyhow::Result<WorldState> {
     WorldState::new(AccountsState::Local(LocalAccountsState::new()), None)
@@ -172,8 +172,8 @@ fn public_world_state_snapshot_contains_parseable_account_bocs() -> anyhow::Resu
         .iter()
         .find(|entry| entry.address == addr.display_base64_url(false).to_string())
         .context("snapshot should contain the inserted account")?;
-    let parsed = tycho_types::boc::Boc::decode_base64(&entry.shard_account_boc64)?
-        .parse::<ShardAccount>()?;
+    let parsed =
+        rston::boc::Boc::decode_base64(&entry.shard_account_boc64)?.parse::<ShardAccount>()?;
 
     let original = account
         .account
@@ -230,8 +230,7 @@ fn public_world_state_from_snapshot_rejects_invalid_account_address() -> anyhow:
         libraries_boc64: vec![],
         accounts: vec![WorldStateAccountSnapshot {
             address: "not-an-address".to_owned(),
-            shard_account_boc64: body_with_u32(0x9999_8888)
-                .map(tycho_types::boc::Boc::encode_base64)?,
+            shard_account_boc64: body_with_u32(0x9999_8888).map(rston::boc::Boc::encode_base64)?,
         }],
     };
 
@@ -361,7 +360,7 @@ fn public_world_state_load_snapshot_failure_keeps_existing_state() -> anyhow::Re
         libraries_boc64: vec![],
         accounts: vec![WorldStateAccountSnapshot {
             address: "not-an-address".to_owned(),
-            shard_account_boc64: body_with_u32(1).map(tycho_types::boc::Boc::encode_base64)?,
+            shard_account_boc64: body_with_u32(1).map(rston::boc::Boc::encode_base64)?,
         }],
     };
 
@@ -409,7 +408,7 @@ fn public_world_state_snapshot_skips_cached_non_existing_accounts() -> anyhow::R
 #[test]
 fn public_world_state_snapshot_rejects_rootless_config_without_panicking() -> anyhow::Result<()> {
     let mut state = new_world_state()?;
-    state.set_config(tycho_types::dict::Dict::new());
+    state.set_config(rston::dict::Dict::new());
 
     let error = state
         .snapshot()

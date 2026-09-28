@@ -4,15 +4,15 @@
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail, ensure};
-use tokio::time::Instant;
-use ton_fullnode_master::tl::{Answer, BlockIdExt, Query};
-use tracing::debug;
-use tycho_types::{
+use rston::{
     boc::Boc,
     cell::{HashBytes, Load, LoadCell},
     merkle::MerkleProof,
     models::{Block, BlockId, BlockInfo, PrevBlockRef, ShardIdent},
 };
+use tokio::time::Instant;
+use ton_fullnode_master::tl::{Answer, BlockIdExt, Query};
+use tracing::debug;
 
 use crate::network::{Network, Peer};
 

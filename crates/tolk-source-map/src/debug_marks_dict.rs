@@ -20,13 +20,13 @@
 // The result is: HashMap<cell_hash, Vec<(offset, mark_id)>> in TVM-visible coordinates.
 
 use anyhow::anyhow;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellFamily, CellSlice, Load};
+use rston::dict::{Dict, RawDict};
+use rston::prelude::DynCell;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSlice, Load};
-use tycho_types::dict::{Dict, RawDict};
-use tycho_types::prelude::DynCell;
 
 /// A single debug mark position: (`bit_offset_in_cell`, `mark_id`).
 pub type MarkEntry = (i32, i32);
@@ -294,7 +294,7 @@ fn key_slice_to_binary(slice: &CellSlice, bits: usize) -> String {
     read_bits_as_string(&mut slice.clone(), bits)
 }
 
-// load_uint() returns u64, can't fit 256 bits; load_biguint() absent in this tycho-types version
+// load_uint() returns u64, can't fit 256 bits; load_biguint() absent in this rston version
 fn hash_from_key_slice(mut slice: CellSlice) -> String {
     let mut bytes = [0u8; 32];
     for b in &mut bytes {

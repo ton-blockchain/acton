@@ -7,11 +7,11 @@ use crate::support::toncenter::{
     spawn_toncenter_v3_mock, toncenter_v2_error_response, toncenter_v2_get_libraries_ok_response,
     toncenter_v3_account_states_ok_response, toncenter_v3_error_response,
 };
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder};
 use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 use std::{fs, path::Path, thread};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder};
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}

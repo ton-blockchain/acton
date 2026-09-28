@@ -4,13 +4,13 @@ use super::{
     std_address_json,
 };
 use anyhow::Context;
+use rston::cell::Cell;
+use rston::models::IntAddr;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use tokio::task::JoinSet;
 use ton_api::{Network, OffchainJsonResolver, TonApiClient};
 use ton_indexer_contracts::jettons;
-use tycho_types::cell::Cell;
-use tycho_types::models::IntAddr;
 
 pub(super) fn inspect(ctx: &InspectorContext<'_>, reports: &mut Vec<InspectionReport>) {
     let (Some(code), Some(data)) = (ctx.code, ctx.data) else {

@@ -12,6 +12,8 @@ use inquire::validator::{ErrorMessage, Validation};
 use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use rston::cell::{DynCell, LevelMask};
+use rston::models::{StdAddr, StdAddrFormat};
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::io::{self, IsTerminal, Write, stdin};
@@ -22,8 +24,6 @@ use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use tvm_ffi::from_stack::FromStack;
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::cell::{DynCell, LevelMask};
-use tycho_types::models::{StdAddr, StdAddrFormat};
 
 extension!(println in (Context) with (arg6: TupleItem, type6: BigInt, arg5: TupleItem, type5: BigInt, arg4: TupleItem, type4: BigInt, arg3: TupleItem, type3: BigInt, arg2: TupleItem, type2: BigInt, arg1: TupleItem, type1: BigInt) using println_impl);
 #[allow(clippy::too_many_arguments)]

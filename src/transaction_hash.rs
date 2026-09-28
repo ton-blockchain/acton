@@ -5,7 +5,7 @@ use base64::{
     Engine as _,
     engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD},
 };
-use tycho_types::cell::HashBytes;
+use rston::cell::HashBytes;
 
 pub(crate) fn toncenter_transaction_hash_hex(hash: &str) -> anyhow::Result<String> {
     if let Ok(hash) = HashBytes::from_str(hash) {

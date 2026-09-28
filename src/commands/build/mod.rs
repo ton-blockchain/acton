@@ -13,6 +13,7 @@ use acton_config::config::{
 use anyhow::anyhow;
 use heck::ToLowerCamelCase;
 use log::debug;
+use rston::boc::Boc;
 use serde_json::json;
 use source_artifact::{SourceArtifactDebugInfo, save_source_artifact};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -21,7 +22,6 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
-use tycho_types::boc::Boc;
 
 mod dep_graph;
 mod source_artifact;

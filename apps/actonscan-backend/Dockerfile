@@ -11,6 +11,7 @@ RUN apt-get update \
 COPY Cargo.toml build.rs /build/
 COPY src /build/src
 COPY crates /build/crates
+COPY libs/rston /build/libs/rston
 COPY xtask /build/xtask
 COPY apps/actonscan-backend/Cargo.toml apps/actonscan-backend/Cargo.lock apps/actonscan-backend/rust-toolchain.toml ./
 COPY apps/actonscan-backend/src ./src

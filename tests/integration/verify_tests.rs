@@ -5,13 +5,13 @@ use crate::support::toncenter::{spawn_toncenter_v3_mock, toncenter_v3_account_st
 use crate::support::verifier::{
     CapturedVerifierRequest, VerifierMockResponse, spawn_verifier_mock,
 };
+use rston::boc::Boc;
+use rston::cell::Cell;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
-use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}

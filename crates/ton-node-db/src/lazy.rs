@@ -8,12 +8,12 @@ use std::sync::{Arc, Mutex, OnceLock};
 use anyhow::{Context, Result, anyhow, ensure};
 use quick_cache::{Weighter, sync::Cache};
 use rocksdb::DB;
-use serde::Serialize;
-use tycho_types::cell::{
+use rston::cell::{
     Cell, CellContext, CellDescriptor, CellFamily, CellImpl, CellInner, CellParts, DynCell,
     HashBytes, LevelMask,
 };
-use tycho_types::util::ArrayVec;
+use rston::util::ArrayVec;
+use serde::Serialize;
 
 use crate::cells::{Reference, StoredCell};
 
@@ -267,6 +267,10 @@ impl CellImpl for LazyCell {
 
     fn reference_cloned(&self, index: u8) -> Option<Cell> {
         self.resolve().reference_cloned(index)
+    }
+
+    fn reference_repr_hash(&self, index: u8) -> Option<HashBytes> {
+        self.resolve().reference_repr_hash(index)
     }
 
     fn virtualize(&self) -> &DynCell {

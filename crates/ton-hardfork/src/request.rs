@@ -3,9 +3,7 @@
 use crate::{AccountWrite, AdminBatch, HardforkSources};
 use anyhow::{Context, Result, bail, ensure};
 use base64::{Engine, engine::general_purpose::STANDARD};
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
-use tycho_types::{
+use rston::{
     boc::Boc,
     cell::{Cell, CellBuilder, CellFamily, Lazy, Store},
     models::{
@@ -15,6 +13,8 @@ use tycho_types::{
     num::VarUint56,
     prelude::HashBytes,
 };
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 /// One account replacement within a hardfork batch, addressed in raw workchain form.
 /// Deserialization rejects unknown fields so misspelled edits cannot silently do less work.
@@ -161,12 +161,12 @@ pub fn account_batch(sources: &HardforkSources, edits: &[AccountEdit]) -> Result
     Ok(batch)
 }
 
-fn parse_balance(value: &str) -> Result<tycho_types::num::Tokens> {
+fn parse_balance(value: &str) -> Result<rston::num::Tokens> {
     ensure!(
         !value.is_empty() && value.bytes().all(|b| b.is_ascii_digit()),
         "Balance must be a nonnegative integer in nanotons"
     );
-    let balance = tycho_types::num::Tokens::new(value.parse().context("Balance is too large")?);
+    let balance = rston::num::Tokens::new(value.parse().context("Balance is too large")?);
     ensure!(balance.is_valid(), "Balance exceeds the TON currency limit");
     Ok(balance)
 }

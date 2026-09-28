@@ -6,14 +6,14 @@ use axum::body::Body;
 use axum::http::Request;
 use expect_test::{expect, expect_file};
 use http_body_util::BodyExt;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, Lazy};
+use rston::models::{MessageLayout, MsgInfo, OwnedMessage, ShardIdent, Transaction, TxInfo};
+use rston::num::Tokens;
 use serde_json::{Value, json};
 use tokio::sync::Notify;
 use ton_indexer_core::Batch;
 use tower::ServiceExt;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, Lazy};
-use tycho_types::models::{MessageLayout, MsgInfo, OwnedMessage, ShardIdent, Transaction, TxInfo};
-use tycho_types::num::Tokens;
 
 use super::*;
 use crate::streaming::tests::{block, transaction};
@@ -105,7 +105,7 @@ async fn normalizes_before_broadcast_and_returns_the_committed_transaction() -> 
         unreachable!()
     };
     info.import_fee = Tokens::new(9);
-    info.src = tycho_types::models::ExtAddr::new(8, [7]);
+    info.src = rston::models::ExtAddr::new(8, [7]);
     let submitted = CellBuilder::build_from(submitted)?;
     let expected_hash = *submitted.repr_hash();
     let batch = committed(tx, ShardIdent::BASECHAIN)?;

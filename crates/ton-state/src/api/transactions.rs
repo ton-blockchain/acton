@@ -12,11 +12,11 @@ use base64::{
     Engine,
     engine::general_purpose::{STANDARD, URL_SAFE},
 };
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, HashBytes, Lazy};
+use rston::models::{Message, MsgInfo, StdAddr, StdAddrFormat, Transaction, TxInfo};
 use ton_node_db::BlockIndex;
 use toncenter::v2::{self as v2, requests::TransactionsRequest, responses as wire};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, HashBytes, Lazy};
-use tycho_types::models::{Message, MsgInfo, StdAddr, StdAddrFormat, Transaction, TxInfo};
 
 use super::{Api, ApiError};
 

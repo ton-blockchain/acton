@@ -19,7 +19,7 @@ use ton::{
     },
 };
 use tonutils::tvm::Address;
-use tycho_types::{
+use rston::{
     boc::{Boc, BocRepr},
     cell::{Cell, CellBuilder, HashBytes},
     models::{
@@ -1181,7 +1181,7 @@ fn unix_time_u32() -> Result<u32> {
 mod tests {
     use ed25519_dalek::SigningKey;
     use ton::{ton_core::traits::tlb::TLB, ton_wallet::WalletVersion as TonWalletVersion};
-    use tycho_types::boc::Boc;
+    use rston::boc::Boc;
 
     use super::{MAX_GRAMS_NANO, format_nano_grams, parse_grams, ton_wallet};
 

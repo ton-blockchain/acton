@@ -1,10 +1,10 @@
 use crate::localnet::LocalnetAccountState;
 use crate::types::Hash256;
 use anyhow::Context;
+use rston::boc::Boc;
 use ton::ton_core::cell::{TonCell, TonHash};
 use ton::ton_core::traits::tlb::TLB;
 use ton::ton_wallet::WalletVersion;
-use tycho_types::boc::Boc;
 
 const V2_WALLET_V5_BETA_CODE_HASH: &str = "89fKU0k97trCizgZhqhJQDy6w9LFhHea8IEGWvCsS5M=";
 

@@ -1,6 +1,8 @@
 use crate::commands::common::error_fmt;
 use acton_config::color::OwoColorize;
 use anyhow::anyhow;
+use rston::boc::Boc;
+use rston::cell::{Cell, HashBytes};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
@@ -12,8 +14,6 @@ use tasm_core::types::{ArgValue, Code, Instruction};
 use tolk_compiler::SourceMap;
 use tolk_source_map::SourceLocation;
 use ton_api::{Network, TonApiClient};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, HashBytes};
 
 mod remote;
 

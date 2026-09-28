@@ -11,8 +11,8 @@
 //! and the conventional [get-method ID calculation](https://docs.ton.org/tvm/get-method).
 
 use anyhow::{Context, ensure};
-use tycho_types::cell::Cell;
-use tycho_types::dict::RawIter;
+use rston::cell::Cell;
+use rston::dict::RawIter;
 
 const SETCP_OPCODE: u8 = 0xff;
 const DICTPUSHCONST_PREFIX: u64 = 0b1_1110_1001_0100;

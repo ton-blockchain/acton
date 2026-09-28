@@ -6,13 +6,13 @@ use crate::support::toncenter::{
     find_v2_internal_message_by_hash, test_std_addr,
 };
 use base64::Engine as _;
+use rston::boc::{Boc, BocRepr};
+use rston::cell::CellBuilder;
+use rston::models::{CurrencyCollection, ExtraCurrencyCollection, MsgInfo, OwnedMessage};
+use rston::num::VarUint248;
 use serde_json::{Value, json};
 use toncenter::v2::{requests as v2_requests, responses as v2_responses};
 use toncenter::v3::responses as v3_responses;
-use tycho_types::boc::{Boc, BocRepr};
-use tycho_types::cell::CellBuilder;
-use tycho_types::models::{CurrencyCollection, ExtraCurrencyCollection, MsgInfo, OwnedMessage};
-use tycho_types::num::VarUint248;
 
 const TEXT_COMMENT: &str = "typed message with extra currencies";
 const LARGE_EXTRA_CURRENCY: &str = "340282366920938463463374607431768211456";

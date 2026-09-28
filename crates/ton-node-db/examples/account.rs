@@ -6,9 +6,9 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use rston::models::{BlockId, StdAddr};
 use serde_json::json;
 use ton_node_db::NodeDb;
-use tycho_types::models::{BlockId, StdAddr};
 
 #[derive(Parser)]
 struct Args {

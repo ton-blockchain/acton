@@ -1,13 +1,13 @@
 use crate::localnet::LocalnetBlockHeader;
 use crate::types::BocBytes;
 use anyhow::Context;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder};
-use tycho_types::merkle::MerkleProof;
-use tycho_types::models::ShardAccount;
-use tycho_types::models::block::{ShardDescription, ShardHashes, ShardIdent};
-use tycho_types::models::currency::CurrencyCollection;
-use tycho_types::prelude::HashBytes;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder};
+use rston::merkle::MerkleProof;
+use rston::models::ShardAccount;
+use rston::models::block::{ShardDescription, ShardHashes, ShardIdent};
+use rston::models::currency::CurrencyCollection;
+use rston::prelude::HashBytes;
 
 /// Account-state payload expected by `liteServer.accountState`.
 ///

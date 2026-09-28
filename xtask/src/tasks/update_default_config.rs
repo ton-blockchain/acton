@@ -5,8 +5,8 @@ use std::time::Duration;
 use anyhow::{Context, Result, bail};
 use clap::Args;
 use reqwest::blocking::Client;
+use rston::boc::Boc;
 use serde::Deserialize;
-use tycho_types::boc::Boc;
 
 const DEFAULT_CONFIG_PATH: &str = "crates/ton-executor/src/default_config.boc64";
 const TONCENTER_GET_CONFIG_ALL_URL: &str = "https://toncenter.com/api/v2/getConfigAll";

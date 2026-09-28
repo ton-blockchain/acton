@@ -18,5 +18,5 @@ pub use error::{BoxError, Error, Result};
 pub use message::normalized_external_message_hash;
 pub use model::{BlockId, Hash256, HashParseError};
 pub use pipeline::{IndexPipeline, RunOutcome};
+pub use rston;
 pub use traits::{BlockSource, CheckpointStore, Sink};
-pub use tycho_types;

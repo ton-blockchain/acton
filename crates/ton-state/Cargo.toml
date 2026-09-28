@@ -32,7 +32,7 @@ ton-p2p = { path = "../ton-p2p" }
 tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tvm-ffi.workspace = true
-tycho-types.workspace = true
+rston.workspace = true
 utoipa.workspace = true
 
 [dev-dependencies]

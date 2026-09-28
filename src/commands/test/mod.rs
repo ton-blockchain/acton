@@ -41,6 +41,9 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 use log::{debug, error, warn};
 use path_absolutize::Absolutize;
 use regex::Regex;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, HashBytes};
+use rston::models::{ShardAccount, StdAddr};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -64,9 +67,6 @@ use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, Ru
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
 use tvm_ffi::serde::serialize_tuple;
 use tvm_ffi::stack::Tuple;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, HashBytes};
-use tycho_types::models::{ShardAccount, StdAddr};
 use walkdir::WalkDir;
 
 mod annotations;

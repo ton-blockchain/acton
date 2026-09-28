@@ -125,17 +125,16 @@ pub async fn create(root: &Path, request: CreateNetwork) -> Result<NetworkDirect
                 .iter()
                 .map(|wallet| &wallet.shard_account_boc_hex),
         ) {
-            let shard =
-                tycho_types::boc::BocRepr::decode_hex::<tycho_types::models::ShardAccount, _>(boc)
-                    .map_err(|error| {
-                        Error::invalid(format!("Invalid genesis ShardAccount: {error}"))
-                    })?;
+            let shard = rston::boc::BocRepr::decode_hex::<rston::models::ShardAccount, _>(boc)
+                .map_err(|error| {
+                    Error::invalid(format!("Invalid genesis ShardAccount: {error}"))
+                })?;
             let account = shard
                 .load_account()
                 .map_err(|error| Error::invalid(format!("Invalid genesis account: {error}")))?
                 .ok_or_else(|| Error::invalid("Genesis account is empty"))?;
-            if !matches!(&account.address, tycho_types::models::IntAddr::Std(address) if address.workchain == 0)
-                || !matches!(account.state, tycho_types::models::AccountState::Active(_))
+            if !matches!(&account.address, rston::models::IntAddr::Std(address) if address.workchain == 0)
+                || !matches!(account.state, rston::models::AccountState::Active(_))
             {
                 return Err(Error::invalid(
                     "Genesis wallets and imports must be active accounts in workchain 0",

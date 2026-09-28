@@ -4,9 +4,9 @@ use crate::message::Executor;
 use crate::message::types::{PrevBlockId, PrevBlocksInfo, RunTransactionArgs};
 use crate::{DEFAULT_CONFIG, EXT_METHOD_STACK_ALL_ITEMS};
 use num_bigint::BigInt;
+use rston::boc::Boc;
 use std::ffi::c_char;
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::boc::Boc;
 
 const MESSAGE_B64: &str = "te6ccgEBAQEAXAAAs2gA3hg/j9iig2aTi8NU/hguuHV4Mf1mEUmqqnI9JLMCjg8ACW3KjJfr/ID5Nkj7xB33xCZD+wzKhEVCVM/gq78qkGEQF9eEAAAAAAAAAAAAAAAAAAAAAAAAwA==";
 const SHARD_ACCOUNT_B64: &str = "te6ccgEBAgEAZQABUEIAo/QUie4HOlbbq3s8tbZIXLyq3iMgXy2Ih0e2fuJ7AAAAAAAtxsABAG/AAltyoyX6/yA+TZI+8Qd98QmQ/sMyoRFQlTP4Ku/KpBhCAl3DSqAZUAAAAAAAtxsFgEC6F1wABA==";

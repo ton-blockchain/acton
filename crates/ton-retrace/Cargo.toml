@@ -16,7 +16,7 @@ ton-executor = { workspace = true }
 tasm-core = { workspace = true }
 tvm-logs = { workspace = true }
 tvm-ffi = { workspace = true }
-tycho-types = { workspace = true }
+rston = { workspace = true }
 num-bigint = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }

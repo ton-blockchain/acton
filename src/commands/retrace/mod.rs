@@ -6,13 +6,13 @@ use acton_config::config::{ActonConfig, manifest_path, project_root as configure
 use acton_debug::replayer::TolkReplayer;
 use acton_debug::serve_single_replayer_dap;
 use anyhow::{Context, anyhow};
+use rston::boc::Boc;
+use rston::cell::Cell;
+use rston::models::{IntAddr, OutAction, RelaxedMsgInfo, TickTock, TxInfo};
 use std::collections::HashMap;
 use std::fs;
 use std::str::FromStr;
 use ton_retrace::{ComputeInfo, Network, retrace};
-use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
-use tycho_types::models::{IntAddr, OutAction, RelaxedMsgInfo, TickTock, TxInfo};
 
 struct ContractTraceArtifacts {
     code_cell: Cell,
@@ -405,7 +405,7 @@ fn print_retrace_result(
 
                     println!("     {:<15} {}", "Mode:".dimmed(), clean_mode.yellow());
                     match lib {
-                        tycho_types::models::LibRef::Hash(h) => {
+                        rston::models::LibRef::Hash(h) => {
                             let value = &h.to_string();
                             println!(
                                 "     {:<15} {}",
@@ -413,7 +413,7 @@ fn print_retrace_result(
                                 format!("0x{value}").yellow()
                             );
                         }
-                        tycho_types::models::LibRef::Cell(c) => {
+                        rston::models::LibRef::Cell(c) => {
                             if verbose {
                                 println!(
                                     "     {:<15} {}",
@@ -544,7 +544,7 @@ fn format_tokens(nanograms: u64) -> String {
 }
 
 fn format_action_title(action: &OutAction) -> String {
-    use tycho_types::models::OutAction;
+    use rston::models::OutAction;
     match action {
         OutAction::SendMsg { .. } => "Send Message".bright_blue().to_string(),
         OutAction::SetCode { .. } => "Set Code".bright_magenta().to_string(),

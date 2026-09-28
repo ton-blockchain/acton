@@ -4,9 +4,9 @@
 use crate::stack::{Tuple, TupleItem};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use rston::cell::{Cell, HashBytes, Load};
+use rston::models::{AnyAddr, IntAddr, ShardAccount, StdAddr};
 use thiserror::Error;
-use tycho_types::cell::{Cell, HashBytes, Load};
-use tycho_types::models::{AnyAddr, IntAddr, ShardAccount, StdAddr};
 
 /// An error type for converting `TupleItem` to a Rust type.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -298,8 +298,8 @@ impl FromStack for ShardAccount {
 mod tests {
     use super::*;
     use crate::stack::{Tuple, TupleItem};
-    use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Store};
-    use tycho_types::models::{OptionalAccount, ShardAccount, StdAddr};
+    use rston::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Store};
+    use rston::models::{OptionalAccount, ShardAccount, StdAddr};
 
     #[test]
     fn test_string_from_stack() {

@@ -15,6 +15,10 @@ use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256, Lt, Seqno};
 use anyhow::Context;
 use crc::{CRC_16_XMODEM, Crc};
 use num_bigint::BigInt;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellFamily, Store};
+use rston::dict::Dict;
+use rston::models::{Block, Message, MsgInfo};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
@@ -29,10 +33,6 @@ use ton_executor::message::PrevBlockId;
 use toncenter::v2::stack::TvmStackEntry;
 use tvm_ffi::json_stack::{json_to_legacy_stack, std_stack_into_tuple};
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
-use tycho_types::dict::Dict;
-use tycho_types::models::{Block, Message, MsgInfo};
 
 const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_XMODEM);
 
@@ -3586,11 +3586,11 @@ mod tests {
     use super::*;
     use crate::executor::{ExecContext, ExecResult, TvmExecutor};
     use crate::remote::RemoteProvider;
+    use rston::boc::BocRepr;
+    use rston::cell::{CellSliceParts, HashBytes};
+    use rston::models::config::BlockchainConfigParams;
+    use rston::models::{CurrencyCollection, IntAddr, IntMsgInfo, OwnedMessage, StdAddr};
     use ton_networks::Network;
-    use tycho_types::boc::BocRepr;
-    use tycho_types::cell::{CellSliceParts, HashBytes};
-    use tycho_types::models::config::BlockchainConfigParams;
-    use tycho_types::models::{CurrencyCollection, IntAddr, IntMsgInfo, OwnedMessage, StdAddr};
 
     const REGULAR_OPCODE: u32 = 0x178d_4519;
     const BOUNCE_PREFIX: u32 = 0xffff_ffff;

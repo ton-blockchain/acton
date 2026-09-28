@@ -2,10 +2,10 @@ use crate::common::assertion;
 use crate::support::localnet::pretty_json_for_snapshot;
 use crate::support::project::ProjectBuilder;
 use crate::support::toncenter::bounceable_user_friendly_address;
+use rston::boc::Boc;
+use rston::cell::Cell;
 use serde_json::{Value, json};
 use toncenter::v2::{requests, responses};
-use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
 
 const ZERO_ADDRESS: &str = "0:0000000000000000000000000000000000000000000000000000000000000000";
 const ZERO_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";

@@ -16,7 +16,7 @@ serde = { workspace = true, features = ["rc"] }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 hex = { workspace = true }
-tycho-types = { workspace = true }
+rston = { workspace = true }
 rustc-hash = { workspace = true }
 num-bigint = { workspace = true }
 tvm-ffi = { workspace = true }

@@ -3,7 +3,7 @@
 
 use super::metadata::Asset;
 use anyhow::Result;
-use tycho_types::{
+use rston::{
     boc::Boc,
     cell::{Cell, CellBuilder, Store},
     models::{AnyAddr, StateInit, StdAddr},

@@ -3,11 +3,11 @@ use crate::file_build_cache::FileBuildCache;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, ContractConfig};
 use anyhow::anyhow;
+use rston::boc::Boc;
+use rston::cell::HashBytes;
 use std::path::Path;
 use tolk_compiler::abi::ContractABI;
 use tolk_compiler::{CompilerResult, SourceMap};
-use tycho_types::boc::Boc;
-use tycho_types::cell::HashBytes;
 
 pub(crate) struct ContractInterface {
     pub abi: ContractABI,

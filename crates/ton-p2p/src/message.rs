@@ -10,13 +10,13 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use anyhow::{Context, Result, bail, ensure};
 use everscale_network::{adnl, overlay};
 use rand::seq::SliceRandom;
-use tokio::{sync::Mutex, time::Instant};
-use tracing::info;
-use tycho_types::{
+use rston::{
     boc::Boc,
     cell::{Cell, HashBytes},
     models::{IntAddr, MsgInfo, OwnedMessage, StdAddr},
 };
+use tokio::{sync::Mutex, time::Instant};
+use tracing::info;
 
 use crate::network::Network;
 

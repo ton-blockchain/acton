@@ -14,7 +14,7 @@
 //!         cell("remaining 48 bytes")
 //! ```
 use crate::stack::{Tuple, TupleItem};
-use tycho_types::cell::{Cell, CellBuilder, CellSlice};
+use rston::cell::{Cell, CellBuilder, CellSlice};
 
 fn build_snake_bytes_cell(bytes: &[u8]) -> Cell {
     let total_bits = bytes.len() * 8;

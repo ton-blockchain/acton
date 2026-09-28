@@ -4,10 +4,10 @@ use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result, ensure};
 use futures::{StreamExt, stream};
+use rston::models::{BlockId, ShardIdent};
 use service_pool::{Failure, Pool};
 use tokio::{task::JoinSet, time::Instant};
 use tracing::{debug, info};
-use tycho_types::models::{BlockId, ShardIdent};
 
 use crate::{
     MessageSender, NetworkConfig, NetworkOptions,

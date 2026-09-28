@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
+use rston::boc::Boc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tasm_core::decompile::Disassembler;
@@ -40,7 +41,6 @@ use tower_lsp::{Client, LanguageServer, LspService, Server};
 use tracing::field::{Field, Visit};
 use tracing::span::{Attributes, Id, Record};
 use tracing::{Event, Level, Metadata, Subscriber};
-use tycho_types::boc::Boc;
 
 pub use ton_language_server_core::LogLevel;
 
@@ -1651,7 +1651,7 @@ fn apply_lsp_changes_to_text(
     }
 }
 
-fn decode_boc(bytes: &[u8]) -> anyhow::Result<tycho_types::cell::Cell> {
+fn decode_boc(bytes: &[u8]) -> anyhow::Result<rston::cell::Cell> {
     let trimmed = bytes.trim_ascii();
     if let Ok(cell) = Boc::decode_hex(trimmed) {
         return Ok(cell);

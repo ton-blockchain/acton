@@ -15,16 +15,16 @@ use crate::support::toncenter::{
 use acton_config::color::ColorMode;
 
 use base64::Engine;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, HashBytes, Lazy};
+use rston::models::{
+    Account, AccountState, CurrencyCollection, IntAddr, OptionalAccount, ShardAccount, StateInit,
+    StdAddr, StdAddrFormat, StorageInfo,
+};
 use std::fs;
 use std::net::TcpListener;
 use std::thread;
 use std::time::{Duration, Instant};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, HashBytes, Lazy};
-use tycho_types::models::{
-    Account, AccountState, CurrencyCollection, IntAddr, OptionalAccount, ShardAccount, StateInit,
-    StdAddr, StdAddrFormat, StorageInfo,
-};
 
 const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
 const TEST_TONCENTER_MAINNET_V2_URL_ENV: &str = "ACTON_TEST_TONCENTER_MAINNET_V2_URL";

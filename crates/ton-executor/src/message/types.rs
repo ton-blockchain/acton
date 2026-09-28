@@ -1,11 +1,11 @@
 use anyhow::Context;
 use num_bigint::{BigInt, Sign};
+use rston::boc::Boc;
+use rston::cell::CellBuilder;
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::boc::Boc;
-use tycho_types::cell::CellBuilder;
 
 /// Result of a transaction emulation.
 #[derive(Deserialize, Debug, Clone)]

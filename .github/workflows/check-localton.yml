@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - ".github/workflows/check-localton.yml"
+      - "libs/rston/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "apps/localton/**"
@@ -20,6 +21,7 @@ on:
       - master
     paths:
       - ".github/workflows/check-localton.yml"
+      - "libs/rston/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "apps/localton/**"

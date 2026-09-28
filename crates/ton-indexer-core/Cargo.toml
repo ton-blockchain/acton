@@ -16,7 +16,7 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
-tycho-types.workspace = true
+rston.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

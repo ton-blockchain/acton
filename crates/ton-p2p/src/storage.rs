@@ -11,8 +11,8 @@ use std::{
 };
 
 use anyhow::{Context, Result, ensure};
+use rston::models::{BlockId, ShardIdent};
 use serde::{Deserialize, Serialize};
-use tycho_types::models::{BlockId, ShardIdent};
 
 use crate::config::NetworkConfig;
 

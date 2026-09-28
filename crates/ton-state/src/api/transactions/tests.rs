@@ -1,19 +1,19 @@
 use std::path::Path;
 
 use expect_test::expect;
-use tycho_types::dict::AugDict;
-use tycho_types::merkle::MerkleUpdate;
-use tycho_types::models::{
+use rston::dict::AugDict;
+use rston::merkle::MerkleUpdate;
+use rston::models::{
     AccountBlock, AccountBlocks, AccountStatus, AccountStatusChange, Block, BlockExtra, BlockId,
     BlockInfo, ComputePhase, ComputePhaseSkipReason, CurrencyCollection, HashUpdate, IntMsgInfo,
     OrdinaryTxInfo, OwnedMessage, ShardIdent, SkippedComputePhase, StoragePhase, ValueFlow,
 };
-use tycho_types::num::{Tokens, Uint15};
+use rston::num::{Tokens, Uint15};
 
 use super::*;
 
 fn transaction(lt: u64, previous: Option<&Lazy<Transaction>>) -> Result<Lazy<Transaction>> {
-    let mut out_msgs = tycho_types::dict::Dict::new();
+    let mut out_msgs = rston::dict::Dict::new();
     out_msgs.set(
         Uint15::new(0),
         CellBuilder::build_from(OwnedMessage {
@@ -103,7 +103,6 @@ fn block(
         })?,
         value_flow: Lazy::new(&ValueFlow::default())?,
         state_update: Lazy::new(&MerkleUpdate::default())?,
-        out_msg_queue_updates: None,
         extra: Lazy::new(&BlockExtra {
             account_blocks: Lazy::new(&accounts)?,
             ..Default::default()

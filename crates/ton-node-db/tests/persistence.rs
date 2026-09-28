@@ -7,17 +7,17 @@ use anyhow::{Context, Result};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use expect_test::expect;
 use rocksdb::DB;
-use sha2::{Digest, Sha256};
-use ton_node_db::{NodeDb, StateStore};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, HashBytes, Lazy, LazyExotic};
-use tycho_types::merkle::MerkleUpdate;
-use tycho_types::models::{
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, HashBytes, Lazy, LazyExotic};
+use rston::merkle::MerkleUpdate;
+use rston::models::{
     Account, AccountState, Block, BlockExtra, BlockId, BlockInfo, BlockRef, BlockchainConfig,
     CurrencyCollection, DepthBalanceInfo, IntAddr, McStateExtra, OptionalAccount, PrevBlockRef,
     ShardAccount, ShardAccounts, ShardDescription, ShardHashes, ShardIdent, ShardStateSplit,
     ShardStateUnsplit, StdAddr, ValidatorInfo, ValueFlow,
 };
+use sha2::{Digest, Sha256};
+use ton_node_db::{NodeDb, StateStore};
 
 #[test]
 fn account_snapshots_report_their_shard_time() -> Result<()> {
@@ -652,7 +652,6 @@ fn transition(previous: PrevBlockRef, old: &Cell, new: &Cell) -> Result<(BlockId
         info: Lazy::new(&info)?,
         value_flow: Lazy::new(&ValueFlow::default())?,
         state_update: LazyExotic::new(&update)?,
-        out_msg_queue_updates: None,
         extra: Lazy::new(&BlockExtra::default())?,
     })?;
     let boc = Boc::encode(&root);

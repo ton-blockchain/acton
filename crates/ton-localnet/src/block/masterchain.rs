@@ -5,21 +5,21 @@ use crate::block::types::{
 };
 use crate::types::Hash256;
 use anyhow::Context;
-use std::collections::BTreeMap;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, Lazy, LazyExotic};
-use tycho_types::dict::{AugDict, Dict};
-use tycho_types::merkle::MerkleUpdate;
-use tycho_types::models::block::{
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, Lazy, LazyExotic};
+use rston::dict::{AugDict, Dict};
+use rston::merkle::MerkleUpdate;
+use rston::models::block::{
     Block, BlockExtra, BlockInfo, BlockRef, McBlockExtra, PrevBlockRef, ShardDescription,
     ShardHashes, ShardIdent, ValueFlow,
 };
-use tycho_types::models::config::{BlockchainConfig, BlockchainConfigParams};
-use tycho_types::models::currency::CurrencyCollection;
-use tycho_types::models::shard::{
+use rston::models::config::{BlockchainConfig, BlockchainConfigParams};
+use rston::models::currency::CurrencyCollection;
+use rston::models::shard::{
     KeyBlockRef, KeyMaxLt, McStateExtra, ShardAccounts, ShardStateUnsplit, ValidatorInfo,
 };
-use tycho_types::prelude::HashBytes;
+use rston::prelude::HashBytes;
+use std::collections::BTreeMap;
 
 /// Builds a serialized localnet masterchain block for one mined basechain block.
 ///
@@ -43,7 +43,6 @@ pub(crate) fn create_masterchain_block_boc(
             .context("Failed to wrap masterchain value flow")?,
         state_update: LazyExotic::new(&state_update)
             .context("Failed to wrap masterchain state update")?,
-        out_msg_queue_updates: None,
         extra: Lazy::new(&extra).context("Failed to wrap masterchain block extra")?,
     };
     let cell = CellBuilder::build_from(&block).context("Failed to serialize masterchain block")?;

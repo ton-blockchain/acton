@@ -1,12 +1,12 @@
 use anyhow::Result;
 use expect_test::expect_file;
-use serde_json::{Value, json};
-use tycho_types::cell::{Cell, CellBuilder, CellFamily};
-use tycho_types::models::{
+use rston::cell::{Cell, CellBuilder, CellFamily};
+use rston::models::{
     AccountState, CurrencyCollection, ExtInMsgInfo, IntAddr, LibDescr, OwnedMessage,
     OwnedRelaxedMessage, RelaxedExtOutMsgInfo, RelaxedIntMsgInfo, RelaxedMsgInfo, StateInit,
     StdAddr,
 };
+use serde_json::{Value, json};
 
 use super::*;
 use crate::api::tests::fixture::{Fixture, NATIVE};

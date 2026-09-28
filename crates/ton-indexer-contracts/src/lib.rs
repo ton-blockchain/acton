@@ -9,7 +9,7 @@ pub mod nfts;
 pub mod types;
 
 use base64::Engine;
-use tycho_types::cell::HashBytes;
+use rston::cell::HashBytes;
 
 pub enum WalletType {
     Unknown,

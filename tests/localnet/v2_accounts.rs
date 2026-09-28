@@ -7,13 +7,13 @@ use crate::support::toncenter::{
     summarize_v2_account_state, test_std_addr, v2_extra_currencies,
 };
 use base64::Engine as _;
+use rston::cell::{Cell, CellFamily};
+use rston::models::{CurrencyCollection, ExtraCurrencyCollection};
+use rston::num::VarUint248;
 use serde_json::json;
 use std::fs;
 use toncenter::v2::{requests as v2_requests, responses as v2_responses};
 use toncenter::v3::responses as v3_responses;
-use tycho_types::cell::{Cell, CellFamily};
-use tycho_types::models::{CurrencyCollection, ExtraCurrencyCollection};
-use tycho_types::num::VarUint248;
 
 #[test]
 fn wallet_and_extended_account_information_match_upstream_shapes() {

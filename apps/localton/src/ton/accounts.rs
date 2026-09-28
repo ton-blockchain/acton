@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::{Context, Result, bail, ensure};
-use tycho_types::{
+use rston::{
     boc::{Boc, BocTag, de},
     cell::{Cell, HashBytes, Load},
     models::{AccountState, IntAddr, OptionalAccount, ShardAccount, SimpleLib, StateInit},
@@ -226,7 +226,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use tycho_types::{
+    use rston::{
         boc::BocRepr,
         cell::{CellBuilder, HashBytes, Lazy},
         dict::Dict,

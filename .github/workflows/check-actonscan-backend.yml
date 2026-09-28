@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - ".github/workflows/check-actonscan-backend.yml"
+      - "libs/rston/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "apps/actonscan-backend/**"
@@ -24,6 +25,7 @@ on:
       - master
     paths:
       - ".github/workflows/check-actonscan-backend.yml"
+      - "libs/rston/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "apps/actonscan-backend/**"

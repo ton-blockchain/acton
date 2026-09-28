@@ -6,12 +6,12 @@ mod metadata;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use expect_test::expect;
-use sha2::{Digest, Sha256};
-use std::collections::HashSet;
-use tycho_types::{
+use rston::{
     cell::{Cell, HashBytes},
     dict::Dict,
 };
+use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 
 fn field(attributes: &Dict<HashBytes, Cell>, name: &str) -> String {
     let mut cell = attributes

@@ -1,3 +1,5 @@
+use rston::boc::Boc;
+use rston::cell::Cell;
 use std::collections::HashMap;
 use std::time::UNIX_EPOCH;
 use ton_executor::ExecutorVerbosity;
@@ -5,8 +7,6 @@ use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use tvm_ffi::from_stack::FromStackTuple;
 use tvm_ffi::serde::serialize_tuple;
 use tvm_ffi::stack::Tuple;
-use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
 
 pub fn run_get_method<T: FromStackTuple>(
     address: String,

@@ -1,9 +1,9 @@
 use crate::types::{ArgValue, Code, Instruction};
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellSlice};
 use std::fs;
 use tolk_compiler::SourceMap;
 use tolk_source_map::SourceLocation;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellSlice};
 
 const MIN_OFFSET_WIDTH: usize = 4;
 const MAX_RENDERED_SOURCE_RANGE_LINES: usize = 4;

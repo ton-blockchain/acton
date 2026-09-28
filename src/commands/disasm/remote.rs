@@ -1,8 +1,8 @@
 use crate::commands::common::error_fmt;
 use acton_config::color::OwoColorize;
 use anyhow::Context;
+use rston::models::{StdAddr, StdAddrFormat};
 use ton_api::{Network, TonApiClient};
-use tycho_types::models::{StdAddr, StdAddrFormat};
 
 pub(super) struct FetchedContractBoc {
     pub(super) boc: String,

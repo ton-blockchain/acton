@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests;
 
-use tycho_types::cell::CellSlice;
+use rston::cell::CellSlice;
 
 /// Returns the original payload for opcode lookup and ABI decoding.
 ///

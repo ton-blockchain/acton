@@ -2,12 +2,12 @@ pub(crate) mod fixture;
 
 use anyhow::Result;
 use expect_test::expect;
-use ton_node_db::{AccountSnapshot, ReadStats};
-use tycho_types::cell::{CellBuilder, HashBytes, Lazy};
-use tycho_types::models::{
+use rston::cell::{CellBuilder, HashBytes, Lazy};
+use rston::models::{
     Account, AccountState, BlockId, CurrencyCollection, IntAddr, OptionalAccount, ShardAccount,
     ShardIdent, StateInit, StdAddr,
 };
+use ton_node_db::{AccountSnapshot, ReadStats};
 
 use super::account_info;
 
@@ -39,7 +39,7 @@ fn account_lifecycle_uses_the_v2_wire_contract() -> Result<()> {
                 balance
                     .other
                     .as_dict_mut()
-                    .set(u32::MAX, tycho_types::num::VarUint248::from(123_u32))?;
+                    .set(u32::MAX, rston::num::VarUint248::from(123_u32))?;
 
                 anyhow::Ok(ShardAccount {
                     account: Lazy::new(&OptionalAccount(Some(Account {

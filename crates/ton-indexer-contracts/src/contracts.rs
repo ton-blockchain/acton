@@ -2,11 +2,11 @@ use std::sync::LazyLock;
 
 use crate::common::{run_get_method, run_get_method_with_stack};
 use num_bigint::BigInt;
+use rston::cell::{Cell, CellBuilder, CellDataBuilder, HashBytes, Load};
+use rston::dict::{Dict, DictKey, LoadDictKey};
+use rston::models::{IntAddr, StdAddr, StdAddrFormat};
 use sha2::{Digest, Sha256};
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::cell::{Cell, CellBuilder, CellDataBuilder, HashBytes, Load};
-use tycho_types::dict::{Dict, DictKey, LoadDictKey};
-use tycho_types::models::{IntAddr, StdAddr, StdAddrFormat};
 
 pub const DOT_TON_DNS_ROOT_MAINNET: &str = "EQC3dNlesgVD8YbAazcauIrXBPfiVhMMr5YYk2in0Mtsz0Bz";
 pub const DOT_TON_DNS_ROOT_TESTNET: &str = "kQDjPtM6QusgMgWfl9kMcG-EALslbTITnKcH8VZK1pnH3f3K";

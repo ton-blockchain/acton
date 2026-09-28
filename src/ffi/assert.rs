@@ -8,12 +8,12 @@ use acton_debug::{RenderedValue, render_tuple_as_tolk_type};
 use anyhow::{Context as ErrorContext, anyhow};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use rston::models::{IntAddr, StdAddr, Transaction};
 use tolk_source_map::SourceLocation;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use tvm_ffi::from_stack::FromStack;
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::models::{IntAddr, StdAddr, Transaction};
 
 extension!(assert_fail in (Context) with (location: String, message: String) using assert_fail_impl);
 fn assert_fail_impl(

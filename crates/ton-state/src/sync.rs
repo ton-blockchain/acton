@@ -2,12 +2,12 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
+use rston::models::BlockId;
 use tokio::sync::watch;
 use ton_indexer_core::{BlockData, BlockSource};
 use ton_indexer_p2p::P2pBlockSource;
 use ton_node_db::{BlockIndex, StateSnapshot, StateStore};
 use tracing::{info, warn};
-use tycho_types::models::BlockId;
 
 use crate::confirmation::Confirmations;
 use crate::streaming::Subscriptions;

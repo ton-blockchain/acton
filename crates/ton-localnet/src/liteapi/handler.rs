@@ -8,6 +8,8 @@ use crate::localnet::{
 use crate::types::{BocBytes, Hash256};
 use crate::{LiteServerErrorCode, LocalnetError};
 use anyhow::Context;
+use rston::boc::Boc;
+use rston::boc::ser::BocHeader;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -27,8 +29,6 @@ use ton_liteapi::tl::response::{
     ShardInfo, TransactionId, TransactionInfo, TransactionList, Version,
 };
 use tvm_ffi::stack::Tuple;
-use tycho_types::boc::Boc;
-use tycho_types::boc::ser::BocHeader;
 
 const SEND_MESSAGE_ACCEPTED_STATUS: u32 = 1;
 const RUN_SMC_METHOD_RESULT_MODE: u32 = 1 << 2;
@@ -600,7 +600,7 @@ async fn lookup_block_header_cell(
     node: &Localnet,
     requested_workchain: i32,
     header: &LocalnetBlockHeader,
-) -> anyhow::Result<tycho_types::cell::Cell> {
+) -> anyhow::Result<rston::cell::Cell> {
     let data = if requested_workchain == MASTERCHAIN_WORKCHAIN {
         node.get_masterchain_block_data(header.id.seqno).await?.0
     } else {

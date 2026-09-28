@@ -5,6 +5,11 @@ use anyhow::Context as AnyhowContext;
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use rston::boc::Boc;
+use rston::cell::{CellBuilder, CellContext, CellSlice, Load, Store};
+use rston::dict::Dict;
+use rston::error::Error;
+use rston::models::StdAddr;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use tasm_core::decompile::Disassembler;
@@ -15,11 +20,6 @@ use ton_executor::get::DEFAULT_GET_METHOD_GAS_LIMIT;
 use ton_executor::{BaseExecutor, ExecutorVerbosity};
 use ton_retrace::trace::{Trace, TraceStep};
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{CellBuilder, CellContext, CellSlice, Load, Store};
-use tycho_types::dict::Dict;
-use tycho_types::error::Error;
-use tycho_types::models::StdAddr;
 
 extension!(measure in (Context) with (location: String, addr: StdAddr, args: TupleItem, baseline: TupleItem, function: TupleItem) using measure_impl);
 fn measure_impl(

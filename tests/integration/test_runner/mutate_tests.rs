@@ -1,6 +1,8 @@
 use crate::common::{acton_exe, strip_ansi};
 use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
+use rston::boc::Boc;
+use rston::cell::CellBuilder;
 use serde_json::Value;
 use std::fmt::Write as _;
 use std::fs;
@@ -8,8 +10,6 @@ use std::path::Path;
 use std::process::{Child, Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
-use tycho_types::boc::Boc;
-use tycho_types::cell::CellBuilder;
 
 const MUTATION_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {

@@ -6,11 +6,11 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, ensure};
 use rocksdb::{DB, Direction, IteratorMode, Options, WriteBatch};
+use rston::boc::Boc;
+use rston::cell::{Cell, Lazy};
+use rston::models::{Block, BlockId, ShardIdent, StdAddr, Transaction};
 use serde::{Deserialize, Serialize};
 use tracing::info;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, Lazy};
-use tycho_types::models::{Block, BlockId, ShardIdent, StdAddr, Transaction};
 
 const MAX_BLOCK_BYTES: u64 = 64 * 1024 * 1024;
 

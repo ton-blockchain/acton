@@ -1,8 +1,8 @@
 use crate::printer::{FormatOptions, PrintState, offset_width_for};
 use crate::spec::SpecInstruction;
 use num_bigint::{BigInt, BigUint};
+use rston::cell::Cell;
 use std::fmt::Write;
-use tycho_types::cell::Cell;
 
 #[derive(Debug, Clone)]
 pub enum Instruction {

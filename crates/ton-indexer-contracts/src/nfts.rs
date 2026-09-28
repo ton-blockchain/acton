@@ -1,10 +1,10 @@
 use crate::common::{run_get_method, run_get_method_with_stack};
 use crate::content::parse_token_content;
 use num_bigint::BigInt;
+use rston::cell::Cell;
+use rston::models::IntAddr;
 use serde_json::Value;
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::cell::Cell;
-use tycho_types::models::IntAddr;
 
 const NFT_CONTENT_KEYS: &[&str] = &[
     "uri",

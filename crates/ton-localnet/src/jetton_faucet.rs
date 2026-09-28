@@ -4,13 +4,13 @@ use crate::node::Node;
 use crate::storage::JettonMasterMeta;
 use crate::types::{Addr, BocBytes, Hash256};
 use anyhow::Context;
-use serde_json::Value;
-use tycho_types::boc::BocRepr;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
-use tycho_types::models::{
+use rston::boc::BocRepr;
+use rston::cell::{Cell, CellBuilder, CellFamily, Store};
+use rston::models::{
     AnyAddr, CurrencyCollection, IntMsgInfo, Message, MsgInfo, OwnedMessage, StdAddr,
 };
-use tycho_types::num::Tokens;
+use rston::num::Tokens;
+use serde_json::Value;
 
 const LEGACY_MINT_OPCODE: u32 = 0x0000_0015;
 const CURRENT_MINT_OPCODE: u32 = 0x642b_7d07;

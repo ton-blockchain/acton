@@ -2,13 +2,13 @@ use crate::block::types::{BlockBuildContext, BuiltShardState, LOCALNET_GLOBAL_ID
 use crate::storage::{AccountMeta, AccountStatus, CellStore};
 use crate::types::{Addr, Lt, Seqno};
 use anyhow::Context;
+use rston::cell::{Cell, Lazy};
+use rston::dict::Dict;
+use rston::models::ShardAccount;
+use rston::models::currency::CurrencyCollection;
+use rston::models::shard::{DepthBalanceInfo, ShardAccounts, ShardStateUnsplit};
+use rston::prelude::HashBytes;
 use std::collections::{BTreeMap, HashMap};
-use tycho_types::cell::{Cell, Lazy};
-use tycho_types::dict::Dict;
-use tycho_types::models::ShardAccount;
-use tycho_types::models::currency::CurrencyCollection;
-use tycho_types::models::shard::{DepthBalanceInfo, ShardAccounts, ShardStateUnsplit};
-use tycho_types::prelude::HashBytes;
 
 /// Builds the previous and next shard states used by the block Merkle update.
 ///
@@ -116,7 +116,7 @@ fn build_state(
     };
 
     Ok(BuiltShardState {
-        cell: tycho_types::cell::CellBuilder::build_from(&state)
+        cell: rston::cell::CellBuilder::build_from(&state)
             .context("Failed to serialize shard state")?,
         accounts_hash,
         total_balance,

@@ -1,6 +1,6 @@
 use num_bigint::BigInt;
+use rston::cell::Cell;
 use std::ops::{Deref, DerefMut};
-use tycho_types::cell::Cell;
 
 /// Tuple represent a stack of items for the TVM.
 #[derive(Default, Debug, Clone, Eq)]

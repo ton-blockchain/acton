@@ -2,6 +2,8 @@ use crate::localnet::{LocalnetBlockId, LocalnetTransactionId};
 use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256, Lt, Seqno};
 use dashmap::DashMap;
 use indexmap::IndexMap;
+use rston::boc::Boc;
+use rston::cell::Cell;
 use rusqlite::{Connection, params};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -9,8 +11,6 @@ use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::fmt::Display;
 use std::sync::{Arc, Mutex};
-use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
 
 pub struct CellStore {
     pub conn: Option<Arc<Mutex<Connection>>>,

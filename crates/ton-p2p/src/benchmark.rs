@@ -3,11 +3,11 @@
 use std::{path::Path, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result, ensure};
+use rston::{boc::Boc, models::Block};
 use serde::Serialize;
 use service_pool::{Failure, Options, Pool};
 use tokio::time::{Instant, sleep, timeout_at};
 use tracing::{info, warn};
-use tycho_types::{boc::Boc, models::Block};
 
 use crate::{
     ClientOptions, NetworkConfig,

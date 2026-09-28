@@ -1731,6 +1731,7 @@ dependencies = [
  "rand 0.8.7",
  "regex",
  "reqwest",
+ "rston",
  "serde",
  "serde_json",
  "sha2",
@@ -1746,7 +1747,6 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
- "tycho-types",
  "utoipa",
  "zip",
 ]
@@ -2523,6 +2523,36 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "rston"
+version = "0.3.5"
+dependencies = [
+ "ahash",
+ "base64",
+ "bitflags",
+ "crc32c",
+ "hex",
+ "num-bigint",
+ "num-traits",
+ "rston-proc",
+ "scc",
+ "serde",
+ "sha2",
+ "smallvec",
+ "thiserror",
+ "tl-proto",
+ "tycho-crypto",
+]
+
+[[package]]
+name = "rston-proc"
+version = "0.3.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -3380,12 +3410,12 @@ version = "1.2.0"
 dependencies = [
  "anyhow",
  "futures",
+ "rston",
  "tl-proto",
  "tokio",
  "tokio-util",
  "ton-liteapi",
  "tracing",
- "tycho-types",
 ]
 
 [[package]]
@@ -3395,10 +3425,10 @@ dependencies = [
  "anyhow",
  "base64",
  "hex",
+ "rston",
  "rustc-hash",
  "serde",
  "serde_json",
- "tycho-types",
 ]
 
 [[package]]
@@ -3407,11 +3437,11 @@ version = "1.2.0"
 dependencies = [
  "async-trait",
  "hex",
+ "rston",
  "serde",
  "serde_json",
  "thiserror",
  "tokio",
- "tycho-types",
 ]
 
 [[package]]
@@ -3701,47 +3731,6 @@ dependencies = [
  "sha2",
  "tl-proto",
 ]
-
-[[package]]
-name = "tycho-types"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "104f8eaefe8d4c12e480906a876f0c6dd6f68c1e7eaeb8fd2c236e8f729019fd"
-dependencies = [
- "ahash",
- "base64",
- "bitflags",
- "crc32c",
- "hex",
- "num-bigint",
- "num-traits",
- "scc",
- "serde",
- "sha2",
- "smallvec",
- "thiserror",
- "tl-proto",
- "tycho-crypto",
- "tycho-types-proc",
- "typeid",
-]
-
-[[package]]
-name = "tycho-types-proc"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ad05cf4ab89631f8c11d85c3aa80f781502440f75361d251f866e0d76ae9d31"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "typeid"
-version = "1.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc7d623258602320d5c55d1bc22793b57daff0ec7efc270ea7d55ce1d5f5471c"
 
 [[package]]
 name = "typenum"

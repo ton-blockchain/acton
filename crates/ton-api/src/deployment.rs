@@ -1,11 +1,11 @@
 use anyhow::{Context, bail};
-use std::collections::HashSet;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, HashBytes};
-use tycho_types::models::{
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, HashBytes};
+use rston::models::{
     IntAddr, Message, MsgInfo, RelaxedMessage, RelaxedMsgInfo, StateInit, StdAddr,
 };
-use tycho_types::num::SplitDepth;
+use rston::num::SplitDepth;
+use std::collections::HashSet;
 
 const MAX_BOC_BASE64_BYTES: usize = 2 * 1024 * 1024;
 const MAX_CELLS: usize = 4096;
@@ -144,17 +144,17 @@ fn state_init_matches_destination(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rston::cell::CellSliceParts;
+    use rston::models::{
+        CurrencyCollection, ExtInMsgInfo, MsgInfo, OwnedMessage, OwnedRelaxedMessage,
+        RelaxedIntMsgInfo,
+    };
+    use rston::num::Tokens;
     use std::str::FromStr;
     use ton::ton_core::cell::TonCell;
     use ton::ton_core::traits::tlb::TLB;
     use ton::ton_core::types::TonAddress;
     use ton::ton_wallet::{Mnemonic, TonWallet, WalletVersion};
-    use tycho_types::cell::CellSliceParts;
-    use tycho_types::models::{
-        CurrencyCollection, ExtInMsgInfo, MsgInfo, OwnedMessage, OwnedRelaxedMessage,
-        RelaxedIntMsgInfo,
-    };
-    use tycho_types::num::Tokens;
 
     const TEST_MNEMONIC: &str = "fancy carpet hello mandate penalty trial consider property top vicious exit rebuild tragic profit urban major total month holiday sudden rib gather media vicious";
 

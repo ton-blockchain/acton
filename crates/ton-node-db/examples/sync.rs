@@ -5,13 +5,13 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use rston::models::BlockId;
 use serde_json::json;
 use ton_indexer_core::BlockSource;
 use ton_indexer_p2p::P2pBlockSource;
 use ton_node_db::StateStore;
 use ton_p2p::{Client, ClientOptions, NetworkConfig, NetworkOptions, load_identity};
 use tracing::info;
-use tycho_types::models::BlockId;
 
 #[derive(Parser)]
 struct Args {

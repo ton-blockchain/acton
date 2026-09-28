@@ -7,12 +7,12 @@ use std::time::Instant;
 
 use anyhow::{Context, Result, ensure};
 use clap::Parser;
+use rston::boc::Boc;
+use rston::cell::CellBuilder;
+use rston::models::{AccountState, Block, BlockId, ShardStateUnsplit};
 use serde_json::{Value, json};
 use ton_node_db::{NodeDb, StateRecord};
 use tracing::info;
-use tycho_types::boc::Boc;
-use tycho_types::cell::CellBuilder;
-use tycho_types::models::{AccountState, Block, BlockId, ShardStateUnsplit};
 
 #[derive(Parser)]
 #[command(about = "Inspect a stopped TON validator's database snapshot")]

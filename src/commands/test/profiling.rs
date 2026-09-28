@@ -5,6 +5,9 @@ use acton_config::test::GasProfileFormat;
 use acton_debug::replayer::{CallFrameInfo, StepMode, Tick, TolkReplayer};
 use chrono;
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
+use rston::boc::Boc;
+use rston::cell::CellSlice;
+use rston::models::{ComputePhase, MsgInfo, TxInfo};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
@@ -19,9 +22,6 @@ use tolk_compiler::types_kernel::TyIdx;
 use ton_emulator::emulator::SendMessageResultSuccess;
 use ton_executor::get::DEFAULT_GET_METHOD_GAS_LIMIT;
 use ton_retrace::trace::{Trace, TraceStep};
-use tycho_types::boc::Boc;
-use tycho_types::cell::CellSlice;
-use tycho_types::models::{ComputePhase, MsgInfo, TxInfo};
 
 const SIGNIFICANT_PERCENT_CHANGE: f64 = 5.0;
 

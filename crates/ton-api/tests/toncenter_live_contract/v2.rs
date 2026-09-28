@@ -1,9 +1,9 @@
 use super::support::{Live, TypedResponse, fixture, invalid_boc};
 use anyhow::{Context, Result};
+use rston::boc::Boc;
+use rston::cell::Cell;
 use serde_json::json;
 use toncenter::v2;
-use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
 
 const ELECTOR_ADDRESS: &str = "-1:3333333333333333333333333333333333333333333333333333333333333333";
 

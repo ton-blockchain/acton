@@ -1,4 +1,12 @@
 use owo_colors::OwoColorize;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellSlice as TyCellSlice, Load};
+use rston::dict;
+use rston::models::{
+    AnyAddr, Base64StdAddrFlags, ChangeLibraryMode, CurrencyCollection, DisplayBase64StdAddr,
+    IntAddr, LibRef, OutAction, OutActionsRevIter, OwnedRelaxedMessage, RelaxedMsgInfo,
+    ReserveCurrencyFlags, SendMsgFlags, StateInit, StdAddr, StdAddrFormat,
+};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::{self, Write};
@@ -11,14 +19,6 @@ use tolk_source_map::{SourceMap, types_kernel};
 use tvm_ffi::from_stack::FromStack;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tvm_logs::parser::{CellLike, CellSlice, VmStackValue};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellSlice as TyCellSlice, Load};
-use tycho_types::dict;
-use tycho_types::models::{
-    AnyAddr, Base64StdAddrFlags, ChangeLibraryMode, CurrencyCollection, DisplayBase64StdAddr,
-    IntAddr, LibRef, OutAction, OutActionsRevIter, OwnedRelaxedMessage, RelaxedMsgInfo,
-    ReserveCurrencyFlags, SendMsgFlags, StateInit, StdAddr, StdAddrFormat,
-};
 
 // ---------------------------------------------------------------------------
 // RenderedValue — structured intermediate format for rendered values
@@ -3320,7 +3320,7 @@ fn render_owned_relaxed_message(
 }
 
 fn render_message_body(
-    parts: &(tycho_types::cell::CellSliceRange, Cell),
+    parts: &(rston::cell::CellSliceRange, Cell),
     body_meta: Option<&ResolvedSendMessageBodyMeta>,
 ) -> RenderedValue {
     let Some(body_meta) = body_meta else {
@@ -3595,7 +3595,7 @@ fn render_int_addr(addr: &IntAddr) -> RenderedValue {
     }
 }
 
-fn render_cell_slice_parts(parts: &(tycho_types::cell::CellSliceRange, Cell)) -> RenderedValue {
+fn render_cell_slice_parts(parts: &(rston::cell::CellSliceRange, Cell)) -> RenderedValue {
     let cell = cell_from_slice_parts(parts);
     cell.as_ref().map_or_else(
         || RenderedValue::typed_leaf("<invalid body>", "cell"),
@@ -3603,7 +3603,7 @@ fn render_cell_slice_parts(parts: &(tycho_types::cell::CellSliceRange, Cell)) ->
     )
 }
 
-fn cell_from_slice_parts(parts: &(tycho_types::cell::CellSliceRange, Cell)) -> Option<Cell> {
+fn cell_from_slice_parts(parts: &(rston::cell::CellSliceRange, Cell)) -> Option<Cell> {
     let slice = parts.0.apply(&parts.1).ok()?;
     let mut builder = CellBuilder::new();
     builder.store_slice(slice).ok()?;
@@ -3879,6 +3879,11 @@ fn render_runtime_extra_currencies_field(value: &VmStackValue) -> RenderedValue 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rston::cell::{CellDataBuilder, CellFamily, HashBytes, Lazy, Store};
+    use rston::dict::{Dict, DictKey, StoreDictKey};
+    use rston::error::Error;
+    use rston::models::{RelaxedIntMsgInfo, SendMsgFlags};
+    use rston::models::{ReserveCurrencyFlags, StdAddr};
     use tolk_source_map::abi::{
         ABICustomPackUnpack, ABIDeclaration, ABIOpcode, ABIOutgoingMessage, ABIStorage,
         ABIStructField,
@@ -3887,11 +3892,6 @@ mod tests {
         AbiAlias, AbiEnum, AbiStruct, Declaration, EnumMemberInfo, FieldInfo, PrefixInfo, SrcRange,
     };
     use tolk_source_map::types_kernel::UnionVariant;
-    use tycho_types::cell::{CellDataBuilder, CellFamily, HashBytes, Lazy, Store};
-    use tycho_types::dict::{Dict, DictKey, StoreDictKey};
-    use tycho_types::error::Error;
-    use tycho_types::models::{RelaxedIntMsgInfo, SendMsgFlags};
-    use tycho_types::models::{ReserveCurrencyFlags, StdAddr};
 
     fn source_map_with_declarations_and_types(
         declarations: Vec<Declaration>,

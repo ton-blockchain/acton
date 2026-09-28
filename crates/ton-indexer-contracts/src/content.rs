@@ -1,9 +1,9 @@
+use rston::cell::Cell;
+use rston::dict::Dict;
+use rston::prelude::HashBytes;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tvm_ffi::stack::Tuple;
-use tycho_types::cell::Cell;
-use tycho_types::dict::Dict;
-use tycho_types::prelude::HashBytes;
 
 pub(crate) fn parse_token_content(content_cell: Cell, keys: &[&str]) -> Value {
     let Ok(mut parser) = content_cell.as_slice() else {

@@ -25,7 +25,7 @@ tolk-syntax = { workspace = true, optional = true }
 tolk-source-map = { workspace = true }
 ton-executor = { workspace = true, optional = true }
 tvm-ffi = { workspace = true }
-tycho-types = { workspace = true }
+rston = { workspace = true }
 tvm-logs = { workspace = true }
 
 [features]

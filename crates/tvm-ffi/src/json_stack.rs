@@ -1,8 +1,8 @@
 use crate::stack::{Tuple, TupleItem};
 use anyhow::Context;
 use num_bigint::BigInt;
+use rston::boc::Boc;
 use serde_json::Value;
-use tycho_types::boc::Boc;
 
 use toncenter::v2::stack::{TvmStackEntry, TvmStackEntryUnsupported};
 
@@ -255,7 +255,7 @@ mod tests {
     use super::*;
     use crate::stack::TupleItem;
     use num_bigint::BigInt;
-    use tycho_types::cell::CellBuilder;
+    use rston::cell::CellBuilder;
 
     #[test]
     fn test_std_stack_uses_tonlib_wire_types() {

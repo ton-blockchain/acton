@@ -9,6 +9,11 @@ use crate::{ComputeInfo, find_base_tx_by_hash, methods};
 use anyhow::Context;
 use base64::Engine;
 use base64::engine::general_purpose;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
+use rston::models::{AccountState, ShardAccount, TickTock, Transaction, TxInfo};
+use rston::models::{BlockchainConfigParams, ConfigParam8};
+use rston::num::Tokens;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock};
@@ -19,11 +24,6 @@ use ton_executor::{ExecutorVerbosity, MissingLibrariesContext, missing_library_c
 use ton_networks::CustomNetworkUrls;
 pub use ton_networks::Network;
 use toncenter::v3;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
-use tycho_types::models::{AccountState, ShardAccount, TickTock, Transaction, TxInfo};
-use tycho_types::models::{BlockchainConfigParams, ConfigParam8};
-use tycho_types::num::Tokens;
 
 /// Fully reproduce (re‑trace) a TON transaction inside a local TON Sandbox
 /// and return a structured report with VM logs, money flow, generated
@@ -431,7 +431,7 @@ async fn load_previous_block_contexts(
         anyhow::ensure!(
             metadata.lt.parse::<u64>()? == tx.lt
                 && metadata.hash == hash
-                && tycho_types::models::StdAddr::from_str(&metadata.account)? == base_tx.address,
+                && rston::models::StdAddr::from_str(&metadata.account)? == base_tx.address,
             "TON Center returned unexpected previous transaction metadata at LT {}",
             tx.lt
         );
@@ -641,15 +641,15 @@ fn to_cell<T: Store + ?Sized>(obj: &T) -> Cell {
 mod tests {
     use super::*;
     use expect_test::expect;
+    use rston::cell::Lazy;
+    use rston::models::{
+        Account, CurrencyCollection, IntMsgInfo, MsgInfo, OptionalAccount, OwnedMessage,
+        SpecialFlags, StateInit, StdAddr,
+    };
     use serde_json::json;
     use std::path::Path;
     use ton_executor::DEFAULT_CONFIG;
     use ton_executor::message::RunTransactionResultSuccess;
-    use tycho_types::cell::Lazy;
-    use tycho_types::models::{
-        Account, CurrencyCollection, IntMsgInfo, MsgInfo, OptionalAccount, OwnedMessage,
-        SpecialFlags, StateInit, StdAddr,
-    };
 
     const NOW: u32 = 1_780_000_000;
     const SEED: [u8; 32] = [0x42; 32];

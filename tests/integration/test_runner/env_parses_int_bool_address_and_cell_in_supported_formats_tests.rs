@@ -1,7 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
-use tycho_types::boc::Boc;
-use tycho_types::cell::CellBuilder;
+use rston::boc::Boc;
+use rston::cell::CellBuilder;
 
 const RAW_ADDR: &str = "0:8356d05f87ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e92598147";
 const FRIENDLY_ZERO_ADDR: &str = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c";

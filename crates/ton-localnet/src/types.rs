@@ -1,17 +1,17 @@
 use crate::error::LocalnetError;
 use base64::Engine;
+use rston::boc::Boc;
+use rston::models::{
+    Base64StdAddrFlags, DisplayBase64StdAddr, ExtraCurrencyCollection, IntAddr, StdAddr,
+    StdAddrFormat,
+};
+use rston::num::VarUint248;
+use rston::prelude::HashBytes;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
-use tycho_types::boc::Boc;
-use tycho_types::models::{
-    Base64StdAddrFlags, DisplayBase64StdAddr, ExtraCurrencyCollection, IntAddr, StdAddr,
-    StdAddrFormat,
-};
-use tycho_types::num::VarUint248;
-use tycho_types::prelude::HashBytes;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExtraCurrency {
@@ -22,7 +22,7 @@ pub struct ExtraCurrency {
 impl ExtraCurrency {
     pub fn from_collection(
         collection: &ExtraCurrencyCollection,
-    ) -> Result<Vec<Self>, tycho_types::error::Error> {
+    ) -> Result<Vec<Self>, rston::error::Error> {
         collection
             .as_dict()
             .iter()
@@ -442,8 +442,8 @@ pub type Lt = u64;
 mod tests {
     use super::{Addr, BocBytes, Hash256};
     use base64::Engine as _;
-    use tycho_types::models::StdAddr;
-    use tycho_types::prelude::HashBytes;
+    use rston::models::StdAddr;
+    use rston::prelude::HashBytes;
 
     #[test]
     fn hash256_serializes_as_hex_string() {

@@ -1,5 +1,5 @@
-use tycho_types::models::{CurrencyCollection, IntMsgInfo};
-use tycho_types::num::Uint15;
+use rston::models::{CurrencyCollection, IntMsgInfo};
+use rston::num::Uint15;
 
 use super::*;
 

@@ -8,7 +8,7 @@
 use super::*;
 use sha2::{Digest, Sha256};
 use ton_hardfork::HardforkSources;
-use tycho_types::boc::Boc;
+use rston::boc::Boc;
 
 /// Stages every state needed by a fresh node, including an unchanged basechain.
 /// Only called after the live verification has authenticated the complete states.
@@ -16,7 +16,7 @@ pub(super) fn stage(layout: &Layout, sources: &HardforkSources) -> Result<()> {
     let directory = staging_dir(&layout.node).join("bootstrap-states");
     fs::create_dir_all(&directory)?;
     let masterchain = BlockId {
-        shard: tycho_types::models::ShardIdent::MASTERCHAIN,
+        shard: rston::models::ShardIdent::MASTERCHAIN,
         seqno: sources.masterchain_prev.seqno,
         root_hash: sources.masterchain_prev.root_hash,
         file_hash: sources.masterchain_prev.file_hash,
@@ -51,7 +51,7 @@ pub(super) fn publish(layout: &Layout) -> Result<()> {
     let staging = staging_dir(&layout.node);
     let plan: HardforkPlan = serde_json::from_slice(&fs::read(staging.join("plan.json"))?)?;
     let masterchain = BlockId {
-        shard: tycho_types::models::ShardIdent::MASTERCHAIN,
+        shard: rston::models::ShardIdent::MASTERCHAIN,
         seqno: plan.masterchain.seqno,
         root_hash: HashBytes(*plan.masterchain.root_hash.as_bytes()),
         file_hash: HashBytes(*plan.masterchain.file_hash.as_bytes()),

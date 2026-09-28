@@ -3,9 +3,9 @@ use crate::source_map::{Declaration, SourceMap};
 use crate::types_kernel::{TyIdx, TyResolver, render_ty};
 use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
-use tycho_types::cell::{Cell, CellBuilder, CellSlice, Load};
-use tycho_types::dict;
-use tycho_types::models::{AnyAddr, ExtAddr, IntAddr, StdAddr};
+use rston::cell::{Cell, CellBuilder, CellSlice, Load};
+use rston::dict;
+use rston::models::{AnyAddr, ExtAddr, IntAddr, StdAddr};
 
 #[derive(Debug, Clone)]
 pub enum UnpackedValue {
@@ -940,11 +940,11 @@ mod tests {
         AliasInstantiation, ContractABI, StructInstantiation, UnionVariant,
     };
     use expect_test::{Expect, expect};
-    use tycho_types::cell::CellDataBuilder;
-    use tycho_types::cell::{CellBuilder, CellFamily, Store};
-    use tycho_types::dict::{DictKey, StoreDictKey};
-    use tycho_types::error::Error;
-    use tycho_types::models::{AnyAddr, ExtAddr, StdAddr};
+    use rston::cell::CellDataBuilder;
+    use rston::cell::{CellBuilder, CellFamily, Store};
+    use rston::dict::{DictKey, StoreDictKey};
+    use rston::error::Error;
+    use rston::models::{AnyAddr, ExtAddr, StdAddr};
 
     fn empty_abi() -> ContractABI {
         ContractABI {

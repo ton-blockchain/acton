@@ -5,6 +5,9 @@
 !src/
 !crates/
 crates/**/target/
+!libs/
+!libs/rston/
+libs/rston/target/
 !xtask/
 
 !apps/

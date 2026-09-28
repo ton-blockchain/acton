@@ -15,7 +15,7 @@ use sha2::{Digest, Sha256};
 use ton::{block_tlb::TVMStackValue, ton_core::traits::tlb::TLB};
 use tonutils::tvm::Address;
 use tracing::{Instrument, debug, field, info_span};
-use tycho_types::models::config::ValidatorSet as ChainValidatorSet;
+use rston::models::config::ValidatorSet as ChainValidatorSet;
 
 use crate::ton::lite::{AccountInfo, BlockRef, LocalLiteClient, TransactionRef};
 

@@ -3,7 +3,7 @@ use crate::support::project::ProjectBuilder;
 use crate::support::toncenter::{
     append_custom_network, spawn_toncenter_v2_mock, toncenter_v2_latest_fork_snapshot_responses,
 };
-use tycho_types::cell::CellBuilder;
+use rston::cell::CellBuilder;
 
 const IMPORTS: &str = r#"
 import "../../lib/emulation/network"

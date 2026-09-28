@@ -70,6 +70,7 @@ dependencies = [
  "regex",
  "reqwest",
  "ring",
+ "rston",
  "rustc-hash 2.1.1",
  "semver",
  "serde",
@@ -109,7 +110,6 @@ dependencies = [
  "tree-sitter",
  "tvm-ffi",
  "tvm-logs",
- "tycho-types",
  "walkdir",
  "xxhash-rust",
  "zstd",
@@ -150,13 +150,13 @@ dependencies = [
  "log",
  "num-bigint",
  "owo-colors",
+ "rston",
  "serde_json",
  "tolk-source-map",
  "tolk-syntax",
  "ton-executor",
  "tvm-ffi",
  "tvm-logs",
- "tycho-types",
 ]
 
 [[package]]
@@ -182,6 +182,7 @@ dependencies = [
  "log",
  "rand 0.8.6",
  "reqwest",
+ "rston",
  "serde",
  "serde_json",
  "sha2",
@@ -192,7 +193,6 @@ dependencies = [
  "ton-hardfork",
  "tower 0.5.2",
  "tracing",
- "tycho-types",
  "utoipa",
  "uuid",
  "xxhash-rust",
@@ -217,10 +217,10 @@ dependencies = [
  "anyhow",
  "base64",
  "hex",
+ "rston",
  "serde",
  "serde_json",
  "tolk-source-map",
- "tycho-types",
 ]
 
 [[package]]
@@ -814,20 +814,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "blake3"
-version = "1.8.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d9e454fc11f76977dc803893aff6304ed33d6a26efae8696573bea74baa27ae"
-dependencies = [
- "arrayvec",
- "cc",
- "cfg-if",
- "constant_time_eq",
- "cpufeatures 0.3.0",
- "rayon-core",
-]
-
-[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1175,12 +1161,6 @@ name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
-
-[[package]]
-name = "constant_time_eq"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
 name = "content_inspector"
@@ -4461,6 +4441,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "rston"
+version = "0.3.5"
+dependencies = [
+ "ahash",
+ "base64",
+ "bitflags 2.9.4",
+ "crc32c",
+ "dashmap 6.1.0",
+ "hex",
+ "num-bigint",
+ "num-traits",
+ "rayon",
+ "rston-proc",
+ "scc",
+ "serde",
+ "sha2",
+ "smallvec",
+ "thiserror 2.0.20",
+ "tl-proto 0.5.3",
+ "tycho-crypto",
+]
+
+[[package]]
+name = "rston-proc"
+version = "0.3.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.114",
+]
+
+[[package]]
 name = "rusqlite"
 version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5331,12 +5343,12 @@ dependencies = [
  "anyhow",
  "num-bigint",
  "num-traits",
+ "rston",
  "serde",
  "serde_json",
  "smallvec",
  "tolk-compiler",
  "tolk-source-map",
- "tycho-types",
  "zstd",
 ]
 
@@ -5789,9 +5801,9 @@ dependencies = [
  "expect-test",
  "num-bigint",
  "pathdiff",
+ "rston",
  "serde",
  "serde_json",
- "tycho-types",
 ]
 
 [[package]]
@@ -5970,6 +5982,7 @@ dependencies = [
  "log",
  "num-bigint",
  "reqwest",
+ "rston",
  "serde",
  "serde_json",
  "tempfile",
@@ -5980,7 +5993,6 @@ dependencies = [
  "toncenter-keys",
  "tungstenite",
  "tvm-ffi",
- "tycho-types",
  "urlencoding",
 ]
 
@@ -6013,6 +6025,7 @@ dependencies = [
  "anyhow",
  "base64",
  "hex",
+ "rston",
  "rustc-hash 2.1.1",
  "serde",
  "serde_json",
@@ -6020,7 +6033,6 @@ dependencies = [
  "ton-executor",
  "ton-networks",
  "tvm-ffi",
- "tycho-types",
 ]
 
 [[package]]
@@ -6031,12 +6043,12 @@ dependencies = [
  "hex",
  "num-bigint",
  "parking_lot",
+ "rston",
  "rustc-hash 2.1.1",
  "serde",
  "serde_json",
  "ton-objs",
  "tvm-ffi",
- "tycho-types",
 ]
 
 [[package]]
@@ -6045,12 +6057,12 @@ version = "1.2.0"
 dependencies = [
  "anyhow",
  "futures",
+ "rston",
  "tl-proto 0.5.3",
  "tokio",
  "tokio-util",
  "ton-liteapi",
  "tracing",
- "tycho-types",
 ]
 
 [[package]]
@@ -6060,10 +6072,10 @@ dependencies = [
  "anyhow",
  "base64",
  "hex",
+ "rston",
  "rustc-hash 2.1.1",
  "serde",
  "serde_json",
- "tycho-types",
 ]
 
 [[package]]
@@ -6075,11 +6087,11 @@ dependencies = [
  "crc",
  "expect-test",
  "num-bigint",
+ "rston",
  "serde_json",
  "sha2",
  "ton-executor",
  "tvm-ffi",
- "tycho-types",
 ]
 
 [[package]]
@@ -6088,12 +6100,12 @@ version = "1.2.0"
 dependencies = [
  "async-trait",
  "hex",
+ "rston",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
- "tycho-types",
 ]
 
 [[package]]
@@ -6173,6 +6185,7 @@ version = "1.2.0"
 dependencies = [
  "anyhow",
  "expect-test",
+ "rston",
  "serde",
  "serde_json",
  "tasm-core",
@@ -6182,7 +6195,6 @@ dependencies = [
  "tower 0.5.2",
  "tower-lsp",
  "tracing",
- "tycho-types",
 ]
 
 [[package]]
@@ -6240,6 +6252,7 @@ dependencies = [
  "indexmap 2.12.0",
  "num-bigint",
  "reqwest",
+ "rston",
  "rusqlite",
  "rustc-hash 2.1.1",
  "serde",
@@ -6266,7 +6279,6 @@ dependencies = [
  "tower_governor",
  "tracing",
  "tvm-ffi",
- "tycho-types",
  "url",
  "uuid",
 ]
@@ -6292,6 +6304,7 @@ dependencies = [
  "quick_cache",
  "rayon",
  "rocksdb",
+ "rston",
  "serde",
  "serde_json",
  "sha2",
@@ -6303,7 +6316,6 @@ dependencies = [
  "ton-p2p",
  "tracing",
  "tracing-subscriber",
- "tycho-types",
 ]
 
 [[package]]
@@ -6327,6 +6339,7 @@ dependencies = [
  "expect-test",
  "futures",
  "rand 0.8.6",
+ "rston",
  "serde",
  "serde_json",
  "service-pool",
@@ -6337,7 +6350,6 @@ dependencies = [
  "tokio",
  "ton-fullnode-master",
  "tracing",
- "tycho-types",
 ]
 
 [[package]]
@@ -6350,6 +6362,7 @@ dependencies = [
  "log",
  "num-bigint",
  "reqwest",
+ "rston",
  "serde",
  "serde_json",
  "tasm-core",
@@ -6361,7 +6374,6 @@ dependencies = [
  "toncenter-keys",
  "tvm-ffi",
  "tvm-logs",
- "tycho-types",
 ]
 
 [[package]]
@@ -6378,6 +6390,7 @@ dependencies = [
  "http-body-util",
  "num-bigint",
  "rocksdb",
+ "rston",
  "serde",
  "serde_json",
  "sha2",
@@ -6395,7 +6408,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tvm-ffi",
- "tycho-types",
  "utoipa",
 ]
 
@@ -6822,11 +6834,11 @@ dependencies = [
  "anyhow",
  "num-bigint",
  "num-traits",
+ "rston",
  "serde_json",
  "thiserror 2.0.20",
  "toncenter",
  "tvm-ffi-derive",
- "tycho-types",
 ]
 
 [[package]]
@@ -6860,44 +6872,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tycho-types"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2ccb37e250becb5c4b827536644c777c247b41ac6c9ddd30902ff1db29818a7"
-dependencies = [
- "ahash",
- "base64",
- "bitflags 2.9.4",
- "blake3",
- "crc32c",
- "dashmap 6.1.0",
- "hex",
- "num-bigint",
- "num-traits",
- "rayon",
- "scc",
- "serde",
- "sha2",
- "smallvec",
- "thiserror 2.0.20",
- "tl-proto 0.5.3",
- "tycho-crypto",
- "tycho-types-proc",
- "typeid",
-]
-
-[[package]]
-name = "tycho-types-proc"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ad05cf4ab89631f8c11d85c3aa80f781502440f75361d251f866e0d76ae9d31"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.114",
-]
-
-[[package]]
 name = "typed-arena"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6922,12 +6896,6 @@ dependencies = [
  "quote",
  "syn 2.0.114",
 ]
-
-[[package]]
-name = "typeid"
-version = "1.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc7d623258602320d5c55d1bc22793b57daff0ec7efc270ea7d55ce1d5f5471c"
 
 [[package]]
 name = "typenum"
@@ -7835,6 +7803,7 @@ dependencies = [
  "owo-colors",
  "parse-changelog",
  "reqwest",
+ "rston",
  "schemars 0.8.22",
  "serde",
  "serde_json",
@@ -7846,7 +7815,6 @@ dependencies = [
  "toml_edit 0.24.0+spec-1.1.0",
  "ton-language-server-core",
  "ton-syntax",
- "tycho-types",
  "url",
  "urlencoding",
 ]

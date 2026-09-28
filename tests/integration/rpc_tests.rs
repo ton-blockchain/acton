@@ -9,13 +9,13 @@ use crate::support::toncenter::{
     toncenter_v2_masterchain_info_ok_response,
 };
 use crate::support::verifier::{abi_response, spawn_verifier_mock};
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellFamily, Store};
+use rston::models::message::IntAddr;
 use serde_json::Value as JsonValue;
 use std::fs;
 use std::path::Path;
 use std::time::Duration;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
-use tycho_types::models::message::IntAddr;
 
 const RAW_INFO_ADDRESS: &str = "0:1111111111111111111111111111111111111111111111111111111111111111";
 const MATCHED_INFO_ADDRESS: &str =

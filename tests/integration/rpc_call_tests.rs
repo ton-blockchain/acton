@@ -7,14 +7,14 @@ use crate::support::toncenter::{
     toncenter_v2_account_info_with_code_ok_response, toncenter_v2_run_get_method_ok_response,
 };
 use crate::support::verifier::{VerifierMockResponse, abi_response, spawn_verifier_mock};
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellFamily, Store};
+use rston::models::message::IntAddr;
 use serde_json::Value as JsonValue;
 use std::fs;
 use std::path::Path;
 use std::time::Duration;
 use tvm_ffi::stack::TupleItem;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
-use tycho_types::models::message::IntAddr;
 
 const RAW_INFO_ADDRESS: &str = "0:1111111111111111111111111111111111111111111111111111111111111111";
 const MATCHED_INFO_ADDRESS: &str =

@@ -4,11 +4,11 @@
 use anyhow::{Context, Result, bail, ensure};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use num_bigint::{BigInt, Sign};
+use rston::boc::Boc;
+use rston::cell::{CellSlice, DynCell};
 use toncenter::v2::Int64Input;
 use toncenter::v2::stack::{self as wire, LegacyStackEntry, TvmStackEntry};
 use tvm_ffi::stack::{ContData, Tuple, TupleItem};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{CellSlice, DynCell};
 
 const MAX_VALUES: usize = 1000;
 const MAX_DEPTH: usize = 64;

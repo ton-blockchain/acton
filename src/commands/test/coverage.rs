@@ -5,6 +5,7 @@ use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use acton_debug::replayer::{RuntimeStack, StepMode, Tick, TolkReplayer};
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
+use rston::boc::Boc;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::Write as _;
@@ -16,7 +17,6 @@ use tolk_compiler::{
     source_map::{DebugMark, SrcRange},
 };
 use tvm_logs::parser::VmStackValue;
-use tycho_types::boc::Boc;
 
 #[derive(Debug, Clone)]
 pub(super) struct Coverage {

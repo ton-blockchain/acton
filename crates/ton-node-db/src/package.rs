@@ -5,8 +5,8 @@ use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 
 use anyhow::{Context, Result, ensure};
+use rston::models::BlockId;
 use serde::Serialize;
-use tycho_types::models::BlockId;
 
 /// Location of one file inside a TON archive or temporary package.
 /// Offsets refer to the package payload, after its four-byte magic.

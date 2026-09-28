@@ -4,9 +4,9 @@ use crate::support::compilation::{CompilationOrder, extract_compiled_contracts};
 use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output;
 use acton::stdlib::DISABLE_AUTO_STDLIB_ENV;
+use rston::boc::Boc;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tycho_types::boc::Boc;
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}

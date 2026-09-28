@@ -10,6 +10,9 @@ use acton_debug::{PrettyAddressFormat, PrettyRenderOptions, render_unpacked_valu
 use anyhow::{Context, anyhow};
 use clap::Subcommand;
 use log::warn;
+use rston::boc::Boc;
+use rston::cell::{Cell, HashBytes};
+use rston::models::{Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -18,9 +21,6 @@ use tolk_compiler::SourceMap;
 use tolk_compiler::abi::{ABIGetMethod, ContractABI};
 use tolk_compiler::dynamic_unpack;
 use ton_api::{Network, TonApiClient};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, HashBytes};
-use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr};
 
 mod call;
 mod info;

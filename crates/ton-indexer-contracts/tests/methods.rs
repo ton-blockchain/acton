@@ -1,12 +1,12 @@
 use std::fmt::Write;
 
 use expect_test::expect;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder};
 use ton_indexer_contracts::known_get_methods::{
     KNOWN_GET_METHODS, known_get_method_name, known_get_method_names,
 };
 use ton_indexer_contracts::methods::parse_contract_methods;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder};
 
 fn render_result(code: &Cell) -> String {
     match parse_contract_methods(code) {

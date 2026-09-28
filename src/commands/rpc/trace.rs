@@ -13,6 +13,12 @@ use anyhow::{Context, anyhow};
 use chrono::{TimeZone, Utc};
 use log::warn;
 use num_bigint::BigInt;
+use rston::boc::Boc;
+use rston::cell::{HashBytes, Lazy};
+use rston::models::{
+    Account, AccountState as TychoAccountState, CurrencyCollection, IntAddr, OptionalAccount,
+    ShardAccount, StateInit, StdAddr, StdAddrFormat, StorageInfo,
+};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::borrow::Cow;
 use std::collections::BTreeSet;
@@ -23,12 +29,6 @@ use tolk_compiler::SourceMap;
 use ton_api::{Network, TonApiClient};
 use toncenter::v3;
 use tvm_ffi::stack::TupleItem;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{HashBytes, Lazy};
-use tycho_types::models::{
-    Account, AccountState as TychoAccountState, CurrencyCollection, IntAddr, OptionalAccount,
-    ShardAccount, StateInit, StdAddr, StdAddrFormat, StorageInfo,
-};
 
 pub(super) fn rpc_trace_cmd(
     hash: &str,
@@ -601,7 +601,7 @@ fn add_fallback_abi_matches(
     }
 }
 
-fn trace_account_code(account: &ShardAccount) -> Option<tycho_types::cell::Cell> {
+fn trace_account_code(account: &ShardAccount) -> Option<rston::cell::Cell> {
     let state = account.account.load().ok()?.0.map(|account| account.state);
     let Some(TychoAccountState::Active(state)) = state else {
         return None;

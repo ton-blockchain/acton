@@ -1,12 +1,12 @@
 use crate::block::types::BlockTransaction;
 use anyhow::Context;
+use rston::cell::Lazy;
+use rston::models::block::{InMsgDescr, OutMsgDescr};
+use rston::models::currency::CurrencyCollection;
+use rston::models::message::{ImportFees, InMsg, InMsgExternal, OutMsg, OwnedMessage};
+use rston::models::transaction::Transaction;
+use rston::prelude::HashBytes;
 use std::collections::BTreeMap;
-use tycho_types::cell::Lazy;
-use tycho_types::models::block::{InMsgDescr, OutMsgDescr};
-use tycho_types::models::currency::CurrencyCollection;
-use tycho_types::models::message::{ImportFees, InMsg, InMsgExternal, OutMsg, OwnedMessage};
-use tycho_types::models::transaction::Transaction;
-use tycho_types::prelude::HashBytes;
 
 /// Builds the inbound message descriptor for messages we can represent exactly.
 ///
@@ -34,7 +34,7 @@ pub(super) fn build_in_msg_descr(transactions: &[BlockTransaction]) -> anyhow::R
         let owned = in_msg_cell
             .parse::<OwnedMessage>()
             .context("Failed to parse inbound message for block descriptor")?;
-        if !matches!(owned.info, tycho_types::models::MsgInfo::ExtIn(_)) {
+        if !matches!(owned.info, rston::models::MsgInfo::ExtIn(_)) {
             continue;
         }
 

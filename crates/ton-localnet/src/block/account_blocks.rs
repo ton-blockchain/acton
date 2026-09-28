@@ -1,11 +1,11 @@
 use crate::block::types::BlockTransaction;
 use anyhow::Context;
+use rston::cell::Lazy;
+use rston::models::block::{AccountBlock, AccountBlocks};
+use rston::models::currency::CurrencyCollection;
+use rston::models::transaction::{HashUpdate, Transaction};
+use rston::prelude::HashBytes;
 use std::collections::BTreeMap;
-use tycho_types::cell::Lazy;
-use tycho_types::models::block::{AccountBlock, AccountBlocks};
-use tycho_types::models::currency::CurrencyCollection;
-use tycho_types::models::transaction::{HashUpdate, Transaction};
-use tycho_types::prelude::HashBytes;
 
 /// Builds `BlockExtra.account_blocks` from executed localnet transactions.
 ///
@@ -49,7 +49,7 @@ pub(super) fn build_account_blocks(
 
     let mut account_blocks = BTreeMap::new();
     for (account, group) in groups {
-        let transactions = tycho_types::dict::AugDict::try_from_btree(&group.transactions)
+        let transactions = rston::dict::AugDict::try_from_btree(&group.transactions)
             .context("Failed to build account transactions dictionary")?;
         let state_update = Lazy::new(&HashUpdate {
             old: group.old_state_hash,

@@ -9,7 +9,7 @@ use std::{fs, path::Path, time::Instant};
 
 use anyhow::{Context, Result, ensure};
 use tracing::{info, warn};
-use tycho_types::{
+use rston::{
     boc::{Boc, BocRepr},
     models::{McStateExtra, ShardStateUnsplit},
     num::Tokens,

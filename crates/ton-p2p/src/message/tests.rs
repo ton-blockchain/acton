@@ -1,7 +1,7 @@
 use anyhow::Result;
 use expect_test::expect;
-use tycho_types::cell::CellBuilder;
-use tycho_types::models::{ExtInMsgInfo, IntMsgInfo};
+use rston::cell::CellBuilder;
+use rston::models::{ExtInMsgInfo, IntMsgInfo};
 
 use super::*;
 

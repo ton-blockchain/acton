@@ -7,12 +7,12 @@ use crate::block::types::{
 };
 use crate::types::{BocBytes, Hash256};
 use anyhow::Context;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{CellBuilder, Lazy, LazyExotic};
-use tycho_types::merkle::MerkleUpdate;
-use tycho_types::models::block::{Block, BlockExtra, BlockInfo, BlockRef, PrevBlockRef, ValueFlow};
-use tycho_types::models::currency::CurrencyCollection;
-use tycho_types::prelude::HashBytes;
+use rston::boc::Boc;
+use rston::cell::{CellBuilder, Lazy, LazyExotic};
+use rston::merkle::MerkleUpdate;
+use rston::models::block::{Block, BlockExtra, BlockInfo, BlockRef, PrevBlockRef, ValueFlow};
+use rston::models::currency::CurrencyCollection;
+use rston::prelude::HashBytes;
 
 /// Builds a serialized TON `Block` cell for a localnet block.
 ///
@@ -56,7 +56,6 @@ pub(crate) fn create_block_boc(ctx: BlockBuildContext<'_>) -> anyhow::Result<Blo
         info: Lazy::new(&info).context("Failed to wrap block info")?,
         value_flow: Lazy::new(&value_flow).context("Failed to wrap value flow")?,
         state_update: LazyExotic::new(&state_update).context("Failed to wrap state update")?,
-        out_msg_queue_updates: None,
         extra: Lazy::new(&extra).context("Failed to wrap block extra")?,
     };
 

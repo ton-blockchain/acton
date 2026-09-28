@@ -20,6 +20,7 @@ COPY Cargo.toml Cargo.lock /src/
 COPY build.rs /src/build.rs
 COPY src /src/src
 COPY crates /src/crates
+COPY libs/rston /src/libs/rston
 COPY xtask /src/xtask
 COPY apps/localton/Cargo.toml apps/localton/Cargo.lock apps/localton/build.rs ./
 COPY apps/localton/src/main.rs ./src/main.rs

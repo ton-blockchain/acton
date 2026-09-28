@@ -416,9 +416,9 @@ mod tests {
     use crate::replayer::LocalVarRendered;
     use crate::types_render::{RenderedValue, render_runtime_vm_value};
     use anyhow::anyhow;
+    use rston::boc::Boc;
+    use rston::cell::CellBuilder;
     use tvm_logs::parser::{CellLike, VmStackValue};
-    use tycho_types::boc::Boc;
-    use tycho_types::cell::CellBuilder;
 
     fn parse_value_path(input: &str) -> anyhow::Result<ParsedValuePath> {
         let source_file = parse_wrapped_source(input)?;
@@ -427,7 +427,7 @@ mod tests {
         parse_expr_to_path(expr, source_file.source.as_ref())
     }
 
-    fn foo_value_cell() -> tycho_types::cell::Cell {
+    fn foo_value_cell() -> rston::cell::Cell {
         let mut builder = CellBuilder::new();
         builder.store_u32(42).expect("must store field");
         builder.build().expect("must build cell")

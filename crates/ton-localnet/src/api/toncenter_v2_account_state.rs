@@ -4,7 +4,7 @@ use crate::api::toncenter_wallet::{
 use crate::localnet::LocalnetAccountState;
 use crate::types::Hash256;
 use anyhow::Context;
-use tycho_types::boc::Boc;
+use rston::boc::Boc;
 
 const HIGHLOAD_V1_CODE_HASHES: &[(&str, i32)] = &[
     ("CrH/k6nnnA3v9EBdja1rWsn4wBsvHry0JZ/rnpg4AJk=", -1),
@@ -123,7 +123,7 @@ fn read_optional_wallet_id(
 fn parse_account_data<T>(
     account: &LocalnetAccountState,
     account_type: &'static str,
-    parse: impl FnOnce(&mut tycho_types::cell::CellSlice<'_>) -> anyhow::Result<T>,
+    parse: impl FnOnce(&mut rston::cell::CellSlice<'_>) -> anyhow::Result<T>,
 ) -> anyhow::Result<T> {
     let data = account
         .data

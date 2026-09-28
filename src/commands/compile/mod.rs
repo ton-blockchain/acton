@@ -5,13 +5,13 @@ use acton_config::color::OwoColorize;
 use acton_config::config;
 use anyhow::anyhow;
 use log::info;
+use rston::boc::Boc;
 use serde_json;
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
-use tycho_types::boc::Boc;
 
 #[allow(clippy::too_many_arguments)]
 pub fn compile_cmd(

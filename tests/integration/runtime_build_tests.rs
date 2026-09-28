@@ -344,11 +344,10 @@ fn runtime_build_embeds_precompiled_dependency() {
     source.acton().build().run().success();
     let artifact: serde_json::Value =
         serde_json::from_slice(&fs::read(source.path().join("build/leaf.json")).unwrap()).unwrap();
-    let code =
-        tycho_types::boc::Boc::decode_base64(artifact["code_boc64"].as_str().unwrap()).unwrap();
+    let code = rston::boc::Boc::decode_base64(artifact["code_boc64"].as_str().unwrap()).unwrap();
 
     ProjectBuilder::new("runtime-build-boc-dependency")
-        .contract_from_boc("leaf", tycho_types::boc::Boc::encode(code))
+        .contract_from_boc("leaf", rston::boc::Boc::encode(code))
         .contract_with_deps("parent", BRANCH, vec!["leaf"])
         .script_file("check", CHECK_DEPENDENCY_CODE)
         .build()

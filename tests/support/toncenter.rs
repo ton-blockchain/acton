@@ -4,6 +4,14 @@ use crate::common::strip_ansi;
 use crate::support::TestOutputExt;
 use crate::support::localnet::LocalnetHandle;
 use crate::support::project::{ActonCommand, Project, ProjectBuilder};
+use rston::boc::{Boc, BocRepr};
+use rston::cell::HashBytes;
+use rston::cell::{Cell, CellBuilder, CellFamily, CellSliceParts, Lazy, Store};
+use rston::dict::{Dict, RawDict};
+use rston::models::{
+    Account, AccountState, CurrencyCollection, IntAddr, IntMsgInfo, MsgInfo, OptionalAccount,
+    OwnedMessage, ShardAccount, StateInit, StdAddr,
+};
 use std::fmt::Write as _;
 use std::fs;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
@@ -19,14 +27,6 @@ use ton_localnet::types::Addr;
 use toncenter::v2::responses;
 use tvm_ffi::json_stack::legacy_stack_to_json;
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::boc::{Boc, BocRepr};
-use tycho_types::cell::HashBytes;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSliceParts, Lazy, Store};
-use tycho_types::dict::{Dict, RawDict};
-use tycho_types::models::{
-    Account, AccountState, CurrencyCollection, IntAddr, IntMsgInfo, MsgInfo, OptionalAccount,
-    OwnedMessage, ShardAccount, StateInit, StdAddr,
-};
 
 #[derive(Clone)]
 pub(crate) struct ToncenterV2MockResponse {
@@ -1108,7 +1108,7 @@ pub(crate) fn toncenter_v2_verify_quorum_response(
     quorum: u8,
 ) -> ToncenterV2MockResponse {
     let verifier_entry = build_verifier_registry_entry_cell(verifier_id, quorum);
-    let mut dict = Dict::<HashBytes, tycho_types::cell::CellSlice>::new();
+    let mut dict = Dict::<HashBytes, rston::cell::CellSlice>::new();
     let value = verifier_entry
         .as_slice()
         .expect("verifier entry cell must convert to slice");

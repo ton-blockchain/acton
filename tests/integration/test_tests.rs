@@ -1,9 +1,9 @@
 use crate::support::TestOutputExt;
 use crate::support::project::{ProjectBuilder, TestConfig};
+use rston::boc::Boc;
+use rston::cell::Cell;
 use std::fs;
 use toml_edit::DocumentMut;
-use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}

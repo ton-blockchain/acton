@@ -8,6 +8,10 @@ use acton_debug::replayer::StepMode;
 use acton_debug::{ChildDebugContextSpec, ReplayerDebugSession};
 use log::warn;
 use num_bigint::BigInt;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
+use rston::dict::Dict;
+use rston::models::{IntAddr, LibDescr, StdAddr, Transaction};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 use std::collections::VecDeque;
@@ -25,10 +29,6 @@ use ton_emulator::world_state::WorldState;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::GetMethodResultSuccess;
 use tvm_ffi::stack::{ContData, Tuple, TupleItem};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
-use tycho_types::dict::Dict;
-use tycho_types::models::{IntAddr, LibDescr, StdAddr, Transaction};
 
 #[derive(Debug)]
 pub struct DebugStopRequested;

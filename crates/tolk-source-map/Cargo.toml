@@ -15,7 +15,7 @@ anyhow = { workspace = true }
 num-bigint = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tycho-types = { workspace = true }
+rston = { workspace = true }
 pathdiff = { workspace = true }
 
 [dev-dependencies]

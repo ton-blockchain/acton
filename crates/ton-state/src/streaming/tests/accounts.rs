@@ -1,5 +1,5 @@
+use rston::models::{Account, AccountState, OptionalAccount, ShardAccount};
 use ton_node_db::ReadStats;
-use tycho_types::models::{Account, AccountState, OptionalAccount, ShardAccount};
 
 use super::*;
 

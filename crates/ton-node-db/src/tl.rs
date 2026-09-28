@@ -2,8 +2,8 @@
 
 use anyhow::{Result, anyhow, ensure};
 use base64::{Engine, engine::general_purpose::STANDARD};
+use rston::models::{BlockId, ShardIdent};
 use tl_proto::{TlRead, TlWrite};
-use tycho_types::models::{BlockId, ShardIdent};
 
 #[derive(TlRead, TlWrite)]
 pub(crate) struct StoredBlockId {

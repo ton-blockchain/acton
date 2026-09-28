@@ -2,6 +2,8 @@ use ::toncenter::{v2, v3};
 use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
 use reqwest::blocking::Response;
+use rston::boc::Boc;
+use rston::cell::{Cell, HashBytes};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::collections::HashMap;
 use std::env;
@@ -14,8 +16,6 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 pub use ton_networks::{CustomNetworkUrls, Network};
 use toncenter_keys::api_key as toncenter_api_key;
 use tvm_ffi::stack::TupleItem;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, HashBytes};
 
 mod deployment;
 mod offchain;

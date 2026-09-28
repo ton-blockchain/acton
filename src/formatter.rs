@@ -18,6 +18,14 @@ use acton_debug::{
 };
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellSlice, HashBytes};
+use rston::models::{
+    AccountState, AccountStatus, Base64StdAddrFlags, ComputePhase, ComputePhaseSkipReason,
+    DisplayBase64StdAddr, ExecutedComputePhase, IntAddr, Message, MsgInfo, RelaxedMessage,
+    RelaxedMsgInfo, ReserveCurrencyFlags, SendMsgFlags, ShardAccount, StdAddr, Transaction, TxInfo,
+};
+use rston::num::Tokens;
 use rustc_hash::FxHashMap;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
@@ -31,14 +39,6 @@ use tolk_source_map::SourceLocation;
 use ton_api::Network;
 use tvm_ffi::message::original_message_body;
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellSlice, HashBytes};
-use tycho_types::models::{
-    AccountState, AccountStatus, Base64StdAddrFlags, ComputePhase, ComputePhaseSkipReason,
-    DisplayBase64StdAddr, ExecutedComputePhase, IntAddr, Message, MsgInfo, RelaxedMessage,
-    RelaxedMsgInfo, ReserveCurrencyFlags, SendMsgFlags, ShardAccount, StdAddr, Transaction, TxInfo,
-};
-use tycho_types::num::Tokens;
 
 const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT: i32 = 678;
 const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE: i32 = 679;

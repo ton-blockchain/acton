@@ -9,11 +9,11 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-use thiserror::Error;
-use tycho_types::{
+use rston::{
     cell::{Cell, Lazy},
     models::{Message, MsgInfo, Transaction, TxInfo},
 };
+use thiserror::Error;
 
 use crate::{Batch, BlockId, Hash256};
 
@@ -157,14 +157,14 @@ pub struct TraceMessage {
 }
 
 impl TraceMessage {
-    /// Parses the retained cell as a complete `tycho-types` message.
+    /// Parses the retained cell as a complete `rston` message.
     ///
     /// The returned message body borrows from [`Self::cell`].
     ///
     /// # Errors
     ///
     /// Returns an error if the retained cell is not a valid TON message.
-    pub fn load(&self) -> Result<Message<'_>, tycho_types::error::Error> {
+    pub fn load(&self) -> Result<Message<'_>, rston::error::Error> {
         self.cell.parse()
     }
 }
@@ -675,20 +675,18 @@ const fn message_is_linked(message: &TraceMessage) -> bool {
     message.source_transaction.is_some() && message.destination_transaction.is_some()
 }
 
-const fn hash256(hash: tycho_types::cell::HashBytes) -> Hash256 {
+const fn hash256(hash: rston::cell::HashBytes) -> Hash256 {
     Hash256::new(hash.0)
 }
 
-fn invalid_trace_model(
-    context: &'static str,
-) -> impl FnOnce(tycho_types::error::Error) -> TraceError {
+fn invalid_trace_model(context: &'static str) -> impl FnOnce(rston::error::Error) -> TraceError {
     move |error| TraceError::InvalidModel(format!("{context}: {error}"))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tycho_types::{cell::CellBuilder, models::IntMsgInfo};
+    use rston::{cell::CellBuilder, models::IntMsgInfo};
 
     #[test]
     fn retains_and_loads_the_complete_tycho_message() {

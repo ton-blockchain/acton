@@ -7,13 +7,13 @@ use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use crate::virtual_clock::VirtualClock;
 use anyhow::Context;
 use core::cmp;
+use rston::boc::Boc;
+use rston::cell::Cell;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::{BufReader, Write};
 use std::path::Path;
-use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct NodeStateSnapshot {

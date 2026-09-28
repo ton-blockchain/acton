@@ -13,6 +13,9 @@ use acton_debug::{PrettyRenderOptions, RenderedValue, render_tuple_as_tolk_type}
 use anyhow::{Context, anyhow};
 use log::warn;
 use num_traits::ToPrimitive;
+use rston::boc::Boc;
+use rston::cell::Cell;
+use rston::models::{AnyAddr, IntAddr, StdAddr, StdAddrFormat};
 use std::io::{Write, stderr, stdout};
 use std::path::PathBuf;
 use std::process;
@@ -21,9 +24,6 @@ use tolk_compiler::types_kernel::{TyIdx, calc_width_on_stack};
 use ton_api::{Network, TonApiClient};
 use tvm_ffi::json_stack::legacy_stack_to_json;
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
-use tycho_types::models::{AnyAddr, IntAddr, StdAddr, StdAddrFormat};
 
 pub(super) struct RpcCallOptions {
     pub(super) abi: Option<PathBuf>,

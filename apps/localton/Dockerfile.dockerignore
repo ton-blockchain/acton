@@ -10,6 +10,9 @@
 !src/**
 !crates/
 !crates/**
+!libs/
+!libs/rston/
+!libs/rston/**
 !xtask/
 !xtask/**
 !packages/

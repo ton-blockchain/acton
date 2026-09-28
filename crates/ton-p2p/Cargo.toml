@@ -27,7 +27,7 @@ tl-proto-network = { package = "tl-proto", version = "0.4.12" }
 tokio.workspace = true
 ton-fullnode-master = { path = "../ton-fullnode-master" }
 tracing.workspace = true
-tycho-types = { workspace = true, features = ["serde"] }
+rston = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 expect-test.workspace = true

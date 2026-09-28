@@ -1,9 +1,9 @@
 use crate::localnet::LocalnetTransaction;
 use crate::storage::{JettonWalletMeta, NftItemMeta};
 use crate::types::{Addr, BocBytes, Hash256};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellSlice, Load};
-use tycho_types::models::{AnyAddr, IntAddr};
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellSlice, Load};
+use rston::models::{AnyAddr, IntAddr};
 
 const JETTON_TRANSFER_OPCODE: u32 = 0x0f8a_7ea5;
 const JETTON_BURN_OPCODE: u32 = 0x595f_07bc;
@@ -214,8 +214,8 @@ mod tests {
     use super::*;
     use crate::localnet::{LocalnetMessage, LocalnetTransactionId};
     use num_bigint::BigInt;
+    use rston::cell::{CellFamily, Store};
     use serde_json::Value;
-    use tycho_types::cell::{CellFamily, Store};
 
     fn addr(byte: u8) -> Addr {
         Addr {

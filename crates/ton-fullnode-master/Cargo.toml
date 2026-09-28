@@ -18,7 +18,7 @@ tl-proto = { workspace = true }
 tokio = { workspace = true, features = ["net", "rt", "sync", "macros"] }
 tokio-util = { workspace = true, features = ["codec"] }
 tracing = { workspace = true }
-tycho-types = { workspace = true }
+rston = { workspace = true }
 
 [lints]
 workspace = true

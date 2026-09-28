@@ -11,7 +11,7 @@ use ton_hardfork::{
     HardforkBlock, build_hardfork,
     request::{AccountEdit, account_batch},
 };
-use tycho_types::{
+use rston::{
     boc::Boc,
     merkle::MerkleProof,
     models::{Block, BlockProof, PrevBlockRef},
@@ -545,7 +545,7 @@ mod tests {
     #[test]
     fn finishing_publishes_bootstrap_states_before_advancing_the_init_block() {
         use ton_hardfork::{HardforkPrevBlock, HardforkSources, ShardSource};
-        use tycho_types::cell::{CellBuilder, CellFamily};
+        use rston::cell::{CellBuilder, CellFamily};
 
         let (_dir, layout, plan) = fixture();
         install(&layout, &plan, endpoint()).unwrap();
@@ -573,7 +573,7 @@ mod tests {
                     root_hash: HashBytes([4; 32]),
                     file_hash: HashBytes([5; 32]),
                 },
-                state: tycho_types::cell::Cell::empty_cell(),
+                state: rston::cell::Cell::empty_cell(),
             }),
         };
         join_bootstrap::stage(&layout, &sources).unwrap();

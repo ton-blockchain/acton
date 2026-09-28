@@ -359,7 +359,7 @@ pub fn prepare_localnet_wallets(
     config: &ActonConfig,
     names: &[String],
 ) -> anyhow::Result<Vec<acton_localnet::StartupWallet>> {
-    use tycho_types::{
+    use rston::{
         boc::{Boc, BocRepr},
         cell::{HashBytes, Lazy},
         models::{

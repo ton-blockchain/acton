@@ -5,8 +5,8 @@ use std::path::Path;
 
 use anyhow::{Context, Result, ensure};
 use rocksdb::{Cache, DB, MergeOperands, Options};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, DynCell, HashBytes};
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, DynCell, HashBytes};
 
 /// Stores a cell independently of its children. Child hashes and depths keep
 /// unchanged snapshot branches lazy when the updated state is reopened.

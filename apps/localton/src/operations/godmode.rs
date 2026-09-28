@@ -27,8 +27,8 @@ use tokio::task::JoinHandle;
 use ton_fullnode_master::{BlockSource, ServedBlock};
 use ton_liteapi::adnl::crypto::{KeyPair, SecretKey};
 use tracing::{info, warn};
-use tycho_types::models::block::{BlockId, ShardIdent};
-use tycho_types::prelude::HashBytes;
+use rston::models::block::{BlockId, ShardIdent};
+use rston::prelude::HashBytes;
 
 use crate::{
     bootstrap,

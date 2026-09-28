@@ -2,6 +2,7 @@ use acton_debug::RenderedValue;
 use acton_debug::replayer::{ExceptionBreakMode, LocalVarRendered, StepMode, Tick, TolkReplayer};
 use anyhow::Context;
 use base64::Engine as _;
+use rston::boc::Boc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -9,7 +10,6 @@ use std::path::{Path, PathBuf};
 use tolk_source_map::SourceMap;
 use tolk_source_map::debug_marks_dict::parse_debug_marks;
 use tolk_source_map::source_map::{DebugMark, SrcRange, SymbolTypesJson};
-use tycho_types::boc::Boc;
 
 const MAX_SOURCE_TRACE_STEPS: usize = 10_000;
 const MAX_RENDERED_VALUE_DEPTH: usize = 2;

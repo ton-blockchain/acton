@@ -1,7 +1,7 @@
+use rston::boc::Boc;
+use rston::cell::{Cell, CellFamily};
+use rston::dict::Dict;
 use std::sync::{Arc, LazyLock};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellFamily};
-use tycho_types::dict::Dict;
 
 pub const DEFAULT_CONFIG: &str = include_str!("default_config.boc64");
 

@@ -19,7 +19,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 urlencoding = { workspace = true }
 num-bigint = { workspace = true }
-tycho-types = { workspace = true }
+rston = { workspace = true }
 ton-networks = { workspace = true }
 toncenter-keys = { workspace = true }
 log = { workspace = true }

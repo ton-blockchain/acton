@@ -1,8 +1,8 @@
+use rston::cell::Cell;
+use rston::models::{IntAddr, OutAction, StdAddr};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use toncenter::v3;
-use tycho_types::cell::Cell;
-use tycho_types::models::{IntAddr, OutAction, StdAddr};
 
 /// Minimal "handle" for locating a transaction on the TON blockchain.
 ///
@@ -93,7 +93,7 @@ pub struct TraceInMessage {
 #[derive(Debug, Clone)]
 pub struct TraceEmulatedTx {
     /// Emulated transaction.
-    pub raw: tycho_types::models::Transaction,
+    pub raw: rston::models::Transaction,
     /// Unix time of the transaction execution.
     pub utime: u64,
     /// Logical‑time of the transaction.

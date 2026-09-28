@@ -1,9 +1,9 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use crate::support::verifier::{abi_response, spawn_verifier_mock};
+use rston::boc::Boc;
 use serde_json::Value as JsonValue;
 use std::fs;
-use tycho_types::boc::Boc;
 
 const DOC_ABI_LOCAL_CONTRACT: &str = r"
 struct Storage {

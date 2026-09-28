@@ -21,6 +21,13 @@ use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256};
 use crate::v3_events::{JettonBurnEvent, JettonTransferEvent, NftTransferEvent};
 use anyhow::Context;
 use num_bigint::BigInt;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellSlice, HashBytes};
+use rston::dict::Dict;
+use rston::models::{
+    AccountStatusChange, ActionPhase, ComputePhase, ComputePhaseSkipReason, IntAddr,
+    OwnedRelaxedMessage, RelaxedMsgInfo, TxInfo,
+};
 use serde_json::value::Value;
 use std::collections::HashMap;
 use ton_api::toncenter::emulate::v1 as emulate;
@@ -28,13 +35,6 @@ use ton_indexer_contracts::methods::parse_contract_methods;
 use toncenter::v2::responses as v2_response;
 use toncenter::v3 as response;
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellSlice, HashBytes};
-use tycho_types::dict::Dict;
-use tycho_types::models::{
-    AccountStatusChange, ActionPhase, ComputePhase, ComputePhaseSkipReason, IntAddr,
-    OwnedRelaxedMessage, RelaxedMsgInfo, TxInfo,
-};
 
 #[must_use]
 pub fn map_account_balances(accounts: &[LocalnetAccountBalance]) -> Vec<response::AccountBalance> {
@@ -1548,7 +1548,7 @@ impl Default for TransactionDetails {
 fn transaction_details(tx_boc: &BocBytes) -> TransactionDetails {
     let Some(transaction) = Boc::decode(tx_boc)
         .ok()
-        .and_then(|cell| cell.parse::<tycho_types::models::Transaction>().ok())
+        .and_then(|cell| cell.parse::<rston::models::Transaction>().ok())
     else {
         return TransactionDetails::default();
     };
@@ -1588,7 +1588,7 @@ fn transaction_details(tx_boc: &BocBytes) -> TransactionDetails {
     }
 }
 
-fn map_storage_phase(phase: &tycho_types::models::StoragePhase) -> response::StoragePhase {
+fn map_storage_phase(phase: &rston::models::StoragePhase) -> response::StoragePhase {
     response::StoragePhase {
         storage_fees_collected: Some(u128::from(phase.storage_fees_collected).to_string()),
         storage_fees_due: phase
@@ -1755,12 +1755,12 @@ fn hash_bytes_base64(hash: &HashBytes) -> String {
     Hash256::from(hash).to_base64()
 }
 
-const fn map_tycho_account_status(status: tycho_types::models::AccountStatus) -> &'static str {
+const fn map_tycho_account_status(status: rston::models::AccountStatus) -> &'static str {
     match status {
-        tycho_types::models::AccountStatus::Uninit => "uninit",
-        tycho_types::models::AccountStatus::Frozen => "frozen",
-        tycho_types::models::AccountStatus::Active => "active",
-        tycho_types::models::AccountStatus::NotExists => "nonexist",
+        rston::models::AccountStatus::Uninit => "uninit",
+        rston::models::AccountStatus::Frozen => "frozen",
+        rston::models::AccountStatus::Active => "active",
+        rston::models::AccountStatus::NotExists => "nonexist",
     }
 }
 
@@ -1891,11 +1891,11 @@ mod tests {
     use crate::storage::{AccountStatus, JettonMasterMeta, JettonWalletMeta, NftItemMeta};
     use crate::types::Hash256;
     use num_bigint::BigInt;
+    use rston::boc::Boc;
+    use rston::cell::Cell;
     use serde_json::json;
     use std::sync::Arc;
     use tvm_ffi::stack::{Tuple, TupleItem};
-    use tycho_types::boc::Boc;
-    use tycho_types::cell::Cell;
 
     fn sample_jetton_master() -> JettonMasterMeta {
         JettonMasterMeta {

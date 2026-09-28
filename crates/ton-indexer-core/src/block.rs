@@ -2,12 +2,12 @@
 
 use std::collections::HashSet;
 
-use thiserror::Error;
-use tycho_types::{
+use rston::{
     boc::Boc,
     cell::{Cell, HashBytes, Lazy},
     models::{Block, BlockInfo, PrevBlockRef, Transaction, block::BlockId as TychoBlockId},
 };
+use thiserror::Error;
 
 use crate::{BlockId, Error, Hash256, Result};
 
@@ -51,7 +51,7 @@ pub enum DecodeError {
     NotMasterchain(BlockId),
 }
 
-/// A validated, full-fidelity TON block backed by owned `tycho-types` cells.
+/// A validated, full-fidelity TON block backed by owned `rston` cells.
 #[derive(Clone, Debug)]
 pub struct BlockData {
     id: BlockId,
@@ -317,13 +317,13 @@ const fn from_hash(hash: HashBytes) -> Hash256 {
     Hash256::new(hash.0)
 }
 
-fn invalid_model(context: &'static str) -> impl FnOnce(tycho_types::error::Error) -> DecodeError {
+fn invalid_model(context: &'static str) -> impl FnOnce(rston::error::Error) -> DecodeError {
     move |error| DecodeError::InvalidModel(format!("{context}: {error}"))
 }
 
 #[cfg(test)]
 pub(crate) fn test_batch(seqno: u32) -> Batch {
-    use tycho_types::{
+    use rston::{
         cell::{CellBuilder, Lazy},
         merkle::MerkleUpdate,
         models::{BlockExtra, ShardIdent, ValueFlow},
@@ -341,7 +341,6 @@ pub(crate) fn test_batch(seqno: u32) -> Batch {
         info: Lazy::new(&info).unwrap(),
         value_flow: Lazy::new(&ValueFlow::default()).unwrap(),
         state_update: Lazy::new(&MerkleUpdate::default()).unwrap(),
-        out_msg_queue_updates: None,
         extra: Lazy::new(&BlockExtra::default()).unwrap(),
     };
     let root = CellBuilder::build_from(&block).unwrap();

@@ -4,11 +4,11 @@ use std::collections::BTreeMap;
 
 use anyhow::{Context, Result};
 use base64::{Engine, engine::general_purpose::STANDARD};
+use rston::boc::Boc;
+use rston::cell::{Cell, HashBytes, Lazy};
+use rston::models::{AccountState, ShardAccount};
 use serde::Serialize;
 use toncenter::v3::responses as wire;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, HashBytes, Lazy};
-use tycho_types::models::{AccountState, ShardAccount};
 
 use super::Executed;
 use crate::streaming::transaction::{convert_cell, currencies};

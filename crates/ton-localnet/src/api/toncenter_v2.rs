@@ -17,14 +17,14 @@ use crate::storage::{AccountStatus, DnsRecordMeta, NftCollectionMeta, NftItemMet
 use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256};
 use anyhow::Context;
 use base64::Engine;
+use rston::boc::Boc;
+use rston::cell::HashBytes as CellHashBytes;
+use rston::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
 use serde_json::value::Value;
 use ton_indexer_contracts::{WalletType, categorize_wallet};
 use toncenter::v2::{responses as response, stack};
 use tvm_ffi::json_stack::std_stack_from_tuple;
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::boc::Boc;
-use tycho_types::cell::HashBytes as CellHashBytes;
-use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
 
 /// Simulator get-method result with the VM trace produced during execution.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -1006,10 +1006,10 @@ mod tests {
     use super::*;
     use crate::api::toncenter_wallet::read_v2_wallet_state;
     use crate::storage::{DnsRecordMeta, JettonMasterMeta, JettonWalletMeta, NftItemMeta};
+    use rston::cell::{Cell, CellBuilder, CellFamily};
     use serde_json::json;
     use ton::ton_core::traits::tlb::TLB;
     use ton::ton_wallet::WalletVersion;
-    use tycho_types::cell::{Cell, CellBuilder, CellFamily};
 
     const V5_BETA_CODE_BOC: &str =
         "te6cckEBAQEAIwAIQgLkzzsvTG1qYeoPK1RH0mZ4WyavNjfbLe7mvNGqgm80Eg3NjhE=";

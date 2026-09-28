@@ -4,11 +4,11 @@ use crate::offchain_metadata::{
     jetton_content_uri, merge_resolved_metadata, resolve_jetton_metadata,
 };
 use crate::types::Addr;
+use rston::cell::HashBytes as CellHashBytes;
 use std::collections::{BTreeSet, HashMap};
 use ton_api::OffchainJsonResolver;
 use ton_indexer_contracts::categorize_wallet;
 use toncenter::v3 as v3_types;
-use tycho_types::cell::HashBytes as CellHashBytes;
 
 #[derive(Clone, Default)]
 pub(super) struct AddressInfo {

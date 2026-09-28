@@ -2,6 +2,12 @@ use anyhow::Context;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use expect_test::expect;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy};
+use rston::models::{
+    Account, AccountState, CurrencyCollection, IntMsgInfo, MsgInfo, OptionalAccount, OwnedMessage,
+    ShardAccount, SpecialFlags, StateInit, StdAddr, Transaction,
+};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write;
@@ -16,12 +22,6 @@ use ton_executor::message::{
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
 use ton_retrace::{BaseTxInfo, CustomNetworkUrls, Network, retrace_base_tx};
 use toncenter::v3;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy};
-use tycho_types::models::{
-    Account, AccountState, CurrencyCollection, IntMsgInfo, MsgInfo, OptionalAccount, OwnedMessage,
-    ShardAccount, SpecialFlags, StateInit, StdAddr, Transaction,
-};
 
 const NOW: u32 = 1_780_000_000;
 
@@ -164,9 +164,8 @@ impl Fixture {
             "fun onInternalMessage(_: InMessage) {}\nfun onBouncedMessage(_: InMessageBounced) {}"
                 .clone_into(&mut source);
         }
-        let mut config = tycho_types::models::BlockchainConfigParams::from_raw(Boc::decode_base64(
-            DEFAULT_CONFIG,
-        )?);
+        let mut config =
+            rston::models::BlockchainConfigParams::from_raw(Boc::decode_base64(DEFAULT_CONFIG)?);
         if kind == "legacy" {
             let mut version = config.get_global_version()?;
             version.version = 8;
@@ -296,9 +295,9 @@ impl Fixture {
             state = result.shard_account.to_string();
             let cell = Boc::decode_base64(result.transaction.as_ref())?;
             let tx: Transaction = cell.parse()?;
-            let tycho_types::models::ComputePhase::Executed(compute) = (match tx.load_info()? {
-                tycho_types::models::TxInfo::Ordinary(info) => info.compute_phase,
-                tycho_types::models::TxInfo::TickTock(info) => info.compute_phase,
+            let rston::models::ComputePhase::Executed(compute) = (match tx.load_info()? {
+                rston::models::TxInfo::Ordinary(info) => info.compute_phase,
+                rston::models::TxInfo::TickTock(info) => info.compute_phase,
             }) else {
                 anyhow::bail!("Reference compute skipped");
             };

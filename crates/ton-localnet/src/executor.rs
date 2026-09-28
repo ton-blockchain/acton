@@ -1,14 +1,14 @@
 use crate::types::{BocBytes, Lt};
 use anyhow::Context;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder};
+use rston::models::{ComputePhase, Transaction, TxInfo};
 use std::cell::RefCell;
 use ton_emulator::is_external_not_accepted_error;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::message::{
     EmulationResult, Executor, PrevBlocksInfo, RunTransactionArgs, RunTransactionResultSuccess,
 };
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder};
-use tycho_types::models::{ComputePhase, Transaction, TxInfo};
 
 #[derive(Clone, Debug)]
 pub struct ExecContext {

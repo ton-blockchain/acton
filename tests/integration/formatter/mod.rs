@@ -1,8 +1,8 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use acton::formatter::FormatterContext;
+use rston::models::{ReserveCurrencyFlags, SendMsgFlags};
 use std::fs;
-use tycho_types::models::{ReserveCurrencyFlags, SendMsgFlags};
 
 const LINEAR_MESSAGES: &str = r"
 struct (0xF1000001) FmRoute {

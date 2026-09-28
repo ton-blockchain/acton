@@ -67,7 +67,7 @@ tonutils = { version = "1.1.0", features = ["full"] }
 tower-http = { version = "0.6", features = ["fs"] }
 tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
-tycho-types = { version = "0.3.5", default-features = false, features = ["models"] }
+rston = { path = "../../libs/rston", default-features = false, features = ["models"] }
 utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
 zip = { version = "4.6", default-features = false, features = ["deflate"] }
 

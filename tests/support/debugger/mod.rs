@@ -16,6 +16,7 @@ use dap::responses::ContinueResponse;
 use dap::types::StackFrame;
 use dap_client::DapClient;
 use owo_colors::OwoColorize;
+use rston::boc::Boc;
 use rustc_hash::FxHashMap;
 use std::collections::{BTreeMap, HashMap};
 use std::net::TcpListener;
@@ -36,7 +37,6 @@ use ton_executor::get::{GetMethodResult, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
 use tvm_ffi::serde::serialize_tuple;
 use tvm_ffi::stack::Tuple;
-use tycho_types::boc::Boc;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 
@@ -325,7 +325,7 @@ fn execute_script(
     let mut expected_exit_code = None;
 
     // `code_cell` is a `TonCell` (from `ton::ton_core::cell`) but `Env.test_code` expects a
-    // `tycho_types::cell::Cell`. The two cell libraries don't interop directly, so we round-trip
+    // `rston::cell::Cell`. The two cell libraries don't interop directly, so we round-trip
     let test_code_cell = Boc::decode_base64(code_cell.to_boc_base64()?)?;
 
     let mut ctx = Context {

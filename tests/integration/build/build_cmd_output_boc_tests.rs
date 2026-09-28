@@ -1,10 +1,10 @@
 use crate::support::TestOutputExt;
 use crate::support::compilation::extract_compiled_contracts;
 use crate::support::project::ProjectBuilder;
+use rston::boc::Boc;
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use tycho_types::boc::Boc;
 
 fn artifact_boc_bytes(project_path: &Path, contract_name: &str) -> Vec<u8> {
     let artifact_path = project_path

@@ -1,10 +1,10 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use rston::boc::Boc;
 use serde_json::Value;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tycho_types::boc::Boc;
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}

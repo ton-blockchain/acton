@@ -1,4 +1,4 @@
-use tycho_types::boc::Boc;
+use rston::boc::Boc;
 
 use super::{Fec, Message, SYMBOL_SIZE, Transfer};
 

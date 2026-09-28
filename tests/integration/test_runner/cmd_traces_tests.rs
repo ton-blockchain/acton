@@ -2,13 +2,13 @@ use crate::common::assertion;
 use crate::support::TestOutputExt;
 use crate::support::project::{ProjectBuilder, TestConfig};
 use acton_studio::{StudioServer, StudioServerConfig, StudioWorkspace};
+use rston::boc::Boc;
+use rston::models::{IntAddr, MsgInfo, Transaction};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
-use tycho_types::boc::Boc;
-use tycho_types::models::{IntAddr, MsgInfo, Transaction};
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}

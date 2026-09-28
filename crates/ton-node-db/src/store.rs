@@ -6,10 +6,10 @@ use std::time::Instant;
 
 use anyhow::{Context, Result, ensure};
 use rocksdb::{DB, Options, WriteBatch, WriteOptions};
+use rston::cell::{Cell, HashBytes};
+use rston::models::{BlockId, StdAddr};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
-use tycho_types::cell::{Cell, HashBytes};
-use tycho_types::models::{BlockId, StdAddr};
 
 use crate::lazy::{Reader, RecordCache, RecordWeight};
 use crate::state::StateUpdate;

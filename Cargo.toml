@@ -31,6 +31,7 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 ton-hardfork = { path = "crates/ton-hardfork" }
 # local crates
+rston = { path = "libs/rston", features = ["bigint"] }
 acton-config = { path = "crates/acton-config" }
 acton-abi-catalog = { path = "crates/acton-abi-catalog" }
 acton-debug = { path = "crates/acton-debug", default-features = false }
@@ -88,7 +89,6 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 # base TON libraries
 ton = "0.1.2"
 ton-connect-core = "0.0.3"
-tycho-types = { version = "0.3.0", features = ["bigint"] }
 
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
@@ -261,7 +261,7 @@ ton-indexer-contracts = { workspace = true }
 # remote crates
 # base TON libraries
 ton = { workspace = true }
-tycho-types = { workspace = true }
+rston = { workspace = true }
 
 num-bigint = { workspace = true }
 num-traits = { workspace = true }

@@ -13,12 +13,12 @@
 //! few hundred bytes regardless of how large the block is.
 
 use anyhow::Context;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder};
+use rston::merkle::{FilterAction, MerkleFilter, MerkleProof};
+use rston::models::block::{Block, BlockId, BlockProof};
+use rston::prelude::HashBytes;
 use rustc_hash::FxHashSet;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder};
-use tycho_types::merkle::{FilterAction, MerkleFilter, MerkleProof};
-use tycho_types::models::block::{Block, BlockId, BlockProof};
-use tycho_types::prelude::HashBytes;
 
 /// Builds the serialized `BlockProof` link for one block.
 pub fn build_block_proof_link(block_id: &BlockId, block_root: &Cell) -> anyhow::Result<Vec<u8>> {

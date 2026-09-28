@@ -4,10 +4,10 @@ use crate::support::project::ProjectBuilder;
 use crate::support::toncenter::{
     active_shard_account_boc64, summarize_v2_account_state, test_std_addr,
 };
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder};
 use serde_json::{Value, json};
 use toncenter::v2::responses as v2;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder};
 
 // Compiled contract BOCs are pinned to external/ton af7b55483a18037e4e7b5e56b06e83289e5a83da.
 const HIGHLOAD_V1_CODE: &str = "te6cckEBCAEAlwABFP8A9KQT9LzyyAsBAgEgAgMCAUgEBQC48oMI1xgg0x/TH9MfAvgju/Jj7UTQ0x/TH9P/0VEyuvKhUUS68qIE+QFUEFX5EPKj9ATR+AB/jhYhgBD0eG+lIJgC0wfUMAH7AJEy4gGz5lsBpMjLH8sfy//J7VQABNAwAgFIBgcAF7s5ztRNDTPzHXC/+AARuMl+1E0NcLH4vWoNMQ==";

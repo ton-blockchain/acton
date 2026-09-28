@@ -15,6 +15,10 @@ use axum::extract::rejection::JsonRejection;
 use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use base64::{Engine, engine::general_purpose::STANDARD};
+use rston::boc::Boc;
+use rston::cell::{HashBytes, Lazy};
+use rston::dict::Dict;
+use rston::models::{IntAddr, Message, MsgInfo, OptionalAccount, ShardAccount};
 use serde::Deserialize;
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use ton_emulator::world_state::{AccountsState, LocalAccountsState, WorldState};
@@ -22,10 +26,6 @@ use ton_executor::{ExecutorVerbosity, MissingLibrariesContext, missing_library_c
 use ton_node_db::{StateSnapshot, StateView};
 use ton_p2p::ExternalMessage;
 use tracing::{info, warn};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{HashBytes, Lazy};
-use tycho_types::dict::Dict;
-use tycho_types::models::{IntAddr, Message, MsgInfo, OptionalAccount, ShardAccount};
 
 use super::{Api, ApiError, get_method::previous_blocks};
 use response::{SimulationResponse, TransactionRejection};
@@ -353,7 +353,7 @@ fn execute_transaction(
         .map(Boc::decode_base64)
         .transpose()?
         .map_or_else(Dict::new, |root| {
-            Dict::<HashBytes, tycho_types::models::LibDescr>::from_raw(Some(root))
+            Dict::<HashBytes, rston::models::LibDescr>::from_raw(Some(root))
         });
     loop {
         if started.elapsed() >= TIME_BUDGET {
@@ -387,7 +387,7 @@ fn execute_transaction(
                 publishers.set(HashBytes::ZERO, ())?;
                 libraries.set(
                     hash,
-                    tycho_types::models::LibDescr {
+                    rston::models::LibDescr {
                         lib: cell,
                         publishers,
                     },
