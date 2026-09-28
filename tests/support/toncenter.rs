@@ -155,7 +155,7 @@ pub(crate) fn build_internal_message_boc_with_currency_and_body(
             src: IntAddr::Std(source),
             dst: IntAddr::Std(target),
             value,
-            ihr_fee: Default::default(),
+            extra_flags: Default::default(),
             fwd_fee: Default::default(),
             created_at: 0,
             created_lt: 0,

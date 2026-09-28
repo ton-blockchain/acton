@@ -3016,6 +3016,7 @@ mod tests {
             opcode: Some(opcode),
             fwd_fee: 0,
             ihr_fee: 0,
+            extra_flags: 0,
             created_lt: 0,
             extra_currencies: Vec::new(),
         }

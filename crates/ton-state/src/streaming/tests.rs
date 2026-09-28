@@ -270,6 +270,41 @@ async fn frame(body: &mut Body) -> Result<String> {
     Ok(String::from_utf8(bytes.to_vec())?)
 }
 
+#[test]
+fn transaction_messages_preserve_extra_flags_and_forwarding_fees() -> Result<()> {
+    let mut tx = transaction(2)?;
+    let key = rston::num::Uint15::new(0);
+    let mut message = tx.out_msgs.get(key)?.unwrap().parse::<OwnedMessage>()?;
+    let MsgInfo::Int(info) = &mut message.info else {
+        anyhow::bail!("expected an internal message");
+    };
+    info.extra_flags = rston::models::MessageExtraFlags::all();
+    tx.out_msgs.set(key, CellBuilder::build_from(message)?)?;
+
+    let converted = transaction::convert_cell(0, &Lazy::new(&tx)?, &tx)?;
+    let incoming = converted.in_msg.unwrap();
+    let internal = &converted.out_msgs[0];
+    let external = &converted.out_msgs[1];
+    expect![[r#"
+        external-in: None/None/None
+        internal: Some("3")/Some("0")/Some("11")
+        external-out: None/None/None
+    "#]]
+    .assert_eq(&format!(
+        "external-in: {:?}/{:?}/{:?}\ninternal: {:?}/{:?}/{:?}\nexternal-out: {:?}/{:?}/{:?}\n",
+        incoming.extra_flags,
+        incoming.ihr_fee,
+        incoming.fwd_fee,
+        internal.extra_flags,
+        internal.ihr_fee,
+        internal.fwd_fee,
+        external.extra_flags,
+        external.ihr_fee,
+        external.fwd_fee,
+    ));
+    Ok(())
+}
+
 #[tokio::test]
 async fn finalized_batches_emit_single_transactions_and_filter_account_addresses() -> Result<()> {
     let hub = Subscriptions::default();

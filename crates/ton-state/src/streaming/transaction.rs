@@ -172,7 +172,8 @@ fn message(cell: &Cell, tx_hash: &str, incoming: bool) -> Result<wire::Message> 
             result.value = Some(info.value.tokens.to_string());
             result.value_extra_currencies = Some(currencies(&info.value.other)?);
             result.fwd_fee = Some(info.fwd_fee.to_string());
-            result.ihr_fee = Some(info.ihr_fee.to_string());
+            result.ihr_fee = Some("0".into());
+            result.extra_flags = Some(info.extra_flags.bits().to_string());
             result.created_lt = Some(info.created_lt.to_string());
             result.created_at = Some(info.created_at.to_string());
             result.ihr_disabled = Some(info.ihr_disabled);

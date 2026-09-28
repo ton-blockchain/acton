@@ -1093,7 +1093,7 @@ pub(crate) fn map_v3_message(
         created_lt: has_created_lt.then(|| msg.created_lt.to_string()),
         created_at: has_created_lt.then(|| tx_utime.to_string()),
         decoded_opcode: None,
-        extra_flags: is_internal.then(|| "0".to_owned()),
+        extra_flags: is_internal.then(|| msg.extra_flags.to_string()),
         ihr_disabled: is_internal.then_some(true),
         bounce: is_internal.then_some(msg.bounce),
         bounced: is_internal.then_some(msg.bounced),

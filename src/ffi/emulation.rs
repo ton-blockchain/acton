@@ -37,10 +37,10 @@ use rston::dict::Dict;
 use rston::models::{
     AccountState, AccountStatus, AccountStatusChange, ActionPhase, ComputePhase,
     ComputePhaseSkipReason, CurrencyCollection, ExtInMsgInfo, ExtOutMsgInfo,
-    ExtraCurrencyCollection, HashUpdate, IntAddr, IntMsgInfo, LibDescr, Message, MsgInfo,
-    OptionalAccount, OrdinaryTxInfo, OutAction, OutActionsRevIter, RelaxedMessage, RelaxedMsgInfo,
-    ShardAccount, SkippedComputePhase, StateInit, StdAddr, StdAddrFormat, StoragePhase,
-    StorageUsedShort, Transaction, TxInfo,
+    ExtraCurrencyCollection, HashUpdate, IntAddr, IntMsgInfo, LibDescr, Message, MessageExtraFlags,
+    MsgInfo, OptionalAccount, OrdinaryTxInfo, OutAction, OutActionsRevIter, RelaxedMessage,
+    RelaxedMsgInfo, ShardAccount, SkippedComputePhase, StateInit, StdAddr, StdAddrFormat,
+    StoragePhase, StorageUsedShort, Transaction, TxInfo,
 };
 use rston::num::{Tokens, Uint15, VarUint24, VarUint56};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -3844,6 +3844,49 @@ mod tests {
     }
 
     #[test]
+    fn v3_message_reconstruction_preserves_extra_flags_and_hash() -> anyhow::Result<()> {
+        let src = StdAddr::new(0, test_hash(1));
+        let dst = StdAddr::new(0, test_hash(2));
+        let body = CellBuilder::build_from(0x1234_5678_u32)?;
+
+        for flags in [None, Some(0), Some(1), Some(3)] {
+            let message = OwnedMessage {
+                info: MsgInfo::Int(IntMsgInfo {
+                    src: src.clone().into(),
+                    dst: dst.clone().into(),
+                    value: CurrencyCollection::new(1_000_000_000),
+                    extra_flags: MessageExtraFlags::from_bits(flags.unwrap_or(0)).unwrap(),
+                    fwd_fee: Tokens::new(13),
+                    created_lt: 42,
+                    created_at: 1_700_000_000,
+                    ..Default::default()
+                }),
+                init: None,
+                body: body.clone().into(),
+                layout: None,
+            };
+            let original = CellBuilder::build_from(&message)?;
+            let summary = serde_json::from_value(serde_json::json!({
+                "hash": original.repr_hash().to_string(),
+                "source": src.to_string(),
+                "destination": dst.to_string(),
+                "value": "1000000000",
+                "extra_flags": flags.map(|bits| bits.to_string()),
+                "fwd_fee": "13",
+                "ihr_fee": "0",
+                "created_lt": "42",
+                "created_at": "1700000000",
+                "message_content": { "body": Boc::encode_base64(&body) },
+            }))?;
+
+            let reconstructed = build_message_cell_from_v3(&summary)?;
+            assert_eq!(reconstructed.repr_hash(), original.repr_hash());
+            assert_eq!(reconstructed.parse::<OwnedMessage>()?.info, message.info);
+        }
+        Ok(())
+    }
+
+    #[test]
     fn treasury_code_hash_is_recognized() {
         let code = Boc::decode_base64(TREASURY_CODE_BOC64).expect("treasury code must decode");
 
@@ -4691,7 +4734,14 @@ fn infer_msg_info_from_v3(m: &v3::Message) -> anyhow::Result<MsgInfo> {
                     tokens: parse_tokens_opt(m.value.as_deref()),
                     other: ExtraCurrencyCollection::new(),
                 },
-                ihr_fee: parse_tokens_opt(m.ihr_fee.as_deref()),
+                extra_flags: MessageExtraFlags::from_bits(
+                    m.extra_flags
+                        .as_deref()
+                        .unwrap_or("0")
+                        .parse()
+                        .context("Invalid message extra_flags")?,
+                )
+                .context("Unsupported message extra_flags")?,
                 fwd_fee: parse_tokens_opt(m.fwd_fee.as_deref()),
                 created_lt: m
                     .created_lt

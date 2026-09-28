@@ -312,7 +312,7 @@ fn build_wallet_deploy_message(wallet: &Wallet) -> anyhow::Result<String> {
         src: IntAddr::Std(wallet_addr.clone()),
         dst: IntAddr::Std(wallet_addr),
         value: CurrencyCollection::new(STARTUP_DEPLOY_TRANSFER_NANOGRAMS),
-        ihr_fee: Default::default(),
+        extra_flags: Default::default(),
         fwd_fee: Default::default(),
         created_at: 0,
         created_lt: 0,

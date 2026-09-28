@@ -341,7 +341,11 @@ pub struct LocalnetMessage {
     pub init_state: BocBytes,
     pub opcode: Option<u32>,
     pub fwd_fee: u128,
+    /// Legacy TON Center response field; current TON messages have no IHR fee.
     pub ihr_fee: u128,
+    /// TON bounce flags from the internal message header; zero for external messages.
+    #[serde(default)]
+    pub extra_flags: u8,
     pub created_lt: u64,
     #[serde(default)]
     pub extra_currencies: Vec<ExtraCurrency>,
@@ -3157,6 +3161,7 @@ pub(crate) fn convert_to_tx_struct(
             opcode: None,
             fwd_fee: 0,
             ihr_fee: 0,
+            extra_flags: 0,
             created_lt: 0,
             extra_currencies: Vec::new(),
         }
@@ -3221,12 +3226,12 @@ pub(crate) fn convert_to_message_struct(
     let body_hash = Hash256::from(body_cell.repr_hash());
     let body_bytes = Boc::encode(body_cell);
 
-    let (fwd_fee, ihr_fee, bounce, bounced, extra_currencies) = match &msg.info {
+    let (fwd_fee, extra_flags, bounce, bounced, extra_currencies) = match &msg.info {
         MsgInfo::Int(info) => {
             let extra_currencies = ExtraCurrency::from_collection(&info.value.other)?;
             (
                 info.fwd_fee.into(),
-                info.ihr_fee.into(),
+                info.extra_flags.bits(),
                 info.bounce,
                 info.bounced,
                 extra_currencies,
@@ -3260,7 +3265,8 @@ pub(crate) fn convert_to_message_struct(
         init_state: init_state_bytes.into(),
         opcode,
         fwd_fee,
-        ihr_fee,
+        ihr_fee: 0,
+        extra_flags,
         created_lt: meta.created_lt.unwrap_or(0),
         extra_currencies,
     })
@@ -3594,6 +3600,32 @@ mod tests {
 
     const REGULAR_OPCODE: u32 = 0x178d_4519;
     const BOUNCE_PREFIX: u32 = 0xffff_ffff;
+
+    #[test]
+    fn internal_message_extra_flags_reach_v3_without_changing_fees() {
+        for flags in [0, 1, 3] {
+            let mut message: OwnedMessage =
+                BocRepr::decode(internal_message_boc(false, &[REGULAR_OPCODE])).unwrap();
+            let MsgInfo::Int(info) = &mut message.info else {
+                panic!("expected an internal message");
+            };
+            info.extra_flags = rston::models::MessageExtraFlags::from_bits(flags).unwrap();
+            info.fwd_fee = rston::num::Tokens::new(13);
+            let boc: BocBytes = BocRepr::encode(message).unwrap().into();
+            let hash = boc.hash().unwrap();
+            let mapped = convert_to_message_struct(&message_meta(hash), &boc).unwrap();
+
+            assert_eq!(mapped.extra_flags, flags);
+            assert_eq!(mapped.ihr_fee, 0);
+            assert_eq!(mapped.fwd_fee, 13);
+
+            let v3 = crate::api::toncenter_v3::map_v3_message(&mapped, &hash, 0, false);
+            assert_eq!(v3.hash, hash.to_base64());
+            assert_eq!(v3.extra_flags, Some(flags.to_string()));
+            assert_eq!(v3.ihr_fee.as_deref(), Some("0"));
+            assert_eq!(v3.fwd_fee.as_deref(), Some("13"));
+        }
+    }
 
     #[test]
     fn convert_to_message_struct_extracts_regular_internal_opcode() {
@@ -4053,7 +4085,7 @@ mod tests {
                 src: IntAddr::Std(test_std_addr(0x11)),
                 dst: IntAddr::Std(test_std_addr(0x22)),
                 value: CurrencyCollection::new(1),
-                ihr_fee: Default::default(),
+                extra_flags: Default::default(),
                 fwd_fee: Default::default(),
                 created_at: 0,
                 created_lt: 0,

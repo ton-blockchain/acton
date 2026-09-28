@@ -838,7 +838,7 @@ fn build_verifier_payment_message(
             src: IntAddr::Std(sender),
             dst: IntAddr::Std(ton_address_to_std_addr(payment_address)),
             value: CurrencyCollection::new(amount_nano),
-            ihr_fee: Default::default(),
+            extra_flags: Default::default(),
             fwd_fee: Default::default(),
             created_lt: 0,
             created_at: 0,

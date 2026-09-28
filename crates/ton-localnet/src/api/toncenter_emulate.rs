@@ -202,7 +202,7 @@ fn build_internal_message(
             src: IntAddr::Std(from.clone()),
             dst: IntAddr::Std(destination),
             value: CurrencyCollection::new(u128::from(amount)),
-            ihr_fee: Default::default(),
+            extra_flags: Default::default(),
             fwd_fee: Default::default(),
             created_lt: 0,
             created_at: now,

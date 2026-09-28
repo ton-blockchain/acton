@@ -125,7 +125,7 @@ fn build_message(
             bounced: false,
             src: admin.into(),
             dst: master.address.into(),
-            ihr_fee: Tokens::ZERO,
+            extra_flags: Default::default(),
             value: CurrencyCollection::new(MINT_MESSAGE_VALUE),
             fwd_fee: Tokens::ZERO,
             created_at: 0,

@@ -224,14 +224,12 @@ pub(crate) fn convert(
         .values()
         .map(|cell| message(&cell?))
         .collect::<Result<Vec<_>>>()?;
-    // TONLib's fee includes the forwarding and IHR fees carried by outgoing messages.
+    // TONLib's fee includes the forwarding fees carried by outgoing messages.
     let mut fee = tx.total_fees.tokens.into_inner();
     for message in &out_msgs {
         let forwarding = message.fwd_fee.parse::<u128>()?;
-        let ihr = message.ihr_fee.parse::<u128>()?;
         fee = fee
             .checked_add(forwarding)
-            .and_then(|fee| fee.checked_add(ihr))
             .context("transaction fee overflow")?;
     }
     let other_fee = fee
@@ -293,7 +291,6 @@ fn message(cell: &Cell) -> Result<wire::Message> {
             result.destination = info.dst.to_string();
             result.value = info.value.tokens.to_string();
             result.fwd_fee = info.fwd_fee.to_string();
-            result.ihr_fee = info.ihr_fee.to_string();
             result.created_lt = info.created_lt.to_string();
             result.extra_currencies = info
                 .value

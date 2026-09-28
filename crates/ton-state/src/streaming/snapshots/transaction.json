@@ -120,7 +120,7 @@
         "created_lt": "9007199254741002",
         "decoded_opcode": null,
         "destination": "0:0303030303030303030303030303030303030303030303030303030303030303",
-        "extra_flags": null,
+        "extra_flags": "0",
         "fwd_fee": "11",
         "hash": "KmB976smAY7YaLaz7nm+a6X9yoDYlG9mjG/w7ozv/PQ=",
         "hash_norm": null,
