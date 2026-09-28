@@ -886,7 +886,6 @@ impl ValidatorSet {
                 public_key: entry.public_key,
                 weight: 1,
                 adnl_addr: entry.adnl_addr,
-                mc_seqno_since: 0,
                 prev_total_weight: 0,
             });
             debug_assert!(total_wt >= entry.weight);
@@ -1168,7 +1167,10 @@ impl<'de> serde::Deserialize<'de> for ValidatorSet {
     }
 }
 
-/// Validator description.
+/// Validator public key, weight, and optional ADNL address from a TON validator set.
+///
+/// Binary serialization uses `validator#53` or `validator_addr#73`, depending on
+/// whether an ADNL address is present.
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ValidatorDescription {
@@ -1179,9 +1181,6 @@ pub struct ValidatorDescription {
     /// Optional validator ADNL address.
     #[cfg_attr(feature = "serde", serde(default))]
     pub adnl_addr: Option<HashBytes>,
-    /// Since which seqno this validator will be active.
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub mc_seqno_since: u32,
 
     /// Total weight of the previous validators in the list.
     /// The field is not serialized.
@@ -1192,7 +1191,6 @@ pub struct ValidatorDescription {
 impl ValidatorDescription {
     const TAG_BASIC: u8 = 0x53;
     const TAG_WITH_ADNL: u8 = 0x73;
-    const TAG_WITH_MC_SEQNO: u8 = 0x93;
 
     const PUBKEY_TAG: u32 = 0x8e81278a;
 
@@ -1208,11 +1206,7 @@ impl ValidatorDescription {
 
 impl Store for ValidatorDescription {
     fn store_into(&self, builder: &mut CellBuilder, _: &dyn CellContext) -> Result<(), Error> {
-        let with_mc_seqno = self.mc_seqno_since != 0;
-
-        let tag = if with_mc_seqno {
-            Self::TAG_WITH_MC_SEQNO
-        } else if self.adnl_addr.is_some() {
+        let tag = if self.adnl_addr.is_some() {
             Self::TAG_WITH_ADNL
         } else {
             Self::TAG_BASIC
@@ -1223,29 +1217,19 @@ impl Store for ValidatorDescription {
         ok!(builder.store_u256(&self.public_key));
         ok!(builder.store_u64(self.weight));
 
-        let mut adnl = self.adnl_addr.as_ref();
-        if with_mc_seqno {
-            adnl = Some(HashBytes::wrap(&[0; 32]));
-        }
-
-        if let Some(adnl) = adnl {
+        if let Some(adnl) = &self.adnl_addr {
             ok!(builder.store_u256(adnl));
         }
 
-        if with_mc_seqno {
-            builder.store_u32(self.mc_seqno_since)
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 }
 
 impl<'a> Load<'a> for ValidatorDescription {
     fn load_from(slice: &mut CellSlice<'a>) -> Result<Self, Error> {
-        let (with_adnl, with_mc_seqno) = match slice.load_u8() {
-            Ok(Self::TAG_BASIC) => (false, false),
-            Ok(Self::TAG_WITH_ADNL) => (true, false),
-            Ok(Self::TAG_WITH_MC_SEQNO) => (true, true),
+        let with_adnl = match slice.load_u8() {
+            Ok(Self::TAG_BASIC) => false,
+            Ok(Self::TAG_WITH_ADNL) => true,
             Ok(_) => return Err(Error::InvalidTag),
             Err(e) => return Err(e),
         };
@@ -1263,11 +1247,6 @@ impl<'a> Load<'a> for ValidatorDescription {
                 Some(ok!(slice.load_u256()))
             } else {
                 None
-            },
-            mc_seqno_since: if with_mc_seqno {
-                ok!(slice.load_u32())
-            } else {
-                0
             },
             prev_total_weight: 0,
         })

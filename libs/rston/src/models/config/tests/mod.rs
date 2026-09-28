@@ -2,6 +2,30 @@ use super::*;
 use crate::prelude::Boc;
 
 #[test]
+fn global_version() {
+    let mut config = BlockchainConfig::new_empty(HashBytes::ZERO);
+    for (mask, expected) in [
+        (0, "c40000000c0000000000000000"),
+        (0x3ff, "c40000000c00000000000003ff"),
+        (0x8000000000000400, "c40000000c8000000000000400"),
+        (u64::MAX, "c40000000cffffffffffffffff"),
+    ] {
+        let version = GlobalVersion {
+            version: 12,
+            capabilities: mask.into(),
+        };
+        config.set_global_version(&version).unwrap();
+        let cell = CellBuilder::build_from(&config).unwrap();
+        let parsed: BlockchainConfig = cell.parse().unwrap();
+        assert_eq!(parsed.get_global_version().unwrap(), version);
+        assert_eq!(
+            hex::encode(parsed.get_raw_cell(8).unwrap().unwrap().data()),
+            expected
+        );
+    }
+}
+
+#[test]
 fn simple_config() {
     use std::num::NonZeroU32;
 
@@ -297,6 +321,14 @@ fn prod_config() {
         config.contains_next_validator_set().unwrap();
 
         config.get_current_validator_set().unwrap();
+
+        for id in 32..=37 {
+            if let Some(cell) = config.get_raw_cell(id).unwrap() {
+                let validators: ValidatorSet = cell.parse().unwrap();
+                let encoded = CellBuilder::build_from(&validators).unwrap();
+                assert_eq!(encoded.parse::<ValidatorSet>().unwrap(), validators);
+            }
+        }
     }
 
     // Some old config from the network beginning
@@ -332,6 +364,39 @@ fn create_config() {
 }
 
 #[test]
+fn validator_description() {
+    for (tag, adnl_addr) in [
+        (0x53, None),
+        (0x73, Some(HashBytes([0x22; 32]))),
+        (0x73, Some(HashBytes::ZERO)),
+    ] {
+        // TON validator#53 and validator_addr#73 both contain a SigPubKey and weight.
+        let mut builder = CellBuilder::new();
+        builder.store_u8(tag).unwrap();
+        builder.store_u32(0x8e81278a).unwrap();
+        builder.store_u256(&HashBytes([0x11; 32])).unwrap();
+        builder.store_u64(123456789).unwrap();
+        if let Some(adnl) = &adnl_addr {
+            builder.store_u256(adnl).unwrap();
+        }
+        let cell = builder.build().unwrap();
+
+        let validator = cell.parse::<ValidatorDescription>().unwrap();
+        assert_eq!(validator.public_key, HashBytes([0x11; 32]));
+        assert_eq!(validator.weight, 123456789);
+        assert_eq!(validator.adnl_addr, adnl_addr);
+        assert_eq!(CellBuilder::build_from(&validator).unwrap(), cell);
+
+        #[cfg(feature = "serde")]
+        {
+            let json = serde_json::to_string(&validator).unwrap();
+            let parsed: ValidatorDescription = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed, validator);
+        }
+    }
+}
+
+#[test]
 fn validator_subset() {
     use crate::boc::BocRepr;
     use crate::models::{ShardIdent, ShardStateUnsplit};
@@ -359,7 +424,6 @@ fn validator_subset() {
                 .unwrap(),
             weight: 1,
             adnl_addr: None,
-            mc_seqno_since: 0,
             prev_total_weight: 0,
         },
         ValidatorDescription {
@@ -368,7 +432,6 @@ fn validator_subset() {
                 .unwrap(),
             weight: 1,
             adnl_addr: None,
-            mc_seqno_since: 0,
             prev_total_weight: 0,
         },
         ValidatorDescription {
@@ -377,7 +440,6 @@ fn validator_subset() {
                 .unwrap(),
             weight: 1,
             adnl_addr: None,
-            mc_seqno_since: 0,
             prev_total_weight: 0,
         },
         ValidatorDescription {
@@ -386,7 +448,6 @@ fn validator_subset() {
                 .unwrap(),
             weight: 1,
             adnl_addr: None,
-            mc_seqno_since: 0,
             prev_total_weight: 0,
         },
         ValidatorDescription {
@@ -395,7 +456,6 @@ fn validator_subset() {
                 .unwrap(),
             weight: 1,
             adnl_addr: None,
-            mc_seqno_since: 0,
             prev_total_weight: 0,
         },
         ValidatorDescription {
@@ -404,7 +464,6 @@ fn validator_subset() {
                 .unwrap(),
             weight: 1,
             adnl_addr: None,
-            mc_seqno_since: 0,
             prev_total_weight: 0,
         },
         ValidatorDescription {
@@ -413,7 +472,6 @@ fn validator_subset() {
                 .unwrap(),
             weight: 1,
             adnl_addr: None,
-            mc_seqno_since: 0,
             prev_total_weight: 0,
         },
     ];
@@ -428,7 +486,13 @@ fn serde() {
     fn check_config(data: &[u8]) {
         let data = Boc::decode(data).unwrap();
 
-        let original = data.parse::<BlockchainConfig>().unwrap();
+        let mut original = data.parse::<BlockchainConfig>().unwrap();
+
+        // JSON represents known capability names; binary serialization retains all bits.
+        let mut version = original.get_global_version().unwrap();
+        version.capabilities = version.capabilities.iter().collect();
+        original.set_global_version(&version).unwrap();
+
         let json = serde_json::to_string_pretty(&original).unwrap();
 
         let parsed: BlockchainConfig = serde_json::from_str(&json).unwrap();

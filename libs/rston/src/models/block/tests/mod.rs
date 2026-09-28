@@ -16,10 +16,14 @@ fn check_block(boc: &[u8], expected_shards: Option<Vec<ShardIdent>>) -> Cell {
 
     #[cfg(feature = "serde")]
     {
+        // JSON represents known capability names; the binary round-trip below retains all bits.
+        let mut info = info.clone();
+        info.gen_software.capabilities = info.gen_software.capabilities.iter().collect();
+
         let json = serde_json::to_string_pretty(&info).unwrap();
         let parsed: BlockInfo = serde_json::from_str(&json).unwrap();
         let parsed_boc = CellBuilder::build_from(&parsed).unwrap();
-        assert_eq!(block.info, parsed_boc);
+        assert_eq!(serialize_any(info), parsed_boc);
     }
 
     println!("info: {info:#?}");

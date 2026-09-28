@@ -8,7 +8,6 @@ pub use self::block_id::*;
 pub use self::block_proof::*;
 pub use self::shard_hashes::*;
 use crate::cell::*;
-use crate::dict::Dict;
 use crate::error::Error;
 use crate::merkle::MerkleUpdate;
 use crate::models::currency::CurrencyCollection;
@@ -23,9 +22,12 @@ mod shard_hashes;
 #[cfg(test)]
 mod tests;
 
-/// Shard block.
-#[derive(Debug, Clone, Eq, PartialEq)]
+/// A masterchain or shardchain block in the TON `block#11ef55aa` layout.
+///
+/// Referenced structures remain lazy until their corresponding `load_*` method is called.
+#[derive(Debug, Clone, Eq, PartialEq, Store, Load)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[tlb(tag = "#11ef55aa")]
 pub struct Block {
     /// Global network id.
     pub global_id: i32,
@@ -35,16 +37,11 @@ pub struct Block {
     pub value_flow: Lazy<ValueFlow>,
     /// Merkle update for the shard state.
     pub state_update: LazyExotic<MerkleUpdate>,
-    /// Merkle updates for the outgoing messages queue.
-    pub out_msg_queue_updates: Option<Dict<u32, LazyExotic<MerkleUpdate>>>,
     /// Block content.
     pub extra: Lazy<BlockExtra>,
 }
 
 impl Block {
-    const TAG_V1: u32 = 0x11ef55aa;
-    const TAG_V2: u32 = 0x11ef55bb;
-
     const DATA_FOR_SIGN_SIZE: usize = 4 + 32 + 32;
     const DATA_FOR_SIGN_TAG: [u8; 4] = [0x70, 0x6e, 0x0b, 0xc5];
 
@@ -75,74 +72,6 @@ impl Block {
         data[4..36].copy_from_slice(block_id.root_hash.as_ref());
         data[36..68].copy_from_slice(block_id.file_hash.as_ref());
         data
-    }
-}
-
-impl Store for Block {
-    fn store_into(
-        &self,
-        builder: &mut CellBuilder,
-        context: &dyn CellContext,
-    ) -> Result<(), Error> {
-        let tag = if self.out_msg_queue_updates.is_none() {
-            Self::TAG_V1
-        } else {
-            Self::TAG_V2
-        };
-
-        ok!(builder.store_u32(tag));
-        ok!(builder.store_u32(self.global_id as u32));
-        ok!(builder.store_reference(self.info.inner().clone()));
-        ok!(builder.store_reference(self.value_flow.inner().clone()));
-
-        ok!(
-            if let Some(out_msg_queue_updates) = &self.out_msg_queue_updates {
-                let cell = {
-                    let mut builder = CellBuilder::new();
-                    ok!(self.state_update.store_into(&mut builder, context));
-                    ok!(out_msg_queue_updates.store_into(&mut builder, context));
-                    ok!(builder.build_ext(context))
-                };
-                builder.store_reference(cell)
-            } else {
-                self.state_update.store_into(builder, context)
-            }
-        );
-
-        self.extra.store_into(builder, context)
-    }
-}
-
-impl<'a> Load<'a> for Block {
-    fn load_from(slice: &mut CellSlice<'a>) -> Result<Self, Error> {
-        let with_out_msg_queue_updates = match ok!(slice.load_u32()) {
-            Self::TAG_V1 => false,
-            Self::TAG_V2 => true,
-            _ => return Err(Error::InvalidTag),
-        };
-
-        let global_id = ok!(slice.load_u32()) as i32;
-        let info = ok!(Lazy::load_from(slice));
-        let value_flow = ok!(Lazy::load_from(slice));
-
-        let (state_update, out_msg_queue_updates) = if with_out_msg_queue_updates {
-            let slice = &mut ok!(slice.load_reference_as_slice());
-            (
-                ok!(Lazy::load_from(slice)),
-                Some(ok!(Dict::load_from(slice))),
-            )
-        } else {
-            (ok!(Lazy::load_from(slice)), None)
-        };
-
-        Ok(Self {
-            global_id,
-            info,
-            value_flow,
-            state_update,
-            out_msg_queue_updates,
-            extra: ok!(<_>::load_from(slice)),
-        })
     }
 }
 

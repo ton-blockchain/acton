@@ -82,155 +82,25 @@ decl_global_capability! {
         /// Mask: `0x0000020`.
         CapShortDequeue = 5,
 
-        /// _unknown_ (possibly just a stub).
+        /// Store the outgoing message queue size in the shard state.
         ///
         /// Mask: `0x0000040`.
-        CapMbppEnabled = 6,
+        CapStoreOutMsgQueueSize = 6,
 
-        /// Precompute storage stats for cells and use this info for storage phase.
-        /// NOTE: changes behavior for storage phase, computing stats for non-unique cells.
+        /// Include message metadata in message envelopes.
         ///
-        /// Mask: `0x0000080`
-        CapFastStorageStat = 7,
+        /// Mask: `0x0000080`.
+        CapMsgMetadata = 7,
 
-        /// Store init code hash in account state.
+        /// Support deferred message dispatch.
         ///
         /// Mask: `0x0000100`.
-        CapInitCodeHash = 8,
+        CapDeferMessages = 8,
 
-        /// Disable hypercube for message routing.
+        /// Include full collated data for block validation.
         ///
         /// Mask: `0x0000200`.
-        CapOffHypercube = 9,
-
-        /// `MYCODE` TVM opcode.
-        ///
-        /// Mask: `0x0000400`.
-        CapMyCode = 10,
-
-        /// `CHANGELIB` and `SETLIBCODE` TVM opcodes.
-        ///
-        /// Mask: `0x0000800`.
-        CapSetLibCode = 11,
-
-        /// Fix in `SETINDEX*` TVM opcodes.
-        ///
-        /// Mask: `0x0001000`.
-        CapFixTupleIndexBug = 12,
-
-        /// Reliable External Messaging Protocol.
-        ///
-        /// Mask: `0x0002000`.
-        CapRemp = 13,
-
-        /// Support for decentralized elections.
-        ///
-        /// Mask: `0x0004000`.
-        CapDelections = 14,
-
-        // Capability 15 is reserved (?)
-        /// Full message body in bounced messages (in the first child cell).
-        ///
-        /// Mask: `0x0010000`.
-        CapFullBodyInBounced = 16,
-
-        /// `STORAGEFEE` TVM opcode.
-        ///
-        /// Mask: `0x0020000`.
-        CapStorageFeeToTvm = 17,
-
-        /// Support for copyleft messages.
-        ///
-        /// Mask: `0x0040000`.
-        CapCopyleft = 18,
-
-        /// `FIND_BY_*` TVM opcodes.
-        ///
-        /// Mask: `0x0080000`.
-        CapIndexAccounts = 19,
-
-        /// `DIFF*`, `ZIP`, `UNZIP` TVM opcodes.
-        ///
-        /// Mask: `0x0100000`.
-        CapDiff = 20,
-
-        /// Cumulative patches to TVM and cells (popsave, exception handler, loops).
-        ///
-        /// Mask: `0x0200000`.
-        CapsTvmBugfixes2022 = 21,
-
-        /// Support for message queues between workchains.
-        ///
-        /// Mask: `0x0400000`.
-        CapWorkchains = 22,
-
-        /// New continuation serialization format.
-        ///
-        /// Mask: `0x0800000`.
-        CapStcontNewFormat = 23,
-
-        /// Use fast stats for `*DATASIZE*` TVM opcodes.
-        ///
-        /// Mask: `0x1000000`.
-        CapFastStorageStatBugfix = 24,
-
-        /// Add support for transparent loading of merkle cells.
-        ///
-        /// Mask: `0x2000000`.
-        CapResolveMerkleCell = 25,
-
-        /// Prepend signature with `global_id` for TVM.
-        ///
-        /// Mask: `0x4000000`.
-        CapSignatureWithId = 26,
-
-        /// Execute bounce phase even after failed action phase.
-        ///
-        /// Mask: `0x8000000`.
-        CapBounceAfterFailedAction = 27,
-
-        /// Groth16 support in TVM.
-        ///
-        /// Mask: `0x10000000`
-        CapGroth16 = 28,
-
-        /// Makes all fees in config in gas units.
-        ///
-        /// Mask: `0x20000000`
-        CapFeeInGasUnits = 29,
-
-        /// Big cells support.
-        ///
-        /// Mask: `0x40000000`
-        CapBigCells = 30,
-
-        /// Suspend addresses using a config param.
-        ///
-        /// Mask: `0x80000000`
-        CapSuspendedList = 31,
-
-        /// Adds intershard communication between master blocks.
-        ///
-        /// Mask: `0x100000000`
-        CapFastFinality = 32,
-
-        /// Allows to suspend accounts by special extra currencies.
-        ///
-        /// Mask: `0x200000000`
-        CapSuspendByMarks = 33,
-
-        /// Omits master block history to save storage space.
-        ///
-        /// Mask: `0x400000000`
-        CapOmitMasterBlockHistory = 34,
-
-        /// Apply signature domain to verified data.
-        ///
-        /// It is a newer version of [`GlobalCapability::CapSignatureWithId`]
-        /// and has a higher priority if both are enabled at the same time.
-        ///
-        /// Mask: `0x800000000`
-        CapSignatureDomain = 35,
+        CapFullCollatedData = 9,
     }
 }
 
@@ -313,7 +183,8 @@ pub struct GlobalVersion {
 
 /// A set of enabled capabilities.
 ///
-/// See [`GlobalCapability`].
+/// Binary serialization preserves the full mask. Human-readable serialization
+/// contains only the names of known [`GlobalCapability`] flags.
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Store, Load)]
 #[repr(transparent)]
 pub struct GlobalCapabilities(u64);
@@ -448,8 +319,8 @@ impl<'de> serde::Deserialize<'de> for GlobalCapabilities {
                 A: serde::de::SeqAccess<'de>,
             {
                 let mut res = GlobalCapabilities::default();
-                while let Some(capacility) = ok!(seq.next_element::<GlobalCapability>()) {
-                    res |= capacility;
+                while let Some(capability) = ok!(seq.next_element::<GlobalCapability>()) {
+                    res |= capability;
                 }
                 Ok(res)
             }
@@ -505,28 +376,37 @@ mod tests {
 
     #[test]
     fn capabilities_iter() {
-        let capabilities = GlobalCapability::CapCreateStatsEnabled
-            | GlobalCapability::CapBounceMsgBody
-            | GlobalCapability::CapReportVersion
-            | GlobalCapability::CapShortDequeue
-            | GlobalCapability::CapFastStorageStat
-            | GlobalCapability::CapOffHypercube
-            | GlobalCapability::CapMyCode
-            | GlobalCapability::CapFixTupleIndexBug;
+        let capabilities = GlobalCapabilities::new(0x3ff);
 
         let capabilities = capabilities.into_iter().collect::<Vec<_>>();
         assert_eq!(
             capabilities,
             [
+                GlobalCapability::CapIhrEnabled,
                 GlobalCapability::CapCreateStatsEnabled,
                 GlobalCapability::CapBounceMsgBody,
                 GlobalCapability::CapReportVersion,
+                GlobalCapability::CapSplitMergeTransactions,
                 GlobalCapability::CapShortDequeue,
-                GlobalCapability::CapFastStorageStat,
-                GlobalCapability::CapOffHypercube,
-                GlobalCapability::CapMyCode,
-                GlobalCapability::CapFixTupleIndexBug
+                GlobalCapability::CapStoreOutMsgQueueSize,
+                GlobalCapability::CapMsgMetadata,
+                GlobalCapability::CapDeferMessages,
+                GlobalCapability::CapFullCollatedData
             ]
         );
+
+        #[cfg(feature = "serde")]
+        {
+            let json = serde_json::to_string(&GlobalCapabilities::new(0x3ff)).unwrap();
+            let parsed: GlobalCapabilities = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed.into_inner(), 0x3ff);
+            assert_eq!(
+                serde_json::from_str::<Vec<String>>(&json).unwrap(),
+                capabilities
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+            );
+        }
     }
 }
