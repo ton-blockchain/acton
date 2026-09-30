@@ -167,7 +167,7 @@ jobs:
         if: failure() && steps.test-ui-e2e.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: test-ui-e2e-results
+          name: test-ui-e2e-results-${{ matrix.arch }}
           path: test-results/acton-test-ui-e2e
           retention-days: 1
           if-no-files-found: ignore
@@ -184,7 +184,7 @@ jobs:
         if: failure() && steps.explorer-ui-e2e.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: explorer-ui-e2e-results
+          name: explorer-ui-e2e-results-${{ matrix.arch }}
           path: test-results/acton-ui-e2e
           retention-days: 1
           if-no-files-found: ignore

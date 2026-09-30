@@ -30,14 +30,21 @@ _TARGET_VERSION_MAP: dict[str, dict[str, str]] = {
     },
 }
 
-_TARGET_DEPENDENCY_MAP: dict[str, set[str]] = {
-    "x86_64-unknown-linux-gnu": {
-        "libstdc++.so.6",
+_TARGET_DEPENDENCY_MAP: dict[str, list[str]] = {
+    "x86_64-unknown-linux-gnu": [
+        "ld-linux-x86-64.so.2",
+        "libc.so.6",
         "libgcc_s.so.1",
         "libm.so.6",
+        "libstdc++.so.6",
+    ],
+    "aarch64-unknown-linux-gnu": [
+        "ld-linux-aarch64.so.1",
         "libc.so.6",
-        "ld-linux-x86-64.so.2",
-    },
+        "libgcc_s.so.1",
+        "libm.so.6",
+        "libstdc++.so.6",
+    ],
 }
 
 _OTOOL_PATH = "/usr/bin/otool"
@@ -251,7 +258,7 @@ def _run_linux_checks(target: RustTarget, binary_path: str) -> list[str]:
                 ),
             )
 
-    expected_dependencies = _TARGET_DEPENDENCY_MAP[target_key]
+    expected_dependencies = set(_TARGET_DEPENDENCY_MAP[target_key])
     readelf_parser = ReadelfParser.from_binary_path(binary_path)
     actual_dependencies = set(readelf_parser.parse_dependencies())
 
