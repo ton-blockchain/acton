@@ -38,8 +38,7 @@ jobs:
             sys: linux
             abi: gnu
     runs-on: ${{ matrix.runner }}
-    # Temporarily disabled while checking macOS binary dependencies.
-    if: false
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     env:
       TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }}
 
@@ -155,12 +154,10 @@ jobs:
         run: echo "${GITHUB_WORKSPACE}/target/${TARGET_NAME}/release" >> "$GITHUB_PATH"
 
       - name: Test acton binary
-        if: false
         run: |
           acton --help
 
       - name: Run Test UI E2E
-        if: false
         id: test-ui-e2e
         env:
           ACTON_E2E_BIN: ${{ github.workspace }}/target/${{ env.TARGET_NAME }}/release/acton
@@ -193,7 +190,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Run tests
-        if: false
+        if: steps.changes.outputs.packages_only != 'true'
         run: |
           just test
 
@@ -239,8 +236,7 @@ jobs:
     name: Lint Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }})
     strategy: *runner_linux_strategy
     runs-on: ${{ matrix.runner }}
-    # Temporarily disabled while checking macOS binary dependencies.
-    if: false
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     env:
       TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }}
 
@@ -288,19 +284,14 @@ jobs:
   build-macos:
     name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }})
     strategy: &runner_macos_strategy
-      fail-fast: false
       matrix:
         include:
-          - runner: macos-15-intel
-            arch: x86_64
-            vendor: apple
-            sys: darwin
           - runner: macos-15
             arch: aarch64
             vendor: apple
             sys: darwin
     runs-on: ${{ matrix.runner }}
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: github.ref == 'refs/heads/master' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     env:
       TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}
 
@@ -394,12 +385,11 @@ jobs:
         run: echo "${GITHUB_WORKSPACE}/target/${TARGET_NAME}/release" >> "$GITHUB_PATH"
 
       - name: Test acton binary
-        if: false
         run: |
           acton --help
 
       - name: Run tests
-        if: false
+        if: steps.changes.outputs.packages_only != 'true'
         run: |
           just test
 
@@ -427,8 +417,6 @@ jobs:
           if-no-files-found: error
 
       - name: Check Acton target binary
-        # Collect the dependency list before making the x86_64 check required.
-        continue-on-error: ${{ matrix.arch == 'x86_64' }}
         shell: bash
         # language=Bash
         run: |
