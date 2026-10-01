@@ -53,17 +53,27 @@ _TARGET_DEPENDENCY_MAP: dict[str, list[str]] = {
         "libm.so.6",
         "libstdc++.so.6",
     ],
-    "x86_64-apple-darwin": [],
-    "aarch64-apple-darwin": [
-        "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+    "x86_64-apple-darwin": [
         "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
         "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+        "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
         "/System/Library/Frameworks/Security.framework/Versions/A/Security",
-        "/usr/lib/libSystem.B.dylib",
-        "/usr/lib/libobjc.A.dylib",
         "/usr/lib/libc++.1.dylib",
         "/usr/lib/libc++abi.dylib",
         "/usr/lib/libiconv.2.dylib",
+        "/usr/lib/libobjc.A.dylib",
+        "/usr/lib/libSystem.B.dylib",
+    ],
+    "aarch64-apple-darwin": [
+        "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+        "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+        "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+        "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+        "/usr/lib/libc++.1.dylib",
+        "/usr/lib/libc++abi.dylib",
+        "/usr/lib/libiconv.2.dylib",
+        "/usr/lib/libobjc.A.dylib",
+        "/usr/lib/libSystem.B.dylib",
     ],
 }
 
