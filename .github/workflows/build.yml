@@ -300,7 +300,7 @@ jobs:
             vendor: apple
             sys: darwin
     runs-on: ${{ matrix.runner }}
-    if: github.ref == 'refs/heads/master' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     env:
       TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}
 
