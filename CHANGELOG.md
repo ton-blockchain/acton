@@ -62,6 +62,7 @@ All notable changes to this project will be documented in this file.
 
 ### Dependencies
 
+- Reject unexpected shared-library dependencies in macOS ARM64 binary checks.
 - Validate the shared-library dependency set in Linux release binary checks.
 - Use `brace-expansion` version `5.0.12` in generated dApps.
 - Allow the CC0-1.0 dependencies used by BIP39 wallet support in dependency checks.

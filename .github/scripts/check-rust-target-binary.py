@@ -13,6 +13,14 @@ _VERSION_PATTERNS: dict[str, re.Pattern[str]] = {
 
 _READELF_NEEDED_PATTERN: re.Pattern[str] = re.compile(r"\(NEEDED\).*?\[([^]]+)]")
 
+_OTOOL_DEPENDENCY_COMMANDS: list[str] = [
+    "LC_LOAD_DYLIB",
+    "LC_LOAD_WEAK_DYLIB",
+    "LC_REEXPORT_DYLIB",
+    "LC_LOAD_UPWARD_DYLIB",
+    "LC_LAZY_LOAD_DYLIB",
+]
+
 _TARGET_VERSION_MAP: dict[str, dict[str, str]] = {
     "x86_64-unknown-linux-gnu": {
         "GLIBC": "2.34",
@@ -44,6 +52,17 @@ _TARGET_DEPENDENCY_MAP: dict[str, list[str]] = {
         "libgcc_s.so.1",
         "libm.so.6",
         "libstdc++.so.6",
+    ],
+    "aarch64-apple-darwin": [
+        "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+        "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+        "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+        "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+        "/usr/lib/libSystem.B.dylib",
+        "/usr/lib/libobjc.A.dylib",
+        "/usr/lib/libc++.1.dylib",
+        "/usr/lib/libc++abi.dylib",
+        "/usr/lib/libiconv.2.dylib",
     ],
 }
 
@@ -97,7 +116,8 @@ class OtoolParser:
     def from_binary_path(cls, binary_path: str, arch: str) -> "OtoolParser":
         return cls(cls._run(binary_path, arch))
 
-    def parse_field(self, block_name: str, field_name: str) -> str:
+    def parse_fields(self, block_name: str, field_name: str) -> list[str]:
+        values: list[str] = []
         in_block = False
         field_prefix = f"{field_name} "
 
@@ -109,10 +129,24 @@ class OtoolParser:
                 continue
 
             if in_block and stripped.startswith(field_prefix):
-                return stripped.removeprefix(field_prefix).strip()
+                values.append(stripped.removeprefix(field_prefix).strip())
+
+        return values
+
+    def parse_first_field(self, block_name: str, field_name: str) -> str:
+        values = self.parse_fields(block_name, field_name)
+        if len(values) != 0:
+            return values[0]
 
         message = f"unable to find '{field_name}' in '{block_name}' block"
         raise ValueError(message)
+
+    def parse_dependencies(self) -> list[str]:
+        return [
+            dependency.rsplit(" (offset ", 1)[0]
+            for command in _OTOOL_DEPENDENCY_COMMANDS
+            for dependency in self.parse_fields(command, "name")
+        ]
 
 
 class StringsParser:
@@ -299,7 +333,7 @@ def _run_apple_checks(target: RustTarget, binary_path: str) -> list[str]:
             raise ValueError(message)
 
         try:
-            actual_value = parser.parse_field(parts[0], parts[1])
+            actual_value = parser.parse_first_field(parts[0], parts[1])
         except ValueError as error:
             errors.append(f"apple check failed for '{target_key}': {error}")
             continue
@@ -311,6 +345,20 @@ def _run_apple_checks(target: RustTarget, binary_path: str) -> list[str]:
                     f"expected '{expected_value}', actual '{actual_value}'"
                 ),
             )
+
+    expected_dependencies = set(_TARGET_DEPENDENCY_MAP[target_key])
+    actual_dependencies = set(parser.parse_dependencies())
+
+    if actual_dependencies != expected_dependencies:
+        missing_dependencies = sorted(expected_dependencies - actual_dependencies)
+        unexpected_dependencies = sorted(actual_dependencies - expected_dependencies)
+        errors.append(
+            (
+                f"apple check failed for '{target_key}': shared library dependencies, "
+                f"missing {missing_dependencies}, "
+                f"unexpected {unexpected_dependencies}"
+            ),
+        )
 
     return errors
 
