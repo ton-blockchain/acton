@@ -330,7 +330,7 @@ fn random_positive_bigint(rng: &mut StdRng, bits: usize) -> BigInt {
     BigInt::from_bytes_be(Sign::Plus, &raw)
 }
 
-fn mask_high_bits(raw: &mut [u8], bits: usize) {
+const fn mask_high_bits(raw: &mut [u8], bits: usize) {
     if raw.is_empty() || bits == 0 {
         return;
     }

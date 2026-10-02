@@ -1066,7 +1066,7 @@ impl<'a> StackReader<'a> {
         Self { slots, pos: 0 }
     }
 
-    pub(crate) fn read_slot(&mut self) -> SlotValue<'a> {
+    pub(crate) const fn read_slot(&mut self) -> SlotValue<'a> {
         if self.pos < self.slots.len() {
             let slot = self.slots[self.pos];
             self.pos += 1;
@@ -1114,7 +1114,7 @@ impl<'a> StackReader<'a> {
 
 /// Extract a single bit from hex-encoded cell data (nibble array — half-bytes).
 /// Each nibble is 4 bits, MSB first: bit N is in nibble N/4, position N%4 from MSB.
-fn get_bit(nibbles: &[u8], bit_pos: usize) -> u8 {
+const fn get_bit(nibbles: &[u8], bit_pos: usize) -> u8 {
     let idx = bit_pos / 4;
     if idx >= nibbles.len() {
         return 0;

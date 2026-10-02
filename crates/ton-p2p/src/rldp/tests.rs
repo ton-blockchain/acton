@@ -31,7 +31,7 @@ async fn recovers_mainnet_answers_with_missing_source_symbols() {
             symbols_count: data_size.div_ceil(SYMBOL_SIZE),
         };
 
-        for record in symbols.chunks_exact(4 + SYMBOL_SIZE as usize) {
+        for record in symbols.as_chunks::<{ 4 + SYMBOL_SIZE as usize }>().0 {
             let seqno = u32::from_le_bytes(record[..4].try_into().unwrap());
             assert_ne!(seqno, missing_symbol);
 

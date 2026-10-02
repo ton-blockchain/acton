@@ -414,9 +414,7 @@ impl<E: Endpoint> Lease<E> {
 
         let metrics = record.classes.entry(self.class.clone()).or_default();
         let elapsed = self.started.elapsed();
-        let outcome;
-
-        match &result {
+        let outcome = match &result {
             Some(Ok(())) => {
                 metrics.successes = metrics.successes.saturating_add(1);
                 let sample = (elapsed.as_secs_f64() * 1000.0).max(0.001);
@@ -431,11 +429,11 @@ impl<E: Endpoint> Lease<E> {
                     .measured_at
                     .insert(self.class.clone(), Instant::now());
                 record.failures = 0;
-                outcome = "success";
+                "success"
             }
             Some(Err(Failure::Unavailable(_))) => {
                 metrics.unavailable = metrics.unavailable.saturating_add(1);
-                outcome = "unavailable";
+                "unavailable"
             }
             Some(Err(Failure::Retryable(_) | Failure::Invalid(_))) => {
                 metrics.failures = metrics.failures.saturating_add(1);
@@ -450,9 +448,9 @@ impl<E: Endpoint> Lease<E> {
                 // suspension, especially one caused by invalid data.
                 record.suspended_until =
                     Some(record.suspended_until.map_or(until, |old| old.max(until)));
-                outcome = "failed";
+                "failed"
             }
-            Some(Err(Failure::Fatal(_))) => outcome = "fatal",
+            Some(Err(Failure::Fatal(_))) => "fatal",
             None => {
                 metrics.cancelled = metrics.cancelled.saturating_add(1);
                 // A cancelled request has no measured response time, but its
@@ -467,9 +465,9 @@ impl<E: Endpoint> Lease<E> {
                     );
                     metrics.updated_at = unix_seconds();
                 }
-                outcome = "cancelled";
+                "cancelled"
             }
-        }
+        };
 
         debug!(
             operation = "service_pool_attempt",

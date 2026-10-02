@@ -17,7 +17,7 @@ const fn skip_leading_underscores(bytes: &[u8]) -> usize {
     i
 }
 
-pub(crate) fn is_camel_ascii(s: &str) -> bool {
+pub(crate) const fn is_camel_ascii(s: &str) -> bool {
     let bytes = s.as_bytes();
     let mut i = skip_leading_underscores(bytes);
     if i >= bytes.len() {
@@ -53,7 +53,7 @@ pub(crate) fn is_camel_ascii(s: &str) -> bool {
     true
 }
 
-pub(crate) fn is_pascal_ascii(s: &str) -> bool {
+pub(crate) const fn is_pascal_ascii(s: &str) -> bool {
     let bytes = s.as_bytes();
     let mut i = skip_leading_underscores(bytes);
     if i >= bytes.len() {
@@ -82,7 +82,7 @@ pub(crate) fn is_pascal_ascii(s: &str) -> bool {
     true
 }
 
-pub(crate) fn is_screaming_snake_ascii(s: &str) -> bool {
+pub(crate) const fn is_screaming_snake_ascii(s: &str) -> bool {
     let bytes = s.as_bytes();
     let mut i = skip_leading_underscores(bytes);
     if i >= bytes.len() {
