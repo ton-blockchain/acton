@@ -9,7 +9,7 @@ const fn is_upper_or_digit(b: u8) -> bool {
 }
 
 #[inline]
-fn skip_leading_underscores(bytes: &[u8]) -> usize {
+const fn skip_leading_underscores(bytes: &[u8]) -> usize {
     let mut i = 0;
     while i < bytes.len() && bytes[i] == b'_' {
         i += 1;

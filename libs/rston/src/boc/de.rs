@@ -48,38 +48,21 @@ impl<'a> BocHeader<'a> {
         // SAFETY: we have already requested more than 6 bytes
         let [flags, offset_size] = unsafe { *(data.as_ptr().add(4) as *const [u8; 2]) };
 
-        let has_index;
-        let has_crc;
-        let has_cache_bits;
-        let ref_size;
-        let supports_multiple_roots;
-
         // SAFETY: we have already requested more than 4 bytes
         let boc_tag = unsafe { reader.read_boc_tag(data) };
-        match boc_tag {
-            Some(BocTag::Indexed) => {
-                has_index = true;
-                has_crc = false;
-                has_cache_bits = false;
-                ref_size = flags as usize;
-                supports_multiple_roots = false;
-            }
-            Some(BocTag::IndexedCrc32) => {
-                has_index = true;
-                has_crc = true;
-                has_cache_bits = false;
-                ref_size = flags as usize;
-                supports_multiple_roots = false;
-            }
-            Some(BocTag::Generic) => {
-                has_index = flags & 0b1000_0000 != 0;
-                has_crc = flags & 0b0100_0000 != 0;
-                has_cache_bits = flags & 0b0010_0000 != 0;
-                ref_size = (flags & 0b0000_0111) as usize;
-                supports_multiple_roots = true;
-            }
+        let (has_index, has_crc, has_cache_bits, ref_size, supports_multiple_roots) = match boc_tag
+        {
+            Some(BocTag::Indexed) => (true, false, false, flags as usize, false),
+            Some(BocTag::IndexedCrc32) => (true, true, false, flags as usize, false),
+            Some(BocTag::Generic) => (
+                flags & 0b1000_0000 != 0,
+                flags & 0b0100_0000 != 0,
+                flags & 0b0010_0000 != 0,
+                (flags & 0b0000_0111) as usize,
+                true,
+            ),
             None => return Err(Error::UnknownBocTag),
-        }
+        };
 
         if unlikely(has_cache_bits && !has_index) {
             return Err(Error::InvalidHeader);

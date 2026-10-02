@@ -74,9 +74,9 @@ pub(super) fn router(backend: String) -> Router {
         })
 }
 
-async fn proxy(AxumState(state): AxumState<State>, request: Request) -> Result<Response, Response> {
+async fn proxy(AxumState(state): AxumState<State>, request: Request) -> Response {
     if request.method() == axum::http::Method::OPTIONS {
-        return Ok(StatusCode::NO_CONTENT.into_response());
+        return StatusCode::NO_CONTENT.into_response();
     }
 
     let (parts, body) = request.into_parts();
@@ -85,39 +85,48 @@ async fn proxy(AxumState(state): AxumState<State>, request: Request) -> Result<R
         .path_and_query()
         .map_or("/", |value| value.as_str());
     let url = format!("{}{path_and_query}", state.backend);
-    let body = to_bytes(body, 32 * 1024 * 1024).await.map_err(|error| {
-        proxy_error(
-            StatusCode::PAYLOAD_TOO_LARGE,
-            format!("failed to read request body: {error}"),
-        )
-    })?;
+    let body = match to_bytes(body, 32 * 1024 * 1024).await {
+        Ok(body) => body,
+        Err(error) => {
+            return proxy_error(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                format!("failed to read request body: {error}"),
+            );
+        }
+    };
 
     let mut headers = parts.headers;
     remove_hop_by_hop_headers(&mut headers);
-    let upstream = state
+    let upstream = match state
         .client
         .request(parts.method, url)
         .headers(headers)
         .body(body)
         .send()
         .await
-        .map_err(|error| {
-            proxy_error(
+    {
+        Ok(upstream) => upstream,
+        Err(error) => {
+            return proxy_error(
                 StatusCode::BAD_GATEWAY,
                 format!("TON HTTP API backend request failed: {error}"),
-            )
-        })?;
+            );
+        }
+    };
 
     let status = upstream.status();
     let mut headers = upstream.headers().clone();
     remove_hop_by_hop_headers(&mut headers);
-    let body = upstream.bytes().await.map_err(|error| {
-        proxy_error(
-            StatusCode::BAD_GATEWAY,
-            format!("failed to read TON HTTP API backend response: {error}"),
-        )
-    })?;
-    Ok((status, headers, body).into_response())
+    let body = match upstream.bytes().await {
+        Ok(body) => body,
+        Err(error) => {
+            return proxy_error(
+                StatusCode::BAD_GATEWAY,
+                format!("failed to read TON HTTP API backend response: {error}"),
+            );
+        }
+    };
+    (status, headers, body).into_response()
 }
 
 fn remove_hop_by_hop_headers(headers: &mut HeaderMap) {

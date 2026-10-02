@@ -526,10 +526,13 @@ pub(crate) fn encode_to_hex_slice(
         return Err(hex::FromHexError::InvalidStringLength);
     }
 
-    for (byte, output) in input.iter().zip(output.chunks_exact_mut(2)) {
+    let (chunks, remainder) = output.as_chunks_mut::<2>();
+    debug_assert!(remainder.is_empty());
+
+    for (byte, [out_high, out_low]) in input.iter().zip(chunks) {
         let (high, low) = byte2hex(*byte, table);
-        output[0] = high;
-        output[1] = low;
+        *out_high = high;
+        *out_low = low;
     }
 
     Ok(())
