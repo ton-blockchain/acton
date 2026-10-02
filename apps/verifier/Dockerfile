@@ -12,7 +12,7 @@ COPY packages ./packages
 RUN bun install --frozen-lockfile --filter @acton/verifier-ui \
     && bun --filter @acton/verifier-ui build
 
-FROM rust:1.97.1-slim-bookworm AS rust-builder
+FROM rust:1.98.1-slim-bookworm AS rust-builder
 
 WORKDIR /build/apps/verifier
 ARG VCS_REF=unknown

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG RUST_VERSION=1.97.1
+ARG RUST_VERSION=1.98.1
 ARG GO_VERSION=1.24.11
 ARG UBUNTU_VERSION=24.04
 ARG LOCALTON_BASE_IMAGE=ghcr.io/ton-blockchain/localton:sha-72bf7425d9d034adf81ac7ebd900c7d03182f234

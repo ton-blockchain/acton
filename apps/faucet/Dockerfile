@@ -9,7 +9,7 @@ COPY packages ./packages
 RUN bun install --frozen-lockfile --filter @acton/faucet-ui \
     && bun --filter @acton/faucet-ui build
 
-FROM rust:1.97.1-slim-bookworm AS rust-builder
+FROM rust:1.98.1-slim-bookworm AS rust-builder
 
 WORKDIR /build/apps/faucet
 ARG VCS_REF=unknown

@@ -20,7 +20,7 @@ debug-assertions = false
 version = "0.1.0"
 authors = ["TON Core"]
 edition = "2024"
-rust-version = "1.97.1"
+rust-version = "1.98.1"
 repository = "https://github.com/ton-blockchain/acton"
 license = "MIT OR Apache-2.0"
 
