@@ -1484,6 +1484,10 @@
     "name": "Coinone Deposit"
   },
   {
+    "address": "0:18aa8e2eed51747dae033c079b93883d941cad8f65459f2ee9cd7474b6b8ed5d",
+    "name": "DeDust USDT vault"
+  },
+  {
     "address": "0:193c98e9c7f542a1a0095bbf2a62d6d42b9f48b217b2b02460cda494729ee4fc",
     "name": "Orbit Bridge POLYGON Minter"
   },
@@ -1906,6 +1910,10 @@
   {
     "address": "0:4311c5217bcf65b378773d5183d51978127fd4b74130b056ac3caa39d688aa8a",
     "name": "OPTUS DEX"
+  },
+  {
+    "address": "0:43512860d54980cf24d59868a30e679927fb1373c10964db7500edcdf690abc4",
+    "name": "Telegram Stars Withdraw 2"
   },
   {
     "address": "0:436a76c2794a88e3fbfec6b9c0374fc8db046f10868b835420d9937973a665d4",
@@ -2760,6 +2768,10 @@
     "name": "STON.fi DEX"
   },
   {
+    "address": "0:a9bc094e3b3a9c23f354c7007476ac3fcddd12af6aed4b4168337e47692c5323",
+    "name": "DeDust GRAM vault"
+  },
+  {
     "address": "0:a9c1ad2fea5bc6034d6e2867ec5b508ad4d779f5a3bfc551461873f2ec94e084",
     "name": "Marketapp Proxy"
   },
@@ -3346,6 +3358,10 @@
   {
     "address": "0:e58d0685ac8e90a05c34bef9fa18375bb7ea090b7834197061a2cfaf4b6aa0e4",
     "name": "Marketapp Gift Sender"
+  },
+  {
+    "address": "0:e6f3d8824f46b1efbab9afc684793428c55fed69b46a15a49be69a29bc49e530",
+    "name": "Telegram Stars Withdraw 1"
   },
   {
     "address": "0:e796c95723646d2355a12e6b5e9646f8095406c6bf04ff14888e5d0783bf6336",
