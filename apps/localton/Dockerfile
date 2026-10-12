@@ -5,7 +5,7 @@ ARG GO_VERSION=1.24.11
 ARG UBUNTU_VERSION=24.04
 ARG LOCALTON_BASE_IMAGE=ghcr.io/ton-blockchain/localton:sha-72bf7425d9d034adf81ac7ebd900c7d03182f234
 
-FROM oven/bun:1.4.0 AS ui-builder
+FROM oven/bun:1.4.3 AS ui-builder
 WORKDIR /repo
 COPY package.json bun.lock bunfig.toml ./
 COPY packages ./packages

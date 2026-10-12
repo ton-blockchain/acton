@@ -43,5 +43,5 @@
     "@playwright/test": "1.59.0",
     "react-doctor": "^0.9.17"
   },
-  "packageManager": "bun@1.4.0"
+  "packageManager": "bun@1.4.3"
 }

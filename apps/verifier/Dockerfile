@@ -3,7 +3,7 @@
 # TODO: Remove yq from the runtime image once repository initialization no longer parses TOML in shell.
 FROM mikefarah/yq:4.53.6 AS yq
 
-FROM oven/bun:1.4.0-slim AS frontend-builder
+FROM oven/bun:1.4.3-slim AS frontend-builder
 
 WORKDIR /workspace
 
