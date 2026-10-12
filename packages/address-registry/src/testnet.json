@@ -108,12 +108,20 @@
     "name": ".ton DNS"
   },
   {
+    "address": "0:bd95039a1070ba6004a2249d8daca10e9484cc31099cf23d3f899107cbee2c97",
+    "name": "MyTonWallet Swap Fees"
+  },
+  {
     "address": "0:c03f27bb1c03c0025e165e9cf98ce09d85fd87f61f50924cd143ee8ae6eb22b9",
     "name": "STON.fi DEX"
   },
   {
     "address": "0:c21fabd3d0cbd5a746c160d8e838da6481be7534c3cd3895c54161b9e17a0802",
     "name": "CAT Services"
+  },
+  {
+    "address": "0:d49106e94d5220b7bbfaebe253151fb7f9e5d1173ff857ae85f947e7eaf3a0d0",
+    "name": "MyTonWallet Swap Fees"
   },
   {
     "address": "0:dae153a74d894bbc32748198cd626e4f5df4a69ad2fa56ce80fc2644b5708d20",

@@ -1,1 +1,106 @@
-[]
+[
+  {
+    "address": "0:0338def34b84c6ee9134a04ab1601450be446340a37ae259de57cb37bdb590cd",
+    "candidates": [
+      {
+        "source": "ton-assets",
+        "name": "OKX 4"
+      },
+      {
+        "source": "address-book",
+        "name": "OKX"
+      }
+    ]
+  },
+  {
+    "address": "0:24da1e7b8da901e5b3dd0f98c397feb6e5a5ea483195a8b6bd0682cf2c5327ae",
+    "candidates": [
+      {
+        "source": "ton-assets",
+        "name": "OKX 6"
+      },
+      {
+        "source": "address-book",
+        "name": "OKX"
+      }
+    ]
+  },
+  {
+    "address": "0:7f2e84c723d8b6b6b1aacf810c8c26ab23c22022b464b87104b2d3065b0ea70b",
+    "candidates": [
+      {
+        "source": "ton-assets",
+        "name": "OKX 7"
+      },
+      {
+        "source": "address-book",
+        "name": "OKX"
+      }
+    ]
+  },
+  {
+    "address": "0:854ec4521efd52ad43bcf1988e4c44ebdf9a26ad18fa51abfdb685fc3b348a5c",
+    "candidates": [
+      {
+        "source": "ton-assets",
+        "name": "OKX 8"
+      },
+      {
+        "source": "address-book",
+        "name": "OKX"
+      }
+    ]
+  },
+  {
+    "address": "0:a30a49ec725e9f57244b66af4c2da7ab76004b4fce80d3a34b1cd0c37762abce",
+    "candidates": [
+      {
+        "source": "ton-assets",
+        "name": "OKX 5"
+      },
+      {
+        "source": "address-book",
+        "name": "OKX"
+      }
+    ]
+  },
+  {
+    "address": "0:e7e86da08742ed933434ffeb8f08a63c7e100ee842e25f599a9cbf0891574a6c",
+    "candidates": [
+      {
+        "source": "ton-assets",
+        "name": "OKX 3"
+      },
+      {
+        "source": "address-book",
+        "name": "OKX"
+      }
+    ]
+  },
+  {
+    "address": "0:f15db2c62cd86aff0860d39c491fc73a31395fafeb5945e644498562260c782e",
+    "candidates": [
+      {
+        "source": "ton-assets",
+        "name": "OKX 2"
+      },
+      {
+        "source": "address-book",
+        "name": "OKX"
+      }
+    ]
+  },
+  {
+    "address": "0:fd8a466aeb13e02a3ce67411b41b44bcd11bd42636f0807acf6570ca73fc2c13",
+    "candidates": [
+      {
+        "source": "ton-assets",
+        "name": "Durov’s Caps"
+      },
+      {
+        "source": "address-book",
+        "name": "Durov's Caps"
+      }
+    ]
+  }
+]
