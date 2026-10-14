@@ -16,6 +16,9 @@ build-dev:
 build-localton-dev-image:
     docker build --file apps/localton/Dockerfile --target localton-rust-only --build-arg LOCALTON_BASE_IMAGE="{{ LOCALTON_BASE_IMAGE }}" --build-arg VCS_REF="$(git rev-parse HEAD)" --tag "{{ LOCALTON_DEV_IMAGE }}" .
 
+build-localton-ton-image ton_dir target="localton-ton-dev":
+    bash apps/localton/docker/build-with-ton-checkout.sh "{{ join(invocation_directory(), ton_dir) }}" --file apps/localton/Dockerfile --target "{{ target }}" --build-arg TON_BINARIES=source --build-arg TON_BUILD_JOBS --build-arg TON_CLANG_VERSION --build-arg LOCALTON_BASE_IMAGE="{{ LOCALTON_BASE_IMAGE }}" --build-arg VCS_REF="$(git rev-parse HEAD)" --tag "{{ LOCALTON_DEV_IMAGE }}" .
+
 build-source-trace-wasm:
     wasm-pack build crates/acton-source-trace-wasm --target web --out-dir "{{ SOURCE_TRACE_WASM_OUT }}" --out-name acton_source_trace_wasm
 

@@ -725,6 +725,36 @@ ACTON_STUDIO_LOCALTON_IMAGE=localton:dev cargo run -- studio start
 
 Set `LOCALTON_BASE_IMAGE` to use another base image. Set `ACTON_STUDIO_LOCALTON_IMAGE` to build and run another local tag. The environment variable applies when Studio creates a new full TON network environment. Existing environments keep the image recorded in their runtime configuration.
 
+### Build native TON from a checkout
+
+The image uses the pinned official TON release by default. To test TON changes, build native TON from a local checkout of the [TON source repository](https://github.com/ton-blockchain/ton) instead. Initialize its submodules first with `git submodule update --init --recursive`. A source build also includes `create-hardfork`, which the official release omits.
+
+From the repository root, this command extends the published image with TON built from the checkout and the `localton` binary built from this repository:
+
+```bash
+just build-localton-ton-image ~/path/to/ton
+ACTON_STUDIO_LOCALTON_IMAGE=localton:dev cargo run -- studio start
+```
+
+To build the complete image, including API V2 and the indexer, select the `runtime` target:
+
+```bash
+just build-localton-ton-image ~/path/to/ton runtime
+```
+
+The recipe passes only the files that git tracks in the checkout and its submodules, including uncommitted changes. Add new files to the index with `git add` or `git add --intent-to-add` so that the build sees them. Git metadata, build directories, and other untracked files never reach the builder.
+
+You can also pass a checkout to `docker build` directly as the `ton-src` build context. BuildKit then transfers the whole directory, except paths listed in the checkout's own `.dockerignore`:
+
+```bash
+docker build --file apps/localton/Dockerfile \
+  --build-arg TON_BINARIES=source \
+  --build-context ton-src="$HOME/path/to/ton" \
+  --tag localton:dev .
+```
+
+Set the `TON_BUILD_JOBS` build argument to change compiler parallelism (default `4`), or `TON_CLANG_VERSION` to use another clang major version from apt.llvm.org (default `22`). The recipe reads both from environment variables with the same names.
+
 GitHub Actions publishes `ghcr.io/ton-blockchain/localton` for `linux/amd64` and `linux/arm64`. The workflow publishes `latest`, branch, tag, semantic-version, and commit tags.
 
 ## Development checks

@@ -1,9 +1,12 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.19
 
 ARG RUST_VERSION=1.98.1
 ARG GO_VERSION=1.24.11
 ARG UBUNTU_VERSION=24.04
 ARG LOCALTON_BASE_IMAGE=ghcr.io/ton-blockchain/localton:sha-72bf7425d9d034adf81ac7ebd900c7d03182f234
+# Native TON origin: `release` downloads the pinned official release; `source`
+# builds the checkout passed as `--build-context ton-src=/path/to/ton`.
+ARG TON_BINARIES=release
 
 FROM oven/bun:1.4.3 AS ui-builder
 WORKDIR /repo
@@ -52,7 +55,7 @@ RUN install -d -o localton -g localton -m 0700 /var/lib/localton-snapshots \
     && install -d -o localton -g localton -m 0755 /var/lib/ton-indexer/account-scan
 USER localton
 
-FROM ubuntu:${UBUNTU_VERSION} AS ton-binaries
+FROM ubuntu:${UBUNTU_VERSION} AS ton-binaries-release
 ARG TARGETARCH
 ARG TON_RELEASE=v2026.08
 
@@ -107,6 +110,70 @@ RUN set -eux; \
     test -d /opt/ton/smartcont; \
     APPIMAGE_EXTRACT_AND_RUN=1 \
         /opt/ton/generate-random-id -m keys -n 1 >/dev/null
+
+# Placeholder for a TON checkout. Replace it with
+# `--build-context ton-src=/path/to/ton` to build native TON from source.
+FROM scratch AS ton-src
+
+FROM ubuntu:${UBUNTU_VERSION} AS ton-binaries-source
+ARG TON_BUILD_JOBS=4
+# TON CI builds with clang from apt.llvm.org; keep the same major version.
+ARG TON_CLANG_VERSION=22
+
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        gnupg \
+    && curl --fail --silent --show-error --location --retry 5 \
+        https://apt.llvm.org/llvm-snapshot.gpg.key \
+        | gpg --dearmor --output /usr/share/keyrings/llvm.gpg \
+    && . /etc/os-release \
+    && echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] https://apt.llvm.org/${VERSION_CODENAME}/ llvm-toolchain-${VERSION_CODENAME}-${TON_CLANG_VERSION} main" \
+        > /etc/apt/sources.list.d/llvm.list \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        autoconf \
+        automake \
+        build-essential \
+        ccache \
+        "clang-${TON_CLANG_VERSION}" \
+        cmake \
+        git \
+        gperf \
+        libblas-dev \
+        libgsl-dev \
+        libreadline-dev \
+        libtool \
+        ninja-build \
+        pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV CCACHE_COMPRESS=true \
+    CCACHE_DIR=/ccache \
+    CCACHE_MAXSIZE=4G
+
+COPY apps/localton/docker/build-ton.sh /tmp/build-ton.sh
+WORKDIR /src/ton
+# Keep git metadata and the output of local CMake, CLion, release, and
+# WebAssembly builds out of the layer when a checkout is passed directly.
+# BuildKit still transfers them; build-with-ton-checkout.sh avoids that.
+COPY --from=ton-src \
+    --exclude=**/.git \
+    --exclude=.cache \
+    --exclude=build \
+    --exclude=build-* \
+    --exclude=cmake-build-* \
+    --exclude=artifacts \
+    --exclude=3pp_emscripten \
+    --exclude=emsdk \
+    --exclude=openssl_3 \
+    --exclude=tmp \
+    . ./
+RUN --mount=type=cache,id=localton-ton-ccache,target=/ccache \
+    bash /tmp/build-ton.sh "${TON_CLANG_VERSION}" "${TON_BUILD_JOBS}"
+
+FROM ton-binaries-${TON_BINARIES} AS ton-binaries
 
 FROM ubuntu:${UBUNTU_VERSION} AS http-api-builder
 ARG HTTP_API_BUILD_JOBS=4
@@ -321,6 +388,14 @@ USER root
 COPY --from=ton-indexer-builder /out/ton-indexer/bin/ /opt/ton-indexer/bin/
 COPY --from=ton-indexer-builder /out/ton-indexer/lib/ /opt/ton-indexer/lib/
 LABEL org.ton.localton.admin-hardforks="1"
+USER localton
+
+# Development image for TON changes: replace the published native TON files
+# with the `ton-src` checkout build, keeping the published indexer layers.
+FROM localton-rust-only AS localton-ton-dev
+USER root
+RUN rm -rf /opt/ton
+COPY --from=ton-binaries-source /opt/ton /opt/ton
 USER localton
 
 FROM ubuntu:${UBUNTU_VERSION} AS runtime

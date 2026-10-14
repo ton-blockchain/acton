@@ -23,11 +23,22 @@ before=$(du -sb /opt | cut -f1)
 work_dir=$(mktemp -d)
 trap 'rm -rf "${work_dir}"' EXIT
 
+ton_binaries=(create-state dht-server fift generate-random-id lite-client validator-engine validator-engine-console)
+# Source builds also ship create-hardfork, which the official release omits.
+if [[ -e /opt/ton/create-hardfork ]]; then
+    ton_binaries+=(create-hardfork)
+fi
+
 # Each release AppImage bundles an executable and libraries in a filesystem
 # image. Run the extracted ELF directly so the container needs neither FUSE nor
 # extraction at startup. Keep one copy of identical libraries in /opt/ton/lib,
-# which the runtime Dockerfile includes in LD_LIBRARY_PATH.
-for binary in create-state dht-server fift generate-random-id lite-client validator-engine validator-engine-console; do
+# which the runtime Dockerfile includes in LD_LIBRARY_PATH. Source builds
+# install plain executables and already place their libraries there.
+for binary in "${ton_binaries[@]}"; do
+    # AppImage type 2 files carry the magic bytes "AI\x02" at offset 8.
+    if [[ "$(od -An -tx1 -j8 -N3 "/opt/ton/${binary}" | tr -d ' \n')" != 414902 ]]; then
+        continue
+    fi
     (
         cd "${work_dir}"
         "/opt/ton/${binary}" --appimage-extract >/dev/null
@@ -88,9 +99,8 @@ find /opt/ton-indexer/lib -type f -name '*.a' -delete
 find /opt/ton-indexer/bin /opt/ton-indexer/lib "${site_packages}" \
     -type f \( -name '*.so' -o -name '*.so.*' \) \
     -exec strip --strip-unneeded {} +
-strip --strip-unneeded /opt/ton-indexer/bin/* /opt/ton/create-state \
-    /opt/ton/dht-server /opt/ton/fift /opt/ton/generate-random-id \
-    /opt/ton/lite-client /opt/ton/validator-engine /opt/ton/validator-engine-console
+strip --strip-unneeded /opt/ton-indexer/bin/*
+(cd /opt/ton && strip --strip-unneeded "${ton_binaries[@]}")
 
 # Builder imports leave bytecode caches alongside Python source. Python can
 # compile that source on demand, even when it cannot write a new cache file.
