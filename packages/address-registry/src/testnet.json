@@ -40,16 +40,12 @@
     "name": "Thermos"
   },
   {
-    "address": "0:348bcf827469c5fc38541c77fdd91d4e347eac200f6f2d9fd62dc08885f0415f",
-    "name": "Tolya"
-  },
-  {
     "address": "0:393f1a7f102f694e5c6bbcee7d0f58aa06aa1d6a3a23ba59607f4ec434a6b6da",
     "name": "TelePay"
   },
   {
     "address": "0:50fd4050bd1f6bc948ca0f08a3b688b2ca06b65a5fb2266e98f2097493e1c387",
-    "name": "STON.fi DEX"
+    "name": "StonFi Router"
   },
   {
     "address": "0:5257fbb634f34dca6159817d15a91c2edafe9c4c9a3bb329a0a8a170cdc359ee",
@@ -69,7 +65,7 @@
   },
   {
     "address": "0:779dcc815138d9500e449c5291e7f12738c23d575b5310000f6a253bd607384e",
-    "name": "STON.fi DEX"
+    "name": "StonFi DEX 1"
   },
   {
     "address": "0:80d78a35f955a14b679faa887ff4cd5bfc0f43b4a4eea2a7e6927f3701b273c2",
@@ -85,7 +81,7 @@
   },
   {
     "address": "0:92e1411ae546892f33b2c8a89ea90390d8ff4cfbb917a643b91e73f706fdb9d1",
-    "name": "STON.fi DEX"
+    "name": "StonFi Router"
   },
   {
     "address": "0:9c25fd8a1651fdc48c77773b72b71c51164dca419284601afe7f49c520ed61dd",
@@ -109,7 +105,7 @@
   },
   {
     "address": "0:bd95039a1070ba6004a2249d8daca10e9484cc31099cf23d3f899107cbee2c97",
-    "name": "MyTonWallet Swap Fees"
+    "name": "MyTonWallet Swap Fees 2"
   },
   {
     "address": "0:c03f27bb1c03c0025e165e9cf98ce09d85fd87f61f50924cd143ee8ae6eb22b9",
@@ -121,7 +117,7 @@
   },
   {
     "address": "0:d49106e94d5220b7bbfaebe253151fb7f9e5d1173ff857ae85f947e7eaf3a0d0",
-    "name": "MyTonWallet Swap Fees"
+    "name": "MyTonWallet Swap Fees 1"
   },
   {
     "address": "0:dae153a74d894bbc32748198cd626e4f5df4a69ad2fa56ce80fc2644b5708d20",
