@@ -19,6 +19,8 @@ fun onInternalMessage() {
     val contract = tsa.contract(0);
     contract.sendSymbolicInternalMessage(3);
     contract.sendSymbolicExternalMessage(4);
+
+    tsa.saveValueInReport("answer", 42);
 }
 "#;
 

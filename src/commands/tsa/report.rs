@@ -111,11 +111,18 @@ fn print_tsa_result(
         .properties
         .as_ref()
         .map(|properties| &properties.fetched_values);
+    let fetched_value_names = result
+        .properties
+        .as_ref()
+        .map(|properties| &properties.fetched_value_names);
     match fetched_values {
         Some(values) if !values.is_empty() => {
             println!("   {}", "saved values:".dimmed());
             for (key, value) in sort_fetched_values(values) {
-                println!("   - {} = {}", key.cyan(), format_json_value(value));
+                let name = fetched_value_names
+                    .and_then(|names| names.get(key))
+                    .map_or(key, String::as_str);
+                println!("   - {} = {}", name.cyan(), format_json_value(value));
             }
         }
         _ => {}
@@ -199,7 +206,11 @@ fn print_execution_summary(
     if !execution.fetched_cells.is_empty() {
         println!("   {}", "saved cells:".dimmed());
         for (value_id, cell) in &execution.fetched_cells {
-            println!("   - value {}:", value_id.to_string().cyan());
+            let value_id = value_id.to_string();
+            let name = properties
+                .and_then(|properties| properties.fetched_value_names.get(&value_id))
+                .map_or(value_id.as_str(), String::as_str);
+            println!("   - {}:", name.cyan());
             print_raw_cell_block("      ", cell);
         }
     }
@@ -407,6 +418,8 @@ struct TsaSarifMessage {
 struct TsaSarifProperties {
     #[serde(default, rename = "fetchedValues")]
     fetched_values: BTreeMap<String, Value>,
+    #[serde(default, rename = "fetchedValueNames")]
+    fetched_value_names: BTreeMap<String, String>,
     #[serde(default, rename = "additionalInputs")]
     additional_inputs: BTreeMap<String, TsaSarifAdditionalInput>,
 }

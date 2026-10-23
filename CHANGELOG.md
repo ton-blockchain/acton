@@ -84,6 +84,8 @@ All notable changes to this project will be documented in this file.
   TSA generate symbolic message bodies for checker inputs. Decoded storage and
   message bodies use Acton's color-aware typed value renderer in the finding
   summary.
+  Saved values can be named with `tsa.saveValueInReport("name", value)` and
+  appear under those names in findings.
 
 - `acton up --rollback` restores the previous version from the local backup
   that `acton up` creates before replacing the binary. The rollback is

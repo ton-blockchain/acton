@@ -1,3 +1,5 @@
+import "@stdlib/strings"
+
 /// Module for TSA custom checker intrinsics.
 ///
 /// This namespace is intended for checker code executed by TSA, not for
@@ -76,10 +78,21 @@ fun tsa.mkInt(bits: int, signed: bool): int
 fun tsa.saveValue<T>(value: T, valueId: int): void
     asm "705 EXTCALL";
 
-/// Compatibility alias with a more explicit reporting-oriented name.
-fun tsa.saveValueInReport<T>(value: T, valueId: int): void {
+/// Register a readable name for a saved value in TSA reports.
+///
+/// Names must be unique within one checker execution. TSA derives the numeric
+/// value ID from the string hash and reports an error if two names collide.
+/// Available since trunk.
+fun tsa.saveValueInReport<T>(name: string, value: T): void {
+    val valueId = name.hash() & 0x7fffffff;
+    tsa.registerValueName(valueId, name);
     tsa.saveValue(value, valueId);
 }
+
+/// Associate a saved value ID with its display name in TSA reports.
+/// Available since trunk.
+fun tsa.registerValueName(valueId: int, name: string): void
+    asm "717 EXTCALL";
 
 /// Send an internal message with a TSA-generated symbolic body to another contract under test.
 ///
