@@ -11,11 +11,11 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 // Acton selects the TSA release used by its bundled checker intrinsics.
-const TSA_VERSION: &str = "v0.5.5";
+const TSA_VERSION: &str = "v0.1.0-acton.1";
 const TSA_RELEASE_URL: &str =
-    "https://github.com/espritoxyz/tsa/releases/download/v0.5.5/tsa-cli.jar";
-const TSA_RELEASE_SIZE: u64 = 87_678_987;
-const TSA_RELEASE_SHA256: &str = "ec03e6af31a8e4ff9d2ee3e66f4dd2b3081c61cda1a1f92f7516be56ee38873f";
+    "https://github.com/i582/tsa/releases/download/v0.1.0-acton.1/tsa-cli.jar";
+const TSA_RELEASE_SIZE: u64 = 87_565_638;
+const TSA_RELEASE_SHA256: &str = "52ac4162d34beffd5ac0e269d7766896f0dea5ecdef08b800100a42f13145351";
 
 struct ReleaseSource {
     url: String,
@@ -50,7 +50,7 @@ pub(super) fn resolve_tsa_jar(
         }
 
         let question = format!(
-            "Download TSA {TSA_VERSION} (84 MiB) from GitHub to {}?",
+            "Download TSA {TSA_VERSION} (84 MiB) from i582/tsa to {}?",
             jar_path.display()
         );
         if !Confirm::new(&question)
@@ -104,7 +104,7 @@ fn download_tsa_jar(jar_path: &Path) -> anyhow::Result<()> {
         .with_context(|| format!("Failed to create TSA directory {}", parent.display()))?;
 
     println!(
-        "{} TSA {TSA_VERSION} from GitHub releases",
+        "{} TSA {TSA_VERSION} from i582/tsa releases",
         "Downloading".green().bold()
     );
     let client = http::blocking_client_builder()

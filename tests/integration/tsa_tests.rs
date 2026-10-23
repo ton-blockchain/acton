@@ -35,7 +35,7 @@ fn tsa_check(project: &Project) -> ActonCommand {
 }
 
 fn jar_path(project: &Project) -> std::path::PathBuf {
-    project.path().join(".acton/tsa/tsa-cli-v0.5.5.jar")
+    project.path().join(".acton/tsa/tsa-cli-v0.1.0-acton.1.jar")
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn tsa_check_requires_consent_for_missing_jar_without_tty() {
 
     let output = tsa_check(&project).run().failure();
 
-    output.assert_stderr_contains("TSA v0.5.5 is not installed");
+    output.assert_stderr_contains("TSA v0.1.0-acton.1 is not installed");
     output.assert_stderr_contains("--yes");
     output.assert_stderr_contains("--tsa-cli");
     output.assert_stderr_snapshot_matches("integration/snapshots/tsa/missing-jar.stderr.txt");
@@ -69,9 +69,9 @@ fn tsa_check_installs_verified_jar_with_yes() {
         .failure();
     server.finish();
 
-    output.assert_contains("Installed TSA v0.5.5");
+    output.assert_contains("Installed TSA v0.1.0-acton.1");
     output.assert_file_snapshot_matches(
-        ".acton/tsa/tsa-cli-v0.5.5.jar",
+        ".acton/tsa/tsa-cli-v0.1.0-acton.1.jar",
         "integration/snapshots/tsa/verified-jar.txt",
     );
 
@@ -79,7 +79,7 @@ fn tsa_check_installs_verified_jar_with_yes() {
     // is reused without another prompt or network request.
     let repeated = tsa_check(&project).run().failure();
     repeated.assert_not_contains("Downloading TSA");
-    repeated.assert_not_contains("TSA v0.5.5 is not installed");
+    repeated.assert_not_contains("TSA v0.1.0-acton.1 is not installed");
 }
 
 #[test]
