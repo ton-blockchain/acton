@@ -76,7 +76,9 @@ All notable changes to this project will be documented in this file.
 ### CLI
 
 - `acton tsa check` runs custom TSA checkers against project contracts, with
-  typed Tolk helpers, SARIF reports, and ABI-decoded execution inputs.
+  typed Tolk helpers, SARIF reports, and ABI-decoded execution inputs. It uses
+  the project TSA JAR in `.acton/tsa` and offers to download the Acton-supported
+  version when needed; `--yes` permits unattended installation.
 
 - `acton up --rollback` restores the previous version from the local backup
   that `acton up` creates before replacing the binary. The rollback is

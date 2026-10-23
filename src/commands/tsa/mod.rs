@@ -3,24 +3,25 @@ use crate::commands::common::error_fmt;
 use crate::commands::compile::compile_cmd;
 use crate::stdlib;
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
-use anyhow::{Context, anyhow};
+use anyhow::Context;
 use clap::Subcommand;
 use rston::boc::Boc;
 use serde::Deserialize;
-use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
 
 use abi::load_contract_contexts;
+use install::resolve_tsa_jar;
 use report::print_tsa_summary;
 
 mod abi;
+mod install;
 mod report;
 
 /// Custom checker commands that compile project contracts and invoke an external TSA CLI.
-/// The caller supplies the TSA JAR; checker intrinsics are executed by TSA only.
+/// A project-local TSA JAR is installed on demand; checker intrinsics are executed by TSA only.
 ///
 /// Available since trunk.
 #[derive(Subcommand, Clone)]
@@ -31,9 +32,11 @@ pub enum TsaCommand {
         checker: String,
         #[arg(
             long,
-            help = "Path to tsa-cli.jar. Falls back to ACTON_TSA_JAR when omitted"
+            help = "Use a TSA JAR instead of the Acton-managed version (or set ACTON_TSA_JAR)"
         )]
         tsa_cli: Option<String>,
+        #[arg(long, help = "Download the Acton-managed TSA JAR without prompting")]
+        yes: bool,
         #[arg(long, help = "Path to inter-contract communication scheme JSON")]
         scheme: Option<String>,
         #[arg(
@@ -75,6 +78,7 @@ pub fn tsa_cmd(command: TsaCommand) -> anyhow::Result<()> {
         TsaCommand::Check {
             checker,
             tsa_cli,
+            yes,
             scheme,
             output,
             exported_inputs,
@@ -85,6 +89,7 @@ pub fn tsa_cmd(command: TsaCommand) -> anyhow::Result<()> {
         } => tsa_check_cmd(
             &checker,
             tsa_cli,
+            yes,
             scheme,
             output,
             exported_inputs,
@@ -100,6 +105,7 @@ pub fn tsa_cmd(command: TsaCommand) -> anyhow::Result<()> {
 fn tsa_check_cmd(
     checker: &str,
     tsa_cli: Option<String>,
+    yes: bool,
     scheme: Option<String>,
     output: Option<String>,
     exported_inputs: Option<String>,
@@ -115,21 +121,13 @@ fn tsa_check_cmd(
     }
 
     let config = ActonConfig::load()?;
-    let tsa_cli_path = resolve_existing_path(
-        &tsa_cli
-            .or_else(|| env::var("ACTON_TSA_JAR").ok())
-            .ok_or_else(|| {
-                anyhow!(
-                    "Path to tsa-cli.jar is required. Pass --tsa-cli <path> or set ACTON_TSA_JAR."
-                )
-            })?,
-    )?;
     let checker_path = resolve_existing_path(checker)?;
     let scheme_path = scheme.as_deref().map(resolve_existing_path).transpose()?;
     let output_path = output.map(PathBuf::from);
     let requested_exported_inputs_path = exported_inputs.map(PathBuf::from);
 
     ensure_contracts_exist(&config, &contracts)?;
+    let tsa_cli_path = resolve_tsa_jar(tsa_cli.as_deref(), yes, configured_project_root())?;
     prepare_output_path(output_path.as_deref())?;
 
     let temp_dir =

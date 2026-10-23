@@ -49,6 +49,7 @@ mod stdlib_tests;
 mod studio;
 mod test_runner;
 mod test_tests;
+mod tsa_tests;
 mod up_tests;
 mod verify_tests;
 mod wallet_airdrop_tests;
