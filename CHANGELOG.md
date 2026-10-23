@@ -79,7 +79,9 @@ All notable changes to this project will be documented in this file.
   typed Tolk helpers, SARIF reports, and ABI-decoded execution inputs. It uses
   the project TSA JAR in `.acton/tsa` and explains why it is needed before
   offering to download the Acton version from `i582/tsa`, with the standard
-  download progress display; `--yes` permits unattended installation.
+  download progress display; `--yes` permits unattended installation. The
+  `sendSymbolicInternalMessage` and `sendSymbolicExternalMessage` helpers let
+  TSA generate symbolic message bodies for checker inputs.
 
 - `acton up --rollback` restores the previous version from the local backup
   that `acton up` creates before replacing the binary. The rollback is

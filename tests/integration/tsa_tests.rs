@@ -9,6 +9,18 @@ use std::time::{Duration, Instant};
 const SIMPLE_CONTRACT: &str =
     "fun onInternalMessage(_: InMessage) {}\nfun onBouncedMessage(_: InMessageBounced) {}\n";
 const TEST_JAR: &[u8] = b"mock TSA JAR\n";
+const SYMBOLIC_CHECKER: &str = r#"
+import "@acton/tsa"
+
+fun onInternalMessage() {
+    tsa.sendSymbolicInternalMessage(0, 1);
+    tsa.sendSymbolicExternalMessage(0, 2);
+
+    val contract = tsa.contract(0);
+    contract.sendSymbolicInternalMessage(3);
+    contract.sendSymbolicExternalMessage(4);
+}
+"#;
 
 fn tsa_project(name: &str) -> Project {
     ProjectBuilder::new(name)
@@ -36,6 +48,21 @@ fn tsa_check(project: &Project) -> ActonCommand {
 
 fn jar_path(project: &Project) -> std::path::PathBuf {
     project.path().join(".acton/tsa/tsa-cli-v0.1.0-acton.1.jar")
+}
+
+#[test]
+fn tsa_symbolic_message_helpers_compile() {
+    let project = ProjectBuilder::new("tsa-symbolic-messages")
+        .contract("checker", SYMBOLIC_CHECKER)
+        .mapping("@acton", "../lib")
+        .build();
+
+    project
+        .acton()
+        .compile("contracts/checker.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/tsa/symbolic-message-compile.txt");
 }
 
 #[test]

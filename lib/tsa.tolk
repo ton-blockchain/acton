@@ -81,8 +81,11 @@ fun tsa.saveValueInReport<T>(value: T, valueId: int): void {
     tsa.saveValue(value, valueId);
 }
 
-/// Send an internal message without an explicit body to another contract under test.
-fun tsa.sendInternalMessageEmpty(contractId: int, inputId: int): void
+/// Send an internal message with a TSA-generated symbolic body to another contract under test.
+///
+/// TSA reuses the generated input when a checker sends the same `inputId` again.
+/// Available since trunk.
+fun tsa.sendSymbolicInternalMessage(contractId: int, inputId: int): void
     asm "706 EXTCALL";
 
 /// Send a typed internal message body to another contract under test.
@@ -98,8 +101,11 @@ fun tsa.sendInternalMessage<TBody>(body: TBody, contractId: int, inputId: int): 
 fun tsa.getData(contractId: int): cell
     asm "707 EXTCALL";
 
-/// Send an external message without an explicit body to another contract under test.
-fun tsa.sendExternalMessageEmpty(contractId: int, inputId: int): void
+/// Send an external message with a TSA-generated symbolic body to another contract under test.
+///
+/// TSA reuses the generated input when a checker sends the same `inputId` again.
+/// Available since trunk.
+fun tsa.sendSymbolicExternalMessage(contractId: int, inputId: int): void
     asm "708 EXTCALL";
 
 /// Send a typed external message body to another contract under test.
@@ -168,9 +174,11 @@ fun tsa.call<Args, Ret>(contractId: int, methodId: int, args: Args): Ret {
     return Ret.fromTuple(raw);
 }
 
-/// Send an internal message without an explicit body to this contract.
-fun TsaContract<TStorage>.sendInternalMessageEmpty(self, inputId: int): void {
-    tsa.sendInternalMessageEmpty(self.id, inputId);
+/// Send an internal message with a TSA-generated symbolic body to this contract.
+///
+/// Available since trunk.
+fun TsaContract<TStorage>.sendSymbolicInternalMessage(self, inputId: int): void {
+    tsa.sendSymbolicInternalMessage(self.id, inputId);
 }
 
 /// Send a typed internal message body to this contract.
@@ -183,9 +191,11 @@ fun TsaContract<TStorage>.sendInternalMessageWithBody(self, body: slice, inputId
     tsa.sendInternalMessageWithBody(body, self.id, inputId);
 }
 
-/// Send an external message without an explicit body to this contract.
-fun TsaContract<TStorage>.sendExternalMessageEmpty(self, inputId: int): void {
-    tsa.sendExternalMessageEmpty(self.id, inputId);
+/// Send an external message with a TSA-generated symbolic body to this contract.
+///
+/// Available since trunk.
+fun TsaContract<TStorage>.sendSymbolicExternalMessage(self, inputId: int): void {
+    tsa.sendSymbolicExternalMessage(self.id, inputId);
 }
 
 /// Send a typed external message body to this contract.
