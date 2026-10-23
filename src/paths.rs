@@ -5,6 +5,7 @@ pub const DEFAULT_BUILD_TRACES_DIR: &str = "build/traces";
 pub const DEFAULT_BUILD_MUTATION_SESSIONS_DIR: &str = "build/mutation-sessions";
 pub const DEFAULT_BUILD_LOGS_DIR: &str = "build/logs";
 pub const DEFAULT_LANGUAGE_SERVER_LOG_PATH: &str = "build/logs/tolk-language-server.log";
+pub const TSA_INSTALL_DIR: &str = ".acton/tsa";
 
 #[must_use]
 pub fn build_dir(project_root: &Path) -> PathBuf {

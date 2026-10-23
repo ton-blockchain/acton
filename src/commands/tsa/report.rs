@@ -1,5 +1,6 @@
 use super::abi::{TsaContractContext, try_decode_input_body, try_decode_storage_cell};
-use acton_config::color::OwoColorize;
+use acton_config::color::{OwoColorize, colors_enabled};
+use acton_debug::{PrettyRenderOptions, RenderedValue};
 use anyhow::Context;
 use rston::boc::Boc;
 use rston::cell::Cell;
@@ -145,7 +146,7 @@ fn print_execution_summary(
                 .find(|contract| contract.tsa_id == *contract_id)
                 && let Ok(decoded) = try_decode_storage_cell(&cell.cell, contract)
             {
-                print_json_block("      ", &decoded);
+                print_rendered_value_block("      ", &decoded);
             } else {
                 print_raw_cell_block("      ", cell);
             }
@@ -179,23 +180,15 @@ fn print_execution_summary(
                         let decoded = &decoded_messages[0];
                         println!(
                             "      {}",
-                            format!(
-                                "decoded as {} for {}",
-                                decoded.body_name, decoded.contract_label
-                            )
-                            .dimmed()
+                            format!("for {}", decoded.contract_label).dimmed()
                         );
-                        print_json_block("      ", &decoded.data);
+                        print_rendered_value_block("      ", &decoded.data);
                     }
                     _ => {
                         println!("      {}", "decoded candidates:".dimmed());
                         for decoded in decoded_messages {
-                            println!(
-                                "      {}",
-                                format!("{} for {}", decoded.body_name, decoded.contract_label)
-                                    .cyan()
-                            );
-                            print_json_block("        ", &decoded.data);
+                            println!("      {}", decoded.contract_label.cyan());
+                            print_rendered_value_block("        ", &decoded.data);
                         }
                     }
                 }
@@ -238,8 +231,11 @@ fn human_input_type(input_type: Option<&str>) -> &'static str {
     }
 }
 
-fn print_json_block(indent: &str, value: &Value) {
-    let rendered = serde_json::to_string_pretty(value).unwrap_or_else(|_| value.to_string());
+fn print_rendered_value_block(indent: &str, value: &RenderedValue) {
+    let rendered = value.to_pretty_string(PrettyRenderOptions {
+        colorize: colors_enabled(),
+        ..PrettyRenderOptions::default()
+    });
     for line in rendered.lines() {
         println!("{indent}{line}");
     }

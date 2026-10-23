@@ -1,14 +1,12 @@
 use crate::file_build_cache::FileBuildCache;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, ContractConfig, project_root as configured_project_root};
+use acton_debug::{RenderedValue, render_unpacked_value_as_tolk_type};
 use anyhow::{Context, anyhow};
-use rston::boc::Boc;
 use rston::cell::Cell;
-use serde_json::Value;
 use std::path::PathBuf;
 use tolk_compiler::abi::ContractABI as CompilerContractABI;
-use tolk_compiler::dynamic_unpack::{self, UnpackedValue};
-use tolk_compiler::types_kernel::render_ty;
+use tolk_compiler::dynamic_unpack;
 
 #[derive(Clone)]
 pub(super) struct TsaContractContext {
@@ -33,8 +31,7 @@ impl TsaContractContext {
 
 pub(super) struct TsaDecodedMessage {
     pub(super) contract_label: String,
-    pub(super) body_name: String,
-    pub(super) data: Value,
+    pub(super) data: RenderedValue,
 }
 
 pub(super) fn load_contract_contexts(
@@ -120,7 +117,7 @@ fn resolve_project_path(path: &str) -> PathBuf {
 pub(super) fn try_decode_storage_cell(
     cell: &Cell,
     contract: &TsaContractContext,
-) -> anyhow::Result<Value> {
+) -> anyhow::Result<RenderedValue> {
     let abi = contract
         .compiler_abi
         .as_ref()
@@ -140,7 +137,7 @@ pub(super) fn try_decode_storage_cell(
             parser.size_refs()
         );
     }
-    Ok(compiler_data_to_json(&decoded))
+    Ok(render_unpacked_value_as_tolk_type(abi, decoded, storage_ty))
 }
 
 pub(super) fn try_decode_input_body(
@@ -196,55 +193,10 @@ pub(super) fn try_decode_input_body(
 
             decoded_messages.push(TsaDecodedMessage {
                 contract_label: contract.label(),
-                body_name: render_ty(abi, body_ty),
-                data: compiler_data_to_json(&data),
+                data: render_unpacked_value_as_tolk_type(abi, data, body_ty),
             });
         }
     }
 
     decoded_messages
-}
-
-fn compiler_data_to_json(data: &UnpackedValue) -> Value {
-    match data {
-        UnpackedValue::Null | UnpackedValue::Void | UnpackedValue::AddressNone => Value::Null,
-        UnpackedValue::Number(value) => Value::String(value.to_string()),
-        UnpackedValue::Bool(value) => Value::Bool(*value),
-        UnpackedValue::String(value) => Value::String(value.clone()),
-        UnpackedValue::Address(value) => Value::String(value.to_string()),
-        UnpackedValue::ExtAddress(value) => serde_json::json!({
-            "bits": value.data_bit_len,
-            "hex": hex::encode(&value.data),
-        }),
-        UnpackedValue::Cell(value) | UnpackedValue::RemainingBitsAndRefs(value) => {
-            serde_json::json!({
-                "boc64": Boc::encode_base64(value.clone()),
-            })
-        }
-        UnpackedValue::Bits((bytes, bit_len)) => serde_json::json!({
-            "bits": bit_len,
-            "hex": hex::encode(bytes),
-        }),
-        UnpackedValue::Array(values) => {
-            Value::Array(values.iter().map(compiler_data_to_json).collect())
-        }
-        UnpackedValue::Map(values) => Value::Array(
-            values
-                .iter()
-                .map(|(key, value)| {
-                    serde_json::json!({
-                        "key": compiler_data_to_json(key),
-                        "value": compiler_data_to_json(value),
-                    })
-                })
-                .collect(),
-        ),
-        UnpackedValue::Object { fields, .. } => {
-            let mut result = serde_json::Map::new();
-            for (name, value) in fields {
-                result.insert(name.clone(), compiler_data_to_json(value));
-            }
-            Value::Object(result)
-        }
-    }
 }

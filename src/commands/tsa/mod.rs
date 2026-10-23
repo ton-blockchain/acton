@@ -21,7 +21,7 @@ mod install;
 mod report;
 
 /// Custom checker commands that compile project contracts and invoke an external TSA CLI.
-/// A project-local TSA JAR is installed on demand; checker intrinsics are executed by TSA only.
+/// A user-level TSA JAR is installed on demand; checker intrinsics are executed by TSA only.
 ///
 /// Available since trunk.
 #[derive(Subcommand, Clone)]
@@ -127,7 +127,7 @@ fn tsa_check_cmd(
     let requested_exported_inputs_path = exported_inputs.map(PathBuf::from);
 
     ensure_contracts_exist(&config, &contracts)?;
-    let tsa_cli_path = resolve_tsa_jar(tsa_cli.as_deref(), yes, configured_project_root())?;
+    let tsa_cli_path = resolve_tsa_jar(tsa_cli.as_deref(), yes)?;
     prepare_output_path(output_path.as_deref())?;
 
     let temp_dir =

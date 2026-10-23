@@ -31,6 +31,12 @@ fn tsa_project(name: &str) -> Project {
 
 fn tsa_check(project: &Project) -> ActonCommand {
     let root = project.path().to_str().expect("UTF-8 test project path");
+    let home = project
+        .path()
+        .join(".test-home")
+        .to_str()
+        .expect("UTF-8 test home")
+        .to_owned();
     let checker = project
         .path()
         .join("checker.boc")
@@ -43,11 +49,15 @@ fn tsa_check(project: &Project) -> ActonCommand {
         .args(["--project-root", root, "tsa", "check", "--checker"])
         .arg(&checker)
         .arg("target")
+        .env("HOME", &home)
+        .env("USERPROFILE", &home)
         .env_remove("ACTON_TSA_JAR")
 }
 
 fn jar_path(project: &Project) -> std::path::PathBuf {
-    project.path().join(".acton/tsa/tsa-cli-v0.1.0-acton.1.jar")
+    project
+        .path()
+        .join(".test-home/.acton/tsa/tsa-cli-v0.1.0-acton.1.jar")
 }
 
 #[test]
@@ -98,13 +108,20 @@ fn tsa_check_installs_verified_jar_with_yes() {
 
     output.assert_contains("Installed TSA v0.1.0-acton.1");
     output.assert_file_snapshot_matches(
-        ".acton/tsa/tsa-cli-v0.1.0-acton.1.jar",
+        ".test-home/.acton/tsa/tsa-cli-v0.1.0-acton.1.jar",
         "integration/snapshots/tsa/verified-jar.txt",
     );
 
-    // The test JAR is deliberately not executable; the second run proves the cached file
-    // is reused without another prompt or network request.
-    let repeated = tsa_check(&project).run().failure();
+    // The test JAR is deliberately not executable; another project must reuse it
+    // without prompting or downloading it again.
+    let other_project = tsa_project("tsa-other-project");
+    let home = project.path().join(".test-home");
+    let home = home.to_str().expect("UTF-8 test home");
+    let repeated = tsa_check(&other_project)
+        .env("HOME", home)
+        .env("USERPROFILE", home)
+        .run()
+        .failure();
     repeated.assert_not_contains("Downloading TSA");
     repeated.assert_not_contains("TSA v0.1.0-acton.1 is not installed");
 }

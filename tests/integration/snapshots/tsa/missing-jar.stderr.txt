@@ -1,1 +1,1 @@
-Error: TSA v0.1.0-acton.1 is not installed at [ROOT]/.acton/tsa/tsa-cli-v0.1.0-acton.1.jar. Run again with --yes to download it, or pass --tsa-cli <path> (or ACTON_TSA_JAR)
+Error: TSA v0.1.0-acton.1 is not installed at [ROOT]/.test-home/.acton/tsa/tsa-cli-v0.1.0-acton.1.jar. Run again with --yes to download it, or pass --tsa-cli <path> (or ACTON_TSA_JAR)

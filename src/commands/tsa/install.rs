@@ -23,19 +23,22 @@ struct ReleaseSource {
     sha256: String,
 }
 
-pub(super) fn resolve_tsa_jar(
-    explicit_path: Option<&str>,
-    yes: bool,
-    project_root: &Path,
-) -> anyhow::Result<PathBuf> {
+pub(super) fn resolve_tsa_jar(explicit_path: Option<&str>, yes: bool) -> anyhow::Result<PathBuf> {
     let configured_path = env::var("ACTON_TSA_JAR").ok();
     if let Some(path) = explicit_path.or(configured_path.as_deref()) {
         return super::resolve_existing_path(path);
     }
 
-    let jar_path = project_root
-        .join(".acton")
-        .join("tsa")
+    #[cfg(windows)]
+    let home = env::var_os("USERPROFILE").or_else(|| env::var_os("HOME"));
+    #[cfg(not(windows))]
+    let home = env::var_os("HOME");
+    let home = home
+        .filter(|path| !path.is_empty())
+        .ok_or_else(|| anyhow!("Cannot locate your home directory; pass --tsa-cli <path>"))?;
+
+    let jar_path = PathBuf::from(home)
+        .join(crate::paths::TSA_INSTALL_DIR)
         .join(format!("tsa-cli-{TSA_VERSION}.jar"));
     if jar_path.is_file() {
         return Ok(jar_path);
@@ -50,7 +53,7 @@ pub(super) fn resolve_tsa_jar(
         }
 
         println!("Acton uses TSA to run this checker against your contracts");
-        println!("TSA isn't installed for this project yet");
+        println!("TSA isn't installed on this computer yet");
         if !Confirm::new("Download TSA now?")
             .with_default(true)
             .prompt()
