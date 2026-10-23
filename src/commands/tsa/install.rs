@@ -49,11 +49,9 @@ pub(super) fn resolve_tsa_jar(
             );
         }
 
-        let question = format!(
-            "Download TSA {TSA_VERSION} (84 MiB) from i582/tsa to {}?",
-            jar_path.display()
-        );
-        if !Confirm::new(&question)
+        println!("Acton uses TSA to run this checker against your contracts");
+        println!("TSA isn't installed for this project yet");
+        if !Confirm::new("Download TSA now?")
             .with_default(true)
             .prompt()
             .context("Failed to confirm TSA installation")?
@@ -103,31 +101,33 @@ fn download_tsa_jar(jar_path: &Path) -> anyhow::Result<()> {
     fs::create_dir_all(parent)
         .with_context(|| format!("Failed to create TSA directory {}", parent.display()))?;
 
-    println!(
-        "{} TSA {TSA_VERSION} from i582/tsa releases",
-        "Downloading".green().bold()
-    );
     let client = http::blocking_client_builder()
         .timeout(Duration::from_secs(600))
         .build()
         .context("Failed to create TSA download client")?;
+    let progress = if stderr().is_terminal() {
+        ProgressBar::new(source.size)
+    } else {
+        println!("{} TSA", "Downloading".green().bold());
+        ProgressBar::hidden()
+    };
+    progress.set_style(
+        ProgressStyle::default_bar()
+            .template(&format!(
+                " {} [{{bar:40.}}] {{bytes}}/{{total_bytes}} ({{eta}})",
+                "Downloading".green().bold()
+            ))
+            .context("Failed to configure TSA download progress")?
+            .progress_chars("=> "),
+    );
+    progress.set_position(0);
+
     let mut response = client
         .get(&source.url)
         .send()
         .with_context(|| format!("Failed to download TSA from {}", source.url))?
         .error_for_status()
         .with_context(|| format!("TSA release download failed at {}", source.url))?;
-
-    let progress = if stderr().is_terminal() {
-        ProgressBar::new(source.size)
-    } else {
-        ProgressBar::hidden()
-    };
-    progress.set_style(
-        ProgressStyle::default_bar()
-            .template(" {bar:40} {bytes}/{total_bytes} ({eta})")
-            .context("Failed to configure TSA download progress")?,
-    );
 
     let mut temporary = tempfile::NamedTempFile::new_in(parent).with_context(|| {
         format!(
