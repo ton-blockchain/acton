@@ -31,23 +31,20 @@
     "30": "ConfigParam__28",
     "31": "ConfigParam__29",
     "32": "ConfigParam__30",
-    "33": "ConfigParam__31",
-    "34": "ConfigParam__32",
-    "35": "ConfigParam__33",
-    "36": "ConfigParam__34",
-    "37": "ConfigParam__35",
-    "39": "ConfigParam__36",
-    "40": "ConfigParam__37",
-    "43": "ConfigParam__38",
-    "44": "ConfigParam__39",
-    "45": "ConfigParam__40",
-    "46": "ConfigParam__41",
-    "71": "ConfigParam__42",
-    "72": "ConfigParam__43",
-    "73": "ConfigParam__44",
-    "79": "ConfigParam__45",
-    "81": "ConfigParam__46",
-    "82": "ConfigParam__47"
+    "34": "ConfigParam__31",
+    "36": "ConfigParam__32",
+    "39": "ConfigParam__33",
+    "40": "ConfigParam__34",
+    "43": "ConfigParam__35",
+    "44": "ConfigParam__36",
+    "45": "ConfigParam__37",
+    "46": "ConfigParam__38",
+    "71": "ConfigParam__39",
+    "72": "ConfigParam__40",
+    "73": "ConfigParam__41",
+    "79": "ConfigParam__42",
+    "81": "ConfigParam__43",
+    "82": "ConfigParam__44"
   },
   "definitions": {
     "ConfigParam": {
@@ -232,18 +229,6 @@
         {
           "type": "ref",
           "name": "ConfigParam__44"
-        },
-        {
-          "type": "ref",
-          "name": "ConfigParam__45"
-        },
-        {
-          "type": "ref",
-          "name": "ConfigParam__46"
-        },
-        {
-          "type": "ref",
-          "name": "ConfigParam__47"
         }
       ]
     },
@@ -1770,7 +1755,7 @@
           "type": "literal",
           "value": "ConfigParam__31"
         },
-        "prev_temp_validators": {
+        "cur_validators": {
           "type": "ref",
           "name": "ValidatorSet"
         }
@@ -1783,7 +1768,7 @@
           "type": "literal",
           "value": "ConfigParam__32"
         },
-        "cur_validators": {
+        "next_validators": {
           "type": "ref",
           "name": "ValidatorSet"
         }
@@ -1795,45 +1780,6 @@
         "kind": {
           "type": "literal",
           "value": "ConfigParam__33"
-        },
-        "cur_temp_validators": {
-          "type": "ref",
-          "name": "ValidatorSet"
-        }
-      }
-    },
-    "ConfigParam__34": {
-      "type": "struct",
-      "fields": {
-        "kind": {
-          "type": "literal",
-          "value": "ConfigParam__34"
-        },
-        "next_validators": {
-          "type": "ref",
-          "name": "ValidatorSet"
-        }
-      }
-    },
-    "ConfigParam__35": {
-      "type": "struct",
-      "fields": {
-        "kind": {
-          "type": "literal",
-          "value": "ConfigParam__35"
-        },
-        "next_temp_validators": {
-          "type": "ref",
-          "name": "ValidatorSet"
-        }
-      }
-    },
-    "ConfigParam__36": {
-      "type": "struct",
-      "fields": {
-        "kind": {
-          "type": "literal",
-          "value": "ConfigParam__36"
         },
         "anon0": {
           "type": "map",
@@ -1980,12 +1926,12 @@
         }
       }
     },
-    "ConfigParam__37": {
+    "ConfigParam__34": {
       "type": "struct",
       "fields": {
         "kind": {
           "type": "literal",
-          "value": "ConfigParam__37"
+          "value": "ConfigParam__34"
         },
         "anon0": {
           "type": "ref",
@@ -2035,12 +1981,12 @@
         }
       }
     },
-    "ConfigParam__38": {
+    "ConfigParam__35": {
       "type": "struct",
       "fields": {
         "kind": {
           "type": "literal",
-          "value": "ConfigParam__38"
+          "value": "ConfigParam__35"
         },
         "anon0": {
           "type": "ref",
@@ -2203,15 +2149,21 @@
         },
         "max_total_msg_cells": {
           "type": "number"
+        },
+        "out_msg_queue_size_hard_limit": {
+          "type": "number"
+        },
+        "out_msg_queue_size_soft_limit": {
+          "type": "number"
         }
       }
     },
-    "ConfigParam__39": {
+    "ConfigParam__36": {
       "type": "struct",
       "fields": {
         "kind": {
           "type": "literal",
-          "value": "ConfigParam__39"
+          "value": "ConfigParam__36"
         },
         "anon0": {
           "type": "ref",
@@ -2250,12 +2202,12 @@
         }
       }
     },
-    "ConfigParam__40": {
+    "ConfigParam__37": {
       "type": "struct",
       "fields": {
         "kind": {
           "type": "literal",
-          "value": "ConfigParam__40"
+          "value": "ConfigParam__37"
         },
         "anon0": {
           "type": "ref",
@@ -2294,12 +2246,12 @@
         }
       }
     },
-    "ConfigParam__41": {
+    "ConfigParam__38": {
       "type": "struct",
       "fields": {
         "kind": {
           "type": "literal",
-          "value": "ConfigParam__41"
+          "value": "ConfigParam__38"
         },
         "anon0": {
           "type": "ref",
@@ -2328,12 +2280,12 @@
         }
       }
     },
-    "ConfigParam__42": {
+    "ConfigParam__39": {
       "type": "struct",
       "fields": {
         "kind": {
           "type": "literal",
-          "value": "ConfigParam__42"
+          "value": "ConfigParam__39"
         },
         "anon0": {
           "type": "ref",
@@ -2368,12 +2320,12 @@
         }
       }
     },
-    "ConfigParam__43": {
+    "ConfigParam__40": {
       "type": "struct",
       "fields": {
         "kind": {
           "type": "literal",
-          "value": "ConfigParam__43"
+          "value": "ConfigParam__40"
         },
         "anon0": {
           "type": "ref",
@@ -2381,12 +2333,12 @@
         }
       }
     },
-    "ConfigParam__44": {
+    "ConfigParam__41": {
       "type": "struct",
       "fields": {
         "kind": {
           "type": "literal",
-          "value": "ConfigParam__44"
+          "value": "ConfigParam__41"
         },
         "anon0": {
           "type": "ref",
@@ -2394,12 +2346,12 @@
         }
       }
     },
-    "ConfigParam__45": {
+    "ConfigParam__42": {
       "type": "struct",
       "fields": {
         "kind": {
           "type": "literal",
-          "value": "ConfigParam__45"
+          "value": "ConfigParam__42"
         },
         "anon0": {
           "type": "ref",
@@ -2511,12 +2463,12 @@
         }
       }
     },
-    "ConfigParam__46": {
+    "ConfigParam__43": {
       "type": "struct",
       "fields": {
         "kind": {
           "type": "literal",
-          "value": "ConfigParam__46"
+          "value": "ConfigParam__43"
         },
         "anon0": {
           "type": "ref",
@@ -2524,12 +2476,12 @@
         }
       }
     },
-    "ConfigParam__47": {
+    "ConfigParam__44": {
       "type": "struct",
       "fields": {
         "kind": {
           "type": "literal",
-          "value": "ConfigParam__47"
+          "value": "ConfigParam__44"
         },
         "anon0": {
           "type": "ref",

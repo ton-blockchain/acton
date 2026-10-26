@@ -1,48 +1,48 @@
 {
   "parameters": {
     "0": {
-      "line": 623,
-      "roots": [
-        212
-      ],
-      "dependencies": []
-    },
-    "1": {
-      "line": 624,
-      "roots": [
-        213
-      ],
-      "dependencies": []
-    },
-    "2": {
-      "line": 625,
-      "roots": [
-        214
-      ],
-      "dependencies": []
-    },
-    "3": {
-      "line": 626,
+      "line": 627,
       "roots": [
         215
       ],
       "dependencies": []
     },
-    "4": {
-      "line": 627,
+    "1": {
+      "line": 628,
       "roots": [
         216
       ],
       "dependencies": []
     },
-    "5": {
-      "line": 632,
+    "2": {
+      "line": 629,
+      "roots": [
+        217
+      ],
+      "dependencies": []
+    },
+    "3": {
+      "line": 630,
       "roots": [
         218
       ],
+      "dependencies": []
+    },
+    "4": {
+      "line": 631,
+      "roots": [
+        219
+      ],
+      "dependencies": []
+    },
+    "5": {
+      "line": 636,
+      "roots": [
+        221
+      ],
       "dependencies": [
         {
-          "declaration": 217,
+          "declaration": 220,
           "depth": 1,
           "parameterized": false,
           "typeName": "BurningConfig"
@@ -62,9 +62,9 @@
       ]
     },
     "6": {
-      "line": 634,
+      "line": 638,
       "roots": [
-        219
+        222
       ],
       "dependencies": [
         {
@@ -82,9 +82,9 @@
       ]
     },
     "7": {
-      "line": 635,
+      "line": 639,
       "roots": [
-        220
+        223
       ],
       "dependencies": [
         {
@@ -168,13 +168,13 @@
       ]
     },
     "8": {
-      "line": 638,
+      "line": 642,
       "roots": [
-        222
+        225
       ],
       "dependencies": [
         {
-          "declaration": 221,
+          "declaration": 224,
           "depth": 1,
           "parameterized": false,
           "typeName": "GlobalVersion"
@@ -182,9 +182,9 @@
       ]
     },
     "9": {
-      "line": 639,
+      "line": 643,
       "roots": [
-        223
+        226
       ],
       "dependencies": [
         {
@@ -250,9 +250,9 @@
       ]
     },
     "10": {
-      "line": 640,
+      "line": 644,
       "roots": [
-        224
+        227
       ],
       "dependencies": [
         {
@@ -318,19 +318,19 @@
       ]
     },
     "11": {
-      "line": 646,
+      "line": 650,
       "roots": [
-        227
+        230
       ],
       "dependencies": [
         {
-          "declaration": 226,
+          "declaration": 229,
           "depth": 1,
           "parameterized": false,
           "typeName": "ConfigVotingSetup"
         },
         {
-          "declaration": 225,
+          "declaration": 228,
           "depth": 2,
           "parameterized": false,
           "typeName": "ConfigProposalSetup"
@@ -338,9 +338,9 @@
       ]
     },
     "12": {
-      "line": 687,
+      "line": 691,
       "roots": [
-        235
+        238
       ],
       "dependencies": [
         {
@@ -356,13 +356,13 @@
           "typeName": "HashmapE"
         },
         {
-          "declaration": 233,
+          "declaration": 236,
           "depth": 1,
           "parameterized": false,
           "typeName": "WorkchainDescr"
         },
         {
-          "declaration": 234,
+          "declaration": 237,
           "depth": 1,
           "parameterized": false,
           "typeName": "WorkchainDescr"
@@ -386,19 +386,19 @@
           "typeName": "Bool"
         },
         {
-          "declaration": 230,
+          "declaration": 233,
           "depth": 2,
           "parameterized": true,
           "typeName": "WorkchainFormat"
         },
         {
-          "declaration": 231,
+          "declaration": 234,
           "depth": 2,
           "parameterized": true,
           "typeName": "WorkchainFormat"
         },
         {
-          "declaration": 232,
+          "declaration": 235,
           "depth": 2,
           "parameterized": false,
           "typeName": "WcSplitMergeTimings"
@@ -454,13 +454,13 @@
       ]
     },
     "13": {
-      "line": 690,
+      "line": 694,
       "roots": [
-        237
+        240
       ],
       "dependencies": [
         {
-          "declaration": 236,
+          "declaration": 239,
           "depth": 1,
           "parameterized": false,
           "typeName": "ComplaintPricing"
@@ -480,13 +480,13 @@
       ]
     },
     "14": {
-      "line": 694,
+      "line": 698,
       "roots": [
-        239
+        242
       ],
       "dependencies": [
         {
-          "declaration": 238,
+          "declaration": 241,
           "depth": 1,
           "parameterized": false,
           "typeName": "BlockCreateFees"
@@ -506,23 +506,23 @@
       ]
     },
     "15": {
-      "line": 696,
+      "line": 700,
       "roots": [
-        240
+        243
       ],
       "dependencies": []
     },
     "16": {
-      "line": 700,
+      "line": 704,
       "roots": [
-        241
+        244
       ],
       "dependencies": []
     },
     "17": {
-      "line": 706,
+      "line": 710,
       "roots": [
-        242
+        245
       ],
       "dependencies": [
         {
@@ -540,9 +540,9 @@
       ]
     },
     "18": {
-      "line": 710,
+      "line": 714,
       "roots": [
-        244
+        247
       ],
       "dependencies": [
         {
@@ -552,7 +552,7 @@
           "typeName": "Hashmap"
         },
         {
-          "declaration": 243,
+          "declaration": 246,
           "depth": 1,
           "parameterized": false,
           "typeName": "StoragePrices"
@@ -608,32 +608,32 @@
       ]
     },
     "19": {
-      "line": 712,
+      "line": 716,
       "roots": [
-        245
+        248
       ],
       "dependencies": []
     },
     "20": {
-      "line": 725,
+      "line": 729,
       "roots": [
-        249
+        252
       ],
       "dependencies": [
         {
-          "declaration": 246,
+          "declaration": 249,
           "depth": 1,
           "parameterized": false,
           "typeName": "GasLimitsPrices"
         },
         {
-          "declaration": 247,
+          "declaration": 250,
           "depth": 1,
           "parameterized": false,
           "typeName": "GasLimitsPrices"
         },
         {
-          "declaration": 248,
+          "declaration": 251,
           "depth": 1,
           "parameterized": false,
           "typeName": "GasLimitsPrices"
@@ -641,25 +641,25 @@
       ]
     },
     "21": {
-      "line": 726,
+      "line": 730,
       "roots": [
-        250
+        253
       ],
       "dependencies": [
         {
-          "declaration": 246,
+          "declaration": 249,
           "depth": 1,
           "parameterized": false,
           "typeName": "GasLimitsPrices"
         },
         {
-          "declaration": 247,
+          "declaration": 250,
           "depth": 1,
           "parameterized": false,
           "typeName": "GasLimitsPrices"
         },
         {
-          "declaration": 248,
+          "declaration": 251,
           "depth": 1,
           "parameterized": false,
           "typeName": "GasLimitsPrices"
@@ -667,31 +667,31 @@
       ]
     },
     "22": {
-      "line": 737,
+      "line": 741,
       "roots": [
-        255
+        258
       ],
       "dependencies": [
         {
-          "declaration": 253,
+          "declaration": 256,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "BlockLimits"
+        },
+        {
+          "declaration": 257,
           "depth": 1,
           "parameterized": false,
           "typeName": "BlockLimits"
         },
         {
           "declaration": 254,
-          "depth": 1,
-          "parameterized": false,
-          "typeName": "BlockLimits"
-        },
-        {
-          "declaration": 251,
           "depth": 2,
           "parameterized": false,
           "typeName": "ParamLimits"
         },
         {
-          "declaration": 252,
+          "declaration": 255,
           "depth": 2,
           "parameterized": false,
           "typeName": "ImportedMsgQueueLimits"
@@ -699,31 +699,31 @@
       ]
     },
     "23": {
-      "line": 738,
+      "line": 742,
       "roots": [
-        256
+        259
       ],
       "dependencies": [
         {
-          "declaration": 253,
+          "declaration": 256,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "BlockLimits"
+        },
+        {
+          "declaration": 257,
           "depth": 1,
           "parameterized": false,
           "typeName": "BlockLimits"
         },
         {
           "declaration": 254,
-          "depth": 1,
-          "parameterized": false,
-          "typeName": "BlockLimits"
-        },
-        {
-          "declaration": 251,
           "depth": 2,
           "parameterized": false,
           "typeName": "ParamLimits"
         },
         {
-          "declaration": 252,
+          "declaration": 255,
           "depth": 2,
           "parameterized": false,
           "typeName": "ImportedMsgQueueLimits"
@@ -731,13 +731,13 @@
       ]
     },
     "24": {
-      "line": 747,
+      "line": 751,
       "roots": [
-        258
+        261
       ],
       "dependencies": [
         {
-          "declaration": 257,
+          "declaration": 260,
           "depth": 1,
           "parameterized": false,
           "typeName": "MsgForwardPrices"
@@ -745,13 +745,13 @@
       ]
     },
     "25": {
-      "line": 749,
+      "line": 753,
       "roots": [
-        259
+        262
       ],
       "dependencies": [
         {
-          "declaration": 257,
+          "declaration": 260,
           "depth": 1,
           "parameterized": false,
           "typeName": "MsgForwardPrices"
@@ -759,19 +759,19 @@
       ]
     },
     "28": {
-      "line": 787,
+      "line": 791,
       "roots": [
-        266
+        269
       ],
       "dependencies": [
         {
-          "declaration": 260,
+          "declaration": 263,
           "depth": 1,
           "parameterized": false,
           "typeName": "CatchainConfig"
         },
         {
-          "declaration": 261,
+          "declaration": 264,
           "depth": 1,
           "parameterized": false,
           "typeName": "CatchainConfig"
@@ -791,31 +791,31 @@
       ]
     },
     "29": {
-      "line": 788,
+      "line": 792,
       "roots": [
-        267
+        270
       ],
       "dependencies": [
         {
-          "declaration": 262,
-          "depth": 1,
-          "parameterized": false,
-          "typeName": "ConsensusConfig"
-        },
-        {
-          "declaration": 263,
-          "depth": 1,
-          "parameterized": false,
-          "typeName": "ConsensusConfig"
-        },
-        {
-          "declaration": 264,
-          "depth": 1,
-          "parameterized": false,
-          "typeName": "ConsensusConfig"
-        },
-        {
           "declaration": 265,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ConsensusConfig"
+        },
+        {
+          "declaration": 266,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ConsensusConfig"
+        },
+        {
+          "declaration": 267,
+          "depth": 1,
+          "parameterized": false,
+          "typeName": "ConsensusConfig"
+        },
+        {
+          "declaration": 268,
           "depth": 1,
           "parameterized": false,
           "typeName": "ConsensusConfig"
@@ -835,13 +835,13 @@
       ]
     },
     "30": {
-      "line": 800,
+      "line": 804,
       "roots": [
-        271
+        274
       ],
       "dependencies": [
         {
-          "declaration": 270,
+          "declaration": 273,
           "depth": 1,
           "parameterized": false,
           "typeName": "NewConsensusConfigAll"
@@ -859,13 +859,13 @@
           "typeName": "Maybe"
         },
         {
-          "declaration": 268,
+          "declaration": 271,
           "depth": 2,
           "parameterized": false,
           "typeName": "NewConsensusConfig"
         },
         {
-          "declaration": 269,
+          "declaration": 272,
           "depth": 2,
           "parameterized": false,
           "typeName": "NewConsensusConfig"
@@ -951,9 +951,9 @@
       ]
     },
     "31": {
-      "line": 802,
+      "line": 806,
       "roots": [
-        272
+        275
       ],
       "dependencies": [
         {
@@ -1031,19 +1031,19 @@
       ]
     },
     "32": {
-      "line": 803,
+      "line": 807,
       "roots": [
-        273
+        276
       ],
       "dependencies": [
         {
-          "declaration": 210,
+          "declaration": 213,
           "depth": 1,
           "parameterized": false,
           "typeName": "ValidatorSet"
         },
         {
-          "declaration": 211,
+          "declaration": 214,
           "depth": 1,
           "parameterized": false,
           "typeName": "ValidatorSet"
@@ -1055,13 +1055,13 @@
           "typeName": "Hashmap"
         },
         {
-          "declaration": 208,
+          "declaration": 211,
           "depth": 2,
           "parameterized": false,
           "typeName": "ValidatorDescr"
         },
         {
-          "declaration": 209,
+          "declaration": 212,
           "depth": 2,
           "parameterized": false,
           "typeName": "ValidatorDescr"
@@ -1109,111 +1109,7 @@
           "typeName": "HmLabel"
         },
         {
-          "declaration": 199,
-          "depth": 3,
-          "parameterized": false,
-          "typeName": "SigPubKey"
-        },
-        {
-          "declaration": 11,
-          "depth": 4,
-          "parameterized": false,
-          "typeName": "Bit"
-        },
-        {
-          "declaration": 18,
-          "depth": 4,
-          "parameterized": true,
-          "typeName": "Unary"
-        },
-        {
-          "declaration": 19,
-          "depth": 4,
-          "parameterized": true,
-          "typeName": "Unary"
-        }
-      ]
-    },
-    "33": {
-      "line": 804,
-      "roots": [
-        274
-      ],
-      "dependencies": [
-        {
-          "declaration": 210,
-          "depth": 1,
-          "parameterized": false,
-          "typeName": "ValidatorSet"
-        },
-        {
-          "declaration": 211,
-          "depth": 1,
-          "parameterized": false,
-          "typeName": "ValidatorSet"
-        },
-        {
-          "declaration": 12,
-          "depth": 2,
-          "parameterized": true,
-          "typeName": "Hashmap"
-        },
-        {
-          "declaration": 208,
-          "depth": 2,
-          "parameterized": false,
-          "typeName": "ValidatorDescr"
-        },
-        {
-          "declaration": 209,
-          "depth": 2,
-          "parameterized": false,
-          "typeName": "ValidatorDescr"
-        },
-        {
-          "declaration": 20,
-          "depth": 2,
-          "parameterized": true,
-          "typeName": "HashmapE"
-        },
-        {
-          "declaration": 21,
-          "depth": 2,
-          "parameterized": true,
-          "typeName": "HashmapE"
-        },
-        {
-          "declaration": 13,
-          "depth": 3,
-          "parameterized": true,
-          "typeName": "HashmapNode"
-        },
-        {
-          "declaration": 14,
-          "depth": 3,
-          "parameterized": true,
-          "typeName": "HashmapNode"
-        },
-        {
-          "declaration": 15,
-          "depth": 3,
-          "parameterized": true,
-          "typeName": "HmLabel"
-        },
-        {
-          "declaration": 16,
-          "depth": 3,
-          "parameterized": true,
-          "typeName": "HmLabel"
-        },
-        {
-          "declaration": 17,
-          "depth": 3,
-          "parameterized": true,
-          "typeName": "HmLabel"
-        },
-        {
-          "declaration": 199,
+          "declaration": 202,
           "depth": 3,
           "parameterized": false,
           "typeName": "SigPubKey"
@@ -1239,19 +1135,19 @@
       ]
     },
     "34": {
-      "line": 805,
+      "line": 808,
       "roots": [
-        275
+        277
       ],
       "dependencies": [
         {
-          "declaration": 210,
+          "declaration": 213,
           "depth": 1,
           "parameterized": false,
           "typeName": "ValidatorSet"
         },
         {
-          "declaration": 211,
+          "declaration": 214,
           "depth": 1,
           "parameterized": false,
           "typeName": "ValidatorSet"
@@ -1263,13 +1159,13 @@
           "typeName": "Hashmap"
         },
         {
-          "declaration": 208,
+          "declaration": 211,
           "depth": 2,
           "parameterized": false,
           "typeName": "ValidatorDescr"
         },
         {
-          "declaration": 209,
+          "declaration": 212,
           "depth": 2,
           "parameterized": false,
           "typeName": "ValidatorDescr"
@@ -1317,111 +1213,7 @@
           "typeName": "HmLabel"
         },
         {
-          "declaration": 199,
-          "depth": 3,
-          "parameterized": false,
-          "typeName": "SigPubKey"
-        },
-        {
-          "declaration": 11,
-          "depth": 4,
-          "parameterized": false,
-          "typeName": "Bit"
-        },
-        {
-          "declaration": 18,
-          "depth": 4,
-          "parameterized": true,
-          "typeName": "Unary"
-        },
-        {
-          "declaration": 19,
-          "depth": 4,
-          "parameterized": true,
-          "typeName": "Unary"
-        }
-      ]
-    },
-    "35": {
-      "line": 806,
-      "roots": [
-        276
-      ],
-      "dependencies": [
-        {
-          "declaration": 210,
-          "depth": 1,
-          "parameterized": false,
-          "typeName": "ValidatorSet"
-        },
-        {
-          "declaration": 211,
-          "depth": 1,
-          "parameterized": false,
-          "typeName": "ValidatorSet"
-        },
-        {
-          "declaration": 12,
-          "depth": 2,
-          "parameterized": true,
-          "typeName": "Hashmap"
-        },
-        {
-          "declaration": 208,
-          "depth": 2,
-          "parameterized": false,
-          "typeName": "ValidatorDescr"
-        },
-        {
-          "declaration": 209,
-          "depth": 2,
-          "parameterized": false,
-          "typeName": "ValidatorDescr"
-        },
-        {
-          "declaration": 20,
-          "depth": 2,
-          "parameterized": true,
-          "typeName": "HashmapE"
-        },
-        {
-          "declaration": 21,
-          "depth": 2,
-          "parameterized": true,
-          "typeName": "HashmapE"
-        },
-        {
-          "declaration": 13,
-          "depth": 3,
-          "parameterized": true,
-          "typeName": "HashmapNode"
-        },
-        {
-          "declaration": 14,
-          "depth": 3,
-          "parameterized": true,
-          "typeName": "HashmapNode"
-        },
-        {
-          "declaration": 15,
-          "depth": 3,
-          "parameterized": true,
-          "typeName": "HmLabel"
-        },
-        {
-          "declaration": 16,
-          "depth": 3,
-          "parameterized": true,
-          "typeName": "HmLabel"
-        },
-        {
-          "declaration": 17,
-          "depth": 3,
-          "parameterized": true,
-          "typeName": "HmLabel"
-        },
-        {
-          "declaration": 199,
+          "declaration": 202,
           "depth": 3,
           "parameterized": false,
           "typeName": "SigPubKey"
@@ -1447,123 +1239,19 @@
       ]
     },
     "36": {
-      "line": 807,
-      "roots": [
-        277
-      ],
-      "dependencies": [
-        {
-          "declaration": 210,
-          "depth": 1,
-          "parameterized": false,
-          "typeName": "ValidatorSet"
-        },
-        {
-          "declaration": 211,
-          "depth": 1,
-          "parameterized": false,
-          "typeName": "ValidatorSet"
-        },
-        {
-          "declaration": 12,
-          "depth": 2,
-          "parameterized": true,
-          "typeName": "Hashmap"
-        },
-        {
-          "declaration": 208,
-          "depth": 2,
-          "parameterized": false,
-          "typeName": "ValidatorDescr"
-        },
-        {
-          "declaration": 209,
-          "depth": 2,
-          "parameterized": false,
-          "typeName": "ValidatorDescr"
-        },
-        {
-          "declaration": 20,
-          "depth": 2,
-          "parameterized": true,
-          "typeName": "HashmapE"
-        },
-        {
-          "declaration": 21,
-          "depth": 2,
-          "parameterized": true,
-          "typeName": "HashmapE"
-        },
-        {
-          "declaration": 13,
-          "depth": 3,
-          "parameterized": true,
-          "typeName": "HashmapNode"
-        },
-        {
-          "declaration": 14,
-          "depth": 3,
-          "parameterized": true,
-          "typeName": "HashmapNode"
-        },
-        {
-          "declaration": 15,
-          "depth": 3,
-          "parameterized": true,
-          "typeName": "HmLabel"
-        },
-        {
-          "declaration": 16,
-          "depth": 3,
-          "parameterized": true,
-          "typeName": "HmLabel"
-        },
-        {
-          "declaration": 17,
-          "depth": 3,
-          "parameterized": true,
-          "typeName": "HmLabel"
-        },
-        {
-          "declaration": 199,
-          "depth": 3,
-          "parameterized": false,
-          "typeName": "SigPubKey"
-        },
-        {
-          "declaration": 11,
-          "depth": 4,
-          "parameterized": false,
-          "typeName": "Bit"
-        },
-        {
-          "declaration": 18,
-          "depth": 4,
-          "parameterized": true,
-          "typeName": "Unary"
-        },
-        {
-          "declaration": 19,
-          "depth": 4,
-          "parameterized": true,
-          "typeName": "Unary"
-        }
-      ]
-    },
-    "37": {
-      "line": 808,
+      "line": 809,
       "roots": [
         278
       ],
       "dependencies": [
         {
-          "declaration": 210,
+          "declaration": 213,
           "depth": 1,
           "parameterized": false,
           "typeName": "ValidatorSet"
         },
         {
-          "declaration": 211,
+          "declaration": 214,
           "depth": 1,
           "parameterized": false,
           "typeName": "ValidatorSet"
@@ -1575,13 +1263,13 @@
           "typeName": "Hashmap"
         },
         {
-          "declaration": 208,
+          "declaration": 211,
           "depth": 2,
           "parameterized": false,
           "typeName": "ValidatorDescr"
         },
         {
-          "declaration": 209,
+          "declaration": 212,
           "depth": 2,
           "parameterized": false,
           "typeName": "ValidatorDescr"
@@ -1629,7 +1317,7 @@
           "typeName": "HmLabel"
         },
         {
-          "declaration": 199,
+          "declaration": 202,
           "depth": 3,
           "parameterized": false,
           "typeName": "SigPubKey"
@@ -1655,7 +1343,7 @@
       ]
     },
     "39": {
-      "line": 812,
+      "line": 813,
       "roots": [
         281
       ],
@@ -1685,13 +1373,13 @@
           "typeName": "Hashmap"
         },
         {
-          "declaration": 201,
+          "declaration": 204,
           "depth": 2,
           "parameterized": false,
           "typeName": "CryptoSignature"
         },
         {
-          "declaration": 206,
+          "declaration": 209,
           "depth": 2,
           "parameterized": false,
           "typeName": "CryptoSignature"
@@ -1733,19 +1421,19 @@
           "typeName": "HmLabel"
         },
         {
-          "declaration": 200,
+          "declaration": 203,
           "depth": 3,
           "parameterized": false,
           "typeName": "CryptoSignatureSimple"
         },
         {
-          "declaration": 205,
+          "declaration": 208,
           "depth": 3,
           "parameterized": false,
           "typeName": "SignedCertificate"
         },
         {
-          "declaration": 199,
+          "declaration": 202,
           "depth": 3,
           "parameterized": false,
           "typeName": "SigPubKey"
@@ -1769,7 +1457,7 @@
           "typeName": "Unary"
         },
         {
-          "declaration": 203,
+          "declaration": 206,
           "depth": 4,
           "parameterized": false,
           "typeName": "Certificate"
@@ -1777,7 +1465,7 @@
       ]
     },
     "40": {
-      "line": 821,
+      "line": 822,
       "roots": [
         283
       ],
@@ -1803,7 +1491,7 @@
       ]
     },
     "43": {
-      "line": 836,
+      "line": 838,
       "roots": [
         287
       ],
@@ -1841,7 +1529,7 @@
       ]
     },
     "44": {
-      "line": 840,
+      "line": 842,
       "roots": [
         289
       ],
@@ -1927,7 +1615,7 @@
       ]
     },
     "45": {
-      "line": 844,
+      "line": 846,
       "roots": [
         292
       ],
@@ -2013,13 +1701,13 @@
       ]
     },
     "46": {
-      "line": 846,
+      "line": 848,
       "roots": [
         293
       ],
       "dependencies": [
         {
-          "declaration": 383,
+          "declaration": 386,
           "depth": 1,
           "parameterized": false,
           "typeName": "ValRegistryConfig"
@@ -2039,7 +1727,7 @@
       ]
     },
     "71": {
-      "line": 849,
+      "line": 851,
       "roots": [
         295
       ],
@@ -2119,7 +1807,7 @@
       ]
     },
     "72": {
-      "line": 850,
+      "line": 852,
       "roots": [
         296
       ],
@@ -2199,7 +1887,7 @@
       ]
     },
     "73": {
-      "line": 851,
+      "line": 853,
       "roots": [
         297
       ],
@@ -2279,7 +1967,7 @@
       ]
     },
     "79": {
-      "line": 863,
+      "line": 865,
       "roots": [
         301
       ],
@@ -2389,7 +2077,7 @@
       ]
     },
     "81": {
-      "line": 864,
+      "line": 866,
       "roots": [
         302
       ],
@@ -2499,7 +2187,7 @@
       ]
     },
     "82": {
-      "line": 865,
+      "line": 867,
       "roots": [
         303
       ],
@@ -2631,81 +2319,78 @@
     "48": "nanograms$_ amount:(VarUInteger 16) = Grams;",
     "49": "_ grams:Grams = Coins;",
     "50": "extra_currencies$_ dict:(HashmapE 32 (VarUInteger 32))\n                 = ExtraCurrencyCollection;",
-    "199": "ed25519_pubkey#8e81278a pubkey:bits256 = SigPubKey;",
-    "200": "ed25519_signature#5\n  R:bits256\n  s:bits256 = CryptoSignatureSimple;",
-    "201": "_ CryptoSignatureSimple = CryptoSignature;",
-    "203": "certificate#4\n  temp_key:SigPubKey\n  valid_since:uint32\n  valid_until:uint32 = Certificate;",
-    "205": "signed_certificate$_\n  certificate:Certificate\n  certificate_signature:CryptoSignature = SignedCertificate;",
-    "206": "chained_signature#f\n  signed_cert:^SignedCertificate\n  temp_key_signature:CryptoSignatureSimple = CryptoSignature;",
-    "208": "validator#53\n  public_key:SigPubKey\n  weight:uint64 = ValidatorDescr;",
-    "209": "validator_addr#73\n  public_key:SigPubKey\n  weight:uint64\n  adnl_addr:bits256 = ValidatorDescr;",
-    "210": "validators#11\n  utime_since:uint32\n  utime_until:uint32\n  total:(## 16)\n  main:(## 16)\n  { main <= total }\n  { main >= 1 }\n  list:(Hashmap 16 ValidatorDescr) = ValidatorSet;",
-    "211": "validators_ext#12\n  utime_since:uint32\n  utime_until:uint32\n  total:(## 16)\n  main:(## 16)\n  { main <= total }\n  { main >= 1 }\n  total_weight:uint64\n  list:(HashmapE 16 ValidatorDescr) = ValidatorSet;",
-    "212": "_ config_addr:bits256 = ConfigParam 0;",
-    "213": "_ elector_addr:bits256 = ConfigParam 1;",
-    "214": "_ minter_addr:bits256 = ConfigParam 2;",
-    "215": "_ fee_collector_addr:bits256 = ConfigParam 3;",
-    "216": "_ dns_root_addr:bits256 = ConfigParam 4;",
-    "217": "burning_config#01\n  blackhole_addr:(Maybe bits256)\n  fee_burn_num:#\n  fee_burn_denom:#\n  { fee_burn_num <= fee_burn_denom }\n  { fee_burn_denom >= 1 } = BurningConfig;",
-    "218": "_ BurningConfig = ConfigParam 5;",
-    "219": "_\n  mint_new_price:Grams\n  mint_add_price:Grams = ConfigParam 6;",
-    "220": "_ to_mint:ExtraCurrencyCollection = ConfigParam 7;",
-    "221": "capabilities#c4\n  version:uint32\n  capabilities:uint64 = GlobalVersion;",
-    "222": "_ GlobalVersion = ConfigParam 8;",
-    "223": "_ mandatory_params:(Hashmap 32 True) = ConfigParam 9;",
-    "224": "_ critical_params:(Hashmap 32 True) = ConfigParam 10;",
-    "225": "cfg_vote_cfg#36\n  min_tot_rounds:(## 8)\n  max_tot_rounds:(## 8)\n  { min_tot_rounds <= max_tot_rounds }\n  min_wins:uint8\n  max_losses:uint8\n  min_store_sec:(## 32)\n  max_store_sec:(## 32)\n  { min_store_sec <= max_store_sec }\n  bit_price:uint32\n  cell_price:uint32 = ConfigProposalSetup;",
-    "226": "cfg_vote_setup#91\n  normal_params:^ConfigProposalSetup\n  critical_params:^ConfigProposalSetup = ConfigVotingSetup;",
-    "227": "_ ConfigVotingSetup = ConfigParam 11;",
-    "230": "wfmt_basic#1\n  vm_version:int32\n  vm_mode:uint64 = WorkchainFormat 1;",
-    "231": "wfmt_ext#0\n  min_addr_len:(## 12)\n  max_addr_len:(## 12)\n  addr_len_step:(## 12)\n  { min_addr_len >= 64 }\n  { min_addr_len <= max_addr_len }\n  { max_addr_len <= 1023 }\n  { addr_len_step <= 1023 }\n  workchain_type_id:(## 32)\n  { workchain_type_id >= 1 } = WorkchainFormat 0;",
-    "232": "wc_split_merge_timings#0\n  split_merge_delay:uint32\n  split_merge_interval:uint32\n  min_split_merge_interval:uint32\n  max_split_merge_delay:uint32 = WcSplitMergeTimings;",
-    "233": "workchain#a6\n  enabled_since:uint32\n  monitor_min_split:(## 8)\n  min_split:(## 8)\n  max_split:(## 8)\n  { monitor_min_split <= min_split }\n  { min_split <= max_split }\n  { max_split <= 60 }\n  basic:(## 1)\n  active:Bool\n  accept_msgs:Bool\n  flags:(## 13)\n  { flags = 0 }\n  zerostate_root_hash:bits256\n  zerostate_file_hash:bits256\n  version:uint32\n  format:(WorkchainFormat basic) = WorkchainDescr;",
-    "234": "workchain_v2#a7\n  enabled_since:uint32\n  monitor_min_split:(## 8)\n  min_split:(## 8)\n  max_split:(## 8)\n  { monitor_min_split <= min_split }\n  { min_split <= max_split }\n  { max_split <= 60 }\n  basic:(## 1)\n  active:Bool\n  accept_msgs:Bool\n  flags:(## 13)\n  { flags = 0 }\n  zerostate_root_hash:bits256\n  zerostate_file_hash:bits256\n  version:uint32\n  format:(WorkchainFormat basic)\n  split_merge_timings:WcSplitMergeTimings\n  persistent_state_split_depth:(## 8)\n  { persistent_state_split_depth <= 63 } = WorkchainDescr;",
-    "235": "_ workchains:(HashmapE 32 WorkchainDescr) = ConfigParam 12;",
-    "236": "complaint_prices#1a\n  deposit:Grams\n  bit_price:Grams\n  cell_price:Grams = ComplaintPricing;",
-    "237": "_ ComplaintPricing = ConfigParam 13;",
-    "238": "block_grams_created#6b\n  masterchain_block_fee:Grams\n  basechain_block_fee:Grams = BlockCreateFees;",
-    "239": "_ BlockCreateFees = ConfigParam 14;",
-    "240": "_\n  validators_elected_for:uint32\n  elections_start_before:uint32\n  elections_end_before:uint32\n  stake_held_for:uint32 = ConfigParam 15;",
-    "241": "_\n  max_validators:(## 16)\n  max_main_validators:(## 16)\n  min_validators:(## 16)\n  { max_validators >= max_main_validators }\n  { max_main_validators >= min_validators }\n  { min_validators >= 1 } = ConfigParam 16;",
-    "242": "_\n  min_stake:Grams\n  max_stake:Grams\n  min_total_stake:Grams\n  max_stake_factor:uint32 = ConfigParam 17;",
-    "243": "_#cc\n  utime_since:uint32\n  bit_price_ps:uint64\n  cell_price_ps:uint64\n  mc_bit_price_ps:uint64\n  mc_cell_price_ps:uint64 = StoragePrices;",
-    "244": "_ (Hashmap 32 StoragePrices) = ConfigParam 18;",
-    "245": "_ global_id:int32 = ConfigParam 19;",
-    "246": "gas_prices#dd\n  gas_price:uint64\n  gas_limit:uint64\n  gas_credit:uint64\n  block_gas_limit:uint64\n  freeze_due_limit:uint64\n  delete_due_limit:uint64 = GasLimitsPrices;",
-    "247": "gas_prices_ext#de\n  gas_price:uint64\n  gas_limit:uint64\n  special_gas_limit:uint64\n  gas_credit:uint64\n  block_gas_limit:uint64\n  freeze_due_limit:uint64\n  delete_due_limit:uint64 = GasLimitsPrices;",
-    "248": "gas_flat_pfx#d1\n  flat_gas_limit:uint64\n  flat_gas_price:uint64\n  other:GasLimitsPrices = GasLimitsPrices;",
-    "249": "config_mc_gas_prices#_ GasLimitsPrices = ConfigParam 20;",
-    "250": "config_gas_prices#_ GasLimitsPrices = ConfigParam 21;",
-    "251": "param_limits#c3\n  underload:#\n  soft_limit:#\n  { underload <= soft_limit }\n  hard_limit:#\n  { soft_limit <= hard_limit } = ParamLimits;",
-    "252": "imported_msg_queue_limits#d3\n  max_bytes:#\n  max_msgs:# = ImportedMsgQueueLimits;",
-    "253": "block_limits#5d\n  bytes:ParamLimits\n  gas:ParamLimits\n  lt_delta:ParamLimits = BlockLimits;",
-    "254": "block_limits_v2#5e\n  bytes:ParamLimits\n  gas:ParamLimits\n  lt_delta:ParamLimits\n  collated_data:ParamLimits\n  imported_msg_queue:ImportedMsgQueueLimits = BlockLimits;",
-    "255": "config_mc_block_limits#_ BlockLimits = ConfigParam 22;",
-    "256": "config_block_limits#_ BlockLimits = ConfigParam 23;",
-    "257": "msg_forward_prices#ea\n  lump_price:uint64\n  bit_price:uint64\n  cell_price:uint64\n  ihr_price_factor:uint32\n  first_frac:uint16\n  next_frac:uint16 = MsgForwardPrices;",
-    "258": "config_mc_fwd_prices#_ MsgForwardPrices = ConfigParam 24;",
-    "259": "config_fwd_prices#_ MsgForwardPrices = ConfigParam 25;",
-    "260": "catchain_config#c1\n  mc_catchain_lifetime:(## 32)\n  { mc_catchain_lifetime >= 1 }\n  shard_catchain_lifetime:(## 32)\n  { shard_catchain_lifetime >= 1 }\n  shard_validators_lifetime:(## 32)\n  { shard_validators_lifetime >= 1 }\n  shard_validators_num:(## 32)\n  { shard_validators_num >= 1 } = CatchainConfig;",
-    "261": "catchain_config_new#c2\n  flags:(## 7)\n  { flags = 0 }\n  shuffle_mc_validators:Bool\n  mc_catchain_lifetime:(## 32)\n  { mc_catchain_lifetime >= 1 }\n  shard_catchain_lifetime:(## 32)\n  { shard_catchain_lifetime >= 1 }\n  shard_validators_lifetime:(## 32)\n  { shard_validators_lifetime >= 1 }\n  shard_validators_num:(## 32)\n  { shard_validators_num >= 1 } = CatchainConfig;",
-    "262": "consensus_config#d6\n  round_candidates:#\n  { round_candidates >= 1 }\n  next_candidate_delay_ms:uint32\n  consensus_timeout_ms:uint32\n  fast_attempts:uint32\n  attempt_duration:uint32\n  catchain_max_deps:uint32\n  max_block_bytes:uint32\n  max_collated_bytes:uint32 = ConsensusConfig;",
-    "263": "consensus_config_new#d7\n  flags:(## 7)\n  { flags = 0 }\n  new_catchain_ids:Bool\n  round_candidates:(## 8)\n  { round_candidates >= 1 }\n  next_candidate_delay_ms:uint32\n  consensus_timeout_ms:uint32\n  fast_attempts:uint32\n  attempt_duration:uint32\n  catchain_max_deps:uint32\n  max_block_bytes:uint32\n  max_collated_bytes:uint32 = ConsensusConfig;",
-    "264": "consensus_config_v3#d8\n  flags:(## 7)\n  { flags = 0 }\n  new_catchain_ids:Bool\n  round_candidates:(## 8)\n  { round_candidates >= 1 }\n  next_candidate_delay_ms:uint32\n  consensus_timeout_ms:uint32\n  fast_attempts:uint32\n  attempt_duration:uint32\n  catchain_max_deps:uint32\n  max_block_bytes:uint32\n  max_collated_bytes:uint32\n  proto_version:uint16 = ConsensusConfig;",
-    "265": "consensus_config_v4#d9\n  flags:(## 6)\n  { flags = 0 }\n  use_quic:Bool\n  new_catchain_ids:Bool\n  round_candidates:(## 8)\n  { round_candidates >= 1 }\n  next_candidate_delay_ms:uint32\n  consensus_timeout_ms:uint32\n  fast_attempts:uint32\n  attempt_duration:uint32\n  catchain_max_deps:uint32\n  max_block_bytes:uint32\n  max_collated_bytes:uint32\n  proto_version:uint16\n  catchain_max_blocks_coeff:uint32 = ConsensusConfig;",
-    "266": "_ CatchainConfig = ConfigParam 28;",
-    "267": "_ ConsensusConfig = ConfigParam 29;",
-    "268": "simplex_config#21\n  flags:(## 7)\n  use_quic:Bool\n  target_rate_ms:uint32\n  slots_per_leader_window:(## 32)\n  { slots_per_leader_window >= 1 }\n  first_block_timeout_ms:uint32\n  max_leader_window_desync:uint32 = NewConsensusConfig;",
-    "269": "simplex_config_v2#22\n  flags:(## 5)\n  protocol_version:(## 2)\n  use_quic:Bool\n  slots_per_leader_window:(## 32)\n  { slots_per_leader_window >= 1 }\n  noncritical_params:(HashmapE 8 uint32) = NewConsensusConfig;",
-    "270": "new_consensus_config_all#10\n  mc:(Maybe ^NewConsensusConfig)\n  shard:(Maybe ^NewConsensusConfig) = NewConsensusConfigAll;",
-    "271": "_ NewConsensusConfigAll = ConfigParam 30;",
-    "272": "_ fundamental_smc_addr:(HashmapE 256 True) = ConfigParam 31;",
-    "273": "_ prev_validators:ValidatorSet = ConfigParam 32;",
-    "274": "_ prev_temp_validators:ValidatorSet = ConfigParam 33;",
-    "275": "_ cur_validators:ValidatorSet = ConfigParam 34;",
-    "276": "_ cur_temp_validators:ValidatorSet = ConfigParam 35;",
-    "277": "_ next_validators:ValidatorSet = ConfigParam 36;",
-    "278": "_ next_temp_validators:ValidatorSet = ConfigParam 37;",
+    "202": "ed25519_pubkey#8e81278a pubkey:bits256 = SigPubKey;",
+    "203": "ed25519_signature#5\n  R:bits256\n  s:bits256 = CryptoSignatureSimple;",
+    "204": "_ CryptoSignatureSimple = CryptoSignature;",
+    "206": "certificate#4\n  temp_key:SigPubKey\n  valid_since:uint32\n  valid_until:uint32 = Certificate;",
+    "208": "signed_certificate$_\n  certificate:Certificate\n  certificate_signature:CryptoSignature = SignedCertificate;",
+    "209": "chained_signature#f\n  signed_cert:^SignedCertificate\n  temp_key_signature:CryptoSignatureSimple = CryptoSignature;",
+    "211": "validator#53\n  public_key:SigPubKey\n  weight:uint64 = ValidatorDescr;",
+    "212": "validator_addr#73\n  public_key:SigPubKey\n  weight:uint64\n  adnl_addr:bits256 = ValidatorDescr;",
+    "213": "validators#11\n  utime_since:uint32\n  utime_until:uint32\n  total:(## 16)\n  main:(## 16)\n  { main <= total }\n  { main >= 1 }\n  list:(Hashmap 16 ValidatorDescr) = ValidatorSet;",
+    "214": "validators_ext#12\n  utime_since:uint32\n  utime_until:uint32\n  total:(## 16)\n  main:(## 16)\n  { main <= total }\n  { main >= 1 }\n  total_weight:uint64\n  list:(HashmapE 16 ValidatorDescr) = ValidatorSet;",
+    "215": "_ config_addr:bits256 = ConfigParam 0;",
+    "216": "_ elector_addr:bits256 = ConfigParam 1;",
+    "217": "_ minter_addr:bits256 = ConfigParam 2;",
+    "218": "_ fee_collector_addr:bits256 = ConfigParam 3;",
+    "219": "_ dns_root_addr:bits256 = ConfigParam 4;",
+    "220": "burning_config#01\n  blackhole_addr:(Maybe bits256)\n  fee_burn_num:#\n  fee_burn_denom:#\n  { fee_burn_num <= fee_burn_denom }\n  { fee_burn_denom >= 1 } = BurningConfig;",
+    "221": "_ BurningConfig = ConfigParam 5;",
+    "222": "_\n  mint_new_price:Grams\n  mint_add_price:Grams = ConfigParam 6;",
+    "223": "_ to_mint:ExtraCurrencyCollection = ConfigParam 7;",
+    "224": "capabilities#c4\n  version:uint32\n  capabilities:uint64 = GlobalVersion;",
+    "225": "_ GlobalVersion = ConfigParam 8;",
+    "226": "_ mandatory_params:(Hashmap 32 True) = ConfigParam 9;",
+    "227": "_ critical_params:(Hashmap 32 True) = ConfigParam 10;",
+    "228": "cfg_vote_cfg#36\n  min_tot_rounds:(## 8)\n  max_tot_rounds:(## 8)\n  { min_tot_rounds <= max_tot_rounds }\n  min_wins:uint8\n  max_losses:uint8\n  min_store_sec:(## 32)\n  max_store_sec:(## 32)\n  { min_store_sec <= max_store_sec }\n  bit_price:uint32\n  cell_price:uint32 = ConfigProposalSetup;",
+    "229": "cfg_vote_setup#91\n  normal_params:^ConfigProposalSetup\n  critical_params:^ConfigProposalSetup = ConfigVotingSetup;",
+    "230": "_ ConfigVotingSetup = ConfigParam 11;",
+    "233": "wfmt_basic#1\n  vm_version:int32\n  vm_mode:uint64 = WorkchainFormat 1;",
+    "234": "wfmt_ext#0\n  min_addr_len:(## 12)\n  max_addr_len:(## 12)\n  addr_len_step:(## 12)\n  { min_addr_len >= 64 }\n  { min_addr_len <= max_addr_len }\n  { max_addr_len <= 1023 }\n  { addr_len_step <= 1023 }\n  workchain_type_id:(## 32)\n  { workchain_type_id >= 1 } = WorkchainFormat 0;",
+    "235": "wc_split_merge_timings#0\n  split_merge_delay:uint32\n  split_merge_interval:uint32\n  min_split_merge_interval:uint32\n  max_split_merge_delay:uint32 = WcSplitMergeTimings;",
+    "236": "workchain#a6\n  enabled_since:uint32\n  monitor_min_split:(## 8)\n  min_split:(## 8)\n  max_split:(## 8)\n  { monitor_min_split <= min_split }\n  { min_split <= max_split }\n  { max_split <= 60 }\n  basic:(## 1)\n  active:Bool\n  accept_msgs:Bool\n  flags:(## 13)\n  { flags = 0 }\n  zerostate_root_hash:bits256\n  zerostate_file_hash:bits256\n  version:uint32\n  format:(WorkchainFormat basic) = WorkchainDescr;",
+    "237": "workchain_v2#a7\n  enabled_since:uint32\n  monitor_min_split:(## 8)\n  min_split:(## 8)\n  max_split:(## 8)\n  { monitor_min_split <= min_split }\n  { min_split <= max_split }\n  { max_split <= 60 }\n  basic:(## 1)\n  active:Bool\n  accept_msgs:Bool\n  flags:(## 13)\n  { flags = 0 }\n  zerostate_root_hash:bits256\n  zerostate_file_hash:bits256\n  version:uint32\n  format:(WorkchainFormat basic)\n  split_merge_timings:WcSplitMergeTimings\n  persistent_state_split_depth:(## 8)\n  { persistent_state_split_depth <= 63 } = WorkchainDescr;",
+    "238": "_ workchains:(HashmapE 32 WorkchainDescr) = ConfigParam 12;",
+    "239": "complaint_prices#1a\n  deposit:Grams\n  bit_price:Grams\n  cell_price:Grams = ComplaintPricing;",
+    "240": "_ ComplaintPricing = ConfigParam 13;",
+    "241": "block_grams_created#6b\n  masterchain_block_fee:Grams\n  basechain_block_fee:Grams = BlockCreateFees;",
+    "242": "_ BlockCreateFees = ConfigParam 14;",
+    "243": "_\n  validators_elected_for:uint32\n  elections_start_before:uint32\n  elections_end_before:uint32\n  stake_held_for:uint32 = ConfigParam 15;",
+    "244": "_\n  max_validators:(## 16)\n  max_main_validators:(## 16)\n  min_validators:(## 16)\n  { max_validators >= max_main_validators }\n  { max_main_validators >= min_validators }\n  { min_validators >= 1 } = ConfigParam 16;",
+    "245": "_\n  min_stake:Grams\n  max_stake:Grams\n  min_total_stake:Grams\n  max_stake_factor:uint32 = ConfigParam 17;",
+    "246": "_#cc\n  utime_since:uint32\n  bit_price_ps:uint64\n  cell_price_ps:uint64\n  mc_bit_price_ps:uint64\n  mc_cell_price_ps:uint64 = StoragePrices;",
+    "247": "_ (Hashmap 32 StoragePrices) = ConfigParam 18;",
+    "248": "_ global_id:int32 = ConfigParam 19;",
+    "249": "gas_prices#dd\n  gas_price:uint64\n  gas_limit:uint64\n  gas_credit:uint64\n  block_gas_limit:uint64\n  freeze_due_limit:uint64\n  delete_due_limit:uint64 = GasLimitsPrices;",
+    "250": "gas_prices_ext#de\n  gas_price:uint64\n  gas_limit:uint64\n  special_gas_limit:uint64\n  gas_credit:uint64\n  block_gas_limit:uint64\n  freeze_due_limit:uint64\n  delete_due_limit:uint64 = GasLimitsPrices;",
+    "251": "gas_flat_pfx#d1\n  flat_gas_limit:uint64\n  flat_gas_price:uint64\n  other:GasLimitsPrices = GasLimitsPrices;",
+    "252": "config_mc_gas_prices#_ GasLimitsPrices = ConfigParam 20;",
+    "253": "config_gas_prices#_ GasLimitsPrices = ConfigParam 21;",
+    "254": "param_limits#c3\n  underload:#\n  soft_limit:#\n  { underload <= soft_limit }\n  hard_limit:#\n  { soft_limit <= hard_limit } = ParamLimits;",
+    "255": "imported_msg_queue_limits#d3\n  max_bytes:#\n  max_msgs:# = ImportedMsgQueueLimits;",
+    "256": "block_limits#5d\n  bytes:ParamLimits\n  gas:ParamLimits\n  lt_delta:ParamLimits = BlockLimits;",
+    "257": "block_limits_v2#5e\n  bytes:ParamLimits\n  gas:ParamLimits\n  lt_delta:ParamLimits\n  collated_data:ParamLimits\n  imported_msg_queue:ImportedMsgQueueLimits = BlockLimits;",
+    "258": "config_mc_block_limits#_ BlockLimits = ConfigParam 22;",
+    "259": "config_block_limits#_ BlockLimits = ConfigParam 23;",
+    "260": "msg_forward_prices#ea\n  lump_price:uint64\n  bit_price:uint64\n  cell_price:uint64\n  ihr_price_factor:uint32\n  first_frac:uint16\n  next_frac:uint16 = MsgForwardPrices;",
+    "261": "config_mc_fwd_prices#_ MsgForwardPrices = ConfigParam 24;",
+    "262": "config_fwd_prices#_ MsgForwardPrices = ConfigParam 25;",
+    "263": "catchain_config#c1\n  mc_catchain_lifetime:(## 32)\n  { mc_catchain_lifetime >= 1 }\n  shard_catchain_lifetime:(## 32)\n  { shard_catchain_lifetime >= 1 }\n  shard_validators_lifetime:(## 32)\n  { shard_validators_lifetime >= 1 }\n  shard_validators_num:(## 32)\n  { shard_validators_num >= 1 } = CatchainConfig;",
+    "264": "catchain_config_new#c2\n  flags:(## 7)\n  { flags = 0 }\n  shuffle_mc_validators:Bool\n  mc_catchain_lifetime:(## 32)\n  { mc_catchain_lifetime >= 1 }\n  shard_catchain_lifetime:(## 32)\n  { shard_catchain_lifetime >= 1 }\n  shard_validators_lifetime:(## 32)\n  { shard_validators_lifetime >= 1 }\n  shard_validators_num:(## 32)\n  { shard_validators_num >= 1 } = CatchainConfig;",
+    "265": "consensus_config#d6\n  round_candidates:#\n  { round_candidates >= 1 }\n  next_candidate_delay_ms:uint32\n  consensus_timeout_ms:uint32\n  fast_attempts:uint32\n  attempt_duration:uint32\n  catchain_max_deps:uint32\n  max_block_bytes:uint32\n  max_collated_bytes:uint32 = ConsensusConfig;",
+    "266": "consensus_config_new#d7\n  flags:(## 7)\n  { flags = 0 }\n  new_catchain_ids:Bool\n  round_candidates:(## 8)\n  { round_candidates >= 1 }\n  next_candidate_delay_ms:uint32\n  consensus_timeout_ms:uint32\n  fast_attempts:uint32\n  attempt_duration:uint32\n  catchain_max_deps:uint32\n  max_block_bytes:uint32\n  max_collated_bytes:uint32 = ConsensusConfig;",
+    "267": "consensus_config_v3#d8\n  flags:(## 7)\n  { flags = 0 }\n  new_catchain_ids:Bool\n  round_candidates:(## 8)\n  { round_candidates >= 1 }\n  next_candidate_delay_ms:uint32\n  consensus_timeout_ms:uint32\n  fast_attempts:uint32\n  attempt_duration:uint32\n  catchain_max_deps:uint32\n  max_block_bytes:uint32\n  max_collated_bytes:uint32\n  proto_version:uint16 = ConsensusConfig;",
+    "268": "consensus_config_v4#d9\n  flags:(## 6)\n  { flags = 0 }\n  use_quic:Bool\n  new_catchain_ids:Bool\n  round_candidates:(## 8)\n  { round_candidates >= 1 }\n  next_candidate_delay_ms:uint32\n  consensus_timeout_ms:uint32\n  fast_attempts:uint32\n  attempt_duration:uint32\n  catchain_max_deps:uint32\n  max_block_bytes:uint32\n  max_collated_bytes:uint32\n  proto_version:uint16\n  catchain_max_blocks_coeff:uint32 = ConsensusConfig;",
+    "269": "_ CatchainConfig = ConfigParam 28;",
+    "270": "_ ConsensusConfig = ConfigParam 29;",
+    "271": "simplex_config#21\n  flags:(## 7)\n  use_quic:Bool\n  target_rate_ms:uint32\n  slots_per_leader_window:(## 32)\n  { slots_per_leader_window >= 1 }\n  first_block_timeout_ms:uint32\n  max_leader_window_desync:uint32 = NewConsensusConfig;",
+    "272": "simplex_config_v2#22\n  flags:(## 5)\n  protocol_version:(## 2)\n  use_quic:Bool\n  slots_per_leader_window:(## 32)\n  { slots_per_leader_window >= 1 }\n  noncritical_params:(HashmapE 8 uint32) = NewConsensusConfig;",
+    "273": "new_consensus_config_all#10\n  mc:(Maybe ^NewConsensusConfig)\n  shard:(Maybe ^NewConsensusConfig) = NewConsensusConfigAll;",
+    "274": "_ NewConsensusConfigAll = ConfigParam 30;",
+    "275": "_ fundamental_smc_addr:(HashmapE 256 True) = ConfigParam 31;",
+    "276": "_ prev_validators:ValidatorSet = ConfigParam 32;",
+    "277": "_ cur_validators:ValidatorSet = ConfigParam 34;",
+    "278": "_ next_validators:ValidatorSet = ConfigParam 36;",
     "279": "validator_temp_key#3\n  adnl_addr:bits256\n  temp_public_key:SigPubKey\n  seqno:#\n  valid_until:uint32 = ValidatorTempKey;",
     "280": "signed_temp_key#4\n  key:^ValidatorTempKey\n  signature:CryptoSignature = ValidatorSignedTempKey;",
     "281": "_ (HashmapE 256 ValidatorSignedTempKey) = ConfigParam 39;",
@@ -2713,7 +2398,7 @@
     "283": "_ MisbehaviourPunishmentConfig = ConfigParam 40;",
     "284": "size_limits_config#01\n  max_msg_bits:uint32\n  max_msg_cells:uint32\n  max_library_cells:uint32\n  max_vm_data_depth:uint16\n  max_ext_msg_size:uint32\n  max_ext_msg_depth:uint16 = SizeLimitsConfig;",
     "285": "size_limits_config_v2#02\n  max_msg_bits:uint32\n  max_msg_cells:uint32\n  max_library_cells:uint32\n  max_vm_data_depth:uint16\n  max_ext_msg_size:uint32\n  max_ext_msg_depth:uint16\n  max_acc_state_cells:uint32\n  max_mc_acc_state_cells:uint32\n  max_acc_public_libraries:uint32\n  defer_out_queue_size_limit:uint32\n  max_msg_extra_currencies:uint32\n  max_acc_fixed_prefix_length:uint8\n  acc_state_cells_for_storage_dict:uint32\n  max_transaction_library_loads:(Maybe uint32) = SizeLimitsConfig;",
-    "286": "size_limits_config_v3#03\n  max_msg_bits:uint32\n  max_msg_cells:uint32\n  max_library_cells:uint32\n  max_vm_data_depth:uint16\n  max_ext_msg_size:uint32\n  max_ext_msg_depth:uint16\n  max_acc_state_cells:uint32\n  max_mc_acc_state_cells:uint32\n  max_acc_public_libraries:uint32\n  defer_out_queue_size_limit:uint32\n  max_msg_extra_currencies:uint32\n  max_acc_fixed_prefix_length:uint8\n  acc_state_cells_for_storage_dict:uint32\n  max_transaction_library_loads:(Maybe uint32)\n  max_total_msg_bits:uint32\n  max_total_msg_cells:uint32 = SizeLimitsConfig;",
+    "286": "size_limits_config_v3#03\n  max_msg_bits:uint32\n  max_msg_cells:uint32\n  max_library_cells:uint32\n  max_vm_data_depth:uint16\n  max_ext_msg_size:uint32\n  max_ext_msg_depth:uint16\n  max_acc_state_cells:uint32\n  max_mc_acc_state_cells:uint32\n  max_acc_public_libraries:uint32\n  defer_out_queue_size_limit:uint32\n  max_msg_extra_currencies:uint32\n  max_acc_fixed_prefix_length:uint8\n  acc_state_cells_for_storage_dict:uint32\n  max_transaction_library_loads:(Maybe uint32)\n  max_total_msg_bits:uint32\n  max_total_msg_cells:uint32\n  out_msg_queue_size_hard_limit:uint32\n  out_msg_queue_size_soft_limit:uint32 = SizeLimitsConfig;",
     "287": "_ SizeLimitsConfig = ConfigParam 43;",
     "288": "suspended_address_list#00\n  addresses:(HashmapE 288 Unit)\n  suspended_until:uint32 = SuspendedAddressList;",
     "289": "_ SuspendedAddressList = ConfigParam 44;",
@@ -2731,11 +2416,11 @@
     "301": "_ JettonBridgeParams = ConfigParam 79;",
     "302": "_ JettonBridgeParams = ConfigParam 81;",
     "303": "_ JettonBridgeParams = ConfigParam 82;",
-    "383": "val_registry_config#3601163e\n  contract_address:bits256\n  max_collators_per_validator:uint32\n  new_code_hash:(Maybe uint256) = ValRegistryConfig;"
+    "386": "val_registry_config#3601163e\n  contract_address:bits256\n  max_collators_per_validator:uint32\n  new_code_hash:(Maybe uint256) = ValRegistryConfig;"
   },
   "source": {
-    "revision": "3d478cbde854be03a18ab2a59f8fc3c565cf7d14",
-    "sha256": "d940a095d86f76d8c1dd43424767383b920952b1c89831ee03fc0ab9a90b6b23",
-    "url": "https://github.com/ton-blockchain/ton/blob/3d478cbde854be03a18ab2a59f8fc3c565cf7d14/crypto/block/block.tlb"
+    "revision": "5e839c009573925d48d55a3a06e786e2ab31cfea",
+    "sha256": "7ce8f1903e181d2d106cea0e5f8a7e1a46f8a8186f1de2758016891b1eb6d7fb",
+    "url": "https://github.com/ton-blockchain/ton/blob/5e839c009573925d48d55a3a06e786e2ab31cfea/crypto/block/block.tlb"
   }
 }
