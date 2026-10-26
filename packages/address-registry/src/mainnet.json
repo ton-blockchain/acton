@@ -1292,6 +1292,10 @@
     "name": "Vintage Cigars"
   },
   {
+    "address": "0:02840b30b0f36c5369370396433bf71f8569270864ba58c1b6273d79512330c4",
+    "name": "TAC Jetton Proxy"
+  },
+  {
     "address": "0:029f5ea6f4ead9fa6c35f3a33836522954ff136f7aba495f5a5fc3634a055f25",
     "name": "STON.fi DEX"
   },
@@ -1432,6 +1436,10 @@
     "name": "DeDust Major vault"
   },
   {
+    "address": "0:0dbd0ae165d9c5bb0dc32ac61e4307dfc674dd111f534d9fdbaf6793fe54eefe",
+    "name": "Spend.tg Rewards"
+  },
+  {
     "address": "0:0dc09ed193e47757057ed6eee7fb0677719f31bd8828113ed52d47abf23447da",
     "name": "TONAPI gas proxy"
   },
@@ -1498,6 +1506,10 @@
   {
     "address": "0:12d37bc78b6d88acb34a14f676acbe614b722a5c3704a676ad80dd512915339d",
     "name": "OKX 131"
+  },
+  {
+    "address": "0:12f7695207210ba475cf7bbfdedf47d3179fc9db2640862ae877bbe19fbe0ada",
+    "name": "Omniston Resolver 4"
   },
   {
     "address": "0:130a97c6c89d4954fc4781c7e906086060814d3e20f32f116e0e9ee7804f44ba",
@@ -1596,10 +1608,6 @@
     "name": "DeDust Vault"
   },
   {
-    "address": "0:193c98e9c7f542a1a0095bbf2a62d6d42b9f48b217b2b02460cda494729ee4fc",
-    "name": "Orbit Bridge POLYGON Minter"
-  },
-  {
     "address": "0:198ee50999b3fe578472a308dec61edb21c74daeba23af458a4a9760801d336e",
     "name": "Nail Bracelets"
   },
@@ -1614,6 +1622,10 @@
   {
     "address": "0:1a91ac5db4594a52f03e6496e3b367f5456d32741cc671b8f4128c701608f847",
     "name": "ByBit 63"
+  },
+  {
+    "address": "0:1a92759d6cce390a84439da4ffeda087fb2fd7fc507331ea152e2dd64977d000",
+    "name": "ChangeNOW Rebalancer"
   },
   {
     "address": "0:1a983b7ae3499fec78fa56d6ed68b423497cfd06ce36d56988d73d519cad1030",
@@ -1636,12 +1648,8 @@
     "name": "Walt 4"
   },
   {
-    "address": "0:1b589dd8d4780822f70cab5a6b1b56a79430b44f771994053b96e3d3e8b993a6",
-    "name": "Omniston Escrow Minter"
-  },
-  {
-    "address": "0:1b973e97afa6feede2c059e6a020ad839fe83cd5888da6ed289077dcf44c18f7",
-    "name": "Orbit Bridge KLAYTN Governance"
+    "address": "0:1bc702df37bb02d0d4391d3ac56d44b281150f0d9897c1b12b3b7f79a883fdee",
+    "name": "Omniston Escrow Vault"
   },
   {
     "address": "0:1c06b78eb4c0c014b51308221f6263643746fe7be60b4831a8409051cba0306f",
@@ -1686,6 +1694,10 @@
   {
     "address": "0:20111179b6facd9f400cd91aebbe4f8cbad18feb464bef46c93eeaaf093198fb",
     "name": "STON.fi DEX"
+  },
+  {
+    "address": "0:20a5698ef27054ae67ce3a57481264642c4c15f8821f540949b29858b309ee2f",
+    "name": "TAC Cross-chain Layer"
   },
   {
     "address": "0:20a900367cee5c09a8e994923726f9a4e6157a64aa7ad67056cb1a4a13b3b265",
@@ -1754,10 +1766,6 @@
   {
     "address": "0:24da1e7b8da901e5b3dd0f98c397feb6e5a5ea483195a8b6bd0682cf2c5327ae",
     "name": "OKX 6"
-  },
-  {
-    "address": "0:253112d360ea06ea433477774b1ea80adf4a25dea218c0c36d11e964b735cffe",
-    "name": "Orbit Bridge KLAYTN Minter"
   },
   {
     "address": "0:2544ea639b5935996df4afad6a471de5607b1991329755289a1c42213a59d803",
@@ -1868,10 +1876,6 @@
     "name": "Crystal Balls"
   },
   {
-    "address": "0:2d91b57ccac23be5eedf68ef0886ed2616d9ac83ea2c8fb826ad383f9a58d545",
-    "name": "Orbit Bridge TON Vault"
-  },
-  {
     "address": "0:2ecf5e47d591eb67fa6c56b02b6bb1de6a530855e16ad3082eaa59859e8d5fdc",
     "name": "Telegram Team"
   },
@@ -1926,6 +1930,10 @@
   {
     "address": "0:310b71b340182396f5ba08903081a1ef6ab4df571a3ca7b05effa44c4a3b0f92",
     "name": "Megaton Finance DEX"
+  },
+  {
+    "address": "0:32081d54752b9340a75c777a94af0483f07329dd296eb4f915bb45e477b93f8a",
+    "name": "Fragment USDT"
   },
   {
     "address": "0:320fb3bc0af55d47c00425cafde9f1c8d627c5ab6d52f1032dd5cce2e487c93f",
@@ -2248,10 +2256,6 @@
     "name": "Plush Pepes"
   },
   {
-    "address": "0:4713df8361a3c2743ab60aa9f7e79193033cc34dda304b9d913d2fb22e621035",
-    "name": "Omniston Escrow Minter"
-  },
-  {
     "address": "0:4770fa73c41185869e80d40fccccf12f0487b1a206d71b62c4cf21b938f5232a",
     "name": "OKX 128"
   },
@@ -2516,10 +2520,6 @@
     "name": "Snake Boxes"
   },
   {
-    "address": "0:5b77299489782fd852b8c86c079970b69af9e9c31513ed4f6d8fe9e89d75e7ae",
-    "name": "Orbit Bridge POLYGON Governance"
-  },
-  {
     "address": "0:5c3713024f210791c43970addf3bfdc46e37fa25c039249fce255e27a4337eeb",
     "name": "Sleigh Bells"
   },
@@ -2554,6 +2554,10 @@
   {
     "address": "0:5e59ddbfef51dc3e60284d7da2f61d0759e840dff1bbea5c64f74cb25e6297ba",
     "name": "DeDust JetToN vault"
+  },
+  {
+    "address": "0:5e64e6b940c504bcc75bdc6292badb49824418ef3d3e0dd9bfed61be6f035701",
+    "name": "ChangeNOW 2"
   },
   {
     "address": "0:5e68090e14e74a689a2292640dcac0dd2ecc5a358420c7ba31b18d35c62daa27",
@@ -2781,7 +2785,7 @@
   },
   {
     "address": "0:6e2215cd36459ff405bd9a234635348efee159db77a37c85ab89e5e07b97fbdf",
-    "name": "KTON"
+    "name": "KTON Staking"
   },
   {
     "address": "0:6e814e6450e8c578067bb656298fb4d01397dd15018d7f34dc369eaba4c2111c",
@@ -2964,10 +2968,6 @@
     "name": "OKX 162"
   },
   {
-    "address": "0:7c98d4e0a06e50c6a84e755162e97d0c3a392618d777ddcb7e446053f594f9a0",
-    "name": "Orbit Bridge TON Governance"
-  },
-  {
     "address": "0:7cccbcc438540adea4f231880f0fc06ece63706e59e8baa681f343d6facd84ee",
     "name": "Hanging Stars"
   },
@@ -2978,6 +2978,10 @@
   {
     "address": "0:7d133d4e425c8e00de015513a44e66e6d163b21e71720aec7579965e5de28c55",
     "name": "ByBit 8"
+  },
+  {
+    "address": "0:7d628ee463b865b1507a69e8bc6644a9888d8e3c2fe491b879280a14aca5b4e1",
+    "name": "TAC Assets Handler"
   },
   {
     "address": "0:7da4af202cd62dadc31217344ec2d91a348a53a9accb184a1fe4eeeb559bec3e",
@@ -3108,6 +3112,10 @@
     "name": "Binance 9"
   },
   {
+    "address": "0:8649cad97b5c5bc96a960ef748ea6ccff8601c01616fe995ee6893ae4aa7a6c6",
+    "name": "StonFi TON/USDT Pool"
+  },
+  {
     "address": "0:865974621fd9be4237853c228d3673fdd2682fe7fea21b5b311e84334539263b",
     "name": "ByBit 58"
   },
@@ -3212,6 +3220,10 @@
     "name": "ByBit 37"
   },
   {
+    "address": "0:8e3c76126a207e7376c7e23b3f8c82305612f18a4ab879d0cd6ed25c8d8d11b2",
+    "name": "Omniston Resolver 1"
+  },
+  {
     "address": "0:8e91b50381c36dd42accdb51f5cb5d96848568b4924f8079b1a5ae7e10f43eda",
     "name": "Binance 1"
   },
@@ -3248,8 +3260,8 @@
     "name": "Morgenshtern"
   },
   {
-    "address": "0:9220c181a6cfeacd11b7b8f62138df1bb9cc82b6ed2661d2f5faee204b3efb20",
-    "name": "STON.fi DEX"
+    "address": "0:922d627d7d8edbd00e4e23bdb0c54a76ee5e1f46573a1af4417857fa3e23e91f",
+    "name": "StonFi Router USDT Wallet"
   },
   {
     "address": "0:92d2eeb918cc5829de1718985f863bb5cedfcf603fe705d3d37d27dfbd0fff16",
@@ -3409,7 +3421,7 @@
   },
   {
     "address": "0:9da971af38d2f03abdf308d5f91636a97e5a2b07a66c39d71d7cbae3b032eddc",
-    "name": "Tolya"
+    "name": "Anatoly Makosov"
   },
   {
     "address": "0:9dad2bdbf51f5a49c4a9c6d4a4b4001470624731e1bd3e5a4c7f38cacc9271bd",
@@ -3524,10 +3536,6 @@
     "name": "Coinone Withdrawal"
   },
   {
-    "address": "0:a5b03f281aefe1eea0943b3b2fccf4956aff5f9a56d2db1e681a787068f508a0",
-    "name": "Split Proxy"
-  },
-  {
     "address": "0:a62e05ef1701abb5da61f4ab028059ba96f33447696e893ce974152acdf2c523",
     "name": "Adsgram 2"
   },
@@ -3574,6 +3582,10 @@
   {
     "address": "0:a9c1ad2fea5bc6034d6e2867ec5b508ad4d779f5a3bfc551461873f2ec94e084",
     "name": "Marketapp Proxy"
+  },
+  {
+    "address": "0:aa039f027468929ecf1c2beac924c8a6dee030ea4b05d3c514d40376f703686a",
+    "name": "TAC Retranslator"
   },
   {
     "address": "0:aa0cc37a70a3ea7ad7e4265c3a6dcb1726b081e3e68a49251aa89d26dfbfff0c",
@@ -3988,6 +4000,10 @@
     "name": "OKX 56"
   },
   {
+    "address": "0:c3a8e090afa10f066267145f9d0cab8d14b72d1be484605873eba9b5eee8ac7c",
+    "name": "TAC NFT Proxy"
+  },
+  {
     "address": "0:c3f1da8ecda8f8cd42bace224ea3f1b6971eaa7f54c492d4d190527b4f573f7c",
     "name": "ByBit 1"
   },
@@ -4276,6 +4292,10 @@
     "name": "OKX 50"
   },
   {
+    "address": "0:d8481a819c0ee46bde87a573ceda1f19318e5fa6bb11ebd04d32468d53ab301e",
+    "name": "KAST Deposit"
+  },
+  {
     "address": "0:d86ba2e9f7d630b83ac3982b27831b3974accbfcfedea40e223f44fb76ca18d6",
     "name": "OKX 83"
   },
@@ -4408,6 +4428,10 @@
     "name": "TON Strategy 4"
   },
   {
+    "address": "0:e047b8d9cbd0fcf08042ddd2b8a842636fd0fc5a67c26cbf6ffb8163b23ce6ed",
+    "name": "NFTStore Usernames"
+  },
+  {
     "address": "0:e065d735fc349ad0d8674033798b99af76f8dce671a9c49d4fe9164e644a6a52",
     "name": "TONAPI gas proxy"
   },
@@ -4430,6 +4454,10 @@
   {
     "address": "0:e11e95ba088d0f954849a192f772227c3c4479ed64ee965a9cb02c02309b9139",
     "name": "ByBit 46"
+  },
+  {
+    "address": "0:e13a83032aeb177563955ed32bd85f70abae57bb78a300df7fa61de1cb767abe",
+    "name": "ChangeNOW Treasury"
   },
   {
     "address": "0:e1a83dc550023933394653aea2f3bb176d480a8a353dc39b41b179a89077ca1e",
@@ -4672,6 +4700,10 @@
     "name": "Westside Signs"
   },
   {
+    "address": "0:ef6df94db4bd1e19e40da34068509a1109305b4eb0c32899f659ef214be78ace",
+    "name": "Omniston Resolver 2"
+  },
+  {
     "address": "0:efd2134d01a9a1625b42877a5326bab7a1107d456d998446244cfe9f863e41b5",
     "name": "Notcoin Voucher Swap E"
   },
@@ -4786,6 +4818,10 @@
   {
     "address": "0:f5d6cb8792b3bfd4c6f9208758171e593f2dfc32e1e8787c7a740f9045a0fcc3",
     "name": "STON.fi DEX"
+  },
+  {
+    "address": "0:f5eef26012fa502b67623301c1f0f26c2c3ecf96f7ccdaf9f06d9bad392fd5ac",
+    "name": "Omniston Resolver 3"
   },
   {
     "address": "0:f642afc7ce8532fd1ff7c9cce36772ed70b822b3cfeb0a29e9807b43f607a9df",
