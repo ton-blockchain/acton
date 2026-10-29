@@ -267,7 +267,9 @@ impl response::TransactionInfo {
             ));
         }
         let cell = decode_cell(&self.transaction)?;
-        require_complete(&cell)?;
+        // Message bodies can contain application Merkle proofs whose pruned
+        // branches are part of the original committed transaction payload.
+        require_complete_payload(&cell, true)?;
         let transaction: Transaction = cell.parse()?;
         if transaction.account != address.address || transaction.lt != lt {
             return Err(ProofError::Invalid(
