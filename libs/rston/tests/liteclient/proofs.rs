@@ -2,14 +2,18 @@
 
 use super::TestServer;
 use rston::boc::Boc;
-use rston::cell::{Cell, CellBuilder, HashBytes};
+use rston::cell::{Cell, CellBuilder, CellFamily, CellType, DynCell, HashBytes};
 use rston::liteclient::{FromResponse, LiteError, MethodId, ProofError, VerifiedBlock};
+use rston::merkle::MerkleProof;
 use rston::models::vm::{Tuple, TupleItem};
-use rston::models::{BlockId, ExtInMsgInfo, IntAddr, IntMsgInfo, Message, MsgInfo, StdAddr};
+use rston::models::{
+    BlockId, ExtInMsgInfo, IntAddr, IntMsgInfo, Message, MsgInfo, StdAddr, Transaction,
+};
 use rston::num::Tokens;
-use rston::tl::common::{BlockLink, SignatureSet};
+use rston::tl::common::{BlockLink, Int256, SignatureSet};
 use rston::tl::{Request, Response, response};
 use serde::Deserialize;
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
@@ -321,6 +325,153 @@ fn rejects_transactions_for_a_different_address_lt_or_hash() {
         changed
             .verify(&block, &fixture.elector, fixture.transaction_lt)
             .is_err()
+    );
+}
+
+// Swap the real transaction leaf in its block proof and re-root the proof, so the
+// replacement is included in a block that the caller trusts by its new root hash.
+fn include_transaction(
+    original: &response::TransactionInfo,
+    block: BlockId,
+    transaction: Cell,
+) -> (VerifiedBlock, response::TransactionInfo) {
+    fn replace(cell: &DynCell, target: &HashBytes, replacement: &Cell) -> Option<Cell> {
+        if cell.hash(0) == target {
+            return Some(replacement.clone());
+        }
+        let children = cell
+            .references()
+            .map(|child| replace(child, target, replacement))
+            .collect::<Vec<_>>();
+        if children.iter().all(Option::is_none) {
+            return None;
+        }
+        let mut builder = CellBuilder::new();
+        builder.set_exotic(cell.is_exotic());
+        builder.store_cell_data(cell).unwrap();
+        for (index, child) in children.into_iter().enumerate() {
+            let child = child.unwrap_or_else(|| cell.reference_cloned(index as u8).unwrap());
+            builder.store_reference(child).unwrap();
+        }
+        Some(builder.build().unwrap())
+    }
+
+    let proof = Boc::decode(&original.proof)
+        .unwrap()
+        .parse_exotic::<MerkleProof>()
+        .unwrap();
+    let target = *Boc::decode(&original.transaction).unwrap().repr_hash();
+    let cell = replace(proof.cell.as_ref(), &target, &transaction).unwrap();
+    let proof = MerkleProof {
+        hash: *cell.hash(0),
+        depth: cell.depth(0),
+        cell,
+    };
+    let mut info = original.clone();
+    info.id.root_hash = Int256(proof.hash.0);
+    info.transaction = Boc::encode(transaction);
+    let block = BlockId {
+        root_hash: proof.hash,
+        ..block
+    };
+    info.proof = Boc::encode(CellBuilder::build_from(proof).unwrap());
+    (VerifiedBlock::from_trusted(block), info)
+}
+
+// An application Merkle proof with a pruned branch, as carried in message bodies.
+fn application_proof() -> MerkleProof {
+    let mut builder = CellBuilder::new();
+    builder.store_reference(Cell::empty_cell()).unwrap();
+    let child = builder.build().unwrap();
+    let mut builder = CellBuilder::new();
+    builder.store_reference(child).unwrap();
+    let root = builder.build().unwrap();
+    MerkleProof::create(root.as_ref(), HashSet::from([*root.repr_hash()]))
+        .build()
+        .unwrap()
+}
+
+// The real transaction with an external in-message whose body holds one reference.
+fn transaction_with_body_reference(
+    original: &response::TransactionInfo,
+    address: &StdAddr,
+    reference: Cell,
+) -> Cell {
+    let mut builder = CellBuilder::new();
+    builder.store_reference(reference).unwrap();
+    let body = builder.build().unwrap();
+    let message = Message {
+        info: MsgInfo::ExtIn(ExtInMsgInfo {
+            dst: IntAddr::Std(address.clone()),
+            ..Default::default()
+        }),
+        init: None,
+        body: body.as_slice().unwrap(),
+        layout: None,
+    };
+    let mut transaction: Transaction = Boc::decode(&original.transaction).unwrap().parse().unwrap();
+    transaction.in_msg = Some(CellBuilder::build_from(message).unwrap());
+    CellBuilder::build_from(&transaction).unwrap()
+}
+
+#[test]
+fn accepts_application_merkle_proofs_in_a_transaction() {
+    let fixture = fixture();
+    let original: response::TransactionInfo = reply(TRANSACTION);
+    // Pruned branches inside an application Merkle proof belong to the committed
+    // message body; they are not server-side pruning of the transaction.
+    let proof = CellBuilder::build_from(application_proof()).unwrap();
+    let cell = transaction_with_body_reference(&original, &fixture.elector, proof);
+    let (block, info) = include_transaction(&original, fixture.transaction_block, cell);
+
+    let decoded = info
+        .verify(&block, &fixture.elector, fixture.transaction_lt)
+        .unwrap();
+    let mut message: Message<'_> = decoded.in_msg.as_ref().unwrap().parse().unwrap();
+    let embedded = message.body.load_reference().unwrap();
+    assert_eq!(decoded.lt, fixture.transaction_lt);
+    assert_eq!(embedded.cell_type(), CellType::MerkleProof);
+    assert_eq!(
+        embedded
+            .reference(0)
+            .and_then(|cell| cell.reference(0))
+            .unwrap()
+            .cell_type(),
+        CellType::PrunedBranch
+    );
+}
+
+#[test]
+fn rejects_pruned_transaction_data_outside_merkle_proofs() {
+    let fixture = fixture();
+    let original: response::TransactionInfo = reply(TRANSACTION);
+    // The same pruned branch without its Merkle proof cell is incomplete data.
+    let cell =
+        transaction_with_body_reference(&original, &fixture.elector, application_proof().cell);
+    let (block, info) = include_transaction(&original, fixture.transaction_block, cell);
+    assert_eq!(
+        info.verify(&block, &fixture.elector, fixture.transaction_lt)
+            .unwrap_err()
+            .to_string(),
+        "requested payload contains pruned data"
+    );
+
+    // A server-pruned transaction cannot supply its required fields either.
+    let cell = Boc::decode(&original.transaction).unwrap();
+    let mut partial = original;
+    partial.transaction = Boc::encode(
+        MerkleProof::create(cell.as_ref(), HashSet::from([*cell.repr_hash()]))
+            .build()
+            .unwrap()
+            .cell,
+    );
+    let block = VerifiedBlock::from_trusted(fixture.transaction_block);
+    assert_eq!(
+        partial
+            .verify(&block, &fixture.elector, fixture.transaction_lt)
+            .unwrap_err()
+            .to_string(),
+        "requested payload contains pruned data"
     );
 }
 

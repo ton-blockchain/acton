@@ -11,6 +11,10 @@
   a permanently disconnected client. Submitted requests are never replayed, and
   request timeouts still preserve the connection for late responses.
 
+- Single-transaction verification accepts application Merkle proofs and updates
+  inside message bodies, as transaction-history pages already did. Pruned data
+  outside those cells is still rejected.
+
 ### Added
 
 - Global configuration accepts both signed and unsigned 32-bit IPv4 integers
