@@ -13,7 +13,7 @@ const UPSTREAM_REPOSITORY: &str = "https://github.com/toncenter/ton-http-api-cpp
 const UPSTREAM_BINARY: &str = "ton-http-api-cpp";
 const UPSTREAM_BUILD_PATH: &str = "ton-http-api/ton-http-api-cpp";
 const COMMIT: &str = "888318b81e900d0cb38f96974dcf4c115fe7ad07";
-const TON_COMMIT: &str = "9a42919dce98971a6653d326347efcce40bad026";
+const TON_COMMIT: &str = "857b8a57a178e6ae0fe7fa86e7d81c5233de8560";
 const BUILD_SCHEMA: &str = "4";
 const BROKEN_CACHE_CONSTRUCTION: &str = "cache_ = std::make_shared<Cache>(cache_size, way_size);";
 const FIXED_CACHE_CONSTRUCTION: &str = "cache_ = std::make_shared<Cache>(cache_ways, way_size);";

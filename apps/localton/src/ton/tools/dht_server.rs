@@ -24,9 +24,8 @@ use super::{
 
 /// Inputs for the one-shot DHT database and identity creation phase.
 ///
-/// `out_port` is separate from the ADNL endpoint: it controls the binary-owned
-/// outbound socket policy patched into `config.json`, whereas `endpoint` is the
-/// address on which peers reach this DHT node.
+/// `endpoint` is the address on which peers reach this DHT node. `out_port` applies
+/// only to distributions whose generated config exposes an outbound port setting.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DhtInitializeRequest {
     /// Preliminary or final TON global configuration read during initialization.
@@ -98,8 +97,8 @@ pub trait DhtServer: Send + Sync {
 /// Production DHT adapter backed by the pinned official TON distribution.
 ///
 /// This type is the version-compatibility surface for initialization and persistent
-/// flags. It narrowly patches `out_port` while preserving every unknown field in
-/// the binary-owned configuration.
+/// flags. It validates the generated config and overrides the outbound port only
+/// when the distribution exposes that setting.
 #[derive(Clone, Debug)]
 pub struct OfficialDhtServer {
     binaries: TonBinaries,
@@ -200,7 +199,7 @@ impl DhtServer for OfficialDhtServer {
             );
 
             // `dht-server` emits the shared engine config schema. Parse the whole
-            // document before changing Localton's outbound port so release drift
+            // document before applying supported port settings so release drift
             // fails here instead of surfacing as an opaque startup error.
             let mut config = ValidatorEngineConfig::load(&config_path)?;
             config.set_out_port(request.out_port);
@@ -212,7 +211,6 @@ impl DhtServer for OfficialDhtServer {
                 config_path = %database.config.display(),
                 keyring_path = %database.keyring_dir().display(),
                 key_count = database.keyring.len(),
-                out_port = request.out_port,
                 "TON DHT database is ready"
             );
             Ok(database)

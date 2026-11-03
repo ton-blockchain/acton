@@ -1,7 +1,7 @@
 //! Typed model of `validator-engine`'s generated `config.json`.
 //!
 //! The engine owns the file, while Localton owns a small set of deliberate changes:
-//! its outbound port, authenticated control endpoint, and optional liteserver. A
+//! its optional outbound port, authenticated control endpoint, and liteserver. A
 //! complete model prevents those changes from becoming recursive string-key edits
 //! over arbitrary JSON and makes an incompatible TON release fail during bootstrap.
 
@@ -22,7 +22,8 @@ const CONTROL_PERMISSIONS: i32 = 15;
 pub(crate) struct ValidatorEngineConfig {
     #[serde(rename = "@type")]
     constructor: ValidatorConfigConstructor,
-    out_port: u16,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    out_port: Option<u16>,
     addrs: Vec<EngineAddress>,
     adnl: Vec<EngineAdnl>,
     dht: Vec<EngineDht>,
@@ -56,9 +57,12 @@ impl ValidatorEngineConfig {
             .with_context(|| format!("failed to write validator config {}", path.display()))
     }
 
-    /// Replaces the engine's generated outbound ADNL port with the node-owned port.
+    /// Overrides the outbound ADNL port only when the engine exposes this setting.
+    /// Engines that omit it own their socket policy; saving must not add the field.
     pub(crate) fn set_out_port(&mut self, port: u16) {
-        self.out_port = port;
+        if let Some(out_port) = &mut self.out_port {
+            *out_port = port;
+        }
     }
 
     /// Installs the independent identities used for administration and lite queries.
@@ -431,6 +435,7 @@ mod tests {
     #[test]
     fn service_configuration_uses_numeric_ports_and_typed_ids() {
         let mut config: ValidatorEngineConfig = serde_json::from_value(config_json()).unwrap();
+        config.set_out_port(3273);
         config.set_local_services(
             4441,
             KeyId::from_bytes([2; 32]),
@@ -445,6 +450,7 @@ mod tests {
             .join("\n");
         let value = serde_json::to_value(config).unwrap();
 
+        assert_eq!(value["out_port"], 3273);
         assert_eq!(value["control"][0]["port"], 4441);
         assert_eq!(value["control"][0]["allowed"][0]["permissions"], 15);
         assert_eq!(value["liteservers"][0]["port"], 18_004);
@@ -454,5 +460,95 @@ mod tests {
             0202020202020202020202020202020202020202020202020202020202020202
             0404040404040404040404040404040404040404040404040404040404040404"#]]
         .assert_eq(&private_key_ids);
+    }
+
+    #[test]
+    fn generated_config_without_outbound_port_roundtrips() {
+        let generated = include_str!("../../../tests/fixtures/validator-engine-v2026.10.json");
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.json");
+        fs::write(&path, generated).unwrap();
+
+        let mut config = ValidatorEngineConfig::load(&path).unwrap();
+        config.set_out_port(3273);
+        config.set_local_services(
+            4441,
+            KeyId::from_bytes([3; 32]),
+            KeyId::from_bytes([4; 32]),
+            Some((18_004, KeyId::from_bytes([5; 32]))),
+        );
+        config.save(&path).unwrap();
+
+        let saved = fs::read_to_string(&path).unwrap();
+        let reloaded = ValidatorEngineConfig::load(&path).unwrap();
+        expect![[r#"
+            {
+              "@type": "engine.validator.config",
+              "addrs": [
+                {
+                  "@type": "engine.addr",
+                  "ip": 2130706433,
+                  "port": 4442,
+                  "categories": [
+                    0,
+                    1,
+                    2,
+                    3
+                  ],
+                  "priority_categories": []
+                }
+              ],
+              "adnl": [
+                {
+                  "@type": "engine.adnl",
+                  "id": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+                  "category": 1
+                },
+                {
+                  "@type": "engine.adnl",
+                  "id": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+                  "category": 0
+                }
+              ],
+              "dht": [
+                {
+                  "@type": "engine.dht",
+                  "id": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI="
+                }
+              ],
+              "validators": [],
+              "collators": [],
+              "fullnode": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+              "fullnodeslaves": [],
+              "fullnodemasters": [],
+              "liteservers": [
+                {
+                  "@type": "engine.liteServer",
+                  "id": "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=",
+                  "port": 18004
+                }
+              ],
+              "control": [
+                {
+                  "@type": "engine.controlInterface",
+                  "id": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=",
+                  "port": 4441,
+                  "allowed": [
+                    {
+                      "@type": "engine.controlProcess",
+                      "id": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=",
+                      "permissions": 15
+                    }
+                  ]
+                }
+              ],
+              "shards_to_monitor": [],
+              "gc": {
+                "@type": "engine.gc",
+                "ids": []
+              }
+            }"#]]
+        .assert_eq(&saved);
+        assert_eq!(reloaded, config);
     }
 }

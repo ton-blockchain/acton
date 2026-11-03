@@ -82,6 +82,9 @@ All notable changes to this project will be documented in this file.
 
 ### Localnet
 
+- Localton uses TON `v2026.10` binaries, supports their generated engine
+  configuration, and builds HTTP API v2 with matching TON sources.
+
 - Install Localton's TON binaries from custom GitHub releases, including private
   repositories with token authentication, SHA-256 verification, and isolated caches.
 

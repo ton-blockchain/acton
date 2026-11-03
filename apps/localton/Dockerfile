@@ -54,7 +54,7 @@ USER localton
 
 FROM ubuntu:${UBUNTU_VERSION} AS ton-binaries
 ARG TARGETARCH
-ARG TON_RELEASE=v2026.08
+ARG TON_RELEASE=v2026.10
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -68,11 +68,11 @@ RUN set -eux; \
     case "${TARGETARCH}" in \
         amd64) \
             asset="ton-linux-x86_64.zip"; \
-            sha256="548f0f29b5ebf1a42d6aa23438b25c7a0c05b2330a7f278d2ca83fc2015685e9" \
+            sha256="49c38306e841e05a60185b36bbc6426fdf7eda47714d9e7ebb75e3f5620b0096" \
             ;; \
         arm64) \
             asset="ton-linux-arm64.zip"; \
-            sha256="acb73cd85118754e149744d35c3ef4775f065c8545b49600f70ffe8dea68060e" \
+            sha256="62c9b0d9f20fd560b344774a9512d5f7bd4371289d1c5edab6d69f2c869838ab" \
             ;; \
         *) \
             echo "unsupported Docker target architecture: ${TARGETARCH}" >&2; \

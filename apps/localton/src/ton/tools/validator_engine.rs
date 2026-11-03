@@ -264,7 +264,7 @@ impl OfficialValidatorEngine {
 
     /// Builds the common command used by all three engine modes.
     ///
-    /// In TON v2026.08 the trailing `false` and `--ip` are positional/late options
+    /// The trailing `false` and `--ip` are positional/late options
     /// and must stay after the cell database flags. Initialization and temporary
     /// bootstrap intentionally render the same argv: the existing database state
     /// determines whether this release exits after creation or keeps running.
