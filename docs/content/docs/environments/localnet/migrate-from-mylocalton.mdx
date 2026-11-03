@@ -1,0 +1,211 @@
+---
+title: "Migrate from MyLocalTon to Localton and Studio"
+sidebarTitle: "Migrate from MyLocalTon"
+description: "Move from MyLocalTon desktop or Docker to an Acton localnet, translate genesis configuration, and connect existing applications"
+---
+
+import {Accordion, Accordions} from "fumadocs-ui/components/accordion";
+import {Tabs, Tab} from "fumadocs-ui/components/tabs";
+
+<AvailabilityBadge since="trunk" />
+
+This guide covers MyLocalTon (MLT) desktop and `mylocalton-docker`. Localton runs a local TON blockchain with real validators and TON Center APIs. Acton manages the network, and Studio provides its browser interface.
+
+The transition creates a new network. MLT databases, Docker volumes, and Time Machine snapshots do not have a direct import path into Acton. Keep the old network data until you finish the transition.
+
+## Find familiar tools in Studio
+
+| MyLocalTon tool or task | Localton and Studio |
+| --- | --- |
+| Desktop controls or Admin Portal | **Virtual environments** for network lifecycle, **Network → Nodes** for individual nodes |
+| Blockchain Explorer | **Explorer** for blocks, accounts, transactions, jettons, and NFTs |
+| Config Update | **Network → Config** for on-chain parameters |
+| Wallets and faucet | **Wallets** and the environment faucet |
+| Data generator | **Network → Activity** for transfers, batches, jettons, and NFTs |
+| Time Machine checkpoints | **Snapshots** for saved network states |
+
+Select **Localnet** for validator and indexer workflows. [Simulator](/docs/environments/simulator/overview) provides separate features such as virtual time and public-network forks.
+
+## Prepare Acton and Docker
+
+[Install Acton](/docs/installation), then select a [trunk build](/docs/installation#trunk-releases) with custom genesis support:
+
+```bash
+acton up --trunk
+```
+
+Check Docker and Compose:
+
+```bash
+docker info
+docker compose version
+```
+
+In your project directory, initialize Acton:
+
+```bash
+acton init
+```
+
+This creates `Acton.toml` if the file does not exist. Your existing JavaScript or TypeScript application can continue to use TON Center APIs.
+
+Acton selects its Localton image automatically. A custom image must provide the commands and APIs expected by Acton. An MLT image is not a replacement for that image.
+
+## Translate the genesis configuration
+
+Create a separate `genesis.toml`. Acton does not import the MLT `.env` file. Copy only the values that your tests require.
+
+This example retains the MLT network identifier and a 300 ms Simplex target:
+
+```toml title="genesis.toml"
+global_id = -217
+simplex_target_rate_ms = 300
+```
+
+Missing fields use Localton defaults. These defaults differ from MLT defaults. The block interval is a consensus target, so actual timing can vary.
+
+<Accordions>
+<Accordion title="Map MLT environment variables to genesis.toml">
+
+The mappings refer to the [MLT environment file](https://github.com/neodix42/mylocalton-docker/blob/7ffe58315280eb7359a45929c921f32c4bdce5ce/.env) and its [genesis template](https://github.com/neodix42/mylocalton-docker/blob/7ffe58315280eb7359a45929c921f32c4bdce5ce/docker/scripts/gen-zerostate.fif). Check your MLT revision before you copy values from a modified template.
+
+| MLT variable | `genesis.toml` field | Conversion |
+| --- | --- | --- |
+| `GLOBAL_ID` | `global_id` | Same negative integer |
+| `MASTERCHAIN_ONLY` | `workchain_enabled` | Invert the boolean |
+| `VALIDATION_PERIOD` | `elected_for_seconds` | Seconds |
+| `ELECTION_START_BEFORE` | `election_start_before_seconds` | Seconds |
+| `ELECTION_END_BEFORE` | `election_end_before_seconds` | Seconds |
+| `ELECTION_STAKE_FROZEN` | `stakes_frozen_for_seconds` | Seconds |
+| `ORIGINAL_VALIDATOR_SET_VALID_FOR` | `original_validator_set_valid_for_seconds` | Seconds |
+| `SIMPLEX_TARGET_RATE_MS` | `simplex_target_rate_ms` | Milliseconds |
+| `SIMPLEX_SLOTS_PER_LEADER_WINDOW` | `simplex_slots_per_leader_window` | Same count |
+| `SIMPLEX_FIRST_BLOCK_TIMEOUT_MS` | `simplex_first_block_timeout_ms` | Milliseconds |
+| `SIMPLEX_MAX_LEADER_WINDOW_DESYNC` | `simplex_max_leader_window_desync` | Same count |
+| `MIN_SPLIT`, `MAX_SPLIT` | `workchain.min_split`, `workchain.max_split` | Split bounds |
+| `VALIDATORS_PER_SHARD` | `catchain.shard_validators` | Same count |
+| `CRITICAL_PARAM_MIN_WINS`, `CRITICAL_PARAM_MAX_LOSSES` | `critical_voting.min_wins`, `critical_voting.max_losses` | Same counts |
+
+Nested fields use TOML tables. For example:
+
+```toml
+[workchain]
+min_split = 0
+max_split = 4
+
+[critical_voting]
+min_wins = 4
+max_losses = 2
+```
+
+**Prices and limits need unit conversions.** The referenced MLT template multiplies `GAS_PRICE`, `GAS_PRICE_MC`, `CELL_PRICE`, and `CELL_PRICE_MC` by 65,536. Localton accepts these scaled values directly as `gas_price`, `gas_price_masterchain`, `cell_price`, and `cell_price_masterchain`. For example, MLT `GAS_PRICE=1000` becomes `gas_price = 65536000`.
+
+Storage prices use separate fields: `storage.bit_price`, `storage.cell_price`, `storage.masterchain_bit_price`, and `storage.masterchain_cell_price`. They correspond to MLT's `BIT_PRICE_PER_SECOND`, `CELL_PRICE_PER_SECOND`, `BIT_PRICE_PER_SECOND_MC`, and `CELL_PRICE_PER_SECOND_MC` without another multiplication.
+
+For `BLOCK_SIZE_*_KB`, multiply by 1,024 and `BLOCK_LIMIT_MULTIPLIER`. Set the resulting byte thresholds in both `[block_limits.bytes]` and `[masterchain_block_limits.bytes]`. For `BLOCK_GAS_LIMIT_*`, apply the multiplier and use both `[block_limits.gas]` and `[masterchain_block_limits.gas]`.
+
+MLT's `VERSION_CAPABILITIES` supplies the protocol version in this template, despite its name. It corresponds to `global_version`, not the `global_capabilities` bitmask. `PROTO_VERSION` controls a different consensus parameter and has no matching field in `genesis.toml`. Keep Localton defaults unless your test requires a specific protocol configuration.
+
+Balances and stakes use whole GRAM. Localton has one `validator_wallet_balance` for built-in validator wallets and one `faucet_balance`. MLT's separate validator and faucet allocations do not map one-to-one. The [genesis reference](/docs/commands/localnet#genesis-configuration) describes the available groups and constraints.
+
+</Accordion>
+</Accordions>
+
+Studio checks related values, including election windows and block limits. It highlights the fields that need correction. The [custom genesis guide](/docs/environments/how-to/create-network#use-a-custom-genesis) also explains JSON Schema completion.
+
+## Create the replacement network
+
+<Tabs items={["Studio", "CLI"]}>
+<Tab value="Studio">
+
+Run Studio from the project directory:
+
+```bash
+acton studio
+```
+
+1. Open **Virtual environments → Create environment**.
+1. Select **Localnet** and enter `mlt-dev` as the name.
+1. Open **Genesis configuration** and select **Import genesis.toml**.
+1. Check the imported values and correct highlighted fields.
+1. Select configured project wallets under **Startup accounts**, or clear the selection.
+1. Select **Create environment** and wait for readiness.
+
+**Export genesis.toml** saves the complete configuration, including defaults.
+
+</Tab>
+<Tab value="CLI">
+
+Create a network without project startup wallets:
+
+```bash
+acton localnet start mlt-dev --genesis genesis.toml --accounts "" --detach
+acton localnet status mlt-dev
+```
+
+The command prints the assigned endpoints. `--detach` leaves the network in the background.
+
+For a configured `deployer` wallet, replace `--accounts ""` with `--accounts deployer`. Each selected startup wallet receives 100 GRAM.
+
+To open the same network in Studio, run `acton studio` from the same project directory.
+
+</Tab>
+</Tabs>
+
+Acton saves the resolved genesis with the network. Later edits to the input file do not change that network. Create a new network to use another genesis.
+
+`ACTON_LOCALNET_GENESIS` can supply the file path instead of `--genesis`. Explicit timing flags override the file, including dependent election intervals. To preserve imported timing values, omit those flags.
+
+## Move wallets and applications
+
+[Import development wallet mnemonics](/docs/wallets#import-an-existing-wallet) into Acton before you select startup accounts. Importing a mnemonic does not restore balances or transaction history.
+
+An address depends on the wallet version, workchain, wallet ID, and keys. For V5 wallets, the default wallet ID also depends on `global_id`. Check the resulting address before you reuse an address from MLT. Explicit project wallet IDs remain unchanged.
+
+Open **Home → Connect environment** or **Integrate** to obtain the new RPC configuration. Replace MLT endpoint URLs in your application with the displayed TON Center V2 or V3 URLs. Replace any MLT global configuration file used by a LiteAPI client with the new network's configuration.
+
+For Acton scripts with a custom global ID, use a named network entry such as `[networks.mlt-dev]`. Set `global-id = -217` to match this example, then select `--net custom:mlt-dev`. The built-in `--net localnet` selector uses the testnet global ID. See [client connections](/docs/environments/how-to/connect) for endpoint configuration.
+
+Reconnect TON Connect through **Wallets** in the selected Studio environment. The signing connection and the RPC client must target the same network.
+
+## Recreate contract state
+
+Deploy your contracts and run their initialization scripts against the new endpoints. Existing MLT addresses have no account state in the new network by default.
+
+If you already have complete active basechain `ShardAccount` BoCs, you can include them in a new genesis. Save them as a JSON array of hexadecimal strings in `accounts.json`:
+
+```bash
+acton localnet start mlt-imported --genesis genesis.toml \
+  --accounts-file accounts.json --accounts "" --detach
+```
+
+This copies account state, not source transaction history or validator databases. Include contract dependencies explicitly. Plain addresses and contract data cells are not complete account imports. See [account imports](/docs/environments/how-to/fork-and-import#select-the-source-state) for the required format.
+
+## Account for workflow differences
+
+- Add additional validators through [Network → Nodes](/docs/environments/localnet/nodes), instead of an MLT Compose profile such as `validators-3`. Entry into validation does not immediately elect a node.
+- The managed Localton stack includes V2, V3, and the classifier. MLT Compose profiles and CPU limit variables have no corresponding creation controls.
+- [Activity](/docs/environments/localnet/activity) includes transfers, batches, jetton mint/transfer/burn, and NFT mint/transfer. MLT multisig, Highload V3, subscription, library-reference, and NFT sale scenarios need separate scripts.
+- [Snapshots](/docs/environments/how-to/snapshots) save Localton restore points. Restore rebuilds the V3 index. Studio does not import Time Machine archives or provide its branch graph.
+- Split bounds are configurable, but genesis starts with one unsplit shard. `ACTUAL_MIN_SPLIT` and custom configuration-contract code have no equivalent creation field.
+
+## Check the transition
+
+Before you retire the MLT network:
+
+- Check node and API readiness under **Network → Health**.
+- Check the genesis parameters under **Network → Config**.
+- Run a getter and send a wallet transfer against the new endpoints.
+- Open the transaction in **Explorer** after the indexer catches up.
+- Stop and resume the network, then check that its account state remains available.
+
+For the CLI example, resume the saved network without creation flags:
+
+```bash
+acton localnet stop mlt-dev
+acton localnet start mlt-dev --detach
+```
+
+If you selected the genesis file through `ACTON_LOCALNET_GENESIS`, unset that variable before resuming.
+
+Save a [Localton snapshot](/docs/environments/how-to/snapshots) as the starting point for subsequent experiments.

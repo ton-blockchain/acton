@@ -2,6 +2,7 @@
   "title": "Localnet",
   "pages": [
     "overview",
+    "migrate-from-mylocalton",
     "nodes",
     "admin-actions",
     "activity"
