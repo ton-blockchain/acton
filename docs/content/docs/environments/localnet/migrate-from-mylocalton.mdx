@@ -1,7 +1,7 @@
 ---
 title: "Migrate from MyLocalTon to Localton and Studio"
 sidebarTitle: "Migrate from MyLocalTon"
-description: "Move from MyLocalTon desktop or Docker to an Acton localnet, translate genesis configuration, and connect existing applications"
+description: "Move from MyLocalTon to Localton and Studio with detailed genesis mappings, wallet and account migration, client connections, and operational differences"
 ---
 
 import {Accordion, Accordions} from "fumadocs-ui/components/accordion";
@@ -9,11 +9,15 @@ import {Tabs, Tab} from "fumadocs-ui/components/tabs";
 
 <AvailabilityBadge since="trunk" />
 
-This guide covers MyLocalTon (MLT) desktop and `mylocalton-docker`. Localton runs a local TON blockchain with real validators and TON Center APIs. Acton manages the network, and Studio provides its browser interface.
+This guide covers MyLocalTon (MLT) desktop and `mylocalton-docker`. Localton runs a local TON blockchain with real validators and TON Center APIs. Acton manages its lifecycle, and Studio provides the browser interface.
 
-The transition creates a new network. MLT databases, Docker volumes, and Time Machine snapshots do not have a direct import path into Acton. Keep the old network data until you finish the transition.
+You can keep your existing JavaScript or TypeScript application and deployment scripts. Changing the development network does not require a contract rewrite.
 
-## Find familiar tools in Studio
+The transition creates a new blockchain. MLT databases, Docker volumes, and Time Machine snapshots have no direct import path into Acton. An identical `global_id` does not reproduce the old zerostate, block hashes, validator keys, or transaction history.
+
+## What changes with Localton and Studio
+
+Studio brings network operations and application development into one project workspace. The CLI and Studio manage the same localnet catalog for that project.
 
 | MyLocalTon tool or task | Localton and Studio |
 | --- | --- |
@@ -24,7 +28,37 @@ The transition creates a new network. MLT databases, Docker volumes, and Time Ma
 | Data generator | **Network → Activity** for transfers, batches, jettons, and NFTs |
 | Time Machine checkpoints | **Snapshots** for saved network states |
 
-Select **Localnet** for validator and indexer workflows. [Simulator](/docs/environments/simulator/overview) provides separate features such as virtual time and public-network forks.
+The following capabilities are useful during migration and subsequent development:
+
+- **Several named environments.** Keep independent networks for different configurations and tests. Each network has its own state, endpoints, nodes, and snapshots.
+- **A reusable genesis file.** Store the required parameters in `genesis.toml`. Studio imports and exports the file, explains units, and highlights invalid values and related fields.
+- **Connections for existing tools.** Copy Acton or `@ton/ton` examples from **Connect environment**. Studio proxy URLs also expose client requests in **API calls**.
+- **Contract inspection in the same workspace.** Use **Explorer** for accounts, blocks, messages, tokens, and traces. **Contracts** connects deployed contracts with available project sources and ABI artifacts when their code matches.
+- **Project wallets and signing.** Use configured development wallets across environments. Studio provides funding, transfers, and TON Connect sessions for the selected environment.
+- **Controlled test state.** Import active accounts or use **Admin actions** to change balances, code, data, and account status. Snapshots provide restore points before these changes.
+- **Node and workload controls.** Add full nodes or validators, inspect elected sets, generate bounded activity, and optionally copy local blockchain data to reduce synchronization time.
+
+Select **Localnet** for validator, consensus, and indexer workflows. [Simulator](/docs/environments/simulator/overview) is a separate environment type with virtual time, manual mining, and public-network forks.
+
+## Decide what to preserve
+
+| Migration goal | Procedure | What the new network contains |
+| --- | --- | --- |
+| Repeat deployments and integration tests | Create a network, fund project wallets, and run deployment scripts | Fresh contracts and local transaction history |
+| Keep selected contract state | Export complete active basechain accounts and import them at creation | The selected account state, without the source history or pending messages |
+| Preserve the entire MLT chain and its history | Retain the MLT installation and its backups | No direct conversion to a Localton database or snapshot is available |
+
+Before changing the old installation, save its configuration and deployment inputs:
+
+- For MLT Docker, retain `.env`, Compose files, image versions, modified genesis templates, and the existing volumes.
+- For MLT desktop, retain its data directory, `settings.json`, and any custom TON binary configuration.
+- Record the network ID, wallet versions and IDs, account addresses, and the parameters that your tests depend on.
+- Retain development wallet credentials separately from public configuration. An address or public key alone cannot sign transactions.
+- Save deployment scripts, contract code, initialization data, and off-chain metadata files or URLs.
+
+For an account export, stop application writes and activity generators first. Wait for pending messages to settle, then read related accounts at one source block. Stopping all MLT services also stops its API, so export accounts before doing that.
+
+Keep MLT available until you finish the [transition checks](#check-the-transition). Separate ports let both networks run on the same machine, subject to Docker resource limits.
 
 ## Prepare Acton and Docker
 
@@ -32,6 +66,7 @@ Select **Localnet** for validator and indexer workflows. [Simulator](/docs/envir
 
 ```bash
 acton up --trunk
+acton --version
 ```
 
 Check Docker and Compose:
@@ -41,15 +76,21 @@ docker info
 docker compose version
 ```
 
-In your project directory, initialize Acton:
+In your existing project directory, initialize Acton if `Acton.toml` is absent:
 
 ```bash
 acton init
 ```
 
-This creates `Acton.toml` if the file does not exist. Your existing JavaScript or TypeScript application can continue to use TON Center APIs.
+Run later CLI and Studio commands from this project. The default localnet catalog is `<project>/.acton-localnet`; a different project directory selects a different catalog. A custom `--state-dir` must remain the same across CLI commands.
 
-Acton selects its Localton image automatically. A custom image must provide the commands and APIs expected by Acton. An MLT image is not a replacement for that image.
+Docker stores blockchain databases and snapshots in volumes. Copying `.acton-localnet` alone does not back up those databases. Allocate disk space for the network, additional nodes, the V3 index, snapshots, and temporary copies.
+
+Acton selects its Localton image automatically. It uses the TON `v2026.10` toolchain in the current trunk implementation. Older MLT images can use different VM and consensus versions, so compare behavior as well as configuration values.
+
+`ACTON_LOCALNET_IMAGE` selects a compatible custom Localton image for a new runtime. Set it before starting the CLI service or Studio. An MLT image does not implement Acton's runtime contract. An existing runtime retains its saved image selection.
+
+On Windows, use the [WSL installation workflow](/docs/installation) and a Docker engine accessible from that environment. MLT's native Windows packaging does not transfer to Localton.
 
 ## Translate the genesis configuration
 
@@ -62,7 +103,23 @@ global_id = -217
 simplex_target_rate_ms = 300
 ```
 
-Missing fields use Localton defaults. These defaults differ from MLT defaults. The block interval is a consensus target, so actual timing can vary.
+Missing fields, including fields inside partial tables, use Localton defaults. Unknown fields are errors. These defaults are suitable for local development, but they do not reproduce every MLT parameter.
+
+The following differences come from the referenced MLT Docker configuration and the current Localton defaults:
+
+| Parameter | MLT Docker | Localton |
+| --- | --- | --- |
+| Global network ID | `-217` | `-3` |
+| Protocol version | `11` | `15` |
+| Simplex block target | 300 ms | 1,000 ms |
+| Validator round duration | 1,200 s | 120 s |
+| Election start / close offsets | 900 / 300 s | 90 / 30 s |
+| Minimum validator stake | 1,000,000 GRAM | 10,000 GRAM |
+| Maximum stake factor | `10` | `3` |
+
+The block interval is a consensus target. Hardware, load, and elections affect actual block production. A matching interval alone does not produce matching fees or transaction hashes.
+
+Keep all root fields before the first TOML table. A field after `[storage]`, for example, belongs to `storage` until the next table header.
 
 <Accordions>
 <Accordion title="Map MLT environment variables to genesis.toml">
@@ -73,6 +130,12 @@ The mappings refer to the [MLT environment file](https://github.com/neodix42/myl
 | --- | --- | --- |
 | `GLOBAL_ID` | `global_id` | Same negative integer |
 | `MASTERCHAIN_ONLY` | `workchain_enabled` | Invert the boolean |
+| `MAX_VALIDATORS` | `max_validators` | Maximum elected count, not a process count |
+| `MAX_MAIN_VALIDATORS` | `max_masterchain_validators` | Maximum masterchain elected count |
+| `MIN_VALIDATORS` | `min_validators` | Minimum elected count |
+| `MIN_STAKE`, `MAX_STAKE` | `min_validator_stake`, `max_validator_stake` | Whole GRAM |
+| `MIN_TOTAL_STAKE` | `min_total_validator_stake` | Whole GRAM |
+| `MAX_FACTOR` | `max_stake_factor` | Integer ratio; do not apply fixed-point scaling |
 | `VALIDATION_PERIOD` | `elected_for_seconds` | Seconds |
 | `ELECTION_START_BEFORE` | `election_start_before_seconds` | Seconds |
 | `ELECTION_END_BEFORE` | `election_end_before_seconds` | Seconds |
@@ -85,6 +148,9 @@ The mappings refer to the [MLT environment file](https://github.com/neodix42/myl
 | `MIN_SPLIT`, `MAX_SPLIT` | `workchain.min_split`, `workchain.max_split` | Split bounds |
 | `VALIDATORS_PER_SHARD` | `catchain.shard_validators` | Same count |
 | `CRITICAL_PARAM_MIN_WINS`, `CRITICAL_PARAM_MAX_LOSSES` | `critical_voting.min_wins`, `critical_voting.max_losses` | Same counts |
+| `BLOCKCHAIN_INITIAL_BALANCE` | `initial_balance` | Main genesis wallet allocation in whole GRAM |
+| `SIMPLE_FAUCET_INITIAL_BALANCE` | `faucet_balance` | Development faucet allocation in whole GRAM |
+| `VALIDATOR_0_INITIAL_BALANCE` through `VALIDATOR_5_INITIAL_BALANCE` | `validator_wallet_balance` | One shared allocation replaces the individual values |
 
 Nested fields use TOML tables. For example:
 
@@ -98,22 +164,158 @@ min_wins = 4
 max_losses = 2
 ```
 
-**Prices and limits need unit conversions.** The referenced MLT template multiplies `GAS_PRICE`, `GAS_PRICE_MC`, `CELL_PRICE`, and `CELL_PRICE_MC` by 65,536. Localton accepts these scaled values directly as `gas_price`, `gas_price_masterchain`, `cell_price`, and `cell_price_masterchain`. For example, MLT `GAS_PRICE=1000` becomes `gas_price = 65536000`.
+These fields configure blockchain rules. They do not start extra validator processes. Use **Add node** for additional processes and wait for their election.
 
-Storage prices use separate fields: `storage.bit_price`, `storage.cell_price`, `storage.masterchain_bit_price`, and `storage.masterchain_cell_price`. They correspond to MLT's `BIT_PRICE_PER_SECOND`, `CELL_PRICE_PER_SECOND`, `BIT_PRICE_PER_SECOND_MC`, and `CELL_PRICE_PER_SECOND_MC` without another multiplication.
+`VALIDATORS_MASTERCHAIN_NUM` configures the original MLT validator set. It is not equivalent to `max_masterchain_validators` or an Acton node count. Localton creates its own genesis identity and adds other validators through elections.
 
-For `BLOCK_SIZE_*_KB`, multiply by 1,024 and `BLOCK_LIMIT_MULTIPLIER`. Set the resulting byte thresholds in both `[block_limits.bytes]` and `[masterchain_block_limits.bytes]`. For `BLOCK_GAS_LIMIT_*`, apply the multiplier and use both `[block_limits.gas]` and `[masterchain_block_limits.gas]`.
+MLT's `VERSION_CAPABILITIES` supplies the protocol version in this template, despite its name. It corresponds to `global_version`. The separate `global_capabilities` field is a bitmask. `PROTO_VERSION` controls another consensus parameter and has no matching genesis field.
 
-MLT's `VERSION_CAPABILITIES` supplies the protocol version in this template, despite its name. It corresponds to `global_version`, not the `global_capabilities` bitmask. `PROTO_VERSION` controls a different consensus parameter and has no matching field in `genesis.toml`. Keep Localton defaults unless your test requires a specific protocol configuration.
+`HIGHLOAD_FAUCET_INITIAL_BALANCE` and `DATA_FAUCET_INITIAL_BALANCE` have no separate allocation fields. Localton's development faucet, project wallets, and Activity replace these workflows. A matching balance does not preserve an MLT system wallet's address or key.
 
-Balances and stakes use whole GRAM. Localton has one `validator_wallet_balance` for built-in validator wallets and one `faucet_balance`. MLT's separate validator and faucet allocations do not map one-to-one. The [genesis reference](/docs/commands/localnet#genesis-configuration) describes the available groups and constraints.
+Copy related values together. For example, MLT's `MIN_STAKE=1000000` requires a larger `validator_stake` and validator wallet allocation than Localton's defaults. Budget the faucet balance for additional node bootstrap grants too.
+
+With `workchain_enabled = false`, there is no basechain for basechain account imports or the usual application deployments. Start with the basechain enabled unless your scenario specifically tests a masterchain-only network.
+
+</Accordion>
+
+<Accordion title="Convert gas, forwarding, and storage prices">
+
+One GRAM equals 1,000,000,000 nanograms. Balances and stakes in `genesis.toml` use whole GRAM. Fee fields have their own units.
+
+The referenced MLT template multiplies the following environment values by 65,536. Localton expects the resulting integer directly:
+
+| MLT input | Localton field | Example conversion |
+| --- | --- | --- |
+| `GAS_PRICE` | `gas_price` | `1000 × 65536 = 65536000` |
+| `GAS_PRICE_MC` | `gas_price_masterchain` | `10000 × 65536 = 655360000` |
+| `CELL_PRICE` | `cell_price` | `100000 × 65536 = 6553600000` |
+| `CELL_PRICE_MC` | `cell_price_masterchain` | `1000000 × 65536 = 65536000000` |
+
+Root `cell_price` is a message forwarding price. `storage.cell_price` is a storage charge. They are separate parameters.
+
+Storage prices already use the required scaled unit in the MLT environment file. Copy them without another multiplication:
+
+| MLT input | Localton field |
+| --- | --- |
+| `BIT_PRICE_PER_SECOND` | `storage.bit_price` |
+| `CELL_PRICE_PER_SECOND` | `storage.cell_price` |
+| `BIT_PRICE_PER_SECOND_MC` | `storage.masterchain_bit_price` |
+| `CELL_PRICE_PER_SECOND_MC` | `storage.masterchain_cell_price` |
+
+This fragment reproduces those MLT price inputs:
+
+```toml
+gas_price = 65_536_000
+gas_price_masterchain = 655_360_000
+cell_price = 6_553_600_000
+cell_price_masterchain = 65_536_000_000
+
+[storage]
+bit_price = 1
+cell_price = 500
+masterchain_bit_price = 1000
+masterchain_cell_price = 500000
+```
+
+Gas and forwarding fees also contain values hardcoded in the MLT genesis template. For fee-sensitive tests, translate those values too:
+
+| Localton group | Additional values to compare |
+| --- | --- |
+| `[gas]`, `[gas_masterchain]` | Transaction gas limits, special-contract gas, gas credit, block gas, flat fees, account freeze and deletion thresholds |
+| `[forwarding]`, `[forwarding_masterchain]` | Lump price, bit price, IHR factor, and first/next fractions |
+| `[storage]` | Charges for stored bits and cells in each chain |
+
+For example, MLT uses a basechain flat gas limit of `1000` and flat gas price of `1000000`. Localton defaults are `100` and `40000` nanograms. Copying only `GAS_PRICE` therefore does not reproduce MLT fees. Protocol versions and contract code also affect execution costs.
+
+</Accordion>
+
+<Accordion title="Convert block limits and other nested parameters">
+
+For each `BLOCK_SIZE_*_KB` value, calculate `value × 1024 × BLOCK_LIMIT_MULTIPLIER`. Set the result in both chain groups. With multiplier `1`, the referenced MLT size limits become:
+
+```toml
+[block_limits.bytes]
+underload = 262_144
+soft = 1_048_576
+hard = 2_097_152
+
+[masterchain_block_limits.bytes]
+underload = 262_144
+soft = 1_048_576
+hard = 2_097_152
+```
+
+For `BLOCK_GAS_LIMIT_UNDERLOAD`, `BLOCK_GAS_LIMIT_SOFT`, and `BLOCK_GAS_LIMIT_HARD`, apply only `BLOCK_LIMIT_MULTIPLIER`. Use `[block_limits.gas]` and `[masterchain_block_limits.gas]`. Each group requires `underload < soft < hard`.
+
+These block thresholds are different from `gas.block_gas_limit` and `gas_masterchain.block_gas_limit`. Those limits belong to gas configuration. Changing one group does not rewrite the others.
+
+Other genesis groups cover the values that MLT can hardcode in its Fift template:
+
+| Group | Purpose |
+| --- | --- |
+| `[block_limits.logical_time]`, `[masterchain_block_limits.logical_time]` | Logical-time thresholds; these are not wall-clock seconds |
+| `[catchain]` | Validator rotation lifetimes, shard validator count, and masterchain shuffling |
+| `[voting]`, `[critical_voting]` | Configuration proposal rounds, wins/losses, storage times, and prices |
+| `[workchain]` | Split-depth bounds after the network starts |
+
+Genesis starts with one unsplit basechain shard. `ACTUAL_MIN_SPLIT` has no equivalent creation field. `CUSTOM_CONFIG_SMC_URL` and arbitrary replacement system contracts also have no equivalent in `genesis.toml`.
+
+</Accordion>
+
+<Accordion title="Editor completion for genesis.toml">
+
+Generate a schema with the same Acton binary that will create the network:
+
+```bash
+acton meta get-schema genesis-toml > genesis.schema.json
+```
+
+For an editor that supports TOML schema directives, add this line at the top of the file:
+
+```toml
+#:schema ./genesis.schema.json
+```
+
+The schema describes all fields, units, and defaults. Acton also checks relationships between values before creation.
 
 </Accordion>
 </Accordions>
 
-Studio checks related values, including election windows and block limits. It highlights the fields that need correction. The [custom genesis guide](/docs/environments/how-to/create-network#use-a-custom-genesis) also explains JSON Schema completion.
+Studio highlights invalid values and related fields. See the [genesis reference](/docs/commands/localnet#genesis-configuration) for validation rules.
+
+## Prepare development wallets
+
+Import an existing development mnemonic before selecting startup accounts. This interactive example uses Wallet V4R2:
+
+```bash
+acton wallet import --name deployer --version v4r2 --local
+```
+
+Choose the version that matches your existing wallet. The [wallet guide](/docs/wallets#import-an-existing-wallet) covers mnemonic schemes and secure storage.
+
+Importing credentials restores signing access. It does not restore the old network's balance, deployment state, or transaction history. A raw MLT `.pk` file is not a mnemonic and cannot be passed to mnemonic import.
+
+Studio project wallets use mnemonics. If you only have a `.pk` file, keep an external signer that supports that key and connect it to Localton. Alternatively, transfer contract ownership to a mnemonic wallet before export, if the contract supports this operation, or redeploy with that wallet as owner. There is no general conversion from a private key to the original mnemonic.
+
+To preserve an address, match all address inputs:
+
+| Input | Migration detail |
+| --- | --- |
+| Keys and mnemonic scheme | TON and BIP39 derivation are different; identical words alone do not guarantee identical keys |
+| Wallet contract version | V3R2, V4R2, and V5R1 have different code and addresses |
+| Workchain | Masterchain `-1` and basechain `0` addresses are different |
+| Wallet ID / subwallet ID | Copy explicit IDs from the original wallet configuration |
+| Global network ID | Wallet V5's default ID depends on `global_id`; Acton uses the selected network's value |
+
+An explicit project `wallet-id` overrides the network default. Check the resulting raw address in the selected environment before funding or signing. Bounceable and non-bounceable strings can represent the same raw address.
+
+Selected startup wallets receive 100 GRAM when Acton creates the network. This allocation is separate from `faucet_balance` and the built-in validator wallet allocations. An existing network does not fund newly configured wallets or replenish balances on restart.
+
+For parallel tests, initialize the required project wallets at creation. Wait for additional node creation to finish before requesting manual faucet transfers. Concurrent bootstrap grants currently can reuse the faucet sequence number, and submission success does not prove that the destination received funds.
 
 ## Create the replacement network
+
+For a genesis account import, [export the source accounts](#export-from-a-compatible-mlt-api) before this step. The CLI example below explains where to add the resulting `accounts.json`.
 
 <Tabs items={["Studio", "CLI"]}>
 <Tab value="Studio">
@@ -136,25 +338,39 @@ acton studio
 </Tab>
 <Tab value="CLI">
 
-Create a network without project startup wallets:
+Create a network without project startup wallets. This example reserves ports `19000` through `19005`:
 
 ```bash
-acton localnet start mlt-dev --genesis genesis.toml --accounts "" --detach
+acton localnet start mlt-dev --genesis genesis.toml \
+  --port-base 19000 --accounts "" --detach
 acton localnet status mlt-dev
 ```
 
-The command prints the assigned endpoints. `--detach` leaves the network in the background.
+The command waits for readiness and prints the assigned endpoints. `--detach` leaves the network in the background. Omit `--port-base` to let Acton choose available ports.
 
-For a configured `deployer` wallet, replace `--accounts ""` with `--accounts deployer`. Each selected startup wallet receives 100 GRAM.
+For a configured `deployer` wallet, replace `--accounts ""` with `--accounts deployer`. To select several wallets, use `--accounts deployer,tester`. Without this option, Acton uses `[localnet].accounts` from `Acton.toml`.
+
+To import previously exported accounts, add `--accounts-file accounts.json` to the first `start` command. Keep `--accounts ""` unless the selected project wallets have different addresses from all imported accounts. The remaining examples use the same `mlt-dev` network and ports.
+
+To prepare a stopped definition first, use `acton localnet create` with the creation options. Then start it without those options:
+
+```bash
+acton localnet create mlt-prepared --genesis genesis.toml --accounts ""
+acton localnet start mlt-prepared --detach
+```
 
 To open the same network in Studio, run `acton studio` from the same project directory.
 
 </Tab>
 </Tabs>
 
-Acton saves the resolved genesis with the network. Later edits to the input file do not change that network. Create a new network to use another genesis.
+Acton saves the resolved genesis with the network. Later edits to the input file do not change that network. Create a new network to use another genesis. Reusing a saved name with creation flags is rejected instead of silently replacing its configuration.
 
-`ACTON_LOCALNET_GENESIS` can supply the file path instead of `--genesis`. Explicit timing flags override the file, including dependent election intervals. To preserve imported timing values, omit those flags.
+`ACTON_LOCALNET_GENESIS` can supply the file path instead of `--genesis`. An explicit path takes precedence. Acton does not automatically discover a file named `genesis.toml`.
+
+Explicit timing flags override the file, including dependent election intervals. To preserve imported timing values, omit those flags. A resolved export makes later comparisons easier because defaults can change between Acton versions.
+
+The first start can require image downloads and indexer initialization. Wait for **Running** and inspect **Network → Health** before deploying. A running Docker container alone does not prove that the chain and its APIs are ready.
 
 ## Add nodes from local blockchain data
 
@@ -170,50 +386,389 @@ In Studio, open **Network → Nodes → Add node** and select **Copy blockchain 
 
 Acton stops the network while it copies genesis blockchain data, then restarts it and joins the new node. The new node generates independent keys and synchronizes any remaining blocks. The copy requires additional disk space; its duration depends on database size and storage speed.
 
-This option copies data between Localton nodes. It does not import an MLT database, volume, or Time Machine snapshot.
+API requests and transaction submission are interrupted during the stop. Use ordinary synchronization if the existing network must remain available. The new node does not share a live writable database with genesis.
 
-## Move wallets and applications
+This option copies data between Localton nodes in the same managed network. It does not import an MLT database, volume, or Time Machine snapshot, and it does not copy the V3 index.
 
-[Import development wallet mnemonics](/docs/wallets#import-an-existing-wallet) into Acton before you select startup accounts. Importing a mnemonic does not restore balances or transaction history.
+### Manage election participation
 
-An address depends on the wallet version, workchain, wallet ID, and keys. For V5 wallets, the default wallet ID also depends on `global_id`. Check the resulting address before you reuse an address from MLT. Explicit project wallet IDs remain unchanged.
+Without `--validator`, the new process is a full node. With it, the node joins elections after synchronization and wallet preparation. A newly added validator is not immediately part of the current elected set.
 
-Open **Home → Connect environment** or **Integrate** to obtain the new RPC configuration. Replace MLT endpoint URLs in your application with the displayed TON Center V2 or V3 URLs. Replace any MLT global configuration file used by a LiteAPI client with the new network's configuration.
+Read node IDs from the add result or `acton localnet status mlt-dev --json`. Use the returned ID, not the display name:
 
-For Acton scripts with a custom global ID, use a named network entry such as `[networks.mlt-dev]`. Set `global-id = -217` to match this example, then select `--net custom:mlt-dev`. The built-in `--net localnet` selector uses the testnet global ID. See [client connections](/docs/environments/how-to/connect) for endpoint configuration.
+```bash
+acton localnet node mlt-dev leave-validation '<NODE_ID>'
+```
 
-Reconnect TON Connect through **Wallets** in the selected Studio environment. The signing connection and the RPC client must target the same network.
+Wait until **Network → Validators** shows the node outside both the current and next elected sets. Then remove it:
+
+```bash
+acton localnet node mlt-dev remove '<NODE_ID>' --yes
+```
+
+Leaving validation stops future participation but does not cancel current duties. Studio's **Stop node** preserves data and stops the process immediately. Stopping enough elected weight can halt the chain, even if other containers remain healthy. Use removal's `--force` only for scenarios that intentionally interrupt consensus.
+
+## Connect applications and signing tools
+
+Read the endpoints from `acton localnet status mlt-dev`, or open **Home → Connect environment** in Studio. **Integrate** retains the connection examples.
+
+For the CLI network created with `--port-base 19000`, the host ports are:
+
+| Service | Address | Use |
+| --- | --- | --- |
+| Config | `http://127.0.0.1:19000` | Global configuration and local readiness endpoints |
+| Native Admin | `http://127.0.0.1:19001` | Localton administration; separate from the Acton control service |
+| TON Center V2 | `http://127.0.0.1:19002/api/v2` | Getters, account state, messages, and JSON-RPC |
+| TON Center V3 | `http://127.0.0.1:19003/api/v3` | Indexed transactions, traces, tokens, and account data |
+| Observability | `http://127.0.0.1:19004` | Node telemetry |
+| LiteServer | `127.0.0.1:19005` | ADNL/TCP; this is not an HTTP endpoint |
+
+Use the reported addresses if Acton selected ports automatically. Do not carry over MLT port numbers, Docker service names, or an old `global.config.json`.
+
+### Choose direct endpoints or Studio proxy URLs
+
+Direct endpoints connect to the managed localnet. Studio proxy URLs route requests through Studio and associate them with the selected environment. They also support request inspection in **API calls**.
+
+Copy proxy URLs from **Connect environment** rather than constructing them from a network name. The environment ID keeps these URLs stable across renames and runtime restarts. The Studio server must remain available for proxy requests. Direct endpoints are useful for standalone CLI and CI workflows.
+
+Changing the selected Studio environment does not rewrite an already running application's endpoint or a CLI command's network selector.
+
+<Tabs items={["Acton", "TypeScript", "Blueprint", "LiteAPI"]}>
+<Tab value="Acton">
+
+Add a named network to `Acton.toml`. For the genesis example in this guide, use `global-id = -217`:
+
+```toml title="Acton.toml"
+[networks.mlt-dev]
+global-id = -217
+api.v2 = "http://127.0.0.1:19002/api/v2"
+api.v3 = "http://127.0.0.1:19003/api/v3"
+```
+
+If you use Studio proxy URLs, replace both URLs with the generated values. Add the matching `global-id` to the generated entry when the genesis uses a custom ID.
+
+Run your Acton deployment script against that entry:
+
+```bash
+acton script scripts/deploy.tolk --net custom:mlt-dev
+```
+
+Use your actual script path. The built-in `--net localnet` selector uses the testnet global ID, `-3`. A custom selector is necessary to derive default V5 wallet IDs for the `-217` example.
+
+The configuration key in `Acton.toml` is `global-id`. The genesis key is `global_id`. Neither setting changes the other file automatically.
+
+</Tab>
+<Tab value="TypeScript">
+
+Use the existing `@ton/ton` dependency in your application. Its `TonClient` expects the JSON-RPC URL, including `/jsonRPC`:
+
+```typescript
+import {TonClient} from "@ton/ton"
+
+const client = new TonClient({
+  endpoint: "http://127.0.0.1:19002/api/v2/jsonRPC",
+})
+
+const masterchain = await client.getMasterchainInfo()
+console.log(masterchain)
+```
+
+Replace the URL with the Studio proxy V2 URL plus `/jsonRPC` to inspect these calls in Studio. Local endpoints do not need a public TON Center API key.
+
+For V3, use its HTTP endpoints rather than `TonClient`'s V2 JSON-RPC transport:
+
+```typescript
+const response = await fetch("http://127.0.0.1:19003/api/v3/transactions?limit=1")
+if (!response.ok) {
+  throw new Error(`Localnet V3 returned HTTP ${response.status}`)
+}
+const page = await response.json()
+console.log(page.transactions)
+```
+
+V3 can lag behind confirmed chain state. After sending a message, wait for the expected result before asserting that an indexed transaction or trace exists. TON Center V3 is not the V4 API expected by `TonClient4`.
+
+</Tab>
+<Tab value="Blueprint">
+
+Existing Blueprint deployment scripts can use the new V2 endpoint. Configure `WALLET_MNEMONIC` and `WALLET_VERSION` for the same funded development wallet in your existing environment.
+
+For a script named `deployCounter`, run:
+
+```bash
+WALLET_NETWORK_ID=-217 npx blueprint run deployCounter \
+  --custom http://127.0.0.1:19002/api/v2/jsonRPC \
+  --custom-version v2 --custom-type custom --mnemonic
+```
+
+Replace the script name with yours. `WALLET_NETWORK_ID` matters for V5 wallet ID derivation; it does not configure the blockchain. Use `-3` if you retained Localton's default network ID.
+
+Match any non-default wallet ID or subwallet number as well. The [Blueprint mnemonic configuration](https://github.com/ton-org/blueprint#using-mnemonic-provider) documents `WALLET_ID`, `SUBWALLET_NUMBER`, and version-specific behavior.
+
+An explorer link printed by an existing script can still point to a public network. Open the address in the selected Studio environment to inspect the local deployment.
+
+</Tab>
+<Tab value="LiteAPI">
+
+Download the configuration for clients running on the Docker host:
+
+```bash
+curl --fail http://127.0.0.1:19000/localhost.global.config.json \
+  --output localton.global.config.json
+```
+
+Pass this file to your LiteAPI library. With TON's `lite-client` installed, check the connection:
+
+```bash
+lite-client -C localton.global.config.json -c last
+```
+
+The file contains the new zerostate identity, LiteServer public key, and published host port. Copying only the old MLT IP and port is insufficient. A recreated network needs its new configuration even if its name and `global_id` are unchanged.
+
+Use a separate client cache or keystore for each network identity. Do not replace the local configuration with the public mainnet or testnet configuration.
+
+</Tab>
+</Tabs>
+
+### Connect a dApp through TON Connect
+
+Studio signs and submits transactions approved through TON Connect. Your application's RPC endpoint controls its reads and any signed messages it submits directly. Both must refer to the same environment.
+
+1. Open the target environment's **Wallets** page and check the funded project wallet address.
+1. Open the connection dialog in the dApp and copy its TON Connect URL.
+1. Paste the URL into **Connect URL** in Studio and select **Handle request**.
+1. Select the intended development wallet and approve the connection.
+1. Send a small test transaction, approve it in Studio, and inspect it in the same environment's Explorer.
+
+Disconnect old sessions before changing the signing environment. Public wallet applications do not automatically connect to your local validators because your dApp's RPC URL changed.
+
+### Connect from another container or machine
+
+The managed ports bind to the host's `127.0.0.1`. In another container, `127.0.0.1` refers to that container. On a phone or another computer, it refers to that device.
+
+For a containerized client, provide a route to the Docker host and check reachability from inside the client container. On Docker Desktop, `host.docker.internal` identifies the host. Linux setups need an appropriate host-network or forwarding arrangement; a hostname substitution alone does not expose a loopback-only service.
+
+For example, a client container on a native Linux Docker host can use host networking. Replace `my-client-image` with your application image:
+
+```bash
+docker run --rm --network host \
+  --env TON_RPC_URL=http://127.0.0.1:19002/api/v2/jsonRPC \
+  my-client-image
+```
+
+This example assumes your application reads `TON_RPC_URL`. Host networking makes the host's loopback ports accessible to that container.
+
+For a remote HTTP client, forward V2 and V3 through SSH. Run this on the client machine and replace `user@docker-host`:
+
+```bash
+ssh -N \
+  -L 127.0.0.1:19002:127.0.0.1:19002 \
+  -L 127.0.0.1:19003:127.0.0.1:19003 \
+  user@docker-host
+```
+
+While the tunnel is open, the V2 and V3 examples work unchanged on that machine. The client ports must be free.
+
+LiteAPI needs its own TCP forwarding and a configuration containing the reachable address and port. MLT's `EXTERNAL_IP` and embedded file-server configuration do not migrate automatically. Forward only the services the client needs.
 
 ## Recreate contract state
 
-Deploy your contracts and run their initialization scripts against the new endpoints. Existing MLT addresses have no account state in the new network by default.
+For deployment tests, run the existing deployment and initialization scripts against the new endpoints. Existing MLT addresses have no account state in the new network by default. Update application configuration if new owner addresses or initialization data produce different contract addresses.
 
-If you already have complete active basechain `ShardAccount` BoCs, you can include them in a new genesis. Save them as a JSON array of hexadecimal strings in `accounts.json`:
+For state-dependent tests, import selected accounts instead. A genesis import accepts complete active basechain `ShardAccount` bags of cells (BoCs). Save them as a JSON array of hexadecimal strings in `accounts.json`. Add `--accounts-file accounts.json` when you [create the replacement network](#create-the-replacement-network).
 
-```bash
-acton localnet start mlt-imported --genesis genesis.toml \
-  --accounts-file accounts.json --accounts "" --detach
-```
+If you already created `mlt-dev`, use the existing-network import described below or create another named network and update your client endpoints. Restarting `mlt-dev` with an account file does not apply a genesis import to it.
 
 This copies account state, not source transaction history or validator databases. Include contract dependencies explicitly. Plain addresses and contract data cells are not complete account imports. See [account imports](/docs/environments/how-to/fork-and-import#select-the-source-state) for the required format.
 
+### Export from a compatible MLT API
+
+The source API must support `getShardAccountCell`. The C++ V2 `v2.1.7` image in the referenced MLT Docker configuration lacks this endpoint. You can attach a newer API to that source network without replacing its services:
+
+<Accordions>
+<Accordion title="Add a temporary account exporter to MLT Docker">
+
+The [C++ API v2.1.17](https://github.com/toncenter/ton-http-api-cpp/tree/v2.1.17) supports `getShardAccountCell`. In the existing MLT Compose directory, create this additional Compose file:
+
+```yaml title="export-api.compose.yaml"
+services:
+  mlt-export-api:
+    image: toncenter/ton-http-api-cpp:v2.1.17
+    ports:
+      - "127.0.0.1:18082:8081"
+    environment:
+      THACPP_TONLIB_CONFIG_PATH: /usr/share/data/global.config.json
+    volumes:
+      - shared-data:/usr/share/data:ro
+    networks:
+      - main
+```
+
+This uses the `shared-data` volume and `main` network from the referenced MLT Compose file. The shared configuration contains the source chain identity and its internal LiteServer address. Keep the MLT genesis node running.
+
+Start only the exporter, using the same Compose project name as your existing MLT installation:
+
+```bash
+docker compose -f docker-compose.yaml -f export-api.compose.yaml \
+  up -d --no-deps mlt-export-api
+curl --fail http://127.0.0.1:18082/api/v2/getMasterchainInfo
+```
+
+If the original deployment uses `-p`, include that project name in these commands too. Wait for a successful response with `ok: true` before exporting. If the connection fails, inspect the exporter logs:
+
+```bash
+docker compose -f docker-compose.yaml -f export-api.compose.yaml \
+  logs --tail 100 mlt-export-api
+```
+
+After saving the required accounts, remove only the exporter:
+
+```bash
+docker compose -f docker-compose.yaml -f export-api.compose.yaml \
+  stop mlt-export-api
+docker compose -f docker-compose.yaml -f export-api.compose.yaml \
+  rm -f mlt-export-api
+```
+
+For MLT desktop, use the same API with that installation's global configuration and a reachable LiteServer address. The Docker-specific volume and network names above do not apply.
+
+</Accordion>
+</Accordions>
+
+The following command uses the temporary exporter's port. If your existing source API already supports the method, use its V2 URL instead. Replace the address and masterchain sequence number with your MLT values:
+
+```bash
+curl --fail --get http://127.0.0.1:18082/api/v2/getShardAccountCell \
+  --data-urlencode 'address=<ACTIVE_BASECHAIN_ADDRESS>' \
+  --data-urlencode 'seqno=<SOURCE_MASTERCHAIN_SEQNO>' \
+  --output mlt-account.json
+```
+
+Read the source masterchain sequence number from its `getMasterchainInfo` response. Use the same block for related account exports. The source must still retain that state.
+
+The response contains a base64 BoC in `result.bytes`. Convert it to the hexadecimal array expected by `--accounts-file`:
+
+```typescript title="convert-account.mjs"
+import {readFileSync, writeFileSync} from "node:fs"
+
+const response = JSON.parse(readFileSync("mlt-account.json", "utf8"))
+if (!response.ok) {
+  throw new Error(response.error ?? "Account export failed")
+}
+
+const boc = Buffer.from(response.result.bytes, "base64")
+writeFileSync("accounts.json", JSON.stringify([boc.toString("hex")], null, 2) + "\n")
+```
+
+```bash
+node convert-account.mjs
+```
+
+This example writes one account. For several accounts, put their distinct hexadecimal BoCs in the same array. Acton checks the account format, active status, workchain, and duplicate addresses.
+
+### Preserve dependencies and application assumptions
+
+- Include jetton masters and the required jetton wallets together. Include NFT collections and the items that the scenario uses.
+- Retain off-chain metadata servers and assets. An account import preserves stored URLs but does not copy their contents.
+- Supply required libraries and other referenced contracts. Localton does not load missing dependencies from MLT on demand.
+- Retain access to the owner or administrator keys. Importing a contract does not grant signing access or change its owner.
+- Check stored deadlines, wallet sequence numbers, and contract-specific network IDs. Account import does not rewrite contract data for the new clock or network.
+- Exclude imported wallet addresses from **Startup accounts**. A startup allocation and a preserved wallet account are different initial states for the same address.
+
+Genesis rebuilds blockchain bookkeeping for the new network. The import preserves contract code, data, libraries, and balance, but it does not reproduce the old message queue or block history. A wallet's sequence number stored in its contract data remains part of that imported data.
+
+The genesis import path does not accept masterchain system accounts, frozen accounts, or uninitialized accounts. MLT's built-in masterchain wallets therefore do not fit this import path. Use development credentials and fresh funding, or recreate the application state through scripts.
+
+For an existing Localton network, use **Import accounts** or [Admin actions](/docs/environments/localnet/admin-actions). These operations pause the network and apply a hardfork. They are not ordinary transfers or contract deployments. Save a snapshot before replacing live account state.
+
 ## Account for workflow differences
 
-- Add additional validators through [Network → Nodes](/docs/environments/localnet/nodes), instead of an MLT Compose profile such as `validators-3`. Entry into validation does not immediately elect a node.
-- The managed Localton stack includes V2, V3, and the classifier. MLT Compose profiles and CPU limit variables have no corresponding creation controls.
-- [Activity](/docs/environments/localnet/activity) includes transfers, batches, jetton mint/transfer/burn, and NFT mint/transfer. MLT multisig, Highload V3, subscription, library-reference, and NFT sale scenarios need separate scripts.
-- [Snapshots](/docs/environments/how-to/snapshots) save Localton restore points. Restore rebuilds the V3 index. Studio does not import Time Machine archives or provide its branch graph.
-- Split bounds are configurable, but genesis starts with one unsplit shard. `ACTUAL_MIN_SPLIT` and custom configuration-contract code have no equivalent creation field.
+### Configuration changes after creation
+
+Use **Network → Config** to inspect current on-chain values and submit supported changes. Editing `genesis.toml` changes only the input for a future network. Exporting the creation configuration does not capture later on-chain changes.
+
+MLT's Config Update service and Studio's configuration editor operate on chain state. They are separate from Docker process configuration. Values such as `CUSTOM_PARAMETERS`, `HEALTHCHECK_INTERVAL`, `THACPP_*`, and Compose CPU limits are not genesis fields.
+
+Keep custom genesis inputs and the Acton version with your test project. Record later configuration changes in scripts or retain a Localton snapshot that includes them.
+
+### Activity and test traffic
+
+[Activity](/docs/environments/localnet/activity) supports transfers, batches, jetton mint/transfer/burn, and NFT mint/transfer. It adds bounded duration, concurrency, scenario weights, and progress in the same workspace. The localnet service owns a run, so closing the page does not stop it.
+
+MLT multisig, Highload V3, subscription, library-reference, and NFT sale scenarios still need separate scripts. `SPAM_*` and data-generator `PERIOD` values have no direct import. Configure the intended workload in Studio, then compare confirmed outcomes and node/indexer load.
+
+Stopping Activity stops new work; it does not undo messages already submitted. Wait for those messages before exporting account state or taking a baseline snapshot.
+
+### Snapshots, restart, and reset
+
+Localton [snapshots](/docs/environments/how-to/snapshots) capture its blockchain state and node topology. Creation pauses a running network, saves the archive, and resumes it. A stopped network stays stopped.
+
+Restore replaces current state and rebuilds the V3 index. During rebuilding, an indexed query can lag behind the restored chain. MLT Time Machine archives, instance branches, and PostgreSQL snapshots cannot be imported. Studio has no Time Machine branch graph or Localton archive import/export controls.
+
+Create a baseline after the migration checks:
+
+```bash
+acton localnet snapshot mlt-dev create migrated-baseline
+acton localnet snapshot mlt-dev list
+```
+
+Use the returned snapshot ID to restore it:
+
+```bash
+acton localnet snapshot mlt-dev restore '<SNAPSHOT_ID>' --yes
+```
+
+After restore, check chain and API readiness before resuming scripts. If Acton used a temporary control service for an offline restore, start the network again with `acton localnet start mlt-dev --detach`.
+
+Stopping and restarting preserves balances, contracts, and history. It does not reset the chain or repeat startup funding. To return to a test baseline, restore a snapshot. To use another genesis, create a new named network.
+
+Deleting an environment removes its managed blockchain data and snapshots. Use the environment's deletion controls instead of a global Docker prune. Keep the original MLT data until the replacement passes your tests.
+
+### Resource use and deployment topology
+
+Localton's managed stack always includes the indexer services. MLT profiles such as `indexer-minimal`, per-service CPU quotas, and independent service toggles have no equivalent Studio creation controls.
+
+Additional validator databases, state copies, snapshot archives, and index rebuilding all need disk space. **Stop** releases runtime resources while retaining those files. Use **Network → Health** and the diagnostic logs to distinguish a chain failure from an indexer failure.
+
+MLT's web faucet options, including reCAPTCHA and giveaway limits, do not configure Studio's development faucet. A shared public faucet is a separate deployment concern. Native Localton has separate binary configuration documented in its [README](https://github.com/ton-blockchain/acton/blob/master/apps/localton/README.md); MLT's `TON_IMAGE` and `TON_BRANCH` cannot be copied into `genesis.toml`.
+
+## Diagnose migration problems
+
+| Symptom | What to check |
+| --- | --- |
+| Genesis validation rejects a copied value | Check the target field name, units, and related stake or election values; MLT environment names are not TOML keys |
+| Starting an existing name rejects creation options | Omit `--genesis`, timing, port, and account options; unset `ACTON_LOCALNET_GENESIS` |
+| A wallet address changed | Compare mnemonic scheme, wallet version, workchain, wallet ID, and the V5 network ID |
+| A wallet has no funds after credential import | Select it at network creation or fund it afterward; importing keys does not transfer MLT balances |
+| RPC returns 404 or an unexpected response | Use `/api/v2/jsonRPC` for `TonClient`, `/api/v2/<method>` for V2 HTTP methods, or `/api/v3/<resource>` for V3 |
+| `getShardAccountCell` is missing on MLT | The source API version lacks the export method; use a compatible exporter or redeploy |
+| An imported contract calls a missing address | Include its dependencies or deploy them; import has no lazy source-network lookup |
+| V2 shows a transaction but Explorer or V3 does not | Check indexer health and wait for its sequence number to catch up |
+| A client in Docker or on another device cannot connect | Check which machine its loopback address refers to and whether the target port is reachable |
+| Blocks stop after validator changes | Check the current elected set and restore enough stopped validators to recover consensus |
+| Startup reports an unhealthy container | Read that container's diagnostic details; check disk space, image compatibility, and the actual failing service |
+
+Inspect the network and its operation log:
+
+```bash
+acton localnet status mlt-dev --json
+acton localnet logs mlt-dev --tail 200
+```
+
+Studio provides diagnostic details and paths to full logs for failed operations. Preserve those logs before deleting state. A PostgreSQL failure, for example, is not necessarily a genesis error.
 
 ## Check the transition
 
 Before you retire the MLT network:
 
-- Check node and API readiness under **Network → Health**.
-- Check the genesis parameters under **Network → Config**.
-- Run a getter and send a wallet transfer against the new endpoints.
-- Open the transaction in **Explorer** after the indexer catches up.
+- Check node, V2, V3, and indexer readiness under **Network → Health**.
+- Compare the parameters your tests use under **Network → Config**.
+- Check project wallet addresses and balances in the selected environment.
+- Run a contract getter and send a wallet transfer through the migrated application.
+- Open the transaction and trace in **Explorer** after the indexer catches up.
+- For imported contracts, compare code, storage, balances, dependencies, and owner access with the source.
 - Stop and resume the network, then check that its account state remains available.
+- Restore a Localton snapshot and repeat one representative application scenario.
 
 For the CLI example, resume the saved network without creation flags:
 

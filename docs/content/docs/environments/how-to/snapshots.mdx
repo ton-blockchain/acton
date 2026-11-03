@@ -92,7 +92,7 @@ acton localnet snapshot dev list
 Replace `<SNAPSHOT_ID>` with the returned ID, not its display name:
 
 ```bash
-acton localnet snapshot dev restore '<SNAPSHOT_ID>'
+acton localnet snapshot dev restore '<SNAPSHOT_ID>' --yes
 ```
 
 These commands also work when the control service is stopped. Acton opens a temporary service for the operation and closes it afterward. A restore through that temporary service leaves the network stopped again; resume it to continue:
@@ -104,7 +104,7 @@ acton localnet start dev --detach
 Delete an unneeded saved state with its ID:
 
 ```bash
-acton localnet snapshot dev delete '<SNAPSHOT_ID>'
+acton localnet snapshot dev delete '<SNAPSHOT_ID>' --yes
 ```
 
 </Tab>
