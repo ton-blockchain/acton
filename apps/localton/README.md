@@ -748,21 +748,21 @@ The local [`.gitignore`](.gitignore) file excludes state directories, keyrings, 
 
 ## Build the container image
 
-Build the complete image locally:
+Build the complete image from the repository root:
 
 ```bash
-docker build -t localton:dev .
-LOCALTON_IMAGE=localton:dev docker compose up -d
+docker build -f apps/localton/Dockerfile -t localton:dev .
+LOCALTON_IMAGE=localton:dev docker compose -f apps/localton/compose.yaml up -d
 ```
 
 For Localton development from the repository root, reuse the native TON and indexer files from the published image. This command builds the Rust workspace and replaces only the `localton` binary:
 
 ```bash
 just build-localton-dev-image
-ACTON_STUDIO_LOCALTON_IMAGE=localton:dev cargo run -- studio start
+ACTON_LOCALNET_IMAGE=localton:dev cargo run -- studio
 ```
 
-Set `LOCALTON_BASE_IMAGE` to use another base image. Set `ACTON_STUDIO_LOCALTON_IMAGE` to build and run another local tag. The environment variable applies when Studio creates a new full TON network environment. Existing environments keep the image recorded in their runtime configuration.
+Set `LOCALTON_BASE_IMAGE` to use another base image. Set `ACTON_STUDIO_LOCALTON_IMAGE` when running the build recipe to select another local tag, then pass that tag in `ACTON_LOCALNET_IMAGE` when starting Studio. Existing environments keep the image recorded in their runtime configuration.
 
 GitHub Actions publishes `ghcr.io/ton-blockchain/localton` for `linux/amd64` and `linux/arm64`. The workflow publishes `latest`, branch, tag, semantic-version, and commit tags.
 

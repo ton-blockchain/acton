@@ -156,6 +156,16 @@ pub(crate) fn configuration(
 ) -> EnvironmentConfig {
     let ports = network.config.ports();
     EnvironmentConfig::FullTonNetwork {
+        global_id: network
+            .config
+            .genesis
+            .as_ref()
+            .map_or(-3, |genesis| genesis.global_id),
+        genesis_toml: network.config.genesis.as_ref().map(|genesis| {
+            genesis
+                .to_toml()
+                .expect("persisted genesis is TOML-compatible")
+        }),
         api_v2_port: ports.api_v2,
         api_v3_port: ports.api_v3,
         admin_port: ports.admin,

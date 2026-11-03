@@ -1,0 +1,1202 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GenesisConfig",
+  "description": "Immutable parameters used to create a local TON network.\n\nCLI, Studio, and native Localton share this schema. Missing TOML fields use local development defaults; unknown fields are errors. Amounts without a fixed-point price unit are whole GRAM. A saved network retains these values independently of the input file and must be recreated to change them.",
+  "default": {
+    "block_limits": {
+      "bytes": {
+        "hard": 2097152,
+        "soft": 1048576,
+        "underload": 262144
+      },
+      "gas": {
+        "hard": 20000000,
+        "soft": 10000000,
+        "underload": 2000000
+      },
+      "logical_time": {
+        "hard": 10000,
+        "soft": 5000,
+        "underload": 1000
+      }
+    },
+    "catchain": {
+      "masterchain_lifetime_seconds": 250,
+      "shard_lifetime_seconds": 250,
+      "shard_validators": 7,
+      "shard_validators_lifetime_seconds": 5500,
+      "shuffle_masterchain_validators": true
+    },
+    "cell_price": 2621440000,
+    "cell_price_masterchain": 65536000000,
+    "config_balance": 10,
+    "critical_voting": {
+      "bit_price": 2,
+      "cell_price": 1000,
+      "max_losses": 2,
+      "max_rounds": 7,
+      "max_store_seconds": 20000000,
+      "min_rounds": 4,
+      "min_store_seconds": 5000000,
+      "min_wins": 4
+    },
+    "elected_for_seconds": 120,
+    "election_end_before_seconds": 30,
+    "election_start_before_seconds": 90,
+    "elector_balance": 10,
+    "faucet_balance": 1000001,
+    "forwarding": {
+      "bit_price": 26214400,
+      "first_frac": 21845,
+      "ihr_factor": 98304,
+      "lump_price": 400000,
+      "next_frac": 21845
+    },
+    "forwarding_masterchain": {
+      "bit_price": 655360000,
+      "first_frac": 21845,
+      "ihr_factor": 98304,
+      "lump_price": 10000000,
+      "next_frac": 21845
+    },
+    "gas": {
+      "block_gas_limit": 10000000,
+      "delete_due_limit": 1000000000,
+      "flat_gas_limit": 100,
+      "flat_gas_price": 40000,
+      "freeze_due_limit": 100000000,
+      "gas_credit": 10000,
+      "gas_limit": 1000000,
+      "special_gas_limit": 1000000
+    },
+    "gas_masterchain": {
+      "block_gas_limit": 2500000,
+      "delete_due_limit": 1000000000,
+      "flat_gas_limit": 100,
+      "flat_gas_price": 1000000,
+      "freeze_due_limit": 100000000,
+      "gas_credit": 10000,
+      "gas_limit": 1000000,
+      "special_gas_limit": 70000000
+    },
+    "gas_price": 26214400,
+    "gas_price_masterchain": 655360000,
+    "global_capabilities": 1006,
+    "global_id": -3,
+    "global_version": 15,
+    "initial_balance": 4999990000,
+    "masterchain_block_limits": {
+      "bytes": {
+        "hard": 2097152,
+        "soft": 1048576,
+        "underload": 262144
+      },
+      "gas": {
+        "hard": 20000000,
+        "soft": 10000000,
+        "underload": 2000000
+      },
+      "logical_time": {
+        "hard": 10000,
+        "soft": 5000,
+        "underload": 1000
+      }
+    },
+    "max_masterchain_validators": 100,
+    "max_stake_factor": 3,
+    "max_validator_stake": 10000000,
+    "max_validators": 1000,
+    "min_total_validator_stake": 10000,
+    "min_validator_stake": 10000,
+    "min_validators": 1,
+    "original_validator_set_valid_for_seconds": 90,
+    "simplex_first_block_timeout_ms": 700,
+    "simplex_max_leader_window_desync": 250,
+    "simplex_slots_per_leader_window": 4,
+    "simplex_target_rate_ms": 1000,
+    "stakes_frozen_for_seconds": 30,
+    "storage": {
+      "bit_price": 1,
+      "cell_price": 500,
+      "masterchain_bit_price": 1000,
+      "masterchain_cell_price": 500000
+    },
+    "validator_stake": 10001,
+    "validator_wallet_balance": 50005,
+    "voting": {
+      "bit_price": 1,
+      "cell_price": 500,
+      "max_losses": 2,
+      "max_rounds": 3,
+      "max_store_seconds": 10000000,
+      "min_rounds": 2,
+      "min_store_seconds": 1000000,
+      "min_wins": 2
+    },
+    "workchain": {
+      "max_split": 4,
+      "min_split": 0
+    },
+    "workchain_enabled": true
+  },
+  "type": "object",
+  "properties": {
+    "block_limits": {
+      "description": "Workchain block limits in config parameter 23",
+      "default": {
+        "bytes": {
+          "hard": 2097152,
+          "soft": 1048576,
+          "underload": 262144
+        },
+        "gas": {
+          "hard": 20000000,
+          "soft": 10000000,
+          "underload": 2000000
+        },
+        "logical_time": {
+          "hard": 10000,
+          "soft": 5000,
+          "underload": 1000
+        }
+      },
+      "type": "object",
+      "properties": {
+        "bytes": {
+          "description": "Serialized block size in bytes",
+          "default": {
+            "hard": 2097152,
+            "soft": 1048576,
+            "underload": 262144
+          },
+          "type": "object",
+          "properties": {
+            "hard": {
+              "description": "Hard resource ceiling",
+              "default": 2097152,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            },
+            "soft": {
+              "description": "Soft resource ceiling",
+              "default": 1048576,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            },
+            "underload": {
+              "description": "Below this value, a block is underloaded",
+              "default": 262144,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            }
+          },
+          "additionalProperties": false
+        },
+        "gas": {
+          "description": "Gas consumed by transactions",
+          "default": {
+            "hard": 20000000,
+            "soft": 10000000,
+            "underload": 2000000
+          },
+          "type": "object",
+          "properties": {
+            "hard": {
+              "description": "Hard resource ceiling",
+              "default": 20000000,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            },
+            "soft": {
+              "description": "Soft resource ceiling",
+              "default": 10000000,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            },
+            "underload": {
+              "description": "Below this value, a block is underloaded",
+              "default": 2000000,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            }
+          },
+          "additionalProperties": false
+        },
+        "logical_time": {
+          "description": "Logical time delta covered by a block",
+          "default": {
+            "hard": 10000,
+            "soft": 5000,
+            "underload": 1000
+          },
+          "type": "object",
+          "properties": {
+            "hard": {
+              "description": "Hard resource ceiling",
+              "default": 10000,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            },
+            "soft": {
+              "description": "Soft resource ceiling",
+              "default": 5000,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            },
+            "underload": {
+              "description": "Below this value, a block is underloaded",
+              "default": 1000,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "catchain": {
+      "description": "Validator rotation and shard assignment in config parameter 28",
+      "default": {
+        "masterchain_lifetime_seconds": 250,
+        "shard_lifetime_seconds": 250,
+        "shard_validators": 7,
+        "shard_validators_lifetime_seconds": 5500,
+        "shuffle_masterchain_validators": true
+      },
+      "type": "object",
+      "properties": {
+        "masterchain_lifetime_seconds": {
+          "description": "Masterchain catchain lifetime in seconds",
+          "default": 250,
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0,
+          "maximum": 4294967295
+        },
+        "shard_lifetime_seconds": {
+          "description": "Shard catchain lifetime in seconds",
+          "default": 250,
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0,
+          "maximum": 4294967295
+        },
+        "shard_validators": {
+          "description": "Maximum validators assigned to a shard",
+          "default": 7,
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0,
+          "maximum": 4294967295
+        },
+        "shard_validators_lifetime_seconds": {
+          "description": "Shard validator committee lifetime in seconds",
+          "default": 5500,
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0,
+          "maximum": 4294967295
+        },
+        "shuffle_masterchain_validators": {
+          "description": "Shuffle masterchain validator assignments between sessions",
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "cell_price": {
+      "description": "Workchain forwarding cell price in nanograms scaled by 2^16",
+      "default": 2621440000,
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0,
+      "maximum": 9223372036854775807
+    },
+    "cell_price_masterchain": {
+      "description": "Masterchain forwarding cell price in nanograms scaled by 2^16",
+      "default": 65536000000,
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0,
+      "maximum": 9223372036854775807
+    },
+    "config_balance": {
+      "description": "Configuration contract balance in GRAM",
+      "default": 10,
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0,
+      "maximum": 9223372036854775807
+    },
+    "critical_voting": {
+      "description": "Critical configuration proposal rules in config parameter 11",
+      "default": {
+        "bit_price": 2,
+        "cell_price": 1000,
+        "max_losses": 2,
+        "max_rounds": 7,
+        "max_store_seconds": 20000000,
+        "min_rounds": 4,
+        "min_store_seconds": 5000000,
+        "min_wins": 4
+      },
+      "type": "object",
+      "properties": {
+        "bit_price": {
+          "description": "Price per stored bit per second in nanograms",
+          "default": 2,
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0,
+          "maximum": 4294967295
+        },
+        "cell_price": {
+          "description": "Price per stored cell per second in nanograms",
+          "default": 1000,
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0,
+          "maximum": 4294967295
+        },
+        "max_losses": {
+          "description": "Failed rounds allowed before the proposal expires",
+          "default": 2,
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0,
+          "maximum": 255
+        },
+        "max_rounds": {
+          "description": "Maximum voting rounds before a proposal expires",
+          "default": 7,
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0,
+          "maximum": 255
+        },
+        "max_store_seconds": {
+          "description": "Maximum proposal storage period in seconds",
+          "default": 20000000,
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0,
+          "maximum": 4294967295
+        },
+        "min_rounds": {
+          "description": "Minimum voting rounds before a proposal is accepted",
+          "default": 4,
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0,
+          "maximum": 255
+        },
+        "min_store_seconds": {
+          "description": "Minimum proposal storage period in seconds",
+          "default": 5000000,
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0,
+          "maximum": 4294967295
+        },
+        "min_wins": {
+          "description": "Successful rounds required to accept the proposal",
+          "default": 4,
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0,
+          "maximum": 255
+        }
+      },
+      "additionalProperties": false
+    },
+    "elected_for_seconds": {
+      "description": "Validator-set lifetime in seconds",
+      "default": 120,
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 4.0,
+      "maximum": 4294967295
+    },
+    "election_end_before_seconds": {
+      "description": "Time before the validator-set change when elections end",
+      "default": 30,
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0,
+      "maximum": 4294967295
+    },
+    "election_start_before_seconds": {
+      "description": "Time before the validator-set change when elections start",
+      "default": 90,
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0,
+      "maximum": 4294967295
+    },
+    "elector_balance": {
+      "description": "Elector contract balance in GRAM",
+      "default": 10,
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0,
+      "maximum": 9223372036854775807
+    },
+    "faucet_balance": {
+      "description": "Faucet wallet balance in GRAM",
+      "default": 1000001,
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0,
+      "maximum": 9223372036854775807
+    },
+    "forwarding": {
+      "description": "Workchain forwarding prices in config parameter 25",
+      "default": {
+        "bit_price": 26214400,
+        "first_frac": 21845,
+        "ihr_factor": 98304,
+        "lump_price": 400000,
+        "next_frac": 21845
+      },
+      "type": "object",
+      "properties": {
+        "bit_price": {
+          "description": "Bit price in nanograms scaled by 2^16",
+          "default": 26214400,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "first_frac": {
+          "description": "Fraction collected by the first validator, scaled by 2^16",
+          "default": 21845,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0,
+          "maximum": 65535
+        },
+        "ihr_factor": {
+          "description": "Instant Hypercube Routing multiplier scaled by 2^16",
+          "default": 98304,
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0,
+          "maximum": 4294967295
+        },
+        "lump_price": {
+          "description": "Fixed message charge in nanograms",
+          "default": 400000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "next_frac": {
+          "description": "Fraction collected by each subsequent validator, scaled by 2^16",
+          "default": 21845,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0,
+          "maximum": 65535
+        }
+      },
+      "additionalProperties": false
+    },
+    "forwarding_masterchain": {
+      "description": "Masterchain forwarding prices in config parameter 24",
+      "default": {
+        "bit_price": 655360000,
+        "first_frac": 21845,
+        "ihr_factor": 98304,
+        "lump_price": 10000000,
+        "next_frac": 21845
+      },
+      "type": "object",
+      "properties": {
+        "bit_price": {
+          "description": "Bit price in nanograms scaled by 2^16",
+          "default": 655360000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "first_frac": {
+          "description": "Fraction collected by the first validator, scaled by 2^16",
+          "default": 21845,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0,
+          "maximum": 65535
+        },
+        "ihr_factor": {
+          "description": "Instant Hypercube Routing multiplier scaled by 2^16",
+          "default": 98304,
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0,
+          "maximum": 4294967295
+        },
+        "lump_price": {
+          "description": "Fixed message charge in nanograms",
+          "default": 10000000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "next_frac": {
+          "description": "Fraction collected by each subsequent validator, scaled by 2^16",
+          "default": 21845,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0,
+          "maximum": 65535
+        }
+      },
+      "additionalProperties": false
+    },
+    "gas": {
+      "description": "Workchain gas limits and flat fees in config parameter 21",
+      "default": {
+        "block_gas_limit": 10000000,
+        "delete_due_limit": 1000000000,
+        "flat_gas_limit": 100,
+        "flat_gas_price": 40000,
+        "freeze_due_limit": 100000000,
+        "gas_credit": 10000,
+        "gas_limit": 1000000,
+        "special_gas_limit": 1000000
+      },
+      "type": "object",
+      "properties": {
+        "block_gas_limit": {
+          "description": "Maximum gas consumed by a block",
+          "default": 10000000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "delete_due_limit": {
+          "description": "Storage debt that deletes an account, in nanograms",
+          "default": 1000000000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "flat_gas_limit": {
+          "description": "Gas covered by the flat fee",
+          "default": 100,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "flat_gas_price": {
+          "description": "Flat execution fee in nanograms",
+          "default": 40000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "freeze_due_limit": {
+          "description": "Storage debt that freezes an account, in nanograms",
+          "default": 100000000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "gas_credit": {
+          "description": "Gas available before an external message is accepted",
+          "default": 10000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "gas_limit": {
+          "description": "Maximum gas consumed by an ordinary transaction",
+          "default": 1000000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "special_gas_limit": {
+          "description": "Maximum gas consumed by a special contract transaction",
+          "default": 1000000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        }
+      },
+      "additionalProperties": false
+    },
+    "gas_masterchain": {
+      "description": "Masterchain gas limits and flat fees in config parameter 20",
+      "default": {
+        "block_gas_limit": 2500000,
+        "delete_due_limit": 1000000000,
+        "flat_gas_limit": 100,
+        "flat_gas_price": 1000000,
+        "freeze_due_limit": 100000000,
+        "gas_credit": 10000,
+        "gas_limit": 1000000,
+        "special_gas_limit": 70000000
+      },
+      "type": "object",
+      "properties": {
+        "block_gas_limit": {
+          "description": "Maximum gas consumed by a block",
+          "default": 2500000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "delete_due_limit": {
+          "description": "Storage debt that deletes an account, in nanograms",
+          "default": 1000000000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "flat_gas_limit": {
+          "description": "Gas covered by the flat fee",
+          "default": 100,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "flat_gas_price": {
+          "description": "Flat execution fee in nanograms",
+          "default": 1000000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "freeze_due_limit": {
+          "description": "Storage debt that freezes an account, in nanograms",
+          "default": 100000000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "gas_credit": {
+          "description": "Gas available before an external message is accepted",
+          "default": 10000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "gas_limit": {
+          "description": "Maximum gas consumed by an ordinary transaction",
+          "default": 1000000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "special_gas_limit": {
+          "description": "Maximum gas consumed by a special contract transaction",
+          "default": 70000000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        }
+      },
+      "additionalProperties": false
+    },
+    "gas_price": {
+      "description": "Workchain gas price in nanograms scaled by 2^16",
+      "default": 26214400,
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0,
+      "maximum": 9223372036854775807
+    },
+    "gas_price_masterchain": {
+      "description": "Masterchain gas price in nanograms scaled by 2^16",
+      "default": 655360000,
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0,
+      "maximum": 9223372036854775807
+    },
+    "global_capabilities": {
+      "description": "Capability bitmask in config parameter 8",
+      "default": 1006,
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0,
+      "maximum": 9223372036854775807
+    },
+    "global_id": {
+      "description": "Negative TON global network identifier",
+      "default": -3,
+      "type": "integer",
+      "format": "int32",
+      "maximum": -1.0,
+      "minimum": -2147483648
+    },
+    "global_version": {
+      "description": "VM protocol version in config parameter 8",
+      "default": 15,
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 1.0,
+      "maximum": 4294967295
+    },
+    "initial_balance": {
+      "description": "Main genesis wallet balance in GRAM",
+      "default": 4999990000,
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 1.0,
+      "maximum": 9223372036854775807
+    },
+    "masterchain_block_limits": {
+      "description": "Masterchain block limits in config parameter 22",
+      "default": {
+        "bytes": {
+          "hard": 2097152,
+          "soft": 1048576,
+          "underload": 262144
+        },
+        "gas": {
+          "hard": 20000000,
+          "soft": 10000000,
+          "underload": 2000000
+        },
+        "logical_time": {
+          "hard": 10000,
+          "soft": 5000,
+          "underload": 1000
+        }
+      },
+      "type": "object",
+      "properties": {
+        "bytes": {
+          "description": "Serialized block size in bytes",
+          "default": {
+            "hard": 2097152,
+            "soft": 1048576,
+            "underload": 262144
+          },
+          "type": "object",
+          "properties": {
+            "hard": {
+              "description": "Hard resource ceiling",
+              "default": 2097152,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            },
+            "soft": {
+              "description": "Soft resource ceiling",
+              "default": 1048576,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            },
+            "underload": {
+              "description": "Below this value, a block is underloaded",
+              "default": 262144,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            }
+          },
+          "additionalProperties": false
+        },
+        "gas": {
+          "description": "Gas consumed by transactions",
+          "default": {
+            "hard": 20000000,
+            "soft": 10000000,
+            "underload": 2000000
+          },
+          "type": "object",
+          "properties": {
+            "hard": {
+              "description": "Hard resource ceiling",
+              "default": 20000000,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            },
+            "soft": {
+              "description": "Soft resource ceiling",
+              "default": 10000000,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            },
+            "underload": {
+              "description": "Below this value, a block is underloaded",
+              "default": 2000000,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            }
+          },
+          "additionalProperties": false
+        },
+        "logical_time": {
+          "description": "Logical time delta covered by a block",
+          "default": {
+            "hard": 10000,
+            "soft": 5000,
+            "underload": 1000
+          },
+          "type": "object",
+          "properties": {
+            "hard": {
+              "description": "Hard resource ceiling",
+              "default": 10000,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            },
+            "soft": {
+              "description": "Soft resource ceiling",
+              "default": 5000,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            },
+            "underload": {
+              "description": "Below this value, a block is underloaded",
+              "default": 1000,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0,
+              "maximum": 4294967295
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "max_masterchain_validators": {
+      "description": "Maximum number of masterchain validators",
+      "default": 100,
+      "type": "integer",
+      "format": "uint32",
+      "maximum": 65535.0,
+      "minimum": 1.0
+    },
+    "max_stake_factor": {
+      "description": "Maximum stake ratio for one validator",
+      "default": 3,
+      "type": "integer",
+      "format": "uint32",
+      "maximum": 65535.0,
+      "minimum": 1.0
+    },
+    "max_validator_stake": {
+      "description": "Maximum validator stake in GRAM",
+      "default": 10000000,
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0,
+      "maximum": 9223372036854775807
+    },
+    "max_validators": {
+      "description": "Maximum number of validators",
+      "default": 1000,
+      "type": "integer",
+      "format": "uint32",
+      "maximum": 65535.0,
+      "minimum": 1.0
+    },
+    "min_total_validator_stake": {
+      "description": "Minimum total validator stake in GRAM",
+      "default": 10000,
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 1.0,
+      "maximum": 9223372036854775807
+    },
+    "min_validator_stake": {
+      "description": "Minimum validator stake in GRAM",
+      "default": 10000,
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 1.0,
+      "maximum": 9223372036854775807
+    },
+    "min_validators": {
+      "description": "Minimum number of validators",
+      "default": 1,
+      "type": "integer",
+      "format": "uint32",
+      "maximum": 65535.0,
+      "minimum": 1.0
+    },
+    "original_validator_set_valid_for_seconds": {
+      "description": "Original validator-set lifetime in seconds",
+      "default": 90,
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 1.0,
+      "maximum": 4294967295
+    },
+    "simplex_first_block_timeout_ms": {
+      "description": "Timeout for the first block in milliseconds",
+      "default": 700,
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 1.0,
+      "maximum": 4294967295
+    },
+    "simplex_max_leader_window_desync": {
+      "description": "Maximum number of future Simplex leader windows accepted from peers",
+      "default": 250,
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 1.0,
+      "maximum": 4294967295
+    },
+    "simplex_slots_per_leader_window": {
+      "description": "Number of slots in one Simplex leader window",
+      "default": 4,
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 1.0,
+      "maximum": 4294967295
+    },
+    "simplex_target_rate_ms": {
+      "description": "Target Simplex block interval stored as noncritical config 30 key 0",
+      "default": 1000,
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 1.0,
+      "maximum": 4294967295
+    },
+    "stakes_frozen_for_seconds": {
+      "description": "Stake freeze time in seconds",
+      "default": 30,
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0,
+      "maximum": 4294967295
+    },
+    "storage": {
+      "description": "Storage prices in config parameter 18",
+      "default": {
+        "bit_price": 1,
+        "cell_price": 500,
+        "masterchain_bit_price": 1000,
+        "masterchain_cell_price": 500000
+      },
+      "type": "object",
+      "properties": {
+        "bit_price": {
+          "description": "Workchain price for one stored bit",
+          "default": 1,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "cell_price": {
+          "description": "Workchain price for one stored cell",
+          "default": 500,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "masterchain_bit_price": {
+          "description": "Masterchain price for one stored bit",
+          "default": 1000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        },
+        "masterchain_cell_price": {
+          "description": "Masterchain price for one stored cell",
+          "default": 500000,
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0,
+          "maximum": 9223372036854775807
+        }
+      },
+      "additionalProperties": false
+    },
+    "validator_stake": {
+      "description": "Stake submitted by genesis validator automation in GRAM",
+      "default": 10001,
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0,
+      "maximum": 9223372036854775807
+    },
+    "validator_wallet_balance": {
+      "description": "Balance of each built-in validator wallet in GRAM",
+      "default": 50005,
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0,
+      "maximum": 9223372036854775807
+    },
+    "voting": {
+      "description": "Ordinary configuration proposal rules in config parameter 11",
+      "default": {
+        "bit_price": 1,
+        "cell_price": 500,
+        "max_losses": 2,
+        "max_rounds": 3,
+        "max_store_seconds": 10000000,
+        "min_rounds": 2,
+        "min_store_seconds": 1000000,
+        "min_wins": 2
+      },
+      "type": "object",
+      "properties": {
+        "bit_price": {
+          "description": "Price per stored bit per second in nanograms",
+          "default": 1,
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0,
+          "maximum": 4294967295
+        },
+        "cell_price": {
+          "description": "Price per stored cell per second in nanograms",
+          "default": 500,
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0,
+          "maximum": 4294967295
+        },
+        "max_losses": {
+          "description": "Failed rounds allowed before the proposal expires",
+          "default": 2,
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0,
+          "maximum": 255
+        },
+        "max_rounds": {
+          "description": "Maximum voting rounds before a proposal expires",
+          "default": 3,
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0,
+          "maximum": 255
+        },
+        "max_store_seconds": {
+          "description": "Maximum proposal storage period in seconds",
+          "default": 10000000,
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0,
+          "maximum": 4294967295
+        },
+        "min_rounds": {
+          "description": "Minimum voting rounds before a proposal is accepted",
+          "default": 2,
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0,
+          "maximum": 255
+        },
+        "min_store_seconds": {
+          "description": "Minimum proposal storage period in seconds",
+          "default": 1000000,
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0,
+          "maximum": 4294967295
+        },
+        "min_wins": {
+          "description": "Successful rounds required to accept the proposal",
+          "default": 2,
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0,
+          "maximum": 255
+        }
+      },
+      "additionalProperties": false
+    },
+    "workchain": {
+      "description": "Workchain split-depth bounds in config parameter 12",
+      "default": {
+        "max_split": 4,
+        "min_split": 0
+      },
+      "type": "object",
+      "properties": {
+        "max_split": {
+          "description": "Maximum shard prefix length",
+          "default": 4,
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0,
+          "maximum": 255
+        },
+        "min_split": {
+          "description": "Minimum shard prefix length after the chain starts splitting",
+          "default": 0,
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0,
+          "maximum": 255
+        }
+      },
+      "additionalProperties": false
+    },
+    "workchain_enabled": {
+      "description": "`true` when the base workchain is enabled",
+      "default": true,
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false
+}

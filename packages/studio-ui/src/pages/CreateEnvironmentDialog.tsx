@@ -23,6 +23,7 @@ import {
   preferredImportSource,
   type ImportedAccountForm,
 } from "../components/AccountImportEditor"
+import {GenesisSettings, type GenesisSettingsHandle} from "./GenesisSettings"
 import {WalletNamesInput} from "./WalletNamesInput"
 
 import styles from "./CreateEnvironmentDialog.module.css"
@@ -49,8 +50,7 @@ interface EnvironmentFormState {
   readonly rateLimit: string
   readonly responseDelayMs: string
   readonly blockTimeMs: string
-  readonly fullTonBlockTimeMs: string
-  readonly fullTonElectionTimeSeconds: string
+  readonly genesisToml: string
   readonly noMining: boolean
   readonly mineEmptyBlocks: boolean
   readonly importedAccounts: readonly ImportedAccountForm[]
@@ -72,6 +72,8 @@ export function CreateEnvironmentDialog({
     createInitialForm(simulatedDefaultName, defaultStartupAccounts),
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [genesisReady, setGenesisReady] = useState(true)
+  const genesisSettings = useRef<GenesisSettingsHandle>(null)
   const [isDockerNoticeDismissed, setIsDockerNoticeDismissed] = useState(
     () =>
       globalThis.localStorage.getItem(FULL_LOCALNET_DOCKER_NOTICE_DISMISSED_STORAGE_KEY) === "true",
@@ -172,6 +174,7 @@ export function CreateEnvironmentDialog({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (isSubmitting) return
+    if (form.kind === "fullTonNetwork" && !(await genesisSettings.current?.validate())) return
 
     let request: CreateEnvironmentRequest
     try {
@@ -203,16 +206,7 @@ export function CreateEnvironmentDialog({
             : {
                 kind: "fullTonNetwork",
                 accounts: form.accounts,
-                blockTimeMs: optionalPositiveInteger(
-                  form.fullTonBlockTimeMs,
-                  "Block time",
-                  4_294_967_295,
-                ),
-                electionTimeSeconds: optionalPositiveInteger(
-                  form.fullTonElectionTimeSeconds,
-                  "Election time",
-                  4_294_967_295,
-                ),
+                genesisToml: form.genesisToml || undefined,
                 importedAccounts,
               },
       }
@@ -449,36 +443,13 @@ export function CreateEnvironmentDialog({
                 onChange={updateImportedAccount}
                 onRemove={removeImportedAccount}
               />
-              <Disclosure
-                className={styles.compactDisclosure}
-                label="Network timing"
-                contentClassName={styles.advancedContent}
-              >
-                <div className={styles.formGrid}>
-                  <Input
-                    label="Block time"
-                    description="Target interval between blocks"
-                    suffix="ms"
-                    type="number"
-                    min={1}
-                    max={4_294_967_295}
-                    placeholder="1,000"
-                    value={form.fullTonBlockTimeMs}
-                    onChange={event => updateForm("fullTonBlockTimeMs", event.target.value)}
-                  />
-                  <Input
-                    label="Election time"
-                    description="Duration of each validator round"
-                    suffix="s"
-                    type="number"
-                    min={4}
-                    max={4_294_967_295}
-                    placeholder="120"
-                    value={form.fullTonElectionTimeSeconds}
-                    onChange={event => updateForm("fullTonElectionTimeSeconds", event.target.value)}
-                  />
-                </div>
-              </Disclosure>
+              <GenesisSettings
+                ref={genesisSettings}
+                value={form.genesisToml}
+                onChange={value => updateForm("genesisToml", value)}
+                disabled={isSubmitting}
+                onReadyChange={setGenesisReady}
+              />
             </div>
           )}
         </div>
@@ -491,6 +462,7 @@ export function CreateEnvironmentDialog({
             type="submit"
             variant="primary"
             loading={isSubmitting}
+            disabled={form.kind === "fullTonNetwork" && !genesisReady}
             leadingIcon={<Plus size={16} aria-hidden="true" />}
           >
             Create environment
@@ -511,8 +483,7 @@ function createInitialForm(name: string, accounts: readonly string[] = []): Envi
     rateLimit: "",
     responseDelayMs: "",
     blockTimeMs: "",
-    fullTonBlockTimeMs: "",
-    fullTonElectionTimeSeconds: "",
+    genesisToml: "",
     noMining: false,
     mineEmptyBlocks: false,
     importedAccounts: [],

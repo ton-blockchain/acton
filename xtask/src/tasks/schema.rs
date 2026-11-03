@@ -6,6 +6,7 @@ use acton_config::lint_output::LintJsonReport;
 use acton_config::mutation_rules::CustomMutationRulesFile;
 use anyhow::{Context, Result, bail};
 use clap::{Args, ValueEnum};
+use localton_genesis::GenesisConfig;
 use schemars::r#gen::SchemaSettings;
 use schemars::schema::{InstanceType, RootSchema, Schema, SchemaObject};
 use schemars::{JsonSchema, Map};
@@ -13,6 +14,7 @@ use tolk_linter::Linter;
 use ton_language_server_core::LanguageServerSettings;
 
 const ACTON_TOML_OUTPUT_PATH: &str = "crates/acton-config/schemas/acton.schema.json";
+const GENESIS_TOML_OUTPUT_PATH: &str = "crates/localton-genesis/schemas/genesis.schema.json";
 const LINT_REPORT_OUTPUT_PATH: &str = "crates/acton-config/schemas/lint-report.schema.json";
 const MUTATION_RULES_OUTPUT_PATH: &str = "crates/acton-config/schemas/mutation-rules.schema.json";
 const LANGUAGE_SERVER_SETTINGS_OUTPUT_PATH: &str =
@@ -32,6 +34,7 @@ pub(crate) struct SchemaArgs {
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub(crate) enum SchemaTarget {
     ActonToml,
+    GenesisToml,
     LintReport,
     MutationRules,
     LanguageServerSettings,
@@ -41,6 +44,7 @@ impl SchemaTarget {
     const fn default_output_path(self) -> &'static str {
         match self {
             Self::ActonToml => ACTON_TOML_OUTPUT_PATH,
+            Self::GenesisToml => GENESIS_TOML_OUTPUT_PATH,
             Self::LintReport => LINT_REPORT_OUTPUT_PATH,
             Self::MutationRules => MUTATION_RULES_OUTPUT_PATH,
             Self::LanguageServerSettings => LANGUAGE_SERVER_SETTINGS_OUTPUT_PATH,
@@ -50,6 +54,7 @@ impl SchemaTarget {
     const fn label(self) -> &'static str {
         match self {
             Self::ActonToml => "Acton.toml",
+            Self::GenesisToml => "genesis.toml",
             Self::LintReport => "lint JSON report",
             Self::MutationRules => "custom mutation rules",
             Self::LanguageServerSettings => "language server settings",
@@ -63,6 +68,7 @@ pub(crate) fn run(args: SchemaArgs) -> Result<()> {
         .unwrap_or_else(|| PathBuf::from(args.schema.default_output_path()));
     let content = match args.schema {
         SchemaTarget::ActonToml => acton_toml_schema_content()?,
+        SchemaTarget::GenesisToml => genesis_toml_schema_content()?,
         SchemaTarget::LintReport => schema_content::<LintJsonReport>()?,
         SchemaTarget::MutationRules => schema_content::<CustomMutationRulesFile>()?,
         SchemaTarget::LanguageServerSettings => language_server_settings_schema_content()?,
@@ -99,6 +105,50 @@ fn acton_toml_schema_content() -> Result<String> {
 
 fn schema_content<T: JsonSchema>() -> Result<String> {
     serialize_schema(&root_schema::<T>())
+}
+
+fn genesis_toml_schema_content() -> Result<String> {
+    // Shared types have different defaults for each chain and resource. Inline
+    // them so completion can describe the defaults of each specific TOML table.
+    let mut schema = SchemaSettings::draft07()
+        .with(|settings| settings.inline_subschemas = true)
+        .into_generator()
+        .into_root_schema_for::<GenesisConfig>();
+    let defaults = serde_json::to_value(GenesisConfig::default())?;
+    apply_genesis_defaults(&mut schema.schema, &defaults);
+    serialize_schema(&schema)
+}
+
+fn apply_genesis_defaults(schema: &mut SchemaObject, defaults: &serde_json::Value) {
+    schema.metadata().default = Some(defaults.clone());
+    // JSON Schema validators do not enforce Rust integer formats. Keep the
+    // actual width limits in numeric keywords, including TOML's signed range.
+    let bounds = match schema.format.as_deref() {
+        Some("uint8") => Some((0, i64::from(u8::MAX))),
+        Some("uint16") => Some((0, i64::from(u16::MAX))),
+        Some("uint32") => Some((0, i64::from(u32::MAX))),
+        Some("int32") => Some((i64::from(i32::MIN), i64::from(i32::MAX))),
+        Some("uint64") => Some((0, i64::MAX)),
+        _ => None,
+    };
+    if let Some((minimum, maximum)) = bounds {
+        if schema.number().minimum.is_none() {
+            schema.extensions.insert("minimum".into(), minimum.into());
+        }
+        if schema.number().maximum.is_none() {
+            schema.extensions.insert("maximum".into(), maximum.into());
+        }
+    }
+    if let (Some(object), Some(values)) = (&mut schema.object, defaults.as_object()) {
+        // The TOML loader merges defaults recursively, including partially
+        // specified thresholds that are required in the serialized Rust types.
+        object.required.clear();
+        for (key, property) in &mut object.properties {
+            if let (Schema::Object(property), Some(value)) = (property, values.get(key)) {
+                apply_genesis_defaults(property, value);
+            }
+        }
+    }
 }
 
 fn language_server_settings_schema_content() -> Result<String> {

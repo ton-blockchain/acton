@@ -376,9 +376,11 @@ pub fn open_wallets(
 /// Freezes selected project wallets' public state for a new localnet.
 ///
 /// Keys remain in Acton; resuming the network does not repeat funding or deployment.
+/// Default wallet IDs use the genesis global ID; explicit project wallet IDs are retained.
 pub fn prepare_localnet_wallets(
     config: &ActonConfig,
     names: &[String],
+    global_id: i32,
 ) -> anyhow::Result<Vec<acton_localnet::StartupWallet>> {
     use rston::{
         boc::BocRepr,
@@ -392,7 +394,8 @@ pub fn prepare_localnet_wallets(
         return Ok(Vec::new());
     }
 
-    let wallets = open_selected_wallets(config, names, &Network::Localnet)?;
+    let mut wallets = open_selected_wallets(config, names, &Network::Localnet)?;
+    apply_wallet_global_id(config, &mut wallets, global_id)?;
     let mut addresses = std::collections::BTreeSet::new();
     wallets
         .into_iter()
@@ -426,6 +429,35 @@ pub fn prepare_localnet_wallets(
             })
         })
         .collect()
+}
+
+/// Re-derives default wallet IDs and addresses for a localnet's genesis.
+///
+/// Explicit IDs and signing keys stay unchanged. Both startup accounts and the
+/// Studio wallet list must use this rule so they refer to the same contracts.
+pub(crate) fn apply_wallet_global_id(
+    config: &ActonConfig,
+    wallets: &mut BTreeMap<String, Wallet>,
+    global_id: i32,
+) -> anyhow::Result<()> {
+    for (name, wallet) in wallets {
+        let explicit_id = config
+            .wallets
+            .as_ref()
+            .and_then(|wallets| wallets.wallets.get(name))
+            .and_then(|wallet| wallet.wallet_id);
+        if explicit_id.is_some() {
+            continue;
+        }
+        let id = wallet_id_from_global_id(wallet.wallet.version, global_id);
+        if id != wallet.wallet.wallet_id {
+            wallet.wallet.wallet_id = id;
+            let state_init = rston::cell::CellBuilder::build_from(wallet.wallet.state_init()?)?;
+            wallet.wallet.address =
+                StdAddr::new(wallet.wallet.address.workchain, *state_init.repr_hash());
+        }
+    }
+    Ok(())
 }
 
 pub fn open_selected_wallets(

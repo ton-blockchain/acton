@@ -19,6 +19,7 @@ mod runtime;
 mod storage;
 
 pub use error::Error;
+pub use localton_genesis::{GENESIS_SCHEMA_JSON, GenesisConfig, GenesisIssue};
 pub use model::{
     ApiHealth, ApiHealthStatus, CreateNetwork, DockerContainer, Endpoints, Network, NetworkConfig,
     NetworkHealth, NetworkHealthSample, NetworkHealthStatus, NetworkPorts, NetworkState, Node,

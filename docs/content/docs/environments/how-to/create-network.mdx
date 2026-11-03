@@ -1,10 +1,11 @@
 ---
 title: "How to create a virtual network"
 sidebarTitle: "Create a virtual network"
-description: "Learn how to create a simulator network or localnet with project wallets using Studio or the CLI"
+description: "Create a simulator network or localnet with project wallets and custom genesis configuration through Studio or the CLI"
 ---
 
 import {Tabs, Tab} from "fumadocs-ui/components/tabs";
+import {Accordion, Accordions} from "fumadocs-ui/components/accordion";
 
 <AvailabilityBadge since="Acton 1.2" />
 
@@ -81,6 +82,77 @@ These options apply to new networks. [Resume an existing network](/docs/environm
 
 </Tab>
 </Tabs>
+
+## Use a custom genesis
+
+<AvailabilityBadge since="trunk" />
+
+A localnet genesis defines the initial account balances and network rules. You can change validator stakes, election timing, consensus, fees, sharding, block limits, and configuration voting.
+
+Create a separate `genesis.toml` file with the values you need. This example sets a network identifier and a 500 ms block target:
+
+```toml
+global_id = -42
+simplex_target_rate_ms = 500
+```
+
+Missing fields use local development defaults. You do not need to copy the complete configuration into your file.
+
+<Tabs items={["Studio", "CLI"]}>
+<Tab value="Studio">
+
+In **Create environment**, select **Localnet**. Open **Genesis configuration** before you create the network.
+
+- **Import genesis.toml** loads your file into the form.
+- The field groups let you edit individual values without a file.
+- **Export genesis.toml** saves the complete configuration, including defaults.
+- **Reset defaults** restores the local development configuration.
+
+Studio highlights invalid values and related fields with an explanation. For example, **Elections start offset** must be less than **Validator round duration**. Correct the highlighted values before you create the network.
+
+</Tab>
+<Tab value="CLI">
+
+Pass the file when you start a new network:
+
+```bash
+acton localnet start custom --genesis genesis.toml --detach
+```
+
+To save the configuration without starting Docker, use `acton localnet create custom --genesis genesis.toml` instead.
+
+The `ACTON_LOCALNET_GENESIS` environment variable can also supply the file path. An explicit `--genesis` path takes precedence. Acton does not automatically load `genesis.toml` from the project directory.
+
+Explicit `--block-time-ms` and `--election-time-seconds` values override the corresponding genesis timing values. Acton checks the configuration before it starts Docker.
+
+</Tab>
+</Tabs>
+
+Acton saves the complete configuration with the network. Later changes to the source file do not affect that network. To use a different genesis, create a new network.
+
+To resume a saved network, omit creation flags such as `--genesis`. If you set `ACTON_LOCALNET_GENESIS` in your shell, unset it before you resume the network.
+
+Balances and stakes use whole GRAM. Other fields can use nanograms, seconds, milliseconds, or scaled prices. See the [genesis reference](/docs/commands/localnet#genesis-configuration) for field groups, units, and constraints.
+
+<Accordions>
+<Accordion title="Editor completion for genesis.toml">
+
+Export the JSON Schema next to your `genesis.toml` file:
+
+```bash
+acton meta get-schema genesis-toml > genesis.schema.json
+```
+
+For editors that support TOML schema directives, add this line at the top of `genesis.toml`:
+
+```toml
+#:schema ./genesis.schema.json
+```
+
+The schema provides field descriptions, defaults, and type checks. Partial tables are supported. Acton also checks relationships between values before creation.
+
+</Accordion>
+</Accordions>
 
 ## Verify and continue
 

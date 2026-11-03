@@ -619,6 +619,7 @@ mod tests {
         let driver = DockerNetwork {
             compose_file: dir.path().join("compose.yaml"),
             compose_config: NetworkConfig {
+                genesis: None,
                 port_base: 0,
                 ports: None,
                 block_time_ms: None,
@@ -691,6 +692,7 @@ mod tests {
         let driver = DockerNetwork {
             compose_file: dir.path().join("compose.yaml"),
             compose_config: NetworkConfig {
+                genesis: None,
                 port_base: 0,
                 ports: None,
                 block_time_ms: None,

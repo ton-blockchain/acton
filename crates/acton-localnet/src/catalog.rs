@@ -99,6 +99,19 @@ pub async fn create(root: &Path, request: CreateNetwork) -> Result<NetworkDirect
         return Err(Error::invalid("Election time must be at least 4 seconds"));
     }
 
+    let genesis = request
+        .genesis
+        .unwrap_or_default()
+        .with_timing(request.block_time_ms, request.election_time_seconds)
+        .map_err(|error| Error::invalid(format!("Invalid genesis: {error:#}")))?;
+    if !genesis.workchain_enabled
+        && (!request.imported_account_bocs.is_empty() || !request.startup_wallets.is_empty())
+    {
+        return Err(Error::invalid(
+            "Enable the workchain to add startup wallets or import accounts",
+        ));
+    }
+
     for boc in &request.imported_account_bocs {
         if boc.is_empty() || boc.len() % 2 != 0 || !boc.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err(Error::invalid(
@@ -231,6 +244,7 @@ pub async fn create(root: &Path, request: CreateNetwork) -> Result<NetworkDirect
     };
 
     let config = NetworkConfig {
+        genesis: Some(genesis.clone()),
         port_base,
         ports: Some(ports),
         block_time_ms: request.block_time_ms,
@@ -259,6 +273,15 @@ pub async fn create(root: &Path, request: CreateNetwork) -> Result<NetworkDirect
         .await
         .map_err(|e| Error::storage(&data_dir, e))?;
     storage::write_json(&data_dir.join("network.json"), &record).await?;
+    let genesis_path = data_dir.join("genesis.toml");
+    tokio::fs::write(
+        &genesis_path,
+        genesis
+            .to_toml()
+            .map_err(|error| Error::invalid(error.to_string()))?,
+    )
+    .await
+    .map_err(|error| Error::storage(&genesis_path, error))?;
     Ok(NetworkDirectory {
         network: record,
         path: data_dir,

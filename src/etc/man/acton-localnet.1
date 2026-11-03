@@ -147,6 +147,15 @@ Actual block timing depends on consensus and available resources. This option
 sets the target in the initial network configuration.
 .RE
 .sp
+\fB\-\-genesis\fR \fIgenesis.toml\fR
+.RS 4
+Available since trunk.
+.sp
+Read genesis parameters from a TOML file when creating a network.
+\fBACTON_LOCALNET_GENESIS\fR can supply the file path instead. Explicit timing
+flags override the corresponding file values. See \fBGenesis Configuration\fR\&.
+.RE
+.sp
 \fB\-\-election\-time\-seconds\fR \fIseconds\fR
 .RS 4
 Validator round duration, in seconds. The minimum is 4 seconds. The bundled
@@ -176,7 +185,7 @@ the first start.
 .SS "Synopsis"
 \fBacton localnet create\fR [\fIname\fR] [\fIoptions\fR]
 .sp
-Accepts the creation options documented under \fBstart\fR: \fB\-\-port\-base\fR,
+Accepts the creation options documented under \fBstart\fR: \fB\-\-genesis\fR, \fB\-\-port\-base\fR,
 \fB\-\-block\-time\-ms\fR, \fB\-\-election\-time\-seconds\fR, \fB\-\-accounts\fR, and \fB\-\-accounts\-file\fR\&.
 The default name is \fBlocalnet\fR\&. Wallets and import files are read when the
 definition is created.
@@ -348,6 +357,128 @@ Startup, node changes, and snapshot commands already wait for their operations.
 acton localnet operation <OPERATION_ID> \-\-network dev \-\-wait
 .fi
 .RE
+.SH "GENESIS CONFIGURATION"
+Available since trunk.
+.sp
+Create \fBgenesis.toml\fR with the values that your test network needs:
+.sp
+.RS 4
+.nf
+global_id = \-42
+simplex_target_rate_ms = 500
+
+[storage]
+cell_price = 1000
+
+[block_limits.bytes]
+underload = 262144
+soft = 1048576
+hard = 4194304
+.fi
+.RE
+.sp
+Pass the file when creating a network:
+.sp
+.RS 4
+.nf
+acton localnet create dev \-\-genesis genesis.toml
+acton localnet start dev \-\-detach
+.fi
+.RE
+.sp
+Missing values use local development defaults. Unknown keys, invalid integer
+widths, and inconsistent limits are rejected before Docker starts. Partial
+masterchain sections retain masterchain defaults.
+.sp
+Acton saves all resolved values in the network record and a \fBgenesis.toml\fR
+inside its state directory. Editing the source file does not change a saved
+network. Resume it without creation options. Unset \fBACTON_LOCALNET_GENESIS\fR
+before resuming if you used that variable to select the file.
+.sp
+In Studio, select \fBLocalnet\fR when creating an environment. Open
+\fBGenesis configuration\fR to import a file, edit individual fields, export
+the complete file, or reset to defaults.
+.sp
+The configuration includes:
+
+.TS
+allbox tab(:);
+lt lt.
+T{
+Fields or tables
+T}:T{
+Purpose
+T}
+T{
+\fBglobal_id\fR, \fBglobal_version\fR, \fBglobal_capabilities\fR
+T}:T{
+Network identity and protocol features
+T}
+T{
+\fBworkchain_enabled\fR, \fB[workchain]\fR
+T}:T{
+Enable workchain 0 and set shard split bounds
+T}
+T{
+\fBinitial_balance\fR, \fBvalidator_wallet_balance\fR, \fBfaucet_balance\fR, \fBelector_balance\fR, \fBconfig_balance\fR
+T}:T{
+Built\-in account balances in GRAM
+T}
+T{
+\fBvalidator_stake\fR, validator counts and stake limits
+T}:T{
+Election participation and genesis validator funding
+T}
+T{
+Election timing fields
+T}:T{
+Validator rounds, election windows, and stake freezing
+T}
+T{
+\fBsimplex_*\fR, \fB[catchain]\fR
+T}:T{
+Block interval, leader windows, timeouts, and validator rotation
+T}
+T{
+\fBgas_price\fR, \fBgas_price_masterchain\fR, \fB[gas]\fR, \fB[gas_masterchain]\fR
+T}:T{
+Execution prices, limits, and account debt thresholds
+T}
+T{
+\fB[storage]\fR
+T}:T{
+Storage prices per bit and cell
+T}
+T{
+\fBcell_price\fR, \fBcell_price_masterchain\fR, \fB[forwarding]\fR, \fB[forwarding_masterchain]\fR
+T}:T{
+Message forwarding charges
+T}
+T{
+\fB[block_limits]\fR, \fB[masterchain_block_limits]\fR
+T}:T{
+Block byte, gas, and logical\-time thresholds
+T}
+T{
+\fB[voting]\fR, \fB[critical_voting]\fR
+T}:T{
+Configuration proposal rules and storage charges
+T}
+.TE
+.sp
+.sp
+Balances and stakes use whole GRAM. Flat fees and account debt thresholds use
+nanograms. Gas prices, forwarding bit/cell prices, and storage prices use
+nanograms scaled by 65,536. Storage prices apply per second. Forwarding
+fractions and \fBihr_factor\fR also use that scale. \fBmax_stake_factor\fR is an
+unscaled integer. 1 GRAM = 1,000,000,000 nanograms.
+.sp
+Genesis starts with one validator and an unsplit workchain state. Increasing
+\fBmin_validators\fR requires more validators before elections can succeed.
+\fBvalidator_wallet_balance\fR must cover \fBvalidator_stake\fR and a fee reserve.
+Startup wallets and account imports require \fBworkchain_enabled = true\fR\&.
+.sp
+Native Localton accepts the same file with \fBlocalton bootstrap \-\-genesis genesis.toml\fR\&. Its \fBLOCALTON_GENESIS\fR variable supplies the file path.
 .SH "STARTUP ACCOUNTS"
 Create a development wallet, then select it when you create the network:
 .sp

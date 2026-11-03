@@ -1187,6 +1187,7 @@ async fn resolve_request(
             }
         }
         CreateEnvironmentConfig::FullTonNetwork {
+            genesis_toml,
             api_v2_port,
             api_v3_port,
             admin_port,
@@ -1224,7 +1225,16 @@ async fn resolve_request(
                     })
                 })
                 .collect::<Result<Vec<_>, _>>()?;
+            let genesis = genesis_toml
+                .as_deref()
+                .map(acton_localnet::GenesisConfig::parse_toml)
+                .transpose()
+                .map_err(|error| EnvironmentRuntimeError::InvalidRequest {
+                    code: "invalid_genesis",
+                    message: format!("{error:#}"),
+                })?;
             let mut create_network = acton_localnet::CreateNetwork {
+                genesis,
                 name: name.clone(),
                 block_time_ms,
                 election_time_seconds,

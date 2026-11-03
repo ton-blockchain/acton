@@ -10,6 +10,9 @@ use utoipa::ToSchema;
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreateNetwork {
+    /// Resolved genesis values, persisted independently of the source TOML file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub genesis: Option<crate::GenesisConfig>,
     pub name: String,
     pub port_base: Option<u16>,
     #[serde(default)]
@@ -81,6 +84,9 @@ impl NetworkPorts {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NetworkConfig {
+    /// Resolved genesis values, persisted independently of the source TOML file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub genesis: Option<crate::GenesisConfig>,
     pub port_base: u16,
     pub ports: Option<NetworkPorts>,
     pub block_time_ms: Option<u32>,

@@ -31,6 +31,8 @@ export interface ActonSimulatedLocalnetEnvironmentConfig {
 }
 
 export interface FullTonNetworkEnvironmentConfig {
+  readonly globalId: number
+  readonly genesisToml?: string
   readonly kind: "fullTonNetwork"
   readonly accounts: readonly string[]
   readonly apiV2Port: number
@@ -82,6 +84,7 @@ export interface CreateActonSimulatedLocalnetEnvironmentConfig {
 }
 
 export interface CreateFullTonNetworkEnvironmentConfig {
+  readonly genesisToml?: string
   readonly kind: "fullTonNetwork"
   readonly accounts: readonly string[]
   readonly apiV2Port?: number
@@ -423,6 +426,35 @@ export function fetchStudioEnvironments(signal?: AbortSignal): Promise<StudioEnv
   return requestJson<StudioEnvironment[]>("/api/v1/environments", {
     headers: {accept: "application/json"},
     signal,
+  })
+}
+
+/** Validates a genesis document and returns all defaults without creating a network */
+export interface GenesisSection {
+  readonly path: string
+  readonly fields: readonly {
+    readonly key: string
+    readonly value: string
+    readonly boolean: boolean
+  }[]
+}
+
+export interface GenesisForm {
+  readonly toml: string
+  readonly sections: readonly GenesisSection[]
+  readonly issues: readonly GenesisIssue[]
+}
+
+export interface GenesisIssue {
+  readonly fields: readonly string[]
+  readonly message: string
+}
+
+export function parseGenesisToml(toml: string): Promise<GenesisForm> {
+  return requestJson("/api/v1/genesis", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({toml}),
   })
 }
 
@@ -784,6 +816,7 @@ export class StudioRequestError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly fields: readonly string[] = [],
   ) {
     super(message)
   }
@@ -794,7 +827,7 @@ async function request(input: string, init?: RequestInit): Promise<Response> {
   if (response.ok) return response
 
   const fallbackMessage = `Studio server returned ${response.status}`
-  let body: {readonly error?: {readonly message?: unknown}} | null
+  let body: {readonly error?: {readonly message?: unknown}; readonly fields?: unknown} | null
   try {
     body = (await response.json()) as typeof body
   } catch {
@@ -805,6 +838,9 @@ async function request(input: string, init?: RequestInit): Promise<Response> {
   throw new StudioRequestError(
     typeof message === "string" && message ? message : fallbackMessage,
     response.status,
+    Array.isArray(body?.fields)
+      ? body.fields.filter((field): field is string => typeof field === "string")
+      : [],
   )
 }
 

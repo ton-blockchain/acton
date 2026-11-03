@@ -15,6 +15,7 @@ workspace = true
 
 [dependencies]
 acton-config = { workspace = true }
+localton-genesis = { workspace = true, features = ["schema"] }
 clap = { workspace = true }
 anyhow = { workspace = true }
 schemars = { workspace = true }

@@ -101,7 +101,24 @@ async fn bootstrap_basechain(options: BootstrapOptions) -> Result<BootstrapResul
         .build()
         .context("failed to create TON HTTP API client")?;
 
-    let (masterchain_seqno, basechain_seqno, funded) = if let Some((masterchain, basechain)) =
+    let settings_path = options.state_dir.join("settings.json");
+    let masterchain_only = settings_path.is_file()
+        && !crate::storage::Settings::load(&settings_path)?
+            .network
+            .workchain_enabled;
+    let (masterchain_seqno, basechain_seqno, funded) = if masterchain_only {
+        // A network without workchain 0 has no account to fund or shard to await.
+        // The scanner can start directly from an observed masterchain block.
+        let masterchain: MasterchainInfo = get_result(
+            &client,
+            Url::parse(&format!(
+                "{}/getMasterchainInfo",
+                options.endpoint.trim_end_matches('/')
+            ))?,
+        )
+        .await?;
+        (masterchain.last.seqno, 0, false)
+    } else if let Some((masterchain, basechain)) =
         read_indexable_masterchain_seqno(&client, &options.endpoint, options.timeout).await?
     {
         (masterchain, basechain, false)

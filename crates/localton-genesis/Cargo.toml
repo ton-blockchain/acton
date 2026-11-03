@@ -1,0 +1,26 @@
+[package]
+name = "localton-genesis"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+schema = ["dep:schemars"]
+
+[dependencies]
+anyhow.workspace = true
+schemars = { workspace = true, optional = true }
+serde.workspace = true
+serde_path_to_error.workspace = true
+toml.workspace = true
+utoipa.workspace = true
+
+[dev-dependencies]
+expect-test.workspace = true
+jsonschema.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

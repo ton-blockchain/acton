@@ -211,30 +211,36 @@ fn prepare_settings(layout: &Layout, args: &BootstrapArgs) -> Result<Settings> {
         "bootstrap settings must contain an enabled genesis validator"
     );
 
-    if let Some(block_time_ms) = args.block_time {
-        if layout.manifest.is_file() {
-            ensure!(
-                settings.network.simplex_target_rate_ms == block_time_ms,
-                "network block time is {}ms; --block-time cannot change after network creation",
-                settings.network.simplex_target_rate_ms
-            );
-        } else {
-            settings.network.simplex_target_rate_ms = block_time_ms;
-        }
+    let requested = if let Some(path) = &args.genesis {
+        localton_genesis::GenesisConfig::parse_toml(
+            &std::fs::read_to_string(path)
+                .with_context(|| format!("cannot read genesis {}", path.display()))?,
+        )?
+    } else if let Some(json) = &args.genesis_json {
+        serde_json::from_str(json).context("invalid LOCALTON_GENESIS_JSON")?
+    } else {
+        settings.network.clone()
     }
+    .with_timing(args.block_time, args.election_time)?;
 
-    if let Some(election_time_seconds) = args.election_time {
-        if layout.manifest.is_file() {
-            ensure!(
-                settings.network.elected_for_seconds == election_time_seconds,
-                "network election time is {}s; --election-time cannot change after network creation",
-                settings.network.elected_for_seconds
-            );
-        } else {
-            settings
-                .network
-                .set_election_time_seconds(election_time_seconds)?;
-        }
+    if layout.manifest.is_file() {
+        ensure!(
+            settings.network == requested,
+            "genesis cannot change after network creation; create a new state directory"
+        );
+    } else {
+        ensure!(
+            requested.workchain_enabled || args.add_account.is_empty(),
+            "Enable the workchain to import genesis accounts"
+        );
+        settings.network = requested;
+        settings.node.validator_stake_nano = settings.network.validator_stake * 1_000_000_000;
+        settings.node.initial_wallet_amount_nano =
+            settings.network.validator_wallet_balance * 1_000_000_000;
+        settings.validation.max_factor = settings
+            .validation
+            .max_factor
+            .min(f64::from(settings.network.max_stake_factor));
     }
 
     if let Some(advertise_ip) = args.advertise_ip {
@@ -332,3 +338,7 @@ fn mark_instance_stopped(layout: &Layout) -> Result<()> {
     })?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "../../tests/bootstrap/genesis_settings.rs"]
+mod genesis_settings;

@@ -114,6 +114,10 @@ pub enum LocalnetCommand {
 /// genesis options is rejected so `start` cannot silently ignore user settings.
 #[derive(Args)]
 pub struct CreateOptions {
+    /// Genesis parameters from a TOML file, used only when creating a network.
+    /// Explicit timing flags override the corresponding file values.
+    #[arg(long, value_name = "GENESIS_TOML", env = "ACTON_LOCALNET_GENESIS")]
+    pub genesis: Option<PathBuf>,
     pub name: Option<String>,
 
     #[arg(

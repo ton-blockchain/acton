@@ -151,6 +151,14 @@ Actual block timing depends on consensus and available resources. This option
 sets the target in the initial network configuration.
 {{/option}}
 
+{{#option "`--genesis` _genesis.toml_" }}
+Available since trunk.
+
+Read genesis parameters from a TOML file when creating a network.
+`ACTON_LOCALNET_GENESIS` can supply the file path instead. Explicit timing
+flags override the corresponding file values. See **Genesis Configuration**.
+{{/option}}
+
 {{#option "`--election-time-seconds` _seconds_" }}
 Validator round duration, in seconds. The minimum is 4 seconds. The bundled
 Localton image defaults to 120 seconds.
@@ -183,7 +191,7 @@ the first start.
 
 `acton localnet create` [_name_] [_options_]
 
-Accepts the creation options documented under `start`: `--port-base`,
+Accepts the creation options documented under `start`: `--genesis`, `--port-base`,
 `--block-time-ms`, `--election-time-seconds`, `--accounts`, and `--accounts-file`.
 The default name is `localnet`. Wallets and import files are read when the
 definition is created.
@@ -359,6 +367,75 @@ Startup, node changes, and snapshot commands already wait for their operations.
 ```bash
 acton localnet operation <OPERATION_ID> --network dev --wait
 ```
+
+## Genesis Configuration
+
+Available since trunk.
+
+Create `genesis.toml` with the values that your test network needs:
+
+```toml
+global_id = -42
+simplex_target_rate_ms = 500
+
+[storage]
+cell_price = 1000
+
+[block_limits.bytes]
+underload = 262144
+soft = 1048576
+hard = 4194304
+```
+
+Pass the file when creating a network:
+
+```bash
+acton localnet create dev --genesis genesis.toml
+acton localnet start dev --detach
+```
+
+Missing values use local development defaults. Unknown keys, invalid integer
+widths, and inconsistent limits are rejected before Docker starts. Partial
+masterchain sections retain masterchain defaults.
+
+Acton saves all resolved values in the network record and a `genesis.toml`
+inside its state directory. Editing the source file does not change a saved
+network. Resume it without creation options. Unset `ACTON_LOCALNET_GENESIS`
+before resuming if you used that variable to select the file.
+
+In Studio, select **Localnet** when creating an environment. Open
+**Genesis configuration** to import a file, edit individual fields, export
+the complete file, or reset to defaults.
+
+The configuration includes:
+
+| Fields or tables | Purpose |
+| --- | --- |
+| `global_id`, `global_version`, `global_capabilities` | Network identity and protocol features |
+| `workchain_enabled`, `[workchain]` | Enable workchain 0 and set shard split bounds |
+| `initial_balance`, `validator_wallet_balance`, `faucet_balance`, `elector_balance`, `config_balance` | Built-in account balances in GRAM |
+| `validator_stake`, validator counts and stake limits | Election participation and genesis validator funding |
+| Election timing fields | Validator rounds, election windows, and stake freezing |
+| `simplex_*`, `[catchain]` | Block interval, leader windows, timeouts, and validator rotation |
+| `gas_price`, `gas_price_masterchain`, `[gas]`, `[gas_masterchain]` | Execution prices, limits, and account debt thresholds |
+| `[storage]` | Storage prices per bit and cell |
+| `cell_price`, `cell_price_masterchain`, `[forwarding]`, `[forwarding_masterchain]` | Message forwarding charges |
+| `[block_limits]`, `[masterchain_block_limits]` | Block byte, gas, and logical-time thresholds |
+| `[voting]`, `[critical_voting]` | Configuration proposal rules and storage charges |
+
+Balances and stakes use whole GRAM. Flat fees and account debt thresholds use
+nanograms. Gas prices, forwarding bit/cell prices, and storage prices use
+nanograms scaled by 65,536. Storage prices apply per second. Forwarding
+fractions and `ihr_factor` also use that scale. `max_stake_factor` is an
+unscaled integer. 1 GRAM = 1,000,000,000 nanograms.
+
+Genesis starts with one validator and an unsplit workchain state. Increasing
+`min_validators` requires more validators before elections can succeed.
+`validator_wallet_balance` must cover `validator_stake` and a fee reserve.
+Startup wallets and account imports require `workchain_enabled = true`.
+
+Native Localton accepts the same file with `localton bootstrap --genesis
+genesis.toml`. Its `LOCALTON_GENESIS` variable supplies the file path.
 
 ## Startup Accounts
 

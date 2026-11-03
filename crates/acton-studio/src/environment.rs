@@ -96,6 +96,9 @@ pub enum CreateEnvironmentConfig {
         mine_empty_blocks: bool,
     },
     FullTonNetwork {
+        /// Genesis TOML supplied at creation; responses contain resolved defaults.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        genesis_toml: Option<String>,
         api_v2_port: Option<u16>,
         api_v3_port: Option<u16>,
         admin_port: Option<u16>,
@@ -264,6 +267,11 @@ pub enum EnvironmentConfig {
         mine_empty_blocks: bool,
     },
     FullTonNetwork {
+        /// Genesis TOML supplied at creation; responses contain resolved defaults.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        genesis_toml: Option<String>,
+        /// Global network identifier fixed by the resolved genesis.
+        global_id: i32,
         api_v2_port: u16,
         api_v3_port: u16,
         admin_port: u16,
@@ -521,10 +529,10 @@ impl EnvironmentConfig {
                 test_only: true,
                 supports_actions: false,
             },
-            Self::FullTonNetwork { .. } => EnvironmentNetwork {
+            Self::FullTonNetwork { global_id, .. } => EnvironmentNetwork {
                 id: "full-ton-network".to_owned(),
                 label: "Localnet".to_owned(),
-                chain_id: -3,
+                chain_id: *global_id,
                 test_only: true,
                 supports_actions: true,
             },

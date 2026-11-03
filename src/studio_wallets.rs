@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use acton_config::config::ActonConfig;
@@ -44,8 +45,23 @@ impl ProjectWalletRuntime {
         })
     }
 
-    const fn wallets_for(&self, environment: &StudioEnvironment) -> &BTreeMap<String, Wallet> {
-        match &environment.config {
+    fn wallets_for(
+        &self,
+        environment: &StudioEnvironment,
+    ) -> Result<Cow<'_, BTreeMap<String, Wallet>>, WalletRuntimeError> {
+        if let EnvironmentConfig::FullTonNetwork { global_id, .. } = &environment.config {
+            if *global_id == acton_config::config::TESTNET_GLOBAL_ID {
+                return Ok(Cow::Borrowed(&self.localnet_wallets));
+            }
+            let mut wallets = self.localnet_wallets.clone();
+            crate::wallets::apply_wallet_global_id(&self.config, &mut wallets, *global_id)
+                .map_err(|error| WalletRuntimeError::Internal {
+                    code: "wallet_genesis_invalid",
+                    message: error.to_string(),
+                })?;
+            return Ok(Cow::Owned(wallets));
+        }
+        Ok(Cow::Borrowed(match &environment.config {
             EnvironmentConfig::ActonSimulatedLocalnet { .. }
             | EnvironmentConfig::FullTonNetwork { .. }
             | EnvironmentConfig::RemoteTonNetwork {
@@ -54,7 +70,7 @@ impl ProjectWalletRuntime {
             EnvironmentConfig::RemoteTonNetwork {
                 network: PublicTonNetwork::Mainnet,
             } => &self.mainnet_wallets,
-        }
+        }))
     }
 }
 
@@ -62,42 +78,44 @@ impl WalletRuntime for ProjectWalletRuntime {
     fn prepare_localnet_accounts(
         &self,
         names: Vec<String>,
+        global_id: i32,
     ) -> WalletRuntimeFuture<'_, Vec<acton_localnet::StartupWallet>> {
         Box::pin(async move {
-            crate::wallets::prepare_localnet_wallets(&self.config, &names).map_err(|error| {
-                WalletRuntimeError::InvalidRequest {
+            crate::wallets::prepare_localnet_wallets(&self.config, &names, global_id).map_err(
+                |error| WalletRuntimeError::InvalidRequest {
                     code: "startup_wallet_invalid",
                     message: error.to_string(),
-                }
-            })
+                },
+            )
         })
     }
 
     fn list(&self, environment: &StudioEnvironment) -> WalletRuntimeFuture<'_, Vec<StudioWallet>> {
-        let wallets = self
-            .wallets_for(environment)
-            .values()
-            .map(|wallet| StudioWallet {
-                name: wallet.name.clone(),
-                address: DisplayBase64StdAddr {
-                    addr: &wallet.wallet.address,
-                    flags: Base64StdAddrFlags {
-                        testnet: true,
-                        bounceable: false,
-                        base64_url: true,
-                    },
-                }
-                .to_string(),
-                public_key: format!("0x{}", hex::encode(wallet.wallet.key_pair.public_key)),
-                version: crate::commands::simulator::wallet_version_to_string(
-                    wallet.wallet.version,
-                )
-                .to_owned(),
-                wallet_id: wallet.wallet.wallet_id,
-                workchain: i32::from(wallet.wallet.address.workchain),
-            })
-            .collect();
-        Box::pin(async move { Ok(wallets) })
+        let result = self.wallets_for(environment).map(|wallets| {
+            wallets
+                .values()
+                .map(|wallet| StudioWallet {
+                    name: wallet.name.clone(),
+                    address: DisplayBase64StdAddr {
+                        addr: &wallet.wallet.address,
+                        flags: Base64StdAddrFlags {
+                            testnet: true,
+                            bounceable: false,
+                            base64_url: true,
+                        },
+                    }
+                    .to_string(),
+                    public_key: format!("0x{}", hex::encode(wallet.wallet.key_pair.public_key)),
+                    version: crate::commands::simulator::wallet_version_to_string(
+                        wallet.wallet.version,
+                    )
+                    .to_owned(),
+                    wallet_id: wallet.wallet.wallet_id,
+                    workchain: i32::from(wallet.wallet.address.workchain),
+                })
+                .collect()
+        });
+        Box::pin(async move { result })
     }
 
     fn sign(
@@ -106,8 +124,8 @@ impl WalletRuntime for ProjectWalletRuntime {
         wallet_name: &str,
         bytes: Vec<u8>,
     ) -> WalletRuntimeFuture<'_, [u8; 64]> {
-        let result =
-            self.wallets_for(environment)
+        let result = self.wallets_for(environment).and_then(|wallets| {
+            wallets
                 .get(wallet_name)
                 .ok_or_else(|| WalletRuntimeError::NotFound {
                     wallet_name: wallet_name.to_owned(),
@@ -132,69 +150,12 @@ impl WalletRuntime for ProjectWalletRuntime {
                         });
                     }
                     Ok(signing_key.sign(&bytes).to_bytes())
-                });
+                })
+        });
         Box::pin(async move { result })
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use acton_studio::{EnvironmentEndpoints, EnvironmentStatus};
-
-    #[test]
-    fn environments_use_wallets_with_their_global_id() {
-        let runtime = ProjectWalletRuntime {
-            config: ActonConfig::default(),
-            localnet_wallets: BTreeMap::new(),
-            mainnet_wallets: BTreeMap::new(),
-        };
-        let full_ton = full_ton_environment();
-        let testnet = remote_environment(PublicTonNetwork::Testnet);
-        let mainnet = remote_environment(PublicTonNetwork::Mainnet);
-
-        assert!(std::ptr::eq(
-            runtime.wallets_for(&full_ton),
-            &runtime.localnet_wallets
-        ));
-        assert!(std::ptr::eq(
-            runtime.wallets_for(&testnet),
-            &runtime.localnet_wallets
-        ));
-        assert!(std::ptr::eq(
-            runtime.wallets_for(&mainnet),
-            &runtime.mainnet_wallets
-        ));
-    }
-
-    fn full_ton_environment() -> StudioEnvironment {
-        StudioEnvironment::new(
-            "full-ton",
-            "Full TON",
-            EnvironmentStatus::Running,
-            EnvironmentConfig::FullTonNetwork {
-                api_v2_port: 18_080,
-                api_v3_port: 18_081,
-                admin_port: 18_082,
-                config_port: 18_083,
-                observability_port: 18_084,
-                block_time_ms: None,
-                election_time_seconds: None,
-                imported_accounts: Vec::new(),
-                accounts: Vec::new(),
-                nodes: Vec::new(),
-            },
-            EnvironmentEndpoints::default(),
-        )
-    }
-
-    fn remote_environment(network: PublicTonNetwork) -> StudioEnvironment {
-        StudioEnvironment::new_external(
-            "network",
-            "Network",
-            EnvironmentStatus::Running,
-            EnvironmentConfig::RemoteTonNetwork { network },
-            EnvironmentEndpoints::default(),
-        )
-    }
-}
+#[path = "../tests/studio/wallets.rs"]
+mod tests;

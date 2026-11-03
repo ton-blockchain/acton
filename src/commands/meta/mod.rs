@@ -9,6 +9,8 @@ use std::io::{self, Write};
 pub enum BuiltinSchema {
     #[value(name = "acton-toml", alias = "acton")]
     ActonToml,
+    /// Editor completion and validation for a partial localnet genesis file.
+    GenesisToml,
     #[value(alias = "lint-json")]
     LintReport,
     #[value(alias = "custom-mutation-rules")]
@@ -19,6 +21,7 @@ impl BuiltinSchema {
     const fn content(self) -> &'static str {
         match self {
             Self::ActonToml => ACTON_SCHEMA_JSON,
+            Self::GenesisToml => acton_localnet::GENESIS_SCHEMA_JSON,
             Self::LintReport => LINT_REPORT_SCHEMA_JSON,
             Self::MutationRules => MUTATION_RULES_SCHEMA_JSON,
         }

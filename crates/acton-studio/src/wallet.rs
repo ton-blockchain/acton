@@ -45,9 +45,11 @@ pub type WalletRuntimeFuture<'a, T> =
 pub trait WalletRuntime: Send + Sync {
     /// Resolves named project wallets into public genesis state before a full
     /// localnet exists. Implementations retain all private key material locally.
+    /// The genesis network identifier determines default V5 wallet IDs.
     fn prepare_localnet_accounts(
         &self,
         names: Vec<String>,
+        global_id: i32,
     ) -> WalletRuntimeFuture<'_, Vec<acton_localnet::StartupWallet>>;
 
     fn list(&self, environment: &StudioEnvironment) -> WalletRuntimeFuture<'_, Vec<StudioWallet>>;
@@ -66,6 +68,7 @@ impl WalletRuntime for EmptyWalletRuntime {
     fn prepare_localnet_accounts(
         &self,
         names: Vec<String>,
+        _global_id: i32,
     ) -> WalletRuntimeFuture<'_, Vec<acton_localnet::StartupWallet>> {
         Box::pin(async move {
             match names.into_iter().next() {

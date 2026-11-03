@@ -247,6 +247,8 @@ fn full_ton_environment(base_url: &str) -> StudioEnvironment {
         "Full TON network",
         EnvironmentStatus::Running,
         EnvironmentConfig::FullTonNetwork {
+            global_id: -3,
+            genesis_toml: None,
             api_v2_port: 18080,
             api_v3_port: 18081,
             admin_port: 18082,

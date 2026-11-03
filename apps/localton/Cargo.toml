@@ -36,6 +36,7 @@ tracing = "0.1"
 
 [dependencies]
 toncenter = { path = "../../crates/toncenter" }
+localton-genesis = { path = "../../crates/localton-genesis" }
 ton-hardfork = { path = "../../crates/ton-hardfork" }
 anyhow = "1.0"
 async-trait.workspace = true

@@ -38,6 +38,7 @@ acton-debug = { path = "crates/acton-debug", default-features = false }
 acton-source-trace = { path = "crates/acton-source-trace" }
 acton-studio = { path = "crates/acton-studio" }
 acton-localnet = { path = "crates/acton-localnet" }
+localton-genesis = { path = "crates/localton-genesis" }
 acton-mdman = { path = "crates/acton-mdman" }
 ton-objs = { path = "crates/ton-objs" }
 tolk-compiler = { path = "crates/tolk-compiler" }
@@ -96,7 +97,7 @@ crc = "3.3.0"
 owo-colors = "4.2.3" # overall coloring
 comfy-table = "7.1" # coverage table
 tree-sitter = "0.26.12" # tolk parser
-clap = { version = "4.5", features = ["derive"] } # CLI
+clap = { version = "4.5", features = ["derive", "env"] } # CLI
 anyhow = "1.0.100"
 
 # test filtering
@@ -107,6 +108,7 @@ globset = "0.4"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_html_form = "0.4.1"
 serde_json = "1.0.145"
+serde_path_to_error = "0.1.20"
 indexmap = { version = "2.12.0", features = ["serde"] }
 serde-sarif = "0.8.0"
 schemars = { version = "0.8.22", features = ["derive"] }

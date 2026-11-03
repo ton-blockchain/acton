@@ -1,0 +1,131 @@
+global_id = -3
+global_version = 15
+global_capabilities = 1006
+workchain_enabled = true
+initial_balance = 4999990000
+validator_wallet_balance = 50005
+validator_stake = 10001
+faucet_balance = 1000001
+elector_balance = 10
+config_balance = 10
+gas_price = 26214400
+gas_price_masterchain = 655360000
+cell_price = 2621440000
+cell_price_masterchain = 65536000000
+max_validators = 1000
+max_masterchain_validators = 100
+min_validators = 1
+min_validator_stake = 10000
+max_validator_stake = 10000000
+min_total_validator_stake = 10000
+max_stake_factor = 3
+elected_for_seconds = 120
+election_start_before_seconds = 90
+election_end_before_seconds = 30
+stakes_frozen_for_seconds = 30
+original_validator_set_valid_for_seconds = 90
+simplex_target_rate_ms = 1000
+simplex_slots_per_leader_window = 4
+simplex_first_block_timeout_ms = 700
+simplex_max_leader_window_desync = 250
+
+[workchain]
+min_split = 0
+max_split = 4
+
+[storage]
+bit_price = 1
+cell_price = 500
+masterchain_bit_price = 1000
+masterchain_cell_price = 500000
+
+[gas]
+gas_limit = 1000000
+special_gas_limit = 1000000
+gas_credit = 10000
+block_gas_limit = 10000000
+freeze_due_limit = 100000000
+delete_due_limit = 1000000000
+flat_gas_limit = 100
+flat_gas_price = 40000
+
+[gas_masterchain]
+gas_limit = 1000000
+special_gas_limit = 70000000
+gas_credit = 10000
+block_gas_limit = 2500000
+freeze_due_limit = 100000000
+delete_due_limit = 1000000000
+flat_gas_limit = 100
+flat_gas_price = 1000000
+
+[forwarding]
+lump_price = 400000
+bit_price = 26214400
+ihr_factor = 98304
+first_frac = 21845
+next_frac = 21845
+
+[forwarding_masterchain]
+lump_price = 10000000
+bit_price = 655360000
+ihr_factor = 98304
+first_frac = 21845
+next_frac = 21845
+
+[block_limits.bytes]
+underload = 262144
+soft = 1048576
+hard = 2097152
+
+[block_limits.gas]
+underload = 2000000
+soft = 10000000
+hard = 20000000
+
+[block_limits.logical_time]
+underload = 1000
+soft = 5000
+hard = 10000
+
+[masterchain_block_limits.bytes]
+underload = 262144
+soft = 1048576
+hard = 2097152
+
+[masterchain_block_limits.gas]
+underload = 2000000
+soft = 10000000
+hard = 20000000
+
+[masterchain_block_limits.logical_time]
+underload = 1000
+soft = 5000
+hard = 10000
+
+[catchain]
+masterchain_lifetime_seconds = 250
+shard_lifetime_seconds = 250
+shard_validators_lifetime_seconds = 5500
+shard_validators = 7
+shuffle_masterchain_validators = true
+
+[voting]
+min_rounds = 2
+max_rounds = 3
+min_wins = 2
+max_losses = 2
+min_store_seconds = 1000000
+max_store_seconds = 10000000
+bit_price = 1
+cell_price = 500
+
+[critical_voting]
+min_rounds = 4
+max_rounds = 7
+min_wins = 4
+max_losses = 2
+min_store_seconds = 5000000
+max_store_seconds = 20000000
+bit_price = 2
+cell_price = 1000

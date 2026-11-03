@@ -40,6 +40,31 @@ A full node can take about 20 seconds to start with images already available. Im
 
 [Create a localnet](/docs/environments/how-to/create-network) and [connect clients](/docs/environments/how-to/connect) through Studio or the standalone CLI.
 
+## Configure genesis
+
+<AvailabilityBadge since="trunk" />
+
+Create a network from a separate `genesis.toml` file:
+
+```toml
+global_id = -42
+simplex_target_rate_ms = 500
+
+[storage]
+cell_price = 1000
+```
+
+```bash
+acton localnet create dev --genesis genesis.toml
+acton localnet start dev --detach
+```
+
+Missing fields use local development defaults. Acton validates the file and saves the resolved configuration with the network. The source file is only read during creation.
+
+In Studio, select **Localnet** in **Create environment** and open **Genesis configuration**. Import or export `genesis.toml`, edit the fields, or reset to defaults. The configuration covers balances, validators, elections, consensus, fees, sharding, block limits, and configuration voting.
+
+Follow the [custom genesis guide](/docs/environments/how-to/create-network#use-a-custom-genesis) for CLI and Studio instructions. See the [genesis reference](/docs/commands/localnet#genesis-configuration) for field groups, units, and constraints.
+
 ## Localnet controls
 
 - [Manage nodes and validators](/docs/environments/localnet/nodes) to test synchronization and election participation.

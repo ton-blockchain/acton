@@ -52,6 +52,7 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
         crate::info,
         crate::list_environments,
         crate::create_environment,
+        crate::genesis::parse,
         crate::add_full_ton_node,
         crate::enter_full_ton_validation,
         crate::leave_full_ton_validation,

@@ -33,6 +33,7 @@
 
 .formGrid {
   display: grid;
+  align-items: start;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--acton-space-4);
 }
@@ -51,6 +52,47 @@
 .fullTonFields {
   display: grid;
   gap: var(--acton-space-5);
+}
+
+.genesisActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--acton-space-2);
+}
+
+.genesisSections {
+  display: grid;
+  gap: var(--acton-space-1);
+}
+
+.genesisSection > summary {
+  min-height: 32px;
+  padding-block: var(--acton-space-1);
+}
+
+.genesisSection[data-invalid="true"] > summary,
+.genesisSection[data-invalid="true"][open] > summary,
+.compactDisclosure[data-invalid="true"] > summary,
+.compactDisclosure[data-invalid="true"][open] > summary {
+  color: var(--acton-color-danger);
+}
+
+.genesisCheckbox {
+  grid-column: 1 / -1;
+  padding-top: var(--acton-space-1);
+}
+
+.genesisDescription {
+  margin: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+.genesisError {
+  margin: 0;
+  color: var(--acton-color-danger);
+  font-size: var(--acton-font-size-sm);
+  white-space: pre-wrap;
 }
 
 .compactDisclosure {

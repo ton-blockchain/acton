@@ -27,7 +27,8 @@ pub(super) async fn start(
             return Ok(());
         };
         anyhow::ensure!(
-            options.port_base.is_none()
+            options.genesis.is_none()
+                && options.port_base.is_none()
                 && options.block_time_ms.is_none()
                 && options.election_time_seconds.is_none()
                 && options.accounts_file.is_none()
@@ -120,6 +121,15 @@ pub(super) async fn create_request(options: &CreateOptions) -> anyhow::Result<Cr
     } else {
         acton_config::config::ActonConfig::default()
     };
+    let genesis = match &options.genesis {
+        Some(path) => Some(acton_localnet::GenesisConfig::parse_toml(
+            &tokio::fs::read_to_string(path).await.map_err(|error| {
+                anyhow::anyhow!("Cannot read genesis {}: {error}", path.display())
+            })?,
+        )?),
+        None => None,
+    };
+
     let accounts = options
         .accounts
         .as_deref()
@@ -130,13 +140,18 @@ pub(super) async fn create_request(options: &CreateOptions) -> anyhow::Result<Cr
                 .and_then(|localnet| localnet.accounts.as_deref())
         })
         .unwrap_or_default();
-    let startup_wallets = crate::wallets::prepare_localnet_wallets(&config, accounts)?;
+    let startup_wallets = crate::wallets::prepare_localnet_wallets(
+        &config,
+        accounts,
+        genesis.as_ref().map_or(-3, |genesis| genesis.global_id),
+    )?;
     let imported_account_bocs = match &options.accounts_file {
         Some(path) => serde_json::from_slice(&tokio::fs::read(path).await?)?,
         None => Vec::new(),
     };
 
     Ok(CreateNetwork {
+        genesis,
         ports: Default::default(),
         reserved_ports: Vec::new(),
         name: options

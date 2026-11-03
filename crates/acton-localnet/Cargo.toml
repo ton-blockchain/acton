@@ -15,6 +15,7 @@ dunce.workspace = true
 ed25519-dalek.workspace = true
 fs2.workspace = true
 log.workspace = true
+localton-genesis.workspace = true
 rand.workspace = true
 reqwest.workspace = true
 serde.workspace = true

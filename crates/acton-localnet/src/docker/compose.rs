@@ -15,6 +15,18 @@ pub(super) fn render_compose(image: &str, config: &NetworkConfig, nodes: &[Node]
     let ports = config.ports();
 
     COMPOSE_TEMPLATE
+        .replace(
+            "__LOCALTON_GENESIS__",
+            &config.genesis.as_ref().map_or_else(String::new, |genesis| {
+                let json = serde_json::to_string(genesis)
+                    .expect("genesis contains serializable scalar values");
+                // JSON strings are valid YAML scalars, including their escaping.
+                format!(
+                    "LOCALTON_GENESIS_JSON: {}",
+                    serde_json::to_string(&json).expect("JSON string")
+                )
+            }),
+        )
         .replace("__LOCALTON_IMAGE__", image)
         .replace("__LOCALTON_V2_PORT__", &ports.api_v2.to_string())
         .replace("__LOCALTON_V3_PORT__", &ports.api_v3.to_string())
@@ -112,6 +124,7 @@ mod tests {
     #[test]
     fn genesis_contains_imports_and_startup_wallets_after_reload() {
         let config = NetworkConfig {
+            genesis: None,
             port_base: 19000,
             ports: None,
             block_time_ms: None,
@@ -143,6 +156,7 @@ mod tests {
     #[test]
     fn publishes_liteserver_with_matching_host_config_port() {
         let mut config = NetworkConfig {
+            genesis: None,
             port_base: 19000,
             ports: None,
             block_time_ms: None,

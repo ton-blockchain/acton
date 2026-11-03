@@ -178,6 +178,7 @@ dependencies = [
  "ed25519-dalek",
  "expect-test",
  "fs2",
+ "localton-genesis",
  "log",
  "rand 0.8.6",
  "reqwest",
@@ -2785,6 +2786,21 @@ name = "litrs"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
+
+[[package]]
+name = "localton-genesis"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "expect-test",
+ "jsonschema",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "toml",
+ "utoipa",
+]
 
 [[package]]
 name = "lock_api"
@@ -6941,6 +6957,7 @@ dependencies = [
  "expect-test",
  "flate2",
  "indicatif",
+ "localton-genesis",
  "owo-colors",
  "parse-changelog",
  "reqwest",

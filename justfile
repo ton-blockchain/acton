@@ -134,6 +134,7 @@ check-docs:
 
 check-schema:
     cargo run -p xtask -- schema --schema acton-toml --check
+    cargo run -p xtask -- schema --schema genesis-toml --check
     cargo run -p xtask -- schema --schema lint-report --check
     cargo run -p xtask -- schema --schema mutation-rules --check
     cargo run -p xtask -- schema --schema language-server-settings --check
@@ -241,6 +242,7 @@ clean:
 
 generate-schema:
     cargo run -p xtask -- schema --schema acton-toml
+    cargo run -p xtask -- schema --schema genesis-toml
     cargo run -p xtask -- schema --schema lint-report
     cargo run -p xtask -- schema --schema mutation-rules
     cargo run -p xtask -- schema --schema language-server-settings

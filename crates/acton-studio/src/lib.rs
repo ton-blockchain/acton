@@ -31,6 +31,7 @@ mod contract_source_artifact;
 mod environment;
 mod environment_catalog;
 mod environment_store;
+mod genesis;
 mod local_artifacts;
 mod local_process;
 mod local_test_process;
@@ -345,6 +346,7 @@ impl StudioServer {
             testnet_faucet_url: self.config.testnet_faucet_url.clone(),
         };
         let api = Router::new()
+            .route("/genesis", post(genesis::parse))
             .route("/openapi.json", get(openapi::handler))
             .route("/health", get(health))
             .route("/info", get(info))
@@ -789,6 +791,9 @@ async fn resolve_full_ton_account_imports(
     request: &mut CreateEnvironmentRequest,
 ) -> Result<(), StudioApiError> {
     let CreateEnvironmentConfig::FullTonNetwork {
+        genesis_toml,
+        block_time_ms,
+        election_time_seconds,
         imported_accounts,
         accounts,
         startup_wallets,
@@ -798,11 +803,17 @@ async fn resolve_full_ton_account_imports(
         return Ok(());
     };
 
+    let genesis = genesis::validate(
+        genesis_toml.as_deref().unwrap_or_default(),
+        *block_time_ms,
+        *election_time_seconds,
+    )?;
+
     // Resolve wallet names before remote imports or Docker work so an invalid
     // project wallet cannot leave a partially created environment behind.
     *startup_wallets = state
         .wallet_runtime
-        .prepare_localnet_accounts(accounts.clone())
+        .prepare_localnet_accounts(accounts.clone(), genesis.global_id)
         .await
         .map_err(|error| {
             StudioApiError(EnvironmentRuntimeError::InvalidRequest {

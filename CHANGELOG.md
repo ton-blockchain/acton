@@ -82,6 +82,13 @@ All notable changes to this project will be documented in this file.
 
 ### Localnet
 
+- Create networks with a validated `genesis.toml` file through `acton localnet`
+  or Studio, including fees, block limits, validators, elections, and consensus.
+  A generated JSON Schema provides editor completion and validation for partial files.
+  Explicit timing flags override file values before the final configuration is validated.
+  Custom network identifiers apply to startup wallets and Studio wallet operations.
+  Studio highlights invalid and related genesis fields with explanations before creation,
+  and keeps import errors visible until the settings are corrected or reset.
 - Localton uses TON `v2026.10` binaries, supports their generated engine
   configuration, and builds HTTP API v2 with matching TON sources.
 

@@ -491,3 +491,6 @@ async fn foreground_ctrl_c_reports_request_before_graceful_completion() {
 
     drop(service);
 }
+
+#[path = "localnet_command/genesis.rs"]
+mod genesis;

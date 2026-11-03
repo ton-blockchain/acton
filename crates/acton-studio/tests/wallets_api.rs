@@ -46,6 +46,8 @@ impl TestEnvironmentRuntime {
             "Full TON network",
             EnvironmentStatus::Running,
             EnvironmentConfig::FullTonNetwork {
+                global_id: -3,
+                genesis_toml: None,
                 api_v2_port: 18_080,
                 api_v3_port: 18_081,
                 admin_port: 18_082,
@@ -148,6 +150,7 @@ impl WalletRuntime for TestWalletRuntime {
     fn prepare_localnet_accounts(
         &self,
         names: Vec<String>,
+        _global_id: i32,
     ) -> WalletRuntimeFuture<'_, Vec<acton_localnet::StartupWallet>> {
         Box::pin(async move {
             match names.into_iter().next() {

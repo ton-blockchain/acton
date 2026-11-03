@@ -249,6 +249,19 @@ pub enum SnapshotCommand {
 
 #[derive(Debug, Clone, Args)]
 pub struct BootstrapArgs {
+    /// Genesis TOML file. Explicit timing flags override the file values.
+    #[arg(
+        long,
+        value_name = "GENESIS_TOML",
+        env = "LOCALTON_GENESIS",
+        conflicts_with = "genesis_json"
+    )]
+    pub genesis: Option<PathBuf>,
+
+    /// Complete genesis configuration supplied by the managed container runtime.
+    #[arg(long, env = "LOCALTON_GENESIS_JSON", hide = true)]
+    pub genesis_json: Option<String>,
+
     /// Persistent network state. It is created on the first run and reused.
     #[arg(long, default_value = ".localton")]
     pub state_dir: PathBuf,
@@ -351,6 +364,8 @@ pub struct BootstrapArgs {
 impl Default for BootstrapArgs {
     fn default() -> Self {
         Self {
+            genesis: None,
+            genesis_json: None,
             state_dir: PathBuf::from(".localton"),
             ton_bin_dir: None,
             startup_timeout: 180,

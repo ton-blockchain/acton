@@ -25,9 +25,6 @@ use crate::{
     },
 };
 
-const TON_GLOBAL_VERSION: u32 = 15;
-const TON_GLOBAL_CAPABILITIES: u64 = 0x3ee;
-
 /// Complete masterchain and basechain identities produced by genesis bootstrap.
 ///
 /// Both artifacts have already been validated and installed into validator-engine
@@ -211,8 +208,76 @@ fn write_genesis_script(
         .replace('\\', "\\\\");
     let mut script = include_str!("../../assets/gen-zerostate.fif").to_owned();
     let replacements = [
-        ("GLOBAL_VERSION", TON_GLOBAL_VERSION.to_string()),
-        ("GLOBAL_CAPABILITIES", TON_GLOBAL_CAPABILITIES.to_string()),
+        (
+            "VALIDATOR_WALLET_BALANCE",
+            network.validator_wallet_balance.to_string(),
+        ),
+        ("FAUCET_BALANCE", network.faucet_balance.to_string()),
+        ("ELECTOR_BALANCE", network.elector_balance.to_string()),
+        ("CONFIG_BALANCE", network.config_balance.to_string()),
+        (
+            "WORKCHAIN_MIN_SPLIT",
+            network.workchain.min_split.to_string(),
+        ),
+        (
+            "WORKCHAIN_MAX_SPLIT",
+            network.workchain.max_split.to_string(),
+        ),
+        (
+            "STORAGE_PRICES",
+            format!(
+                "{} {} {} {}",
+                network.storage.bit_price,
+                network.storage.cell_price,
+                network.storage.masterchain_bit_price,
+                network.storage.masterchain_cell_price
+            ),
+        ),
+        (
+            "MASTERCHAIN_GAS_LIMITS",
+            gas_limits(&network.gas_masterchain),
+        ),
+        ("GAS_LIMITS", gas_limits(&network.gas)),
+        (
+            "MASTERCHAIN_FORWARDING_PRICES",
+            forwarding_prices(
+                &network.forwarding_masterchain,
+                network.cell_price_masterchain,
+            ),
+        ),
+        (
+            "FORWARDING_PRICES",
+            forwarding_prices(&network.forwarding, network.cell_price),
+        ),
+        (
+            "MASTERCHAIN_BLOCK_LIMITS",
+            block_limits(&network.masterchain_block_limits),
+        ),
+        (
+            "WORKCHAIN_BLOCK_LIMITS",
+            block_limits(&network.block_limits),
+        ),
+        (
+            "CRITICAL_VOTING_PARAMS",
+            voting_params(&network.critical_voting),
+        ),
+        ("VOTING_PARAMS", voting_params(&network.voting)),
+        (
+            "CATCHAIN_PARAMS",
+            format!(
+                "{} {} {} {} {}",
+                network.catchain.masterchain_lifetime_seconds,
+                network.catchain.shard_lifetime_seconds,
+                network.catchain.shard_validators_lifetime_seconds,
+                network.catchain.shard_validators,
+                network.catchain.shuffle_masterchain_validators
+            ),
+        ),
+        ("GLOBAL_VERSION", network.global_version.to_string()),
+        (
+            "GLOBAL_CAPABILITIES",
+            network.global_capabilities.to_string(),
+        ),
         ("GLOBAL_ID", network.global_id.to_string()),
         ("INITIAL_BALANCE", network.initial_balance.to_string()),
         ("GAS_PRICE_MC", network.gas_price_masterchain.to_string()),
@@ -293,7 +358,10 @@ dup Blen 32 <> abort"invalid basestate0 root hash"
         // A masterchain-only test network deliberately omits workchain 0 from
         // config even though the upstream template enables it by default.
         script = script.replace(
-            "basestate0_rhash basestate0_fhash now 0 0 4 0 add-std-workchain",
+            &format!(
+                "basestate0_rhash basestate0_fhash now 0 {} {} 0 add-std-workchain",
+                network.workchain.min_split, network.workchain.max_split
+            ),
             "// basic workchain disabled by settings",
         );
     }
@@ -308,6 +376,52 @@ dup Blen 32 <> abort"invalid basestate0 root hash"
     );
     fs::write(layout.smartcont.join("gen-zerostate.fif"), script)?;
     Ok(())
+}
+
+fn gas_limits(value: &localton_genesis::GasLimits) -> String {
+    format!(
+        "{} {} {} {} {} {} {} {}",
+        value.gas_limit,
+        value.special_gas_limit,
+        value.gas_credit,
+        value.block_gas_limit,
+        value.freeze_due_limit,
+        value.delete_due_limit,
+        value.flat_gas_limit,
+        value.flat_gas_price
+    )
+}
+
+fn forwarding_prices(value: &localton_genesis::ForwardingPrices, cell_price: u64) -> String {
+    format!(
+        "{} {} {} {} {} {}",
+        value.lump_price,
+        value.bit_price,
+        cell_price,
+        value.ihr_factor,
+        value.first_frac,
+        value.next_frac
+    )
+}
+
+fn block_limits(value: &localton_genesis::BlockLimits) -> String {
+    [&value.bytes, &value.gas, &value.logical_time]
+        .map(|limit| format!("{} {} {} triple", limit.underload, limit.soft, limit.hard))
+        .join(" ")
+}
+
+fn voting_params(value: &localton_genesis::Voting) -> String {
+    format!(
+        "_( {} {} {} {} {} {} {} {} )",
+        value.min_rounds,
+        value.max_rounds,
+        value.min_wins,
+        value.max_losses,
+        value.min_store_seconds,
+        value.max_store_seconds,
+        value.bit_price,
+        value.cell_price
+    )
 }
 
 /// Renders a basechain zerostate containing the requested `ShardAccount` values.
@@ -596,8 +710,14 @@ mod tests {
     #[test]
     fn genesis_uses_current_ton_global_version_and_capabilities() {
         let rendered = include_str!("../../assets/gen-zerostate.fif")
-            .replace("GLOBAL_VERSION", &TON_GLOBAL_VERSION.to_string())
-            .replace("GLOBAL_CAPABILITIES", &TON_GLOBAL_CAPABILITIES.to_string());
+            .replace(
+                "GLOBAL_VERSION",
+                &NetworkSettings::default().global_version.to_string(),
+            )
+            .replace(
+                "GLOBAL_CAPABILITIES",
+                &NetworkSettings::default().global_capabilities.to_string(),
+            );
         assert!(rendered.contains("15 1006 config.version!"));
     }
 
@@ -611,3 +731,7 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/bootstrap/genesis_render.rs"]
+mod genesis_render;

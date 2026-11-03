@@ -45,7 +45,7 @@ fn full_localnet_startup_wallets_accept_signed_transfers() -> Result<()> {
 
     // Exercise the actual initial code/data with signature checks enabled. A
     // matching address alone would miss a wrong wallet ID or disabled signing.
-    for prepared in prepare_localnet_wallets(&config, &names)? {
+    for prepared in prepare_localnet_wallets(&config, &names, -3)? {
         let shard: ShardAccount = BocRepr::decode_hex(&prepared.shard_account_boc_hex)?;
         let account = shard.load_account()?.unwrap();
         let AccountState::Active(state) = &account.state else {
@@ -146,7 +146,7 @@ fn full_localnet_startup_wallets_accept_signed_transfers() -> Result<()> {
 async fn full_localnet_startup_wallets_persist_and_reject_collisions() -> Result<()> {
     let config = wallet_config()?;
     let names = vec!["wallet_v4".into(), "wallet_v5".into(), "wallet_v4".into()];
-    let prepared = prepare_localnet_wallets(&config, &names)?;
+    let prepared = prepare_localnet_wallets(&config, &names, -3)?;
     let root = tempfile::tempdir()?;
     catalog::create(
         root.path(),
@@ -187,12 +187,12 @@ async fn full_localnet_startup_wallets_persist_and_reject_collisions() -> Result
     let wallets = &mut aliases.wallets.as_mut().unwrap().wallets;
     wallets.insert("alias".into(), wallets["wallet_v4"].clone());
     errors.push(
-        prepare_localnet_wallets(&aliases, &["alias".into(), "wallet_v4".into()])
+        prepare_localnet_wallets(&aliases, &["alias".into(), "wallet_v4".into()], -3)
             .unwrap_err()
             .to_string(),
     );
     errors.push(
-        prepare_localnet_wallets(&config, &["missing".into()])
+        prepare_localnet_wallets(&config, &["missing".into()], -3)
             .unwrap_err()
             .to_string(),
     );
@@ -205,7 +205,7 @@ async fn full_localnet_startup_wallets_persist_and_reject_collisions() -> Result
         .unwrap()
         .workchain = Some(-1);
     errors.push(
-        prepare_localnet_wallets(&aliases, &["alias".into()])
+        prepare_localnet_wallets(&aliases, &["alias".into()], -3)
             .unwrap_err()
             .to_string(),
     );
