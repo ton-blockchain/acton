@@ -55,9 +55,14 @@ pub(super) fn print_tsa_summary(
         println!("{} TSA reported no findings", "✓".green().bold());
     } else {
         println!(
-            "{} TSA found {} finding(s)",
+            "{} TSA found {} {}",
             "✗".red().bold(),
-            results.len().to_string().bold()
+            results.len().to_string().bold(),
+            if results.len() == 1 {
+                "finding"
+            } else {
+                "findings"
+            }
         );
 
         for (index, result) in results.iter().enumerate() {
@@ -88,20 +93,59 @@ fn print_tsa_result(
     execution: Option<&TsaExportedExecution>,
     contract_contexts: &[TsaContractContext],
 ) {
-    let title = result
+    let message = result
         .message
         .as_ref()
         .and_then(|message| message.text.as_deref())
         .unwrap_or("<no TSA message>");
     let rule_id = result.rule_id.as_deref().unwrap_or("<unknown-rule>");
+    let exit_code = (rule_id == "user-defined-error")
+        .then(|| message.split_once("exit code "))
+        .flatten()
+        .map(|(_, suffix)| {
+            suffix
+                .chars()
+                .take_while(char::is_ascii_digit)
+                .collect::<String>()
+        })
+        .filter(|code| !code.is_empty());
 
     println!();
-    println!(
-        "{} {} {}",
-        format!("{index}.").bold(),
-        rule_id.red().bold(),
-        title
-    );
+    if let Some(failure) = result
+        .properties
+        .as_ref()
+        .and_then(|properties| properties.input_acceptance_failure.as_ref())
+    {
+        let observed = if failure.was_accepted {
+            "accepted"
+        } else {
+            "not accepted"
+        };
+        let expected = if failure.expected_accepted {
+            "acceptance"
+        } else {
+            "rejection"
+        };
+        let title = format!(
+            "Input {} was {observed}, but the checker expected {expected}",
+            failure.input_id
+        );
+        println!("{} {}", format!("{index}.").bold(), title.red().bold());
+    } else if let Some(exit_code) = exit_code {
+        println!(
+            "{} {} {}",
+            format!("{index}.").bold(),
+            "Checker failed".red().bold(),
+            format!("(exit code {exit_code})").dimmed()
+        );
+    } else {
+        println!(
+            "{} {} {}",
+            format!("{index}.").bold(),
+            rule_id.red().bold(),
+            message
+        );
+    }
 
     if let Some(execution) = execution {
         print_execution_summary(execution, result.properties.as_ref(), contract_contexts);
@@ -117,12 +161,13 @@ fn print_tsa_result(
         .map(|properties| &properties.fetched_value_names);
     match fetched_values {
         Some(values) if !values.is_empty() => {
-            println!("   {}", "saved values:".dimmed());
+            println!();
+            println!("   {}", "Checker values:".dimmed());
             for (key, value) in sort_fetched_values(values) {
                 let name = fetched_value_names
                     .and_then(|names| names.get(key))
                     .map_or(key, String::as_str);
-                println!("   - {} = {}", name.cyan(), format_json_value(value));
+                println!("     {} = {}", name.cyan(), format_json_value(value));
             }
         }
         _ => {}
@@ -134,10 +179,12 @@ fn print_execution_summary(
     properties: Option<&TsaSarifProperties>,
     contract_contexts: &[TsaContractContext],
 ) {
-    println!("   {}", format!("execution {}:", execution.index).dimmed());
+    println!();
+    let additional_inputs = properties.map(|properties| &properties.additional_inputs);
+    let input_ids = collect_execution_input_ids(execution, additional_inputs);
 
     if !execution.storages.is_empty() {
-        println!("   {}", "initial storage:".dimmed());
+        println!("   {}", "Initial storage:".dimmed());
         for (contract_id, cell) in &execution.storages {
             let contract_label = contract_contexts
                 .iter()
@@ -146,35 +193,45 @@ fn print_execution_summary(
                     || format!("contract {contract_id}"),
                     TsaContractContext::label,
                 );
-            println!("   - {}:", contract_label.cyan());
+            println!("     {}:", contract_label.cyan());
 
             if let Some(contract) = contract_contexts
                 .iter()
                 .find(|contract| contract.tsa_id == *contract_id)
                 && let Ok(decoded) = try_decode_storage_cell(&cell.cell, contract)
             {
-                print_rendered_value_block("      ", &decoded);
+                print_rendered_value_block("       ", &decoded);
             } else {
-                print_raw_cell_block("      ", cell);
+                print_raw_cell_block("       ", cell);
             }
         }
     }
 
-    let additional_inputs = properties.map(|properties| &properties.additional_inputs);
-    let input_ids = collect_execution_input_ids(execution, additional_inputs);
     if !input_ids.is_empty() {
-        println!("   {}", "inputs:".dimmed());
-        for input_id in input_ids {
+        if !execution.storages.is_empty() {
+            println!();
+        }
+        println!("   {}", "Inputs:".dimmed());
+        for (position, input_id) in input_ids.into_iter().enumerate() {
+            if position > 0 {
+                println!();
+            }
             let input_summary =
                 additional_inputs.and_then(|inputs| inputs.get(&input_id.to_string()));
             let input_kind = input_summary.and_then(|input| input.input_type.as_deref());
             let accepted_suffix = input_summary
-                .map(|input| format!(", accepted={}", input.was_accepted))
+                .map(|input| {
+                    if input.was_accepted {
+                        ", accepted"
+                    } else {
+                        ", not accepted"
+                    }
+                })
                 .unwrap_or_default();
             let input_type = human_input_type(input_kind);
 
             println!(
-                "   - input {} ({input_type}{accepted_suffix})",
+                "     input {} ({input_type}{accepted_suffix})",
                 input_id.to_string().cyan()
             );
 
@@ -182,20 +239,20 @@ fn print_execution_summary(
                 let decoded_messages =
                     try_decode_input_body(&cell.cell, input_kind, contract_contexts);
                 match decoded_messages.len() {
-                    0 => print_raw_cell_block("      ", cell),
+                    0 => print_raw_cell_block("       ", cell),
                     1 => {
                         let decoded = &decoded_messages[0];
                         println!(
-                            "      {}",
+                            "       {}",
                             format!("for {}", decoded.contract_label).dimmed()
                         );
-                        print_rendered_value_block("      ", &decoded.data);
+                        print_rendered_value_block("       ", &decoded.data);
                     }
                     _ => {
-                        println!("      {}", "decoded candidates:".dimmed());
+                        println!("       {}", "decoded candidates:".dimmed());
                         for decoded in decoded_messages {
-                            println!("      {}", decoded.contract_label.cyan());
-                            print_rendered_value_block("        ", &decoded.data);
+                            println!("       {}", decoded.contract_label.cyan());
+                            print_rendered_value_block("         ", &decoded.data);
                         }
                     }
                 }
@@ -204,14 +261,15 @@ fn print_execution_summary(
     }
 
     if !execution.fetched_cells.is_empty() {
+        println!();
         println!("   {}", "saved cells:".dimmed());
         for (value_id, cell) in &execution.fetched_cells {
             let value_id = value_id.to_string();
             let name = properties
                 .and_then(|properties| properties.fetched_value_names.get(&value_id))
                 .map_or(value_id.as_str(), String::as_str);
-            println!("   - {}:", name.cyan());
-            print_raw_cell_block("      ", cell);
+            println!("     {}:", name.cyan());
+            print_raw_cell_block("       ", cell);
         }
     }
 }
@@ -420,8 +478,20 @@ struct TsaSarifProperties {
     fetched_values: BTreeMap<String, Value>,
     #[serde(default, rename = "fetchedValueNames")]
     fetched_value_names: BTreeMap<String, String>,
+    #[serde(default, rename = "inputAcceptanceFailure")]
+    input_acceptance_failure: Option<TsaInputAcceptanceFailure>,
     #[serde(default, rename = "additionalInputs")]
     additional_inputs: BTreeMap<String, TsaSarifAdditionalInput>,
+}
+
+#[derive(Deserialize)]
+struct TsaInputAcceptanceFailure {
+    #[serde(rename = "inputId")]
+    input_id: usize,
+    #[serde(rename = "expectedAccepted")]
+    expected_accepted: bool,
+    #[serde(rename = "wasAccepted")]
+    was_accepted: bool,
 }
 
 #[derive(Deserialize, Default)]

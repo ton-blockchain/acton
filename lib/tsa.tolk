@@ -29,6 +29,22 @@ struct TsaContract<TStorage = cell> {
     id: int
 }
 
+/// An input sent by a TSA checker, including its reusable body.
+///
+/// `inputId` identifies the input in acceptance checks and reports. `body` is the
+/// original message body slice, so it can be sent again without a callback.
+/// Available since trunk.
+struct TsaInput {
+    inputId: int
+    body: slice
+}
+
+/// Check whether this input was accepted by its analyzed contract.
+/// Available since trunk.
+fun TsaInput.wasAccepted(self): bool {
+    return tsa.inputWasAccepted(self.inputId);
+}
+
 /// Bind helper methods to a specific TSA contract id.
 ///
 /// If `initialData` is provided, the contract storage is initialized via
@@ -160,6 +176,28 @@ fun tsa.makeSliceIndependentFromRandomAddresses(independentSlice: slice): void
 fun tsa.inputWasAccepted(inputId: int): bool
     asm "713 EXTCALL";
 
+/// Read the original body of a previously sent checker input.
+///
+/// The input ID must already exist in this checker execution.
+/// Available since trunk.
+fun tsa.getInputBody(inputId: int): slice
+    asm "720 EXTCALL";
+
+/// Fail the checker if the identified input was not accepted by its contract.
+///
+/// TSA reports the input ID and the expected outcome in the finding.
+/// Available since trunk.
+fun tsa.assertInputAccepted(inputId: int): void
+    asm "718 EXTCALL";
+
+/// Fail the checker if the identified input was accepted by its contract.
+///
+/// Use this to verify rejection of replayed or invalid messages. TSA reports
+/// the input ID and the expected outcome in the finding.
+/// Available since trunk.
+fun tsa.assertInputRejected(inputId: int): void
+    asm "719 EXTCALL";
+
 /// Send an internal message with an explicit body slice.
 fun tsa.sendInternalMessageWithBody(body: slice, contractId: int, inputId: int): void
     asm "714 EXTCALL";
@@ -206,9 +244,15 @@ fun TsaContract<TStorage>.sendInternalMessageWithBody(self, body: slice, inputId
 
 /// Send an external message with a TSA-generated symbolic body to this contract.
 ///
+/// Returns a handle containing the input ID and original body for later checks
+/// or replay attempts.
 /// Available since trunk.
-fun TsaContract<TStorage>.sendSymbolicExternalMessage(self, inputId: int): void {
+fun TsaContract<TStorage>.sendSymbolicExternalMessage(self, inputId: int): TsaInput {
     tsa.sendSymbolicExternalMessage(self.id, inputId);
+    return TsaInput {
+        inputId: inputId,
+        body: tsa.getInputBody(inputId),
+    };
 }
 
 /// Send a typed external message body to this contract.

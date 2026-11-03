@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### Explorer
 
+- Direct links to accounts, transactions, and blocks start their visible data requests while the explorer loads, reducing initial loading time without duplicate API calls.
 - The Blocks page fits recent transactions and block lists on mobile screens, and network TPS values animate between refreshes.
 - Transaction pages show breadcrumb-shaped loading placeholders immediately while the trace loads.
 - Mobile transaction summaries place the favorite action immediately after the status and message-route actions above the route. Transaction detail section labels match field labels on desktop and mobile.
@@ -86,6 +87,13 @@ All notable changes to this project will be documented in this file.
   summary.
   Saved values can be named with `tsa.saveValueInReport("name", value)` and
   appear under those names in findings.
+  Finding summaries show every input, present failure details in a concise
+  title, and separate storage, inputs, and checker values with blank lines.
+  Checkers can use `tsa.assertInputAccepted(inputId)` and
+  `tsa.assertInputRejected(inputId)` to report failed input expectations with
+  the input ID and observed acceptance status.
+  `TsaContract.sendSymbolicExternalMessage` returns an input handle with its ID
+  and original body, so checkers can replay the body without a message hook.
 
 - `acton up --rollback` restores the previous version from the local backup
   that `acton up` creates before replacing the binary. The rollback is

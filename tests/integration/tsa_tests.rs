@@ -18,9 +18,12 @@ fun onInternalMessage() {
 
     val contract = tsa.contract(0);
     contract.sendSymbolicInternalMessage(3);
-    contract.sendSymbolicExternalMessage(4);
+    val firstInput = contract.sendSymbolicExternalMessage(4);
+    contract.sendExternalMessageWithBody(firstInput.body, 5);
 
     tsa.saveValueInReport("answer", 42);
+    tsa.assertInputAccepted(1);
+    tsa.assertInputRejected(2);
 }
 "#;
 
