@@ -5,13 +5,95 @@ use super::{
     DockerNetwork, LOCALTON_STATE_DIR, compose::render_compose,
 };
 use crate::{Error, Node};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::time::timeout;
 
-#[cfg(test)]
-mod tests;
-
 impl DockerNetwork {
+    /// Seeds only the new node volume from the stopped genesis volume.
+    /// The runtime owns stopping and restarting the network. The helper takes
+    /// filesystem locks too, so an unexpected live source cannot be copied.
+    pub(crate) async fn copy_node_state(&self, node: &Node) -> Result<(), Error> {
+        let started = Instant::now();
+        let container = format!("{}-copy-{}", self.project_name, uuid::Uuid::new_v4());
+        let mut command = self.docker_command();
+        command
+            .args([
+                "run",
+                "--rm",
+                "--name",
+                &container,
+                "--network",
+                "none",
+                "--volume",
+            ])
+            .arg(format!(
+                "{}_localton-state:/var/lib/localton-source:ro",
+                self.project_name
+            ))
+            .arg("--volume")
+            .arg(format!(
+                "{}_{}-state:{LOCALTON_STATE_DIR}",
+                self.project_name, node.id
+            ))
+            .args(["--entrypoint", "/usr/local/bin/localton", &self.image])
+            .args([
+                "node",
+                "copy-state",
+                "--from-state-dir",
+                "/var/lib/localton-source",
+                "--state-dir",
+                LOCALTON_STATE_DIR,
+            ]);
+
+        tracing::info!(
+            operation = "copy_node_state", node = %node.name, target = %node.id,
+            duration_ms = 0, outcome = "pending", "Copying genesis blockchain data"
+        );
+        let mut child = self.spawn_logged(&mut command, false, "copy genesis blockchain data")?;
+        let result = match timeout(Duration::from_secs(3600), child.wait()).await {
+            Ok(Ok(status)) if status.success() => Ok(()),
+            Ok(Ok(status)) => Err(format!("Blockchain data copy exited with {status}")),
+            Ok(Err(error)) => Err(format!("Failed to wait for blockchain data copy: {error}")),
+            Err(_) => Err("Blockchain data copy did not finish within one hour".to_owned()),
+        };
+
+        // Killing the Docker client does not stop its container. Release the
+        // source lock before the runtime attempts to restart the network.
+        let result = if let Err(error) = result {
+            let _ = child.kill().await;
+            let mut cleanup = self.docker_command();
+            cleanup.args(["rm", "--force", &container]);
+            let cleanup = self
+                .run_command(
+                    cleanup,
+                    "remove the blockchain copy helper",
+                    "node_copy_cleanup_failed",
+                    COMPOSE_NODE_REMOVE_TIMEOUT,
+                )
+                .await;
+            let message = match cleanup {
+                Err(cleanup) if !cleanup.to_string().contains("No such container") => {
+                    format!("{error}; helper cleanup also failed: {cleanup}")
+                }
+                _ => error,
+            };
+            Err(Error::Internal {
+                code: "node_copy_failed",
+                message: format!("{message}\nFull log: {}", self.startup_log_file.display()),
+            })
+        } else {
+            Ok(())
+        };
+
+        tracing::info!(
+            operation = "copy_node_state", node = %node.name, target = %node.id,
+            duration_ms = started.elapsed().as_millis() as u64,
+            outcome = if result.is_ok() { "success" } else { "failure" },
+            "Blockchain data copy finished"
+        );
+        result
+    }
+
     /// Starts or gracefully stops one service without removing its container or state volume.
     /// Explicit service selection and --no-deps leave the network owner and peer nodes alone.
     pub(crate) async fn node_running(
@@ -206,17 +288,7 @@ impl DockerNetwork {
         }
 
         let volume = format!("{}_{}-state", self.project_name, node.id);
-        let mut command = self.docker_command();
-        command.args(["volume", "rm", "--force", &volume]);
-        if let Err(error) = self
-            .run_command(
-                command,
-                "remove the node state volume",
-                "environment_node_remove_failed",
-                COMPOSE_NODE_REMOVE_TIMEOUT,
-            )
-            .await
-        {
+        if let Err(error) = self.remove_node_state(node).await {
             tracing::warn!(
                 operation = "remove_full_ton_node_state",
                 node = %node.name,
@@ -228,6 +300,21 @@ impl DockerNetwork {
         }
 
         Ok(())
+    }
+
+    /// Removes a detached node volume after deletion or an abandoned cold copy.
+    /// Docker refuses removal if a container still uses the volume.
+    pub(crate) async fn remove_node_state(&self, node: &Node) -> Result<(), Error> {
+        let volume = format!("{}_{}-state", self.project_name, node.id);
+        let mut command = self.docker_command();
+        command.args(["volume", "rm", "--force", &volume]);
+        self.run_command(
+            command,
+            "remove the node state volume",
+            "environment_node_remove_failed",
+            COMPOSE_NODE_REMOVE_TIMEOUT,
+        )
+        .await
     }
 
     pub(crate) async fn write_compose(&self, nodes: &[Node]) -> Result<(), Error> {
@@ -260,3 +347,6 @@ impl DockerNetwork {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

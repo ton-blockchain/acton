@@ -55,6 +55,20 @@ acton localnet node dev remove '<NODE_ID>'
 </Tab>
 </Tabs>
 
+## Reduce synchronization time
+
+<AvailabilityBadge since="trunk" />
+
+For an established network, select **Copy blockchain data** in the **Add node** dialog or pass `--copy-state`:
+
+```bash
+acton localnet node dev add validator-b --validator --copy-state
+```
+
+The network stops while Acton copies genesis blockchain data, then restarts before the new node joins. The new node uses independent keys and synchronizes the remaining blocks. Copy time and additional disk usage depend on database size.
+
+Without this option, the new node synchronizes over the network. Existing nodes keep running.
+
 ## Verify election membership
 
 Entering validation enables election participation; it does not immediately elect the node. Leaving validation still requires serving its existing elected duties. Check the current and next sets before removal.

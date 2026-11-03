@@ -61,6 +61,7 @@ async fn whole_network_snapshot_roundtrip_and_rollback() -> Result<()> {
             Action::AddNode {
                 name: "replica".into(),
                 validator: false,
+                copy_state: false,
             },
         )
         .await?;

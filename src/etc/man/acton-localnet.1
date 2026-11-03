@@ -254,7 +254,7 @@ validator belongs to the network and cannot be removed with \fBnode remove\fR\&.
 .SS "Subcommands"
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBadd <name> [\-\-validator]\fR joins a new full node and prints its ID. With
+\h'-04'\(bu\h'+03'\fBadd <name> [\-\-validator] [\-\-copy\-state]\fR joins a new full node and prints its ID. With
 \fB\-\-validator\fR, the node also participates in validator elections.
 .RE
 .sp
@@ -276,6 +276,14 @@ and next elected sets. \fB\-\-force\fR bypasses this check and can disrupt conse
 Election changes take effect through TON election rounds. Completion of
 \fBenter\-validation\fR does not mean the node has already become an elected validator.
 Use the observability dashboard to inspect election membership.
+.sp
+\fB\-\-copy\-state\fR copies genesis blockchain data before the new node joins.
+.sp
+Available since trunk.
+.sp
+The network stops while copying and restarts afterward.
+The new node generates independent keys and synchronizes remaining blocks.
+Without this flag, it synchronizes over the network while existing nodes keep running.
 .sp
 .RS 4
 .nf

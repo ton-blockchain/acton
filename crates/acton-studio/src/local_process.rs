@@ -600,7 +600,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
             let driver = full_localnet(&environment)?;
             let client = driver.client().await?;
             let operation = client
-                .add_node(&request.name, request.validator)
+                .add_node(&request.name, request.validator, request.copy_state)
                 .await
                 .map_err(localnet::error)?;
             client.wait(operation).await.map_err(localnet::error)?;

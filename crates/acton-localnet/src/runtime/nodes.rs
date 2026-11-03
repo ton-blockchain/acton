@@ -22,6 +22,7 @@ impl Context {
         driver: &DockerNetwork,
         name: String,
         validator: bool,
+        copy_state: bool,
     ) -> Result<Value, Error> {
         self.require_running().await?;
         let name = name.trim();
@@ -60,6 +61,10 @@ impl Context {
             stopped: false,
         };
 
+        if copy_state {
+            self.copy_node_state(driver, &node).await?;
+        }
+
         self.phase("joiningNode").await?;
         self.entry.record.write().await.nodes.push(node.clone());
         Runtime::save(&self.entry).await?;
@@ -72,6 +77,55 @@ impl Context {
             return Err(error);
         }
         serde_json::to_value(node).map_err(|e| Error::invalid(e.to_string()))
+    }
+
+    /// Keeps the original topology intact while a cold copy is prepared.
+    /// Restart is attempted after both copy and stop failures; shutdown keeps
+    /// ownership of the stopped network instead of starting services again.
+    async fn copy_node_state(&mut self, driver: &DockerNetwork, node: &Node) -> Result<(), Error> {
+        self.entry.record.write().await.status = Status::Stopping;
+        self.phase("stopping").await?;
+        let copied = async {
+            self.observe(driver, driver.stop()).await?;
+            self.entry.record.write().await.status = Status::Stopped;
+            self.phase("copyingNodeState").await?;
+            driver.copy_node_state(node).await
+        }
+        .await;
+
+        let prepared = copied.is_ok();
+        let result = if *self.runtime.inner.closing.borrow() {
+            copied.and_then(|()| {
+                Err(Error::Conflict {
+                    code: "service_stopping",
+                    message: "The service is stopping; the node was not added".to_owned(),
+                })
+            })
+        } else {
+            let restarted = self.start(driver).await;
+            match (copied, restarted) {
+                (Ok(()), Ok(())) => Ok(()),
+                (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+                (Err(error), Err(restart)) => Err(Error::Internal {
+                    code: "node_copy_restart_failed",
+                    message: format!("{error}; restarting the network also failed: {restart}"),
+                }),
+            }
+        };
+        if let Err(error) = result {
+            // A successful copy owns an uninitialized target volume. Discard it
+            // so a later add without --copy-state cannot consume the old seed.
+            if prepared && let Err(cleanup) = driver.remove_node_state(node).await {
+                return Err(Error::Internal {
+                    code: "node_copy_cleanup_failed",
+                    message: format!(
+                        "{error}; removing copied blockchain data also failed: {cleanup}"
+                    ),
+                });
+            }
+            return Err(error);
+        }
+        Ok(())
     }
 
     pub(super) async fn remove_node(

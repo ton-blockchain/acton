@@ -85,6 +85,10 @@ All notable changes to this project will be documented in this file.
 
 ### Localnet
 
+- Optionally add a node from a local copy of genesis blockchain data with
+  `acton localnet node add --copy-state` or the Studio checkbox. The network stops
+  while copying and resumes afterward; the new node keeps its own keys and
+  synchronizes the remaining blocks.
 - Add a MyLocalTon migration guide covering Studio workflows, genesis configuration,
   wallet and client connections, and state transfer limits.
 - Create networks with a validated `genesis.toml` file through `acton localnet`

@@ -71,11 +71,18 @@ impl Client {
     }
 
     /// Lets the service allocate and persist node identity before joining the network.
-    pub async fn add_node(&self, name: &str, validator: bool) -> Result<Operation, Error> {
+    /// Copying state temporarily stops the network and copies only public chain data;
+    /// the new node always generates independent keys.
+    pub async fn add_node(
+        &self,
+        name: &str,
+        validator: bool,
+        copy_state: bool,
+    ) -> Result<Operation, Error> {
         self.request(
             Method::POST,
             "/v1/network/nodes",
-            Some(json!({"name": name, "validator": validator})),
+            Some(json!({"name": name, "validator": validator, "copyState": copy_state})),
         )
         .await
     }

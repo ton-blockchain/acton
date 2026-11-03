@@ -156,6 +156,22 @@ Acton saves the resolved genesis with the network. Later edits to the input file
 
 `ACTON_LOCALNET_GENESIS` can supply the file path instead of `--genesis`. Explicit timing flags override the file, including dependent election intervals. To preserve imported timing values, omit those flags.
 
+## Add nodes from local blockchain data
+
+<AvailabilityBadge since="trunk" />
+
+MLT can copy genesis database files to speed up a new node's synchronization. Localton provides an optional equivalent for nodes in the same managed network:
+
+```bash
+acton localnet node mlt-dev add validator-b --validator --copy-state
+```
+
+In Studio, open **Network → Nodes → Add node** and select **Copy blockchain data**. Leave it unchecked for normal network synchronization.
+
+Acton stops the network while it copies genesis blockchain data, then restarts it and joins the new node. The new node generates independent keys and synchronizes any remaining blocks. The copy requires additional disk space; its duration depends on database size and storage speed.
+
+This option copies data between Localton nodes. It does not import an MLT database, volume, or Time Machine snapshot.
+
 ## Move wallets and applications
 
 [Import development wallet mnemonics](/docs/wallets#import-an-existing-wallet) into Acton before you select startup accounts. Importing a mnemonic does not restore balances or transaction history.

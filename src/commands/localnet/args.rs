@@ -155,6 +155,10 @@ pub enum NodeCommand {
 
         #[arg(long)]
         validator: bool,
+
+        /// Copy genesis blockchain data before joining, temporarily stopping the network.
+        #[arg(long)]
+        copy_state: bool,
     },
     Remove {
         id: String,

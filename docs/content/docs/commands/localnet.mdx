@@ -366,7 +366,7 @@ validator belongs to the network and cannot be removed with `node remove`.
 
 #### Subcommands
 
-- `add <name> [--validator]` joins a new full node and prints its ID. With
+- `add <name> [--validator] [--copy-state]` joins a new full node and prints its ID. With
   `--validator`, the node also participates in validator elections.
 - `enter-validation <id>` enables election participation for an existing node.
 - `leave-validation <id>` disables future election participation. The node
@@ -378,6 +378,14 @@ validator belongs to the network and cannot be removed with `node remove`.
 Election changes take effect through TON election rounds. Completion of
 `enter-validation` does not mean the node has already become an elected validator.
 Use the observability dashboard to inspect election membership.
+
+`--copy-state` copies genesis blockchain data before the new node joins.
+
+<AvailabilityBadge since="trunk" />
+
+The network stops while copying and restarts afterward.
+The new node generates independent keys and synchronizes remaining blocks.
+Without this flag, it synchronizes over the network while existing nodes keep running.
 
 ```bash
 acton localnet node dev add validator-b --validator

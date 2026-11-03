@@ -267,6 +267,7 @@ export interface UpdateEnvironmentRequest {
 export interface CreateFullTonNodeRequest {
   readonly name: string
   readonly validator: boolean
+  readonly copyState: boolean
 }
 
 export interface EnvironmentSnapshot {

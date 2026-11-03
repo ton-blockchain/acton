@@ -9,6 +9,12 @@ use crate::{
 
 pub async fn execute(command: NodeCommand) -> Result<()> {
     match command {
+        NodeCommand::CopyState {
+            from_state_dir,
+            state,
+        } => {
+            crate::node::database_copy::prepare(&from_state_dir, &state.state_dir)?;
+        }
         NodeCommand::Stats { state } => {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
             let settings = toolchain.settings()?;

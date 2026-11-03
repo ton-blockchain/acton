@@ -158,10 +158,14 @@ async fn execute(client: &Client, command: LocalnetCommand, json: bool) -> anyho
         LocalnetCommand::Node { command, .. } => {
             let base = "/v1/network/nodes".to_owned();
             let (method, path, body) = match command {
-                NodeCommand::Add { name, validator } => (
+                NodeCommand::Add {
+                    name,
+                    validator,
+                    copy_state,
+                } => (
                     Method::POST,
                     base,
-                    Some(json!({"name":name, "validator":validator})),
+                    Some(json!({"name":name, "validator":validator, "copyState":copy_state})),
                 ),
                 NodeCommand::Remove { id, force, .. } => {
                     validate_identifier(&id)?;

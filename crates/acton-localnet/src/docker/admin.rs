@@ -815,6 +815,7 @@ mod tests {
                     .submit(Action::AddNode {
                         name: format!("after-fork-{index}"),
                         validator: false,
+                        copy_state: false,
                     })
                     .await?;
 

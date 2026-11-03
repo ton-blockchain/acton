@@ -1,8 +1,5 @@
 //! Durable asynchronous operations shared by HTTP and command-line clients.
 
-#[cfg(test)]
-mod tests;
-
 use super::{Entry, Runtime};
 use crate::{Error, Operation, OperationStatus, OperationStep, Status, storage};
 use serde_json::Value;
@@ -15,13 +12,32 @@ pub(crate) enum Action {
     Start,
     Stop,
     Delete,
-    AddNode { name: String, validator: bool },
-    RemoveNode { id: String, force: bool },
-    NodeRunning { id: String, running: bool },
-    Validation { id: String, enabled: bool },
-    CreateSnapshot { name: Option<String> },
-    RestoreSnapshot { id: String },
-    DeleteSnapshot { id: String },
+    AddNode {
+        name: String,
+        validator: bool,
+        copy_state: bool,
+    },
+    RemoveNode {
+        id: String,
+        force: bool,
+    },
+    NodeRunning {
+        id: String,
+        running: bool,
+    },
+    Validation {
+        id: String,
+        enabled: bool,
+    },
+    CreateSnapshot {
+        name: Option<String>,
+    },
+    RestoreSnapshot {
+        id: String,
+    },
+    DeleteSnapshot {
+        id: String,
+    },
     UpdateConfig(crate::UpdateNetworkConfig),
 }
 
@@ -289,6 +305,10 @@ impl Context {
                 | Action::Delete
                 | Action::CreateSnapshot { .. }
                 | Action::RestoreSnapshot { .. }
+                | Action::AddNode {
+                    copy_state: true,
+                    ..
+                }
         ) {
             self.runtime.stop_activity().await?;
         }
@@ -346,8 +366,12 @@ impl Context {
                     self.entry.record.write().await.status = Status::Stopped;
                 }
             }
-            Action::AddNode { name, validator } => {
-                return self.add_node(&driver, name, validator).await;
+            Action::AddNode {
+                name,
+                validator,
+                copy_state,
+            } => {
+                return self.add_node(&driver, name, validator, copy_state).await;
             }
             Action::RemoveNode { id, force } => self.remove_node(&driver, &id, force).await?,
             Action::NodeRunning { id, running } => self.node_running(&driver, &id, running).await?,
@@ -454,3 +478,6 @@ fn snapshot_result(
         }),
     }
 }
+
+#[cfg(test)]
+mod tests;

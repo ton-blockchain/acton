@@ -42,6 +42,10 @@ pub struct CreateFullTonNodeRequest {
     pub name: String,
     #[serde(default)]
     pub validator: bool,
+    /// Temporarily stop the network and copy genesis chain data before joining.
+    /// The new node generates its own keys and synchronizes any remaining blocks.
+    #[serde(default)]
+    pub copy_state: bool,
 }
 
 /// Controls whether Studio may remove a validator that still belongs to an elected set.

@@ -5,6 +5,7 @@
 //! share: service keys, engine database initialization, durable node identity,
 //! readiness, and transfer of a running process into the common registry.
 
+pub(crate) mod database_copy;
 mod database_dump;
 mod validator;
 
@@ -175,7 +176,9 @@ pub(crate) async fn initialize_joined_node(
         "join initialization requires a node with the joined role"
     );
     if node_layout.manifest.is_file() {
-        return NodeManifest::load(&node_layout.manifest, &node.name);
+        let manifest = NodeManifest::load(&node_layout.manifest, &node.name)?;
+        database_copy::discard(layout)?;
+        return Ok(manifest);
     }
 
     let started = std::time::Instant::now();
@@ -187,6 +190,10 @@ pub(crate) async fn initialize_joined_node(
     );
 
     let result = async {
+        ensure!(
+            database_dump.is_none() || !database_copy::exists(layout),
+            "cannot combine a TON database dump with copied local blockchain data"
+        );
         clean_partial_node(&node_layout.root)?;
         node_layout.create_dirs()?;
 
@@ -205,6 +212,8 @@ pub(crate) async fn initialize_joined_node(
 
         if let Some(archive) = database_dump {
             database_dump::import(archive, &node_layout.db, &node.name).await?;
+        } else {
+            database_copy::install(layout, &node.name)?;
         }
 
         let manifest = NodeManifest::new(
@@ -216,6 +225,7 @@ pub(crate) async fn initialize_joined_node(
             None,
         );
         manifest.save_atomic(&node_layout.manifest)?;
+        database_copy::discard(layout)?;
 
         Ok(manifest)
     }

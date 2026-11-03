@@ -139,11 +139,13 @@ async fn remove(State(state): State<ApiState>) -> Result<(StatusCode, Json<Opera
 }
 
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct AddNode {
     name: String,
     #[serde(default)]
     validator: bool,
+    #[serde(default)]
+    copy_state: bool,
 }
 
 async fn add_node(
@@ -155,6 +157,7 @@ async fn add_node(
         Action::AddNode {
             name: request.name,
             validator: request.validator,
+            copy_state: request.copy_state,
         },
     )
     .await

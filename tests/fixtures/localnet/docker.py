@@ -79,6 +79,8 @@ if 'compose' in args:
     elif verb == 'up':
         with (root / 'events').open('a') as output:
             output.write('up\n')
+        if (root / 'fail-restart').exists():
+            raise SystemExit('Fixture network restart failed')
         marker.touch()
         network_marker.touch()
         for node in nodes:
@@ -109,6 +111,16 @@ if 'compose' in args:
             output.write('validation\n')
     else:
         raise SystemExit('Unexpected compose command: ' + verb)
+elif 'run' in args and 'copy-state' in args:
+    with (root / 'events').open('a') as output:
+        output.write('copy-state\n')
+    if marker.exists():
+        raise SystemExit('Cannot copy a running fixture network')
+    if (root / 'fail-copy').exists():
+        raise SystemExit('Fixture blockchain copy failed')
+    if not any(value.endswith('localton-state:/var/lib/localton-source:ro') for value in args):
+        raise SystemExit('Copy source must be mounted read-only')
+    (root / 'copied-state').touch()
 elif 'run' in args and 'snapshot' in args:
     # Cold archives use a standalone container with only the selected volumes.
     action = args[args.index('snapshot') + 1]
@@ -142,6 +154,8 @@ elif 'pull' in args:
         time.sleep(0.05)
     print('bbbbbbbbbbbb: Pull complete', flush=True)
     (root / 'image-ready').touch()
+elif 'volume' in args and 'rm' in args:
+    (root / 'copied-state').unlink(missing_ok=True)
 elif 'volume' in args or 'rm' in args:
     pass
 elif 'context' in args and 'show' in args:

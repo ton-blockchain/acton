@@ -243,9 +243,9 @@ SUBCOMMANDS
           acton localnet node [network] command
 
       Subcommands
-          o  add <name> [--validator] joins a new full node and prints its ID.
-             With --validator, the node also participates in validator
-             elections.
+          o  add <name> [--validator] [--copy-state] joins a new full node and
+             prints its ID. With --validator, the node also participates in
+             validator elections.
 
           o  enter-validation <id> enables election participation for an
              existing node.
@@ -263,6 +263,16 @@ SUBCOMMANDS
           of enter-validation does not mean the node has already become an
           elected validator. Use the observability dashboard to inspect
           election membership.
+
+          --copy-state copies genesis blockchain data before the new node
+          joins.
+
+          Available since trunk.
+
+          The network stops while copying and restarts afterward. The new node
+          generates independent keys and synchronizes remaining blocks. Without
+          this flag, it synchronizes over the network while existing nodes keep
+          running.
 
               acton localnet node dev add validator-b --validator
               acton localnet status dev --json

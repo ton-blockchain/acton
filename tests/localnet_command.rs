@@ -25,6 +25,9 @@ mod offline;
 #[path = "localnet_command/network_config.rs"]
 mod network_config;
 
+#[path = "localnet_command/node_copy.rs"]
+mod node_copy;
+
 #[path = "localnet_command/shutdown.rs"]
 mod shutdown;
 

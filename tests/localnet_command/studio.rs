@@ -260,6 +260,7 @@ async fn studio_uses_cli_for_lifecycle_and_http_for_nodes_and_snapshots() {
             CreateFullTonNodeRequest {
                 name: "peer".to_owned(),
                 validator: false,
+                copy_state: false,
             },
         )
         .await

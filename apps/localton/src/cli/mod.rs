@@ -579,6 +579,15 @@ pub enum IndexerCommand {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum NodeCommand {
+    /// Copy stopped-node blockchain data into a new node's state directory
+    CopyState {
+        /// Stopped Localton state directory used as the source
+        #[arg(long, value_name = "PATH")]
+        from_state_dir: PathBuf,
+
+        #[command(flatten)]
+        state: StateArgs,
+    },
     /// Print validator-engine-console getstats output.
     Stats {
         #[command(flatten)]

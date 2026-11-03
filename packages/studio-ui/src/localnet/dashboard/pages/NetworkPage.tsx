@@ -51,6 +51,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onActionsChange, onEnvironmen
   const [nodeName, setNodeName] = useState("")
   const [nodeNameEdited, setNodeNameEdited] = useState(false)
   const [nodeIsValidator, setNodeIsValidator] = useState(true)
+  const [copyState, setCopyState] = useState(false)
   const [isAdding, setIsAdding] = useState(false)
   const [removingNode, setRemovingNode] = useState<FullTonNode>()
   const [isRemoving, setIsRemoving] = useState(false)
@@ -118,6 +119,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onActionsChange, onEnvironmen
       const updated = await addStudioFullTonNode(environment.id, {
         name,
         validator: nodeIsValidator,
+        copyState,
       })
       onEnvironmentChange(updated)
       setNodeName("")
@@ -141,6 +143,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onActionsChange, onEnvironmen
     }
   }, [
     config,
+    copyState,
     environment,
     isAdding,
     nodeIsValidator,
@@ -478,6 +481,13 @@ export const NetworkPage: FC<NetworkPageProps> = ({onActionsChange, onEnvironmen
                 setNodeName(`${validator ? "validator" : "node"}-${nextNodeNumber}`)
               }
             }}
+          />
+          <Checkbox
+            checked={copyState}
+            label="Copy blockchain data"
+            description="Start from genesis node data to reduce synchronization time · Temporarily stops the network while copying"
+            disabled={isAdding}
+            onChange={event => setCopyState(event.target.checked)}
           />
           <DialogActions>
             <Button variant="outline" onClick={() => setAddDialogOpen(false)}>

@@ -231,7 +231,10 @@ fn ensure_dump_layout(staging: &Path) -> Result<()> {
     Ok(())
 }
 
-fn publish_entries(staging: &Path, database: &Path) -> Result<()> {
+/// Publishes validated chain entries while preserving independently generated
+/// node configuration and keys. The caller retains a source for retry until the
+/// node manifest commits the complete database.
+pub(super) fn publish_entries(staging: &Path, database: &Path) -> Result<()> {
     for entry in fs::read_dir(staging)? {
         let entry = entry?;
         let destination = database.join(entry.file_name());
