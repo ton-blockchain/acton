@@ -10,9 +10,13 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [package.metadata.cargo-shear]
-# cargo-shear 1.13.4 does not normalize the `..` segments in this test's #[path].
+# cargo-shear 1.13.4 does not normalize the `..` segments in test module #[path] attributes.
 # https://github.com/Boshen/cargo-shear/issues/587
-ignored-paths = ["tests/binaries/github.rs"]
+ignored-paths = [
+    "tests/binaries/github.rs",
+    "tests/bootstrap/genesis_render.rs",
+    "tests/bootstrap/genesis_settings.rs",
+]
 
 [workspace]
 members = ["crates/*", "xtask"]

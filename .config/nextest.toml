@@ -15,11 +15,11 @@ max-threads = 1
 max-threads = 1
 
 [[profile.default.overrides]]
-filter = 'binary(localnet_command) | package(acton-localnet)'
+filter = 'binary(localnet_command) | package(acton-localnet) | test(studio_genesis_wallets)'
 test-group = 'localnet-serial'
 
 [[profile.ci.overrides]]
-filter = 'binary(localnet_command) | package(acton-localnet)'
+filter = 'binary(localnet_command) | package(acton-localnet) | test(studio_genesis_wallets)'
 test-group = 'localnet-serial'
 
 [[profile.default.overrides]]

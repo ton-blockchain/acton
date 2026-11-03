@@ -10,6 +10,7 @@ mod reporting;
 mod snapshots;
 mod start;
 mod test_runs;
+mod wallets;
 
 const STUDIO_START_TIMEOUT: Duration = Duration::from_secs(30);
 const STUDIO_STOP_TIMEOUT: Duration = Duration::from_secs(5);
@@ -22,18 +23,25 @@ struct StudioCliProcess {
 
 impl StudioCliProcess {
     fn start(project: &Project) -> Self {
+        Self::start_with_env(project, &[])
+    }
+
+    fn start_with_env(project: &Project, environment: &[(&str, String)]) -> Self {
         for attempt in 0..STUDIO_START_ATTEMPTS {
             let (listener, port) = reserve_studio_port();
             drop(listener);
 
             let port_arg = port.to_string();
             let url = format!("http://127.0.0.1:{port}");
-            let command = project.acton().current_dir(project.path()).args([
+            let mut command = project.acton().current_dir(project.path()).args([
                 "studio",
                 "--port",
                 &port_arg,
                 "--no-open",
             ]);
+            for (name, value) in environment {
+                command = command.env(name, value);
+            }
 
             // Model a real terminal: Ctrl+C targets Studio's foreground process
             // group, including managed children that fail to isolate themselves.

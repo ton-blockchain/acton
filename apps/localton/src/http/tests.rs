@@ -141,7 +141,7 @@ fn openapi_documents_config_and_admin_routes() {
         "NodeRuntime",
         "ServiceRuntime",
         "Settings",
-        "NetworkSettings",
+        "GenesisConfig",
         "NodeSettings",
         "ServiceSettings",
         "HttpServiceSettings",
@@ -161,6 +161,26 @@ fn openapi_documents_config_and_admin_routes() {
             "administrative OpenAPI is missing {schema}"
         );
     }
+
+    let mut pending = vec![&admin_document];
+    let mut unresolved_references = Vec::new();
+    while let Some(value) = pending.pop() {
+        match value {
+            Value::Object(fields) => {
+                if let Some(reference) = fields.get("$ref").and_then(Value::as_str)
+                    && let Some(pointer) = reference.strip_prefix('#')
+                    && admin_document.pointer(pointer).is_none()
+                {
+                    unresolved_references.push(reference);
+                }
+                pending.extend(fields.values());
+            }
+            Value::Array(values) => pending.extend(values),
+            _ => {}
+        }
+    }
+    unresolved_references.sort_unstable();
+    expect![["[]\n"]].assert_debug_eq(&unresolved_references);
 
     let documented_operations = [
         ("CONFIG /", &config_document["paths"]["/"]["get"]),

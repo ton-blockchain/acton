@@ -75,6 +75,9 @@ All notable changes to this project will be documented in this file.
 
 ### CLI
 
+- Update Markdown and compression dependencies to address RustSec advisories
+  RUSTSEC-2026-0414, RUSTSEC-2026-0418, and RUSTSEC-2026-0433.
+
 - `acton up --rollback` restores the previous version from the local backup
   that `acton up` creates before replacing the binary. The rollback is
   offline, picks the most recently modified backup, and is a no-op once the

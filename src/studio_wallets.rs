@@ -155,7 +155,3 @@ impl WalletRuntime for ProjectWalletRuntime {
         Box::pin(async move { result })
     }
 }
-
-#[cfg(test)]
-#[path = "../tests/studio/wallets.rs"]
-mod tests;

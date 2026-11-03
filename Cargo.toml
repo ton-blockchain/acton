@@ -80,7 +80,7 @@ tree-sitter-tlb = { path = "crates/tree-sitter-tlb" }
 toncenter-keys = { path = "crates/toncenter-keys" }
 tree-sitter-toml-ng = { path = "crates/tree-sitter-toml-ng" }
 handlebars = { version = "6.4.0", features = ["dir_source"] }
-pulldown-cmark = { version = "0.13.1", default-features = false, features = ["html"] }
+pulldown-cmark = { version = "0.13.6", default-features = false, features = ["html"] }
 url = "2.5.7"
 uuid = { version = "1.18", features = ["serde", "v4"] }
 
