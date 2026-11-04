@@ -33,12 +33,12 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        uses: Swatinem/rust-cache@v2.9.2
         with:
           key: apps-localton-binary-${{ runner.os }}-${{ runner.arch }}
           save-if: ${{ github.ref == 'refs/heads/master' }}
@@ -48,14 +48,14 @@ jobs:
         run: rustup toolchain install
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        uses: oven-sh/setup-bun@v2.2.0
 
       - name: Install UI dependencies
         working-directory: ${{ github.workspace }}
         run: bun ci
 
       - name: Install just
-        uses: taiki-e/install-action@84f5ac3124727fb3d284d4d22ee9ab3654fd09a6 # v2.87.7
+        uses: taiki-e/install-action@v2.87.7
         with:
           tool: just@1.58.0
           fallback: none
@@ -76,7 +76,7 @@ jobs:
           sha256sum "${archive}" > "${archive}.sha256"
 
       - name: Upload localton artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: localton-nightly-linux-${{ matrix.arch }}
           path: |
@@ -96,7 +96,7 @@ jobs:
 
     steps:
       - name: Download localton artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@v8.0.1
         with:
           pattern: localton-nightly-linux-*
           path: release-artifacts

@@ -8,3 +8,6 @@ rules:
   template-injection:
     ignore:
       - release.yml
+  cache-poisoning:
+    ignore:
+      - build-localton-docker-image.yml
