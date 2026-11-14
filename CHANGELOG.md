@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Build Artifacts
+
+- `cargo xtask sync-artifacts` downloads artifacts from `ton-blockchain/acton`, regardless of the local Git remote.
+
 ### Verifier
 
 - Verification statistics show the total beside the page title and compiler versions as a share of the registry without a language breakdown.

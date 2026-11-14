@@ -50,12 +50,19 @@ impl Github {
         Ok(())
     }
 
-    pub(crate) fn download_release_asset(self, tag: &str, asset_name: &str) -> Result<Vec<u8>> {
+    pub(crate) fn download_release_asset(
+        self,
+        repository: &str,
+        tag: &str,
+        asset_name: &str,
+    ) -> Result<Vec<u8>> {
         let output = self
             .command_output(&[
                 "release",
                 "download",
                 tag,
+                "--repo",
+                repository,
                 "--pattern",
                 asset_name,
                 "--output",
@@ -63,7 +70,7 @@ impl Github {
             ])
             .with_context(|| {
                 format!(
-                    "failed to download asset `{asset_name}` from release `{tag}` in the current repository"
+                    "failed to download asset `{asset_name}` from release `{tag}` in `{repository}`"
                 )
             })?;
 

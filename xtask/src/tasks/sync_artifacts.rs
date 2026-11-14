@@ -11,6 +11,7 @@ use serde::Deserialize;
 use tar::Archive;
 use tempfile::Builder as TempfileBuilder;
 
+const ARTIFACTS_REPOSITORY: &str = "ton-blockchain/acton";
 const RELEASE_OBJS_RELEASE_TAG: &str = "release-objs";
 const TON_OBJS_DIR: &str = "objs";
 const TON_ARTIFACTS_LOCK_NAME: &str = "ton-artifacts.lock";
@@ -29,13 +30,16 @@ const FIFT_STDLIB_FILES: &[&str] = &["Asm.fif", "Fift.fif"];
 
 pub(crate) fn run() -> Result<()> {
     println!(
-        "Syncing `{TON_OBJS_ARTIFACTS_MANIFEST_PATH}` from GitHub release `{RELEASE_OBJS_RELEASE_TAG}`"
+        "Syncing `{TON_OBJS_ARTIFACTS_MANIFEST_PATH}` from `{ARTIFACTS_REPOSITORY}` release `{RELEASE_OBJS_RELEASE_TAG}`"
     );
 
     let objs_dir = Path::new(TON_OBJS_DIR);
     let github = Github::new();
-    let downloaded_asset =
-        github.download_release_asset(RELEASE_OBJS_RELEASE_TAG, ARTIFACTS_MANIFEST_ASSET_NAME)?;
+    let downloaded_asset = github.download_release_asset(
+        ARTIFACTS_REPOSITORY,
+        RELEASE_OBJS_RELEASE_TAG,
+        ARTIFACTS_MANIFEST_ASSET_NAME,
+    )?;
 
     let manifest_contents = str::from_utf8(&downloaded_asset)
         .context("downloaded artifacts manifest is not valid UTF-8")?;
@@ -223,7 +227,8 @@ fn refresh_local_objs_from_release(
     ));
     progress.enable_steady_tick(std::time::Duration::from_millis(120));
 
-    let downloaded_archive = github.download_release_asset(RELEASE_OBJS_RELEASE_TAG, archive_name);
+    let downloaded_archive =
+        github.download_release_asset(ARTIFACTS_REPOSITORY, RELEASE_OBJS_RELEASE_TAG, archive_name);
     progress.finish_and_clear();
 
     let downloaded_archive = downloaded_archive?;
@@ -255,8 +260,11 @@ fn download_local_stdlib_archive_from_release(
     ));
     progress.enable_steady_tick(std::time::Duration::from_millis(120));
 
-    let downloaded_archive =
-        github.download_release_asset(RELEASE_OBJS_RELEASE_TAG, TON_STDLIB_ASSET_NAME);
+    let downloaded_archive = github.download_release_asset(
+        ARTIFACTS_REPOSITORY,
+        RELEASE_OBJS_RELEASE_TAG,
+        TON_STDLIB_ASSET_NAME,
+    );
     progress.finish_and_clear();
 
     let downloaded_archive = downloaded_archive?;
