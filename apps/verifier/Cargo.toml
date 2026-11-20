@@ -70,6 +70,7 @@ axum = { version = "0.8", features = ["multipart"] }
 base64 = "0.22"
 clap = { version = "4.5", features = ["derive", "env"] }
 dunce = "1.0.5"
+form_urlencoded = "1"
 hex = "0.4"
 httpdate = "1"
 include_dir = "0.7"

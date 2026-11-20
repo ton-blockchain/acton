@@ -66,6 +66,63 @@ const SOURCES_ALIASED_FILES: &str = r#"[
 ]"#;
 
 #[tokio::test]
+async fn legacy_source_file_links_redirect_to_selected_source() {
+    let code_hash = CODE_HASH_ONE;
+    for (file, encoded_file) in [
+        ("src/counter.tolk", "src%2Fcounter.tolk"),
+        ("src/utils/math.fc", "src%2Futils%2Fmath.fc"),
+        ("NOTICE", "NOTICE"),
+        (
+            "src/example%20%2B%26%3F%23%25.tolk",
+            "src%2Fexample+%2B%26%3F%23%25.tolk",
+        ),
+        (
+            "src/%D1%82%D0%B5%D1%81%D1%82.tolk",
+            "src%2F%D1%82%D0%B5%D1%81%D1%82.tolk",
+        ),
+    ] {
+        let path = format!("/{}/{}/files/{file}", &code_hash[..2], &code_hash[2..]);
+        let response = get(app_state(&[], CODE_HASH_ONE), &path).await;
+
+        assert_eq!(response.status(), StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(
+            response.headers()[header::LOCATION],
+            format!("/{code_hash}?file={encoded_file}"),
+        );
+    }
+}
+
+#[tokio::test]
+async fn legacy_source_file_links_normalize_uppercase_hashes_for_head_requests() {
+    let path = format!("/AA/{}/files/contracts/Sale.tolk", "A".repeat(62));
+    let response = head(app_state(&[], CODE_HASH_ONE), &path).await;
+
+    assert_eq!(response.status(), StatusCode::PERMANENT_REDIRECT);
+    assert_eq!(
+        response.headers()[header::LOCATION],
+        format!("/{CODE_HASH_ONE}?file=contracts%2FSale.tolk"),
+    );
+}
+
+#[tokio::test]
+async fn legacy_source_file_links_reject_invalid_hashes() {
+    for (prefix, hash_suffix) in [
+        ("a", "a".repeat(63)),
+        ("aaa", "a".repeat(61)),
+        ("aa", "a".repeat(61)),
+        ("aa", "a".repeat(63)),
+        ("gg", "a".repeat(62)),
+        ("aa", "g".repeat(62)),
+    ] {
+        let path = format!("/{prefix}/{hash_suffix}/files/contracts/Sale.tolk");
+        let response = get(app_state(&[], CODE_HASH_ONE), &path).await;
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert!(!response.headers().contains_key(header::LOCATION));
+    }
+}
+
+#[tokio::test]
 async fn legacy_source_endpoint_returns_blueprint_upgrade_error() {
     let request = Request::builder()
         .method(Method::POST)

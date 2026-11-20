@@ -28,6 +28,10 @@ pub fn router_with_state(state: AppState) -> Router {
         .route("/healthz", get(handlers::health::handler))
         .route("/robots.txt", get(handlers::robots::handler))
         .route("/source", post(handlers::legacy::source_handler))
+        .route(
+            "/{prefix}/{hash_suffix}/files/{*file}",
+            get(handlers::legacy::source_file_redirect),
+        )
         .route("/version", get(handlers::health::version))
         .nest("/api/v1", handlers::api::v1::router())
         .fallback(handlers::frontend::handler)
