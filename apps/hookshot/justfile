@@ -1,0 +1,39 @@
+all: precommit
+
+build:
+    cargo build --release --locked
+
+build-dev:
+    cargo build --locked
+
+build-ci: build
+
+fmt:
+    cargo fmt --package hookshot
+
+fmt-check:
+    cargo fmt --package hookshot --check
+
+check-deps:
+    cargo shear --deny-warnings
+
+clippy:
+    cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+check-deny:
+    cargo deny check
+
+test:
+    cargo test --locked
+
+check-ci: fmt-check check-deps clippy check-deny
+
+check: check-ci test
+
+precommit: fmt build check
+
+run:
+    cargo run --locked
+
+clean:
+    cargo clean

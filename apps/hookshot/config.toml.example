@@ -1,0 +1,8 @@
+[server]
+bind_addr = "127.0.0.1:3000"
+
+[http]
+timeout_seconds = 30
+
+[logging]
+level = "info"

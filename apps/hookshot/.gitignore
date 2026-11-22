@@ -1,0 +1,9 @@
+# IDE
+.idea
+
+# Rust build artifacts
+target/
+
+# Local configuration
+/.env
+/config.toml

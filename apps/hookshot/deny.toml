@@ -1,0 +1,37 @@
+[graph]
+all-features = true
+
+[licenses]
+allow = [
+  "Apache-2.0",
+  "BSD-3-Clause",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "Unicode-3.0",
+]
+confidence-threshold = 0.8
+exceptions = []
+unused-allowed-license = "deny"
+unused-license-exception = "deny"
+
+[advisories]
+ignore = []
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+highlight = "all"
+workspace-default-features = "allow"
+external-default-features = "allow"
+
+[bans.workspace-dependencies]
+duplicates = "deny"
+include-path-dependencies = true
+unused = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+unused-allowed-source = "deny"
