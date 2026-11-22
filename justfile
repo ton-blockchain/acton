@@ -235,8 +235,16 @@ update-template-wrappers:
 
 precommit: fmt fmt-ui build build-ui check check-ui
 
-clean:
+cargo-clean:
     cargo clean
+    cargo clean --manifest-path apps/actonscan-backend/Cargo.toml
+    cargo clean --manifest-path apps/faucet/Cargo.toml
+    cargo clean --manifest-path apps/faucet-bot/Cargo.toml
+    cargo clean --manifest-path apps/hookshot/Cargo.toml
+    cargo clean --manifest-path apps/localton/Cargo.toml
+    cargo clean --manifest-path apps/verifier/Cargo.toml
+
+clean: cargo-clean
     rm -rf packages/test-ui/dist
     rm -rf packages/studio-ui/dist
 
