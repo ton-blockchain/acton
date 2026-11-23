@@ -936,6 +936,11 @@
     "symbol": "ANT"
   },
   {
+    "address": "0:5f6223160940ef15dcdf56dfb441cb1430e5134254ba1dd34a878dbd8ecab802",
+    "name": "Anthropic xStock",
+    "symbol": "ANTx"
+  },
+  {
     "address": "0:2358565a1f45e26f45461307b7d78f0783b6ab493e66849c03077613212d0e15",
     "image": "https://proxy.toncenter.com/7jHoEtlS4_MbxzY346vB_U3P77aH9x7Tcpl4Py2ZqqI/pr:small/bG9jYWw6Ly8vMmMvODMvMmM4M2U4ODhiZDBkMzZiMTJmM2Y3ODlhMTkyNGNjMGI0MjdjMWExYzQyMWIxNmI1MGI5OTAxZjAyZWI4NTFlMA",
     "name": "Antique Pine",
@@ -4375,6 +4380,18 @@
     "symbol": "DICKSHOTI"
   },
   {
+    "address": "0:8160bf5935799507a2732e9c23ec7f82c3eb3a1d1524aa8c641d72ff9288f221",
+    "image": "https://proxy.toncenter.com/67TNCZceP6PtEMQNjn0cAyg6hJOAwk1sAADZAwW6COk/pr:small/bG9jYWw6Ly8vNzgvMTkvNzgxOWIwMzU3OGRmMmRjNDA0OGJhMGY0MGRlOTVhMWMxYWE5YzAzNzA0OWIxYmFlYTRlM2MwZDlhYzhlM2I3Ng",
+    "name": "Dictator",
+    "symbol": "Dictator"
+  },
+  {
+    "address": "0:b26a2f3e487cac50d559f7537fe991422e6adc5978358ebf0214d7f4548d0a7a",
+    "image": "https://proxy.toncenter.com/wBbzzYMe-1CdPMVPE5WbfjULy-qUjZ_gIKJDqiAA5_w/pr:small/bG9jYWw6Ly8vY2QvNzMvY2Q3Mzk3OTNkZDM2MDY0YmI2YmJmODMwNWU0YzFmZDVkNTYxNjhjNmFjMTgwZWM5YWU0OTIxYzE2ZDU5M2NhMw",
+    "name": "Dictator AI",
+    "symbol": "DAI"
+  },
+  {
     "address": "0:88e02e49227348330c6f148ba72a0cebc5afeb0c962e5de1c7d1f17f58a6e7b1",
     "image": "https://proxy.toncenter.com/C-LlBtuWGFe2JqGkZJ_1-5Xu3mhZPzyLGATpXVEbwPs/pr:small/bG9jYWw6Ly8vODgvZGQvODhkZDIwNGJhOGRlYzJmOWNlNjk1NmU5NTRjMjVkNTY4MzNlZjFiYTI5Zjk5M2U1NDgzMjQ2MTk5N2NkNjU2MQ",
     "name": "DIGGER",
@@ -4703,6 +4720,12 @@
     "symbol": "DKNGx"
   },
   {
+    "address": "0:0f26961d1d2fa83b48cb1e0931588625a3e2d1740ddd2de6a8835585b1576f66",
+    "image": "https://proxy.toncenter.com/4xE5ibFXXshQ24QVeZVslo1umCsr8Ux4bQogVM4-0Fs/pr:small/bG9jYWw6Ly8vZmEvODkvZmE4OTkwZTg4ODRmMjM4YjYwZTJmYjliNzVhYjQzZDQyMWRjOTZkMDMyMTRlNjk5YTZlZmIyNzM3NTI4OWI2NA",
+    "name": "Dragon Gold Miner",
+    "symbol": "DGM"
+  },
+  {
     "address": "0:6dc6b66d930694da09948838ab6067230de2eca15878bbf6e51b429d34b6e843",
     "image": "https://proxy.toncenter.com/5E9O16DKiQr3f8L5hmV_ZbKd-wdzIcPWn1TZzSx3fPs/pr:small/bG9jYWw6Ly8vOWIvMTAvOWIxMDg0NmE5OGQ3M2EwMGU1NjIyMTUzODFlMzEwZTc5OTQ5ZDUzMTNiZmEzYWE0YzFlNGQ2OWFiN2ExNWIwZA",
     "name": "DragonTON",
@@ -4945,6 +4968,12 @@
     "address": "0:254ba23fc241300276bcd689000ef72dfd73aec5a197289f3b29b1a02e22a9a2",
     "name": "Eagle Materials xStock",
     "symbol": "EXPx"
+  },
+  {
+    "address": "0:7fd60587f416624e81640329f34bed3b1d445471580f71050463ffbb40cd1719",
+    "image": "https://proxy.toncenter.com/5q4P8n-TSQc4MjpFYzngCwEE9GTNy4X8P79SMThoFmE/pr:small/bG9jYWw6Ly8vYTMvNWYvYTM1ZjMzOGQ5YmJjY2M2NzI3MzNiNmI4YzNkY2E3YTIyODg4YzU5MmM5ZGM1ZmMzYTgzNmI1ZjJhMmJjZWJkZQ",
+    "name": "Earn Qualify Build",
+    "symbol": "EQB"
   },
   {
     "address": "0:4eebb6c10088255bf699af2269c03648ed947f27f6bb2ee85eb64d2b23ffc401",
@@ -6181,6 +6210,12 @@
     "symbol": "GLX"
   },
   {
+    "address": "0:6ef6a280a271c37b16b90542ceddf7669fbbd6bc4c52a51e0b78dc9f401d9d62",
+    "image": "https://proxy.toncenter.com/WjWptHekO8QFd7qBEjXs07HzxAADHZ-gkbeUTc6huDk/pr:small/bG9jYWw6Ly8vODMvNTcvODM1N2Q1Yzk3ZGQ4OGI5MzZjMTAyMTgzZmNlOTUxMGE5MzgwYzhkNGE1NzU0YTVkNGI5M2FkYTJhODE0MWE5Yg",
+    "name": "Gamarium",
+    "symbol": "GMRM"
+  },
+  {
     "address": "0:387b04f019fbbba55402f998c8deca05c05e97ad724e36363a3261b32fca5608",
     "image": "https://proxy.toncenter.com/gYxTnpLOY3MLfCprdolvCF0G2zA96EC9xMHZmsasKmI/pr:small/bG9jYWw6Ly8vYzUvYmIvYzViYjdkOWYxOGQ5MmUwNTMzMTlhNzI5NTdkY2Q1NTAzZDEyNTRlOGM2ODZmN2RmYTdkOWZkNDdlODhkODE1OA",
     "name": "Game Hunters",
@@ -6422,6 +6457,12 @@
     "symbol": "GHOST"
   },
   {
+    "address": "0:26b466210c941aab4dafa0a150f6c0b718f72e5ea2b5a2204d00a5b2ef6c4101",
+    "image": "https://proxy.toncenter.com/n_kWcQSKsKsc-4y8r5-71gcYN-osw4VJlkNEPDeXHxU/pr:small/bG9jYWw6Ly8vYmQvZTcvYmRlNzFjZTQ0MjE5MTA3MjkxMzQyNmE3NmY0ZWVhMTc1OTRkN2M2NzZiNDlkYzAwZTg4NDg5MmYxNjU1ZTEzMQ",
+    "name": "Gift Gram",
+    "symbol": "GGRAM"
+  },
+  {
     "address": "0:5e9f1b4d4a61856d5f22707c57a525e4d8db6956cc9bf89134099b41bc803a1f",
     "image": "https://proxy.toncenter.com/QVoBh2mXNa-Frr-2Z8FGkGyL40eK_viISF9-GETRcnQ/pr:small/bG9jYWw6Ly8vMjkvZTcvMjllN2QyNDA3MTQwMWQ1YWY2MjBkNzdjYjhkMDRkYTFiMzA4OWEwN2E4YTI0YWVhYjkwNGU5MmZkMDdiODZiYQ",
     "name": "GIFTED",
@@ -6437,6 +6478,12 @@
     "image": "https://proxy.toncenter.com/AQUkOP0WrjL03tUr1wgVKJtCI1mew7URcqBeuOyaBE0/pr:small/bG9jYWw6Ly8vMzcvNmYvMzc2ZjlkZWM0NjkzMTRiOTI2Mzg2ZWEyOWUwYTlhZjE5YzBjY2FjYmE4ZTU5MTcyYTBkM2RiZjJjNjU4YmUxNA",
     "name": "Gifties",
     "symbol": "GIFT"
+  },
+  {
+    "address": "0:399161023899e5b8848a675a784cf5a717c59608786d1117c626d0d35b19361e",
+    "image": "https://proxy.toncenter.com/lHYrez7MQ862RxupxNm869NLsS5fHbqxuBml1IhAGlM/pr:small/bG9jYWw6Ly8vMWIvMzcvMWIzNzNjODJhZGM5MmNkOWYzMTM0NzUxZGI5YTA1OTA4ZjU5NzEwN2IzNjBlYTVjNmYyMzE3MGY2Mjg0NmRkOQ",
+    "name": "GiftKO Coin",
+    "symbol": "GiftKO"
   },
   {
     "address": "0:3d55029b8f831207493eeec2b552b6322209fd527529197a5472405ef7ea2c97",
@@ -7554,11 +7601,6 @@
     "symbol": "IBTAx"
   },
   {
-    "address": "0:f3a995fe31a8811f64947b15d74916dea3ebb45430d0ab24e099470c5c3b41c1",
-    "name": "Icahn Enterprises xStock",
-    "symbol": "IEPx"
-  },
-  {
     "address": "0:d67eeb8342f4fc1e123f82136b6a2d4b3930355c61f0d78a5520f6aa2805da92",
     "name": "Ice",
     "symbol": "ICE"
@@ -8300,6 +8342,12 @@
     "symbol": "jInvest"
   },
   {
+    "address": "-1:bf7e01ea11ccc2b302e99c112822f832aee254be7fd00ede5046379c63cc3796",
+    "image": "https://proxy.toncenter.com/Nptc8MTaB8nIFryjkF9B_ZFk2F93v_UsDVq0MyyDOPg/pr:small/bG9jYWw6Ly8vODEvZWUvODFlZTE3ZDFmYjVkMTg0ZWEyZGViODc0MjUwNWM0YjU5YTRiMWNmMmNiZjk2ZWY2YmIxNTI0NzRkN2JkYWE0Nw",
+    "name": "Jury Token",
+    "symbol": "JURY"
+  },
+  {
     "address": "0:7e30fc2b7751ba58a3642f3fd59d5e96a810ddd78d8a310bfe8353bef10500df",
     "name": "jUSDC",
     "symbol": "jUSDC"
@@ -8916,6 +8964,12 @@
     "address": "0:21a6098ad55e6fe7095c2021bb000d04364a3527e275bfa99fc54707630aaa2f",
     "name": "Leverage Shares 2X Long SPCX Daily ETF xStock",
     "symbol": "SPCHx"
+  },
+  {
+    "address": "0:f56c0aae11740c7d41f025422036aa727801265f0d64d6469481034caa8ada40",
+    "image": "https://proxy.toncenter.com/d6KoHBvAC2UhVwgGX-DJfN9G8K24CdAzVtnk1ji7euc/pr:small/bG9jYWw6Ly8vZDkvNTcvZDk1N2Y2YzczMjRmMGZjNGI0NjFkODk1NTQ4MjY2ODNlOTYxZTBjNmZlNTBjODQwNWU3M2I5ZjgxYWViYjBlMw",
+    "name": "LEVY",
+    "symbol": "LEVY"
   },
   {
     "address": "0:f7c56be022c3c453f537137f77c32090d5d58a7fb322c9cc036bc207e809ede3",
@@ -13193,6 +13247,12 @@
     "image": "https://proxy.toncenter.com/WPppP_ixeclUn6Ps3NOfnwr5aQQHdsmyhOeIjWoscrk/pr:small/bG9jYWw6Ly8vN2UvZDIvN2VkMjI1NTgzMmI4ZTMzZjM0NWQ1MDhlYjdiYzYxNjBmMDg4ZTFlZjlhYThiNjNhYjJjYjU1ODI3YTliNGI0Zg",
     "name": "Raccoon Coin",
     "symbol": "RACC"
+  },
+  {
+    "address": "0:e733280c9a0c62d4e6254a919c51be54586ced528dbcc37c39e3eb3fc523d785",
+    "image": "https://proxy.toncenter.com/BM-sE8kuombVSoJ1xtacEs9KEQL6Jeancmp5O28hYmY/pr:small/bG9jYWw6Ly8vZDAvZmMvZDBmY2NlMDFhNTY5YmY4YzI1NjNiZmU2NzJkNDUwNDNkYzY0MzY4NTJmM2YwZjFjMzY5Yjk3NmU4ZTFjODUyYg",
+    "name": "Raccoon Heist",
+    "symbol": "HEIST"
   },
   {
     "address": "0:41f24f8bd38e5cef7a088fd3f982de3fdcfc4bcf1476936938d7bfa3282b3378",
@@ -17892,6 +17952,12 @@
     "image": "https://proxy.toncenter.com/1LXmxnOgYvSpI0FwlSHxPrC4sW9GRv3ey9Mc8fUNrX4/pr:small/bG9jYWw6Ly8vN2UvYTYvN2VhNjk3Zjc2YjQ0M2Q4YjU3OWMwYWU3MzNmODU4MWQ0MjJmNWNiMGRmYjk1YzE1YmY2ZWExZmEyMjAxNDE2YQ",
     "name": "Victor's Company",
     "symbol": "VIC"
+  },
+  {
+    "address": "0:e3a65933a97b5e4e0ad162ded7b6f5f1a13f9cb0bc612ad09bb066660c0b660f",
+    "image": "https://proxy.toncenter.com/7S9NS8V5fyYBkI-HggvsXBIvX1lrO1KJdTsFLbGhX1k/pr:small/bG9jYWw6Ly8vMjIvNTIvMjI1MmU5ZWJkMjAxNjJjOTc5OGIzYjkwMTM0ZDU3ODNlZmVmMTIxZjFkNWQ5NjJkYTE2MDM4OGE2MGExNTdmOQ",
+    "name": "Victor's Company",
+    "symbol": "VICX"
   },
   {
     "address": "0:82e607a4c5b94bb93ddef77210879077c718c4de649abac45e8e20785854cadf",
