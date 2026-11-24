@@ -505,7 +505,12 @@ impl<'db, 'a> InferenceContext<'db, 'a> {
     }
 
     pub fn set_resolved(&mut self, use_: NameUse) {
-        self.resolved_refs.push(use_);
+        // Names are not always visited in source order (an object literal records a field
+        // key after inferring its value), while lookups binary-search this list by span.
+        let index = self
+            .resolved_refs
+            .partition_point(|existing| existing.span.start <= use_.span.start);
+        self.resolved_refs.insert(index, use_);
     }
 
     pub fn get_resolved_node<'node, Node: AstNode<'node>>(&self, node: &Node) -> Option<&NameUse> {
