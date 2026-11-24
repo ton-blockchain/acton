@@ -2564,7 +2564,7 @@ function getHistoryActionBaseLabel(action: V3Action, isIncoming: boolean): strin
     return isIncoming ? "Received GRAM" : "Send GRAM"
   }
 
-  return ACTION_TYPE_LABELS[action.type] ?? "Unsupported action"
+  return ACTION_TYPE_LABELS[action.type] ?? action.type
 }
 
 // Base labels are sentence case, so they lowercase cleanly behind a prefix - unless the first
