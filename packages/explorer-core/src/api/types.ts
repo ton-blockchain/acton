@@ -486,6 +486,106 @@ export interface V3ActionDetailsNftPutOnSale {
   readonly marketplace: V3ActionString
 }
 
+export interface V3ActionDetailsNftFixedSaleCreate {
+  readonly depositor: V3ActionAddress
+  readonly seller: V3ActionAddress
+  readonly sale: V3ActionAddress
+  readonly nft_item: V3ActionAddress
+  readonly nft_collection: V3ActionAddress
+  readonly nft_item_index: V3ActionString
+  readonly price: V3ActionString
+  readonly fee_amount: V3ActionString
+  readonly fee_address: V3ActionAddress
+}
+
+export interface V3ActionDetailsNftFixedSaleUpdate {
+  readonly seller: V3ActionAddress
+  readonly sale: V3ActionAddress
+  readonly nft_item: V3ActionAddress
+  readonly nft_collection: V3ActionAddress
+  readonly nft_item_index: V3ActionString
+  readonly price: V3ActionString
+  readonly fee_amount: V3ActionString
+  readonly fee_address: V3ActionAddress
+}
+
+export interface V3ActionDetailsNftFixedSalePurchase {
+  readonly buyer: V3ActionAddress
+  readonly seller: V3ActionAddress
+  readonly recipient: V3ActionAddress
+  readonly sale: V3ActionAddress
+  readonly nft_item: V3ActionAddress
+  readonly nft_collection: V3ActionAddress
+  readonly nft_item_index: V3ActionString
+  readonly query_id: V3ActionString
+  readonly price: V3ActionString
+  readonly fee_amount: V3ActionString
+  readonly fee_address: V3ActionAddress
+}
+
+export interface V3ActionDetailsNftFixedSaleCancel {
+  readonly seller: V3ActionAddress
+  readonly sale: V3ActionAddress
+  readonly nft_item: V3ActionAddress
+  readonly nft_collection: V3ActionAddress
+  readonly nft_item_index: V3ActionString
+}
+
+export interface V3ActionDetailsNftOfferCreate {
+  readonly buyer: V3ActionAddress
+  readonly offer: V3ActionAddress
+  readonly nft_item: V3ActionAddress
+  readonly nft_collection: V3ActionAddress
+  readonly nft_item_index: V3ActionString
+  readonly amount: V3ActionString
+  readonly price: V3ActionString
+  readonly fee_amount: V3ActionString
+  readonly fee_address: V3ActionAddress
+}
+
+export interface V3ActionDetailsNftOfferAccept {
+  readonly buyer: V3ActionAddress
+  readonly seller: V3ActionAddress
+  readonly recipient: V3ActionAddress
+  readonly offer: V3ActionAddress
+  readonly nft_item: V3ActionAddress
+  readonly nft_collection: V3ActionAddress
+  readonly nft_item_index: V3ActionString
+  readonly query_id: V3ActionString
+  readonly price: V3ActionString
+  readonly fee_amount: V3ActionString
+  readonly fee_address: V3ActionAddress
+}
+
+export interface V3ActionDetailsNftOfferCancel {
+  readonly buyer: V3ActionAddress
+  readonly offer: V3ActionAddress
+  readonly nft_item: V3ActionAddress
+  readonly nft_collection: V3ActionAddress
+  readonly nft_item_index: V3ActionString
+  readonly refund_amount: V3ActionString
+  readonly fee_amount: V3ActionString
+  readonly fee_address: V3ActionAddress
+}
+
+export interface V3ActionDetailsNftOfferSignedCancel {
+  readonly buyer: V3ActionAddress
+  readonly offer: V3ActionAddress
+  readonly nft_item: V3ActionAddress
+  readonly nft_collection: V3ActionAddress
+  readonly nft_item_index: V3ActionString
+  readonly refund_amount: V3ActionString
+}
+
+export interface V3ActionDetailsNftOfferExpire {
+  readonly buyer: V3ActionAddress
+  readonly offer: V3ActionAddress
+  readonly nft_item: V3ActionAddress
+  readonly nft_collection: V3ActionAddress
+  readonly nft_item_index: V3ActionString
+  readonly refund_amount: V3ActionString
+}
+
 export interface V3ActionDetailsNftPutOnAuction {
   readonly nft_collection: V3ActionAddress
   readonly nft_item: V3ActionAddress
@@ -1019,6 +1119,15 @@ export type V3Action =
   | V3ActionBase<"nft_purchase", V3ActionDetailsNftTransfer>
   | V3ActionBase<"dns_purchase", V3ActionDetailsDnsPurchase>
   | V3ActionBase<"nft_put_on_sale", V3ActionDetailsNftPutOnSale>
+  | V3ActionBase<"nft_fixed_sale_create", V3ActionDetailsNftFixedSaleCreate>
+  | V3ActionBase<"nft_fixed_sale_update", V3ActionDetailsNftFixedSaleUpdate>
+  | V3ActionBase<"nft_fixed_sale_purchase", V3ActionDetailsNftFixedSalePurchase>
+  | V3ActionBase<"nft_fixed_sale_cancel", V3ActionDetailsNftFixedSaleCancel>
+  | V3ActionBase<"nft_offer_create", V3ActionDetailsNftOfferCreate>
+  | V3ActionBase<"nft_offer_accept", V3ActionDetailsNftOfferAccept>
+  | V3ActionBase<"nft_offer_cancel", V3ActionDetailsNftOfferCancel>
+  | V3ActionBase<"nft_offer_signed_cancel", V3ActionDetailsNftOfferSignedCancel>
+  | V3ActionBase<"nft_offer_expire", V3ActionDetailsNftOfferExpire>
   | V3ActionBase<"nft_put_on_auction", V3ActionDetailsNftPutOnAuction>
   | V3ActionBase<"teleitem_start_auction", V3ActionDetailsNftPutOnAuction>
   | V3ActionBase<"tick_tock", V3ActionDetailsTickTock>

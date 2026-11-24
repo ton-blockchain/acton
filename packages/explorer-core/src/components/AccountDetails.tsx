@@ -2344,7 +2344,16 @@ const ACTION_TYPE_LABELS = {
   nft_cancel_sale: "Cancel sale",
   nft_discovery: "NFT discovery",
   nft_finish_auction: "Finish auction",
+  nft_fixed_sale_cancel: "Cancel sale",
+  nft_fixed_sale_create: "Put on sale",
+  nft_fixed_sale_purchase: "NFT purchase",
+  nft_fixed_sale_update: "Update sale",
   nft_mint: "Mint NFT",
+  nft_offer_accept: "Accept NFT offer",
+  nft_offer_cancel: "Cancel NFT offer",
+  nft_offer_create: "Create NFT offer",
+  nft_offer_expire: "NFT offer expired",
+  nft_offer_signed_cancel: "Cancel NFT offer by signature",
   nft_purchase: "NFT purchase",
   nft_put_on_auction: "Put on auction",
   nft_put_on_sale: "Put on sale",
@@ -2432,7 +2441,16 @@ const ACTION_TYPE_ICONS = {
   nft_cancel_sale: ImageIcon,
   nft_discovery: ImageIcon,
   nft_finish_auction: Gavel,
+  nft_fixed_sale_cancel: ImageIcon,
+  nft_fixed_sale_create: ImageIcon,
+  nft_fixed_sale_purchase: ImageIcon,
+  nft_fixed_sale_update: ImageIcon,
   nft_mint: ImagePlus,
+  nft_offer_accept: ImageIcon,
+  nft_offer_cancel: ImageIcon,
+  nft_offer_create: ImageIcon,
+  nft_offer_expire: ImageIcon,
+  nft_offer_signed_cancel: ImageIcon,
   nft_purchase: ImageIcon,
   nft_put_on_auction: Gavel,
   nft_put_on_sale: ImageIcon,
@@ -2959,6 +2977,112 @@ function getHistoryActionDisplay(
         "Account",
       )
     }
+    case "nft_fixed_sale_create":
+    case "nft_fixed_sale_update":
+      return addressAction(
+        action.details.sale,
+        "sale",
+        false,
+        "Sale",
+        valueLines(
+          tonToNftValueLine(
+            action.details.price,
+            "neutral",
+            action.details.nft_item,
+            action.details.nft_item_index,
+            context.metadata,
+            action.details.nft_collection,
+          ),
+        ),
+      )
+    case "nft_fixed_sale_purchase":
+    case "nft_offer_accept": {
+      const amountTone = getTransferValueTone(
+        action.details.buyer,
+        action.details.seller,
+        context.ownerAddress,
+      )
+
+      return sourceDestinationAction(
+        action.details.seller,
+        action.details.recipient,
+        context.ownerAddress,
+        () =>
+          valueLines(
+            tonToNftValueLine(
+              action.details.price,
+              amountTone,
+              action.details.nft_item,
+              action.details.nft_item_index,
+              context.metadata,
+              action.details.nft_collection,
+            ),
+          ),
+        "Account",
+        {destinationAccounts: [action.details.buyer]},
+      )
+    }
+    case "nft_fixed_sale_cancel":
+      return addressAction(
+        action.details.sale,
+        "sale",
+        false,
+        "Sale",
+        valueLines(
+          actionNftValueLine(
+            action.details.nft_item,
+            action.details.nft_item_index,
+            context.metadata,
+            action.details.nft_collection,
+          ),
+        ),
+      )
+    case "nft_offer_create":
+      return sourceDestinationAction(
+        action.details.buyer,
+        action.details.offer,
+        context.ownerAddress,
+        () =>
+          valueLines(
+            tonToNftValueLine(
+              action.details.amount,
+              getTransferValueTone(
+                action.details.buyer,
+                action.details.offer,
+                context.ownerAddress,
+              ),
+              action.details.nft_item,
+              action.details.nft_item_index,
+              context.metadata,
+              action.details.nft_collection,
+            ),
+          ),
+        "Offer",
+      )
+    case "nft_offer_cancel":
+    case "nft_offer_signed_cancel":
+    case "nft_offer_expire":
+      return sourceDestinationAction(
+        action.details.offer,
+        action.details.buyer,
+        context.ownerAddress,
+        () =>
+          valueLines(
+            tonToNftValueLine(
+              action.details.refund_amount,
+              getTransferValueTone(
+                action.details.offer,
+                action.details.buyer,
+                context.ownerAddress,
+              ),
+              action.details.nft_item,
+              action.details.nft_item_index,
+              context.metadata,
+              action.details.nft_collection,
+            ),
+          ),
+        "Offer",
+      )
     case "nft_put_on_sale":
       return addressAction(
         action.details.sale_address,
@@ -3626,6 +3750,16 @@ function matchesAnyActionAddress(
   ownerAddress: string,
 ): boolean {
   return addresses.some(address => (address ? isSameAddress(address, ownerAddress) : false))
+}
+
+function getTransferValueTone(
+  source: string | null,
+  destination: string | null,
+  ownerAddress: string,
+): HistoryValueTone {
+  if (matchesAnyActionAddress([source], ownerAddress)) return "negative"
+  if (matchesAnyActionAddress([destination], ownerAddress)) return "positive"
+  return "neutral"
 }
 
 function addressAction(
