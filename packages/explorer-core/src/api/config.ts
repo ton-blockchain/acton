@@ -1232,7 +1232,7 @@ function parsePrecompiledContracts(
 function parseValidatorRegistry(value: unknown): ValidatorRegistryConfiguration | undefined {
   const candidate = unwrapAnonymousConfigValue(value)
   if (
-    candidate?.kind !== "ValRegistryConfig" ||
+    candidate?.kind !== "ValRegistryConfig_val_registry_config_old" ||
     typeof candidate.max_collators_per_validator !== "number"
   ) {
     return undefined
@@ -1247,9 +1247,8 @@ function parseValidatorRegistry(value: unknown): ValidatorRegistryConfiguration 
   const codeHash = maybeCodeHash as Record<string, unknown>
   let newCodeHash: string | undefined
   if (codeHash.kind === "Maybe_just") {
-    if (typeof codeHash.value !== "bigint") return undefined
-    newCodeHash = fixedBigintHex(codeHash.value)
-    if (!newCodeHash) return undefined
+    if (!(codeHash.value instanceof Uint8Array) || codeHash.value.length !== 32) return undefined
+    newCodeHash = `0x${bytesToHex(codeHash.value)}`
   } else if (codeHash.kind !== "Maybe_nothing") {
     return undefined
   }
