@@ -140,7 +140,7 @@ jobs:
           fi
 
       - name: Run installer smoke checks
-        uses: ./.github/actions/check-release-artifact
+        uses: $/.github/actions/check-release-artifact
 
   cleanup-temporary-release:
     name: Delete temporary installer release

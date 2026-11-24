@@ -66,7 +66,7 @@ jobs:
             --target "${{ matrix.target_name }}"
 
       - name: Run release artifact checks
-        uses: ./.github/actions/check-release-artifact
+        uses: $/.github/actions/check-release-artifact
 
   check-artifact-with-qemu:
     name: Check release artifact with QEMU (${{ matrix.target_name }})
@@ -138,4 +138,4 @@ jobs:
           chmod +x acton-bin/acton
 
       - name: Run release artifact checks with QEMU
-        uses: ./.github/actions/check-release-artifact
+        uses: $/.github/actions/check-release-artifact

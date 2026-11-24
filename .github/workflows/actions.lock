@@ -75,6 +75,9 @@ workflows:
         - 'oven-sh/setup-bun@v2.2.0'
         - 'swatinem/rust-cache@v2.9.2'
         - 'taiki-e/install-action@v2.87.7'
+    '.github/workflows/check-actions.yml':
+        - 'actions/checkout@v7.0.1'
+        - 'zizmorcore/zizmor-action@v0.8.1'
     '.github/workflows/check-actonscan-backend.yml':
         - 'actions/checkout@v7.0.1'
         - 'swatinem/rust-cache@v2.9.2'
@@ -126,9 +129,6 @@ workflows:
         - 'oven-sh/setup-bun@v2.2.0'
         - 'swatinem/rust-cache@v2.9.2'
         - 'taiki-e/install-action@v2.87.7'
-    '.github/workflows/check-zizmor.yml':
-        - 'actions/checkout@v7.0.1'
-        - 'zizmorcore/zizmor-action@v0.8.1'
     '.github/workflows/deploy-actonscan.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
