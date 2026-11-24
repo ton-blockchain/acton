@@ -2260,11 +2260,24 @@
       }
     },
     "ValRegistryConfig": {
+      "type": "union",
+      "options": [
+        {
+          "type": "ref",
+          "name": "ValRegistryConfig_val_registry_config_old"
+        },
+        {
+          "type": "ref",
+          "name": "ValRegistryConfig_val_registry_config"
+        }
+      ]
+    },
+    "ValRegistryConfig_val_registry_config_old": {
       "type": "struct",
       "fields": {
         "kind": {
           "type": "literal",
-          "value": "ValRegistryConfig"
+          "value": "ValRegistryConfig_val_registry_config_old"
         },
         "contract_address": {
           "type": "buffer"
@@ -2275,8 +2288,63 @@
         "new_code_hash": {
           "type": "maybe",
           "value": {
-            "type": "bigint"
+            "type": "buffer"
           }
+        }
+      }
+    },
+    "ValRegistryConfig_val_registry_config": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ValRegistryConfig_val_registry_config"
+        },
+        "contract_address": {
+          "type": "buffer"
+        },
+        "new_code_hash": {
+          "type": "maybe",
+          "value": {
+            "type": "buffer"
+          }
+        },
+        "roles": {
+          "type": "map",
+          "key": {
+            "type": "number"
+          },
+          "value": {
+            "type": "ref",
+            "name": "ValRegistryRoleConfig"
+          }
+        },
+        "voting_timeout": {
+          "type": "number"
+        },
+        "voting_price": {
+          "type": "bigint"
+        },
+        "node_update_period": {
+          "type": "number"
+        }
+      }
+    },
+    "ValRegistryRoleConfig": {
+      "type": "struct",
+      "fields": {
+        "kind": {
+          "type": "literal",
+          "value": "ValRegistryRoleConfig"
+        },
+        "threshold_add": {
+          "type": "number"
+        },
+        "threshold_remove": {
+          "type": "number"
+        },
+        "max_nodes": {
+          "type": "number"
         }
       }
     },
