@@ -430,10 +430,10 @@ describe("network configuration parser", () => {
       beginCell().store(storePrecompiledContractsConfig(precompiledContractsConfig)).endCell(),
     )
     const validatorRegistry: ValRegistryConfig = {
-      kind: "ValRegistryConfig",
+      kind: "ValRegistryConfig_val_registry_config_old",
       contract_address: Buffer.alloc(32, 0xe1),
       max_collators_per_validator: 8,
-      new_code_hash: {kind: "Maybe_just", value: 0xe2n},
+      new_code_hash: {kind: "Maybe_just", value: Buffer.from(`${"00".repeat(31)}e2`, "hex")},
     }
     config.set(46, beginCell().store(storeValRegistryConfig(validatorRegistry)).endCell())
     const oracleEntries = Dictionary.empty<bigint, bigint>()

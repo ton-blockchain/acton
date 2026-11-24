@@ -462,10 +462,30 @@ unary_succ$1
 exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 46 1`] = `
 "_ ValRegistryConfig = ConfigParam 46;
 
-val_registry_config#3601163e
+val_registry_config_old#3601163e
   contract_address:bits256
   max_collators_per_validator:uint32
-  new_code_hash:(Maybe uint256) = ValRegistryConfig;"
+  new_code_hash:(Maybe bits256) = ValRegistryConfig;
+
+val_registry_config#3601163f
+  contract_address:bits256
+  new_code_hash:(Maybe bits256)
+  roles:(HashmapE 5 ValRegistryRoleConfig)
+  voting_timeout:uint32
+  voting_price:Grams
+  node_update_period:(## 32)
+  { node_update_period >= 2 } = ValRegistryConfig;
+
+nanograms$_ amount:(VarUInteger 16) = Grams;
+
+val_registry_role_config#e19f2d29
+  threshold_add:(## 16)
+  { threshold_add >= 1 }
+  { threshold_add <= 10000 }
+  threshold_remove:(## 16)
+  { threshold_remove >= 1 }
+  { threshold_remove <= 10000 }
+  max_nodes:uint32 = ValRegistryRoleConfig;"
 `;
 
 exports[`configuration TL-B catalog keeps root declarations first, exact tags and all recursive constructors: ConfigParam 46 additional types 1`] = `
@@ -473,5 +493,63 @@ exports[`configuration TL-B catalog keeps root declarations first, exact tags an
 
 just$1
   {X:Type}
-  value:X = Maybe X;"
+  value:X = Maybe X;
+
+hme_empty$0
+  {n:#}
+  {X:Type} = HashmapE n X;
+
+hme_root$1
+  {n:#}
+  {X:Type}
+  root:^(Hashmap n X) = HashmapE n X;
+
+var_uint$_
+  {n:#}
+  len:(#< n)
+  value:(uint (len * 8)) = VarUInteger n;
+
+hm_edge#_
+  {n:#}
+  {X:Type}
+  {l:#}
+  {m:#}
+  label:(HmLabel ~l n)
+  {n = (~m) + l}
+  node:(HashmapNode m X) = Hashmap n X;
+
+hmn_leaf#_
+  {X:Type}
+  value:X = HashmapNode 0 X;
+
+hmn_fork#_
+  {n:#}
+  {X:Type}
+  left:^(Hashmap n X)
+  right:^(Hashmap n X) = HashmapNode (n + 1) X;
+
+hml_short$0
+  {m:#}
+  {n:#}
+  len:(Unary ~n)
+  {n <= m}
+  s:(n * Bit) = HmLabel ~n m;
+
+hml_long$10
+  {m:#}
+  n:(#<= m)
+  s:(n * Bit) = HmLabel ~n m;
+
+hml_same$11
+  {m:#}
+  v:Bit
+  n:(#<= m) = HmLabel ~n m;
+
+bit$_ (## 1) = Bit;
+
+unary_zero$0 = Unary ~0;
+
+unary_succ$1
+  {n:#}
+  x:(Unary ~n) = Unary ~(n + 1);"
 `;

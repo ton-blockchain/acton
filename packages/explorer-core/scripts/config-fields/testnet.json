@@ -238,7 +238,19 @@
     ],
     "44": ["addresses", "addresses{}", "suspended_until"],
     "45": ["list", "list{}", "list{}.gas_usage"],
-    "46": ["contract_address", "max_collators_per_validator", "new_code_hash"],
+    "46": [
+      "contract_address",
+      "max_collators_per_validator",
+      "new_code_hash",
+      "node_update_period",
+      "roles",
+      "roles{}",
+      "roles{}.max_nodes",
+      "roles{}.threshold_add",
+      "roles{}.threshold_remove",
+      "voting_price",
+      "voting_timeout"
+    ],
     "71": [
       "bridge_address",
       "external_chain_address",

@@ -265,6 +265,102 @@ describe("historical network configuration constructors", () => {
     }
   })
 
+  test.each([null, Buffer.alloc(32), Buffer.from(`00${"ff".repeat(31)}`, "hex")])(
+    "validator registry constructors in parameter 46 with code hash %p",
+    newCodeHash => {
+      const legacy = beginCell()
+        .storeUint(0x36_01_16_3e, 32)
+        .storeBuffer(Buffer.alloc(32, 0xe1))
+        .storeUint(8, 32)
+        .storeMaybeBuffer(newCodeHash, 32)
+        .endCell()
+      const legacyParameter = parseConfigParameter(46, legacy)
+      expect(legacyParameter.parseError).toBeUndefined()
+      expect(legacyParameter.validatorRegistry).toEqual({
+        contractAddress: `-1:${"e1".repeat(32)}`,
+        maxCollatorsPerValidator: 8,
+        ...(newCodeHash === null ? {} : {newCodeHash: `0x${newCodeHash.toString("hex")}`}),
+      })
+
+      const roles = Dictionary.empty<number, readonly [number, number, number]>()
+      roles.set(0, [1, 10_000, 5])
+      roles.set(31, [10_000, 1, 0xff_ff_ff_ff])
+      const current = beginCell()
+        .storeUint(0x36_01_16_3f, 32)
+        .storeBuffer(Buffer.alloc(32, 0xe1))
+        .storeMaybeBuffer(newCodeHash, 32)
+        .storeDict(roles, Dictionary.Keys.Uint(5), {
+          serialize: ([add, remove, maxNodes], builder) =>
+            builder
+              .storeUint(0xe1_9f_2d_29, 32)
+              .storeUint(add, 16)
+              .storeUint(remove, 16)
+              .storeUint(maxNodes, 32),
+          parse: () => {
+            throw new Error("not used in test")
+          },
+        })
+        .storeUint(0xff_ff_ff_ff, 32)
+        .storeCoins(9_007_199_254_740_993n)
+        .storeUint(2, 32)
+        .endCell()
+      const currentParameter = parseConfigParameter(46, current)
+      expect(currentParameter.parseError).toBeUndefined()
+      // The new constructor uses the generic view so all role and voting fields remain visible.
+      expect(currentParameter.validatorRegistry).toBeUndefined()
+      expect(currentParameter.parsedValue).toMatchObject({
+        kind: "object",
+        entries: [
+          {
+            key: "Contract address",
+            value: {kind: "address", value: `-1:${"e1".repeat(32)}`},
+          },
+          {
+            key: "New code hash",
+            value: {
+              kind: "object",
+              entries:
+                newCodeHash === null
+                  ? []
+                  : [{key: "Value", value: {value: `0x${newCodeHash.toString("hex")}`}}],
+            },
+          },
+          {
+            key: "Roles",
+            value: {
+              kind: "map",
+              entries: [
+                {
+                  key: {value: "0"},
+                  value: {
+                    entries: [
+                      {key: "Threshold add", value: {value: "1"}},
+                      {key: "Threshold remove", value: {value: "10000"}},
+                      {key: "Max nodes", value: {value: "5"}},
+                    ],
+                  },
+                },
+                {
+                  key: {value: "31"},
+                  value: {
+                    entries: [
+                      {key: "Threshold add", value: {value: "10000"}},
+                      {key: "Threshold remove", value: {value: "1"}},
+                      {key: "Max nodes", value: {value: "4294967295"}},
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+          {key: "Voting timeout", value: {value: "4294967295"}},
+          {key: "Voting price", value: {value: "9007199254740993"}},
+          {key: "Node update period", value: {value: "2"}},
+        ],
+      })
+    },
+  )
+
   test("jetton bridges in parameters 79, 81 and 82", () => {
     const oracles = Dictionary.empty<bigint, bigint>()
     oracles.set(0x11n, 0x22n)
