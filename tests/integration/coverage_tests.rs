@@ -608,6 +608,62 @@ fn test_coverage_lcov_snapshot() {
 }
 
 #[test]
+fn test_coverage_drops_branches_of_excluded_test_files() {
+    let project = ProjectBuilder::new("coverage-excluded-test-branches")
+        .contract("simple", SIMPLE_CONTRACT)
+        .file(
+            "code/helper",
+            r"
+            fun isZero(value: int): bool {
+                return value == 0;
+            }
+        ",
+        )
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+            import "../code/helper"
+
+            get fun `test a branchless helper called from a test`() {
+                var i = 0;
+                while (i < 10) {
+                    if (i == 0) {
+                        expect(isZero(i)).toBeTrue();
+                    } else {
+                        expect(isZero(i)).toBeFalse();
+                    }
+                    i += 1;
+                }
+            }
+        "#,
+        )
+        .build();
+
+    let lcov_path = project.path().join("lcov.info");
+
+    let output = project
+        .acton()
+        .test()
+        .with_coverage()
+        .with_coverage_format("lcov")
+        .run()
+        .success();
+
+    output
+        .assert_passed(1)
+        .assert_contains("LCOV file saved in lcov.info");
+
+    let lcov_content = fs::read_to_string(&lcov_path).expect("Should read lcov.info");
+    assertion().eq(
+        normalize_output(lcov_content.as_str(), project.path()),
+        snapbox::file!(
+            "snapshots/coverage/test_coverage_drops_branches_of_excluded_test_files.lcov"
+        ),
+    );
+}
+
+#[test]
 fn test_coverage_exports_files_with_zero_hits() {
     let project = ProjectBuilder::new("coverage-zero-hit-file")
         .contract("simple", SIMPLE_CONTRACT)
