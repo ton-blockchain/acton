@@ -149,8 +149,16 @@
   box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
-.metadataButton {
-  align-self: flex-start;
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   min-height: 18px;
   padding: 0;
   color: var(--acton-color-accent);
@@ -162,17 +170,18 @@
   font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-normal);
   line-height: 18px;
+  text-decoration: none;
 }
 
-.collectionName + .metadataButton {
+.collectionName + .actions {
   margin-top: 4px;
 }
 
-.metadataButton:hover {
+.action:hover {
   text-decoration: underline;
 }
 
-.metadataButton:focus-visible {
+.action:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }

@@ -1,3 +1,4 @@
+import {ExternalLink} from "lucide-react"
 import type {FC, ReactNode} from "react"
 
 import {AccountAddressDetailRow, AccountDetailRows, AccountTextDetailRow} from "./AccountDetailRows"
@@ -21,6 +22,10 @@ interface NftItemOverviewProps extends NftOverviewBaseProps {
   readonly ownerAddress?: string
   readonly collectionAddress?: string
   readonly index: string
+  readonly externalLink?: {
+    readonly href: string
+    readonly label: string
+  }
   readonly onMetadataClick: () => void
 }
 
@@ -64,9 +69,21 @@ export const NftOverview: FC<NftOverviewProps> = props => (
           </div>
         )}
         {props.kind === "item" && (
-          <button type="button" className={styles.metadataButton} onClick={props.onMetadataClick}>
-            Metadata
-          </button>
+          <div className={styles.actions}>
+            <button type="button" className={styles.action} onClick={props.onMetadataClick}>
+              Metadata
+            </button>
+            {props.externalLink && (
+              <a
+                className={styles.action}
+                href={props.externalLink.href}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {props.externalLink.label} <ExternalLink size={12} aria-hidden="true" />
+              </a>
+            )}
+          </div>
         )}
       </div>
     </div>

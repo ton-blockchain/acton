@@ -62,6 +62,7 @@ import {NftImageReveal} from "../components/NftImageReveal"
 import {NftOverview} from "../components/NftOverview"
 import {useNftImageVisibility} from "../hooks/useNftImageVisibility"
 import {isEcosystemNft, nftCollectionKey} from "../nfts/ecosystemCollections"
+import {getTelegramGiftFragmentUrl} from "../nfts/telegramGiftFragmentUrl"
 import {SuspendedAccountOverview} from "../components/SuspendedAccountOverview"
 import {VestingOverview} from "../components/VestingOverview"
 import {WalletV5PluginsTab} from "../components/WalletV5PluginsTab"
@@ -1904,6 +1905,10 @@ export const AccountPage: FC<AccountPageProps> = ({
         ...getNftImageSources(currentNftItem?.content, NFT_IMAGE_SOURCE_KEYS),
       ]
   const nftItemIsScam = nftItemTokenInfo?.is_scam === true || currentNftItem?.is_scam === true
+  const telegramGiftUrl =
+    ecosystemNetwork === "mainnet" && !nftItemIsScam && !nftItemIsNsfw
+      ? getTelegramGiftFragmentUrl(currentNftItem?.content)
+      : undefined
   const nftItemMetadataJson = currentNftItem
     ? JSON.stringify(
         {
@@ -2489,6 +2494,11 @@ export const AccountPage: FC<AccountPageProps> = ({
                       ownerAddress={nftItemOwnerAddress}
                       collectionAddress={nftItemCollectionAddress}
                       index={currentNftItem.index}
+                      externalLink={
+                        telegramGiftUrl
+                          ? {href: telegramGiftUrl, label: "Open on Fragment"}
+                          : undefined
+                      }
                       onAddressClick={handleSearch}
                       onMetadataClick={() => setJettonMetadataOpen(true)}
                     />
