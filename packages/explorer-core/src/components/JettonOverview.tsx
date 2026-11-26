@@ -10,6 +10,7 @@ import styles from "./JettonOverview.module.css"
 interface JettonOverviewProps {
   readonly name: string
   readonly symbol?: string
+  readonly isScam: boolean
   readonly image: string
   readonly imageSources: readonly string[]
   readonly decimals?: string
@@ -24,6 +25,7 @@ interface JettonOverviewProps {
 export const JettonOverview: FC<JettonOverviewProps> = ({
   name,
   symbol,
+  isScam,
   image,
   imageSources,
   decimals,
@@ -71,6 +73,7 @@ export const JettonOverview: FC<JettonOverviewProps> = ({
         )}
       </div>
     </div>
+    {isScam && <span className={styles.scamLabel}>SCAM</span>}
     {totalSupply !== undefined && (
       <div className={styles.chartPlaceholder}>
         <svg viewBox="0 0 392 112" preserveAspectRatio="none" aria-hidden="true">

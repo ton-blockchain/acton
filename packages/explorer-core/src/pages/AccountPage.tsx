@@ -1830,6 +1830,9 @@ export const AccountPage: FC<AccountPageProps> = ({
   const tokenInfo = jettonMaster ?? jettonWalletMaster
   const tokenSymbol = tokenInfo?.jetton_content.symbol
   const tokenName = tokenInfo?.jetton_content.name || "Unknown jetton"
+  const tokenIsScam = accountTokenInfo.some(
+    info => info.type === "jetton_masters" && info.is_scam === true,
+  )
   const tokenDecimals = tokenInfo?.jetton_content.decimals
   const tokenImageSources = getImageSources(tokenInfo?.jetton_content, TOKEN_IMAGE_SOURCE_KEYS)
   const tokenImage = tokenImageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE
@@ -2448,6 +2451,7 @@ export const AccountPage: FC<AccountPageProps> = ({
                     <JettonOverview
                       name={tokenName}
                       symbol={tokenSymbol}
+                      isScam={tokenIsScam}
                       image={tokenImage}
                       imageSources={tokenImageSources}
                       decimals={tokenDecimals}
