@@ -69,6 +69,23 @@
   z-index: 2;
 }
 
+.card > .scamLabel {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: var(--acton-color-danger);
+  color: var(--acton-color-danger-foreground);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-bold);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
 .header {
   min-width: 0;
   display: flex;
@@ -207,23 +224,6 @@
   border-radius: 12px;
   background: var(--acton-color-surface-raised);
   overflow: hidden;
-}
-
-.scamLabel {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 1;
-  transform: translate(-50%, -50%);
-  padding: 4px 7px;
-  border-radius: 6px;
-  background: var(--acton-color-danger);
-  color: var(--acton-color-danger-foreground);
-  font-size: var(--acton-font-size-xs);
-  font-weight: var(--acton-font-weight-bold);
-  line-height: 1;
-  letter-spacing: 0.02em;
-  pointer-events: none;
 }
 
 .image {

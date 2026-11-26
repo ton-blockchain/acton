@@ -87,6 +87,7 @@ export const NftOverview: FC<NftOverviewProps> = props => (
         )}
       </div>
     </div>
+    {props.isScam && <span className={styles.scamLabel}>SCAM</span>}
     <div className={styles.divider} />
     <div className={styles.body}>
       <div className={styles.main}>
@@ -130,7 +131,6 @@ export const NftOverview: FC<NftOverviewProps> = props => (
           blurred={props.blurred ?? props.isScam}
           revealControl={props.revealControl}
         />
-        {props.isScam && <span className={styles.scamLabel}>SCAM</span>}
       </div>
     </div>
   </div>
