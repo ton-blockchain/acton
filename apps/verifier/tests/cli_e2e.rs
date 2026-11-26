@@ -578,17 +578,23 @@ fn rejects_local_head_behind_ahead_or_diverged_from_remote() {
         let remote = dir.path().join("source-repo.git");
         let original = git(&repo, &["rev-parse", "HEAD"]);
         if matches!(state, "behind" | "diverged") {
-            git(&repo, &["checkout", "-b", "other-writer"]);
+            // Keep the original checkout's remote-tracking ref stale.
             git(
-                &repo,
+                dir.path(),
+                &[
+                    "clone",
+                    "--branch",
+                    "main",
+                    "source-repo.git",
+                    "other-writer",
+                ],
+            );
+            let writer = dir.path().join("other-writer");
+            git(
+                &writer,
                 &["commit", "--allow-empty", "-m", "Remote advancement"],
             );
-            // Push by URL so the local tracking reference stays stale.
-            git(
-                &repo,
-                &["push", remote.to_str().expect("remote path"), "HEAD:main"],
-            );
-            git(&repo, &["checkout", "main"]);
+            git(&writer, &["push", "origin", "HEAD:main"]);
         }
         if matches!(state, "ahead" | "diverged") {
             git(
