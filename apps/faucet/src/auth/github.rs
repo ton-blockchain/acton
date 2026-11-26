@@ -1,6 +1,5 @@
 use anyhow::Context;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use chrono::{DateTime, Utc};
 use faucet_config::{GitHubAuthConfig, GitHubTierConfig};
 use faucet_valkey::{CappedEphemeralStoreDecision, ValkeyStore};
 use rand::RngCore;
@@ -8,6 +7,7 @@ use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::time::Duration;
+use time::OffsetDateTime;
 use utoipa::ToSchema;
 
 const GITHUB_AUTHORIZE_URL: &str = "https://github.com/login/oauth/authorize";
@@ -82,7 +82,8 @@ struct GitHubTokenResponse {
 struct GitHubProfile {
     id: u64,
     login: String,
-    created_at: DateTime<Utc>,
+    #[serde(with = "time::serde::rfc3339")]
+    created_at: OffsetDateTime,
     public_repos: u32,
     followers: u32,
 }
@@ -248,7 +249,8 @@ impl GitHubAuth {
 
         let identity = self.refresh_identity(grant.identity);
         let token = random_token();
-        let expires_at = Utc::now().timestamp() + self.config.session_ttl_seconds as i64;
+        let expires_at =
+            OffsetDateTime::now_utc().unix_timestamp() + self.config.session_ttl_seconds as i64;
         let session = BrowserSession {
             device_uid: grant.device_uid,
             identity: identity.clone(),
@@ -283,7 +285,9 @@ impl GitHubAuth {
         let session: BrowserSession =
             serde_json::from_str(&value).context("Failed to decode GitHub session")?;
 
-        if session.device_uid != device_uid || session.expires_at <= Utc::now().timestamp() {
+        if session.device_uid != device_uid
+            || session.expires_at <= OffsetDateTime::now_utc().unix_timestamp()
+        {
             return Err(AuthError::InvalidSession);
         }
         Ok(self.refresh_identity(session.identity))
@@ -377,9 +381,8 @@ impl GitHubAuth {
     }
 
     fn identity_from_profile(&self, profile: GitHubProfile) -> GitHubIdentity {
-        let account_age_days = Utc::now()
-            .signed_duration_since(profile.created_at)
-            .num_days()
+        let account_age_days = (OffsetDateTime::now_utc() - profile.created_at)
+            .whole_days()
             .max(0) as u64;
         self.refresh_identity(GitHubIdentity {
             github_user_id: profile.id,
@@ -387,7 +390,7 @@ impl GitHubAuth {
             tier: FaucetTier::Guest,
             max_requests: 0,
             account_age_days,
-            account_created_at: Some(profile.created_at.timestamp()),
+            account_created_at: Some(profile.created_at.unix_timestamp()),
             public_repos: profile.public_repos,
             followers: profile.followers,
         })
@@ -454,12 +457,10 @@ fn refresh_identity(
     established: &GitHubTierConfig,
 ) -> GitHubIdentity {
     if let Some(created_at) = identity.account_created_at
-        && let Some(created_at) = DateTime::from_timestamp(created_at, 0)
+        && let Ok(created_at) = OffsetDateTime::from_unix_timestamp(created_at)
     {
-        identity.account_age_days = Utc::now()
-            .signed_duration_since(created_at)
-            .num_days()
-            .max(0) as u64;
+        identity.account_age_days =
+            (OffsetDateTime::now_utc() - created_at).whole_days().max(0) as u64;
     }
     identity.tier = evaluate_tier(
         identity.account_age_days,

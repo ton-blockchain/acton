@@ -75,13 +75,13 @@ tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 rston = { path = "../../libs/rston", default-features = false, features = ["models", "wallet", "liteclient"] }
 utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
-zip = { version = "9.0", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.5", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 expect-test.workspace = true
 
 [build-dependencies]
-chrono = "0.4"
+time = "0.3"
 
 [profile.release]
 strip = true

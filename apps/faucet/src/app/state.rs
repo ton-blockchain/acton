@@ -1,5 +1,4 @@
-use apalis::prelude::json::JsonCodec;
-use apalis_sqlite::{CompactType, HookCallbackListener, SqliteStorage};
+use apalis_sqlite::SqliteStorage;
 use faucet_antifraud::Antifraud;
 use faucet_config::Config;
 use faucet_pow::Pow;
@@ -16,7 +15,7 @@ use crate::handlers::CreateClaim;
 
 #[derive(Clone)]
 pub(crate) struct AppState {
-    pub(crate) storage: SqliteStorage<CreateClaim, JsonCodec<CompactType>, HookCallbackListener>,
+    pub(crate) storage: SqliteStorage<CreateClaim>,
     pub(crate) database: SqlitePool,
     pub(super) wallet: Arc<Wallet>,
     pub(crate) client: Arc<ToncenterClient>,

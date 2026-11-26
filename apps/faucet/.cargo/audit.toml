@@ -1,10 +1,3 @@
-[advisories]
-ignore = [
-  # SQLx records its optional MySQL driver's RSA dependency in Cargo.lock.
-  # Faucet only enables SQLite; deny.toml forbids RSA in the resolved build graph.
-  "RUSTSEC-2023-0071",
-]
-
 [output]
 deny = ["yanked"]
 quiet = false

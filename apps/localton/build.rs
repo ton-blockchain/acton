@@ -1,6 +1,6 @@
 use std::{env, path::PathBuf, process::Command};
 
-use chrono::Utc;
+use time::OffsetDateTime;
 
 fn main() {
     println!("cargo:rerun-if-env-changed=LOCALTON_GIT_HASH");
@@ -8,7 +8,7 @@ fn main() {
 
     let package_version = env::var("CARGO_PKG_VERSION").expect("CARGO_PKG_VERSION must be set");
     let git_hash = git_hash();
-    let build_date = Utc::now().format("%Y-%m-%d");
+    let build_date = OffsetDateTime::now_utc().date();
 
     println!("cargo:rustc-env=LOCALTON_LONG_VERSION={package_version} ({git_hash} {build_date})");
 }

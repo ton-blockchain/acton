@@ -1,6 +1,6 @@
 use std::{env, path::PathBuf, process::Command};
 
-use chrono::Utc;
+use time::OffsetDateTime;
 
 fn main() {
     println!("cargo:rerun-if-env-changed=VERIFIER_GIT_HASH");
@@ -11,7 +11,7 @@ fn main() {
 
     println!("cargo:rustc-env=GIT_HASH={git_hash}");
 
-    let build_date = Utc::now().format("%Y-%m-%d").to_string();
+    let build_date = OffsetDateTime::now_utc().date();
     println!("cargo:rustc-env=BUILD_DATE={build_date}");
 
     println!("cargo:rustc-env=VERIFIER_LONG_VERSION={pkg_version} ({git_hash} {build_date})");

@@ -30,9 +30,6 @@ license-files = [
 ignore = []
 
 [bans]
-deny = [
-  { name = "rsa", reason = "RUSTSEC-2023-0071 is excluded from the lockfile audit only while RSA is absent from the build graph" },
-]
 multiple-versions = "allow"
 wildcards = "deny"
 allow-wildcard-paths = true

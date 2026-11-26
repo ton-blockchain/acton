@@ -9,6 +9,7 @@ use rston::models::{
 };
 use rston::wallet::{SendMsgFlags, WalletMessage};
 use std::time::Duration as StdDuration;
+use time::OffsetDateTime;
 use toncenter::ToncenterClient;
 use tracing::{error, info, warn};
 
@@ -59,7 +60,7 @@ pub(super) async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyh
 
         match status {
             Ok(_) => {
-                let paid_at = chrono::Utc::now().timestamp();
+                let paid_at = OffsetDateTime::now_utc().unix_timestamp();
                 record_payout_audit(&state, &payout_audit, paid_at).await;
                 record_successful_claim(&state, &task).await;
                 record_sent_subnet_amount(&state, &task, amount).await;

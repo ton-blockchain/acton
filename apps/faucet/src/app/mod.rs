@@ -1,7 +1,7 @@
 use anyhow::Context;
 use apalis::layers::WorkerBuilderExt;
 use apalis::prelude::{WorkerBuilder, WorkerError};
-use apalis_sqlite::{Config as SqliteConfig, SqliteStorage};
+use apalis_sqlite::SqliteStorage;
 use axum::middleware;
 use axum_governor::GovernorLayer;
 use faucet_antifraud::Antifraud;
@@ -9,7 +9,7 @@ use faucet_config::{ClaimRateLimitConfig, Config, DefaultRateLimitConfig};
 use faucet_pow::Pow;
 use faucet_valkey::ValkeyStore;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -28,7 +28,7 @@ use crate::antifraud::audit::AntifraudAuditStore;
 use crate::antifraud::blacklist::BlacklistStore;
 use crate::auth::github::GitHubAuth;
 use crate::blockchain::wallet::Wallet;
-use crate::handlers::{self, CreateClaim};
+use crate::handlers;
 use crate::middlewares::{enter_request_span, insert_client_ip};
 
 mod logger;
@@ -74,7 +74,11 @@ pub async fn run() -> anyhow::Result<()> {
     info!(database_url = %config.database.url, "Connecting to database");
     let opts = SqliteConnectOptions::from_str(&config.database.url)
         .context("Invalid database URL")?
-        .create_if_missing(true);
+        .create_if_missing(true)
+        .journal_mode(SqliteJournalMode::Wal)
+        .synchronous(SqliteSynchronous::Normal)
+        .pragma("temp_store", "MEMORY")
+        .pragma("cache_size", "64000");
     let antifraud_opts = SqliteConnectOptions::from_str(&config.antifraud_database.url)
         .context("Invalid antifraud database URL")?
         .create_if_missing(true)
@@ -113,7 +117,8 @@ pub async fn run() -> anyhow::Result<()> {
     .await;
     info!("Initialized rate limiter");
 
-    SqliteStorage::setup(&pool)
+    SqliteStorage::migrations()
+        .run(&pool)
         .await
         .context("Failed to setup storage")?;
     let antifraud_audit = AntifraudAuditStore::setup(antifraud_pool)
@@ -142,8 +147,9 @@ pub async fn run() -> anyhow::Result<()> {
     for (subject, count) in bans_by_subject {
         info!(subject, count, "Active antifraud bans");
     }
-    let storage_config = SqliteConfig::new(std::any::type_name::<CreateClaim>());
-    let storage = SqliteStorage::new_with_callback(&config.database.url, &storage_config);
+    let (storage_pool, claim_listener) = SqliteStorage::connect_with_callback(&config.database.url)
+        .context("Failed to create claim storage pool")?;
+    let storage = SqliteStorage::new(&storage_pool);
     info!("Initialized claim storage");
 
     let wallet = Wallet::new(&config.faucet.mnemonic).context("Failed to create faucet wallet")?;
@@ -181,8 +187,8 @@ pub async fn run() -> anyhow::Result<()> {
     let worker_state = shared_state.clone();
 
     let worker_name = format!("claim-worker-{}", Uuid::new_v4());
-    let worker = WorkerBuilder::new(&worker_name)
-        .backend(storage)
+    let worker = WorkerBuilder::new(worker_name.as_str())
+        .backend(storage.with_callback(claim_listener))
         .concurrency(1)
         .data(worker_state)
         .build(send_claim);

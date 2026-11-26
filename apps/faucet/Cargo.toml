@@ -28,7 +28,6 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 anyhow = "1.0.100"
 axum = "0.8.8"
-chrono = { version = "0.4", features = ["serde"] }
 faucet-config = { path = "crates/faucet-config" }
 hex = "0.4.3"
 http = "1"
@@ -38,18 +37,18 @@ reqwest = "0.12.28"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.146"
 sha2 = "0.10.9"
+time = "0.3"
 tokio = "1.53.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json"] }
 
 [dependencies]
 anyhow = { workspace = true }
-apalis = "1.0.0-beta.2"
-apalis-sqlite = "1.0.0-beta.4"
+apalis = "1.2"
+apalis-sqlite = "1.2"
 axum = { workspace = true, features = ["macros"] }
 axum-governor = "1"
 base64 = "0.22.1"
-chrono = { workspace = true }
 dotenvy = "0.15.7"
 dunce = "1.0.5"
 faucet-antifraud = { path = "crates/faucet-antifraud" }
@@ -66,7 +65,8 @@ semver = "1.0.28"
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite"] }
+sqlx = { version = "0.9.1", default-features = false, features = ["runtime-tokio", "sqlite"] }
+time = { workspace = true, features = ["serde-well-known"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
 rston = { path = "../../libs/rston", default-features = false, features = ["wallet"] }
 toncenter = { path = "crates/toncenter" }
@@ -80,7 +80,7 @@ uuid = { version = "1.18", features = ["v4"] }
 tracing-subscriber = { workspace = true }
 
 [build-dependencies]
-chrono = { workspace = true }
+time = { workspace = true }
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3
