@@ -244,7 +244,7 @@ fn collect_executed_lines_per_files(
         while !replayer.is_finished() {
             replayer.step_with_callback(StepMode::StepInto, |tick, replayer| match tick {
                 Tick::Loc { .. } => {
-                    if let Some(loc) = record_current_line_hit(
+                    match record_current_line_hit(
                         &mut line_hits_per_file,
                         &mut last_recorded_loc,
                         replayer,
@@ -252,7 +252,11 @@ fn collect_executed_lines_per_files(
                         include_wrappers,
                         include_tests,
                     ) {
-                        last_coverage_loc = Some(loc);
+                        CoverageLoc::Tracked(loc) => last_coverage_loc = Some(loc),
+                        // Execution moved into a file that is left out of the report, so
+                        // branches taken there must not be charged to the last reported line.
+                        CoverageLoc::Ignored => last_coverage_loc = None,
+                        CoverageLoc::Unknown => {}
                     }
                 }
                 Tick::TvmStackValues { stack } => {
@@ -288,12 +292,16 @@ fn record_current_line_hit(
     wrapper_roots: &[PathBuf],
     include_wrappers: bool,
     include_tests: bool,
-) -> Option<(String, i64)> {
+) -> CoverageLoc {
     let (file, line) =
-        current_coverage_loc(replayer, wrapper_roots, include_wrappers, include_tests)?;
+        match current_coverage_loc(replayer, wrapper_roots, include_wrappers, include_tests) {
+            CoverageLoc::Tracked(loc) => loc,
+            CoverageLoc::Ignored => return CoverageLoc::Ignored,
+            CoverageLoc::Unknown => return CoverageLoc::Unknown,
+        };
 
     if last_recorded_loc.as_ref() == Some(&(file.clone(), line)) {
-        return Some((file, line));
+        return CoverageLoc::Tracked((file, line));
     }
 
     *last_recorded_loc = Some((file.clone(), line));
@@ -301,7 +309,17 @@ fn record_current_line_hit(
     let entry = line_hits_per_file.entry(file.clone()).or_default();
     *entry.entry(line).or_insert(0) += 1;
 
-    Some((file, line))
+    CoverageLoc::Tracked((file, line))
+}
+
+/// Where the replayer currently is, from the coverage report's point of view.
+enum CoverageLoc {
+    /// A line of a file that is part of the report.
+    Tracked((String, i64)),
+    /// A line of a file that is left out of the report (a test file or a wrapper).
+    Ignored,
+    /// The current instruction has no source location.
+    Unknown,
 }
 
 fn current_coverage_loc(
@@ -309,10 +327,10 @@ fn current_coverage_loc(
     wrapper_roots: &[PathBuf],
     include_wrappers: bool,
     include_tests: bool,
-) -> Option<(String, i64)> {
+) -> CoverageLoc {
     let line = replayer.current_line();
     if line == 0 {
-        return None;
+        return CoverageLoc::Unknown;
     }
 
     let file_id = replayer.current_file_id();
@@ -322,10 +340,10 @@ fn current_coverage_loc(
         .to_owned();
 
     if is_ignored_coverage_file(&file, wrapper_roots, include_wrappers, include_tests) {
-        return None;
+        return CoverageLoc::Ignored;
     }
 
-    Some((file, zero_based_line(line)))
+    CoverageLoc::Tracked((file, zero_based_line(line)))
 }
 
 fn coverage_location_for_range(source_map: &SourceMap, range: &SrcRange) -> Option<(String, i64)> {
@@ -519,10 +537,10 @@ fn branch_coverage_loc(
     include_wrappers: bool,
     include_tests: bool,
 ) -> Option<(String, i64)> {
-    if let Some(loc) =
-        current_coverage_loc(replayer, wrapper_roots, include_wrappers, include_tests)
-    {
-        return Some(loc);
+    match current_coverage_loc(replayer, wrapper_roots, include_wrappers, include_tests) {
+        CoverageLoc::Tracked(loc) => return Some(loc),
+        CoverageLoc::Ignored => return None,
+        CoverageLoc::Unknown => {}
     }
 
     if should_fallback_to_last_coverage_loc(instruction_opcode(instr_name)) {
