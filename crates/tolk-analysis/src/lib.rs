@@ -5,7 +5,10 @@ use tolk_resolver::resolve_index::LocalDefId;
 use tolk_resolver::{
     AstNodeSpanExt, FileDb, FileId, ProjectIndex, Resolved, Span, SymbolId, SymbolKind,
 };
-use tolk_syntax::{Assign, Call, CallArgument, SetAssign, TryFromNode};
+use tolk_syntax::{
+    AsCast, Assign, Call, CallArgument, DotAccess, Instantiation, NotNull, Paren, SetAssign,
+    TryFromNode,
+};
 use tolk_ty::{TypeDb, WorkspaceBodyTypes};
 
 mod constant_evaluator;
@@ -126,6 +129,10 @@ impl AnalysisDb {
             };
 
             let mut usage_flags = UseFlags::READ;
+            // Receiver mutability reaches a usage only along the receiver path. Once the walk
+            // leaves it (a call argument, an object literal, an operand), the usage only feeds
+            // a temporary value that a mutating method cannot write back.
+            let mut on_receiver_path = true;
             let mut current = usage_node.parent();
             while let Some(node) = current {
                 if let Ok(assign) = Assign::try_from_node(node) {
@@ -143,7 +150,8 @@ impl AnalysisDb {
                         usage_flags = UseFlags::WRITE | UseFlags::MUTATE;
                         break;
                     }
-                } else if let Ok(call) = Call::try_from_node(node)
+                } else if on_receiver_path
+                    && let Ok(call) = Call::try_from_node(node)
                     && let Some(qualifier) = call.callee_qualifier()
                     && let Some(callee) = call.callee_identifier()
                     && (qualifier.span().contains(usage.span.start())
@@ -172,6 +180,17 @@ impl AnalysisDb {
                     break;
                 }
 
+                on_receiver_path = on_receiver_path
+                    && if let Ok(cast) = AsCast::try_from_node(node) {
+                        cast.expr()
+                            .is_some_and(|expr| expr.span().contains(usage.span.start()))
+                    } else {
+                        DotAccess::try_from_node(node).is_ok()
+                            || Call::try_from_node(node).is_ok()
+                            || Instantiation::try_from_node(node).is_ok()
+                            || Paren::try_from_node(node).is_ok()
+                            || NotNull::try_from_node(node).is_ok()
+                    };
                 current = node.parent();
             }
 
